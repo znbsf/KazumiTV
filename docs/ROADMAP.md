@@ -18,3 +18,5 @@
 5. 稳定版门槛：多个设备/系统版本、长时播放与内存/热稳定、发布签名和升级、完整许可清单与CI。未通过的项目保留在功能台账，不用“能启动”代替验收。
 
 [逐项实现和验证状态](MIGRATION-STATUS.md)
+
+[同类开源项目源码初审与播放适配顺序](PLAYBACK-ARCHITECTURE-REFERENCES.md)：Kazumi 优先对齐，补充参考 Animeko、EasyBangumi、Cloudstream。
