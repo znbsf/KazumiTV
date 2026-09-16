@@ -4,6 +4,18 @@
 
 优先级保持：Kazumi 上游功能等价 → Android TV / WebView 能力差异 → 其他项目补充方案。沿用现有主页风格，不因参考项目重启架构或替换规则生态。
 
+## WebView 平台差异与当前缺口
+
+2026-09-16 对照本地上游快照 `1b395a50`（不表示已联网确认最新上游）：
+
+- Kazumi 用统一 VideoWebviewController 接口隔离实现：Windows、Linux、Apple 分支；Android 检测 DOCUMENT_START_SCRIPT 能力，支持时走现代实现，不支持时走兼容实现。验证码也有独立控制器和平台工厂。
+- Android 系统版本不能单独代表 WebView 能力，需检查实际 WebView 提供程序、版本与功能支持。网页开始前注入、子框架、请求拦截、Cookie、代理和生命周期都是对照维度，不能假设各平台行为一致。
+- 当前原生版（0.3.1-preview.1）使用兼容脚本、请求拦截、页面数据解析及少量站点接口适配；尚未建立上游那样的能力检测与现代/兼容双分支。该项是下一轮播放重点，不标作已完成。
+- 区分我们的注入脚本不兼容和站点自身现代 JavaScript 无法运行：前者可通过兼容语法改善，后者不能靠修改注入脚本或伪装 UA 解决。只有通用能力仍不足且证据明确时才加站点专用路径。
+- WebView 负责网页执行、验证和媒体地址获取；原版内置播放通常交给 media-kit/libmpv，当前原生版交给 Media3。网页解析失败与媒体请求/解码失败必须分别诊断。
+
+来源：[上游控制器](https://github.com/Predidit/Kazumi/blob/1b395a50/lib/webview/video/video_webview_controller.dart)、[上游能力检测](https://github.com/Predidit/Kazumi/blob/1b395a50/lib/services/platform/webview_feature_service.dart)、[Android WebView 功能检测](https://developer.android.com/reference/androidx/webkit/WebViewFeature)。
+
 ## 已核对的实现
 
 - `open-ani/animeko`：`616eaae77a2faa2d482d26574f15316607770a0e`，仓库许可标识 `AGPL-3.0`。
