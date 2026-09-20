@@ -16,6 +16,14 @@ object VerificationScript {
           function node(x){return x?document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue:null;}
           try {
             var html=document.documentElement?document.documentElement.outerHTML:'';
+            var panels=document.querySelectorAll('.msg-jump'),throttled=false;
+            for(var pi=0;pi<panels.length;pi++){
+              var heading=panels[pi].querySelector('.window-title'),message=panels[pi].querySelector('.msg-content p');
+              var headingText=heading?(heading.textContent||'').trim():'';
+              var messageText=message?(message.textContent||'').trim():'';
+              if((headingText==='系统提示'||headingText==='系統提示')&&new RegExp(${JSONObject.quote(SourcePageChecks.THROTTLE_TEXT_PATTERN)}).test(messageText))throttled=true;
+            }
+            if(throttled)return JSON.stringify({ready:false,throttled:true,challenge:false,acted:s.acted,done:false,failed:false,image:'',url:location.href});
             var value=c.captchaDetectValue||'', challenge=false;
             if(value){
               if(c.captchaDetectType===2)challenge=html.indexOf(value)>=0;
@@ -41,7 +49,7 @@ object VerificationScript {
               var canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
               canvas.getContext('2d').drawImage(img,0,0);image=canvas.toDataURL('image/png');}}catch(e){}}
             return JSON.stringify({ready:document.readyState==='complete'&&!!document.body&&document.body.childNodes.length>0,
-              challenge:challenge,acted:s.acted,done:s.done,failed:s.failed,image:image,url:location.href});
+              throttled:false,challenge:challenge,acted:s.acted,done:s.done,failed:s.failed,image:image,url:location.href});
           }catch(e){return JSON.stringify({failed:true,ready:false});}
         })();
         """.trimIndent()
@@ -72,7 +80,7 @@ class VerificationProgress {
         seenChallenge=seenChallenge||challenge
         acted=acted||snapshot.optBoolean("acted")
         val evidence=seenChallenge||acted||snapshot.optBoolean("done")
-        if(snapshot.optBoolean("ready")&&!snapshot.optBoolean("failed")&&!challenge&&evidence)clearSamples++ else clearSamples=0
+        if(snapshot.optBoolean("ready")&&!snapshot.optBoolean("throttled")&&!snapshot.optBoolean("failed")&&!challenge&&evidence)clearSamples++ else clearSamples=0
         return clearSamples>=3
     }
 }

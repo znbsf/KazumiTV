@@ -15,10 +15,49 @@ import androidx.compose.ui.unit.dp
 /** Explicit opt-in real-device smoke test; never logs credentials or response bodies. */
 class TvNetworkInstrumentation : Instrumentation() {
     private var mode = "network"
-    override fun onCreate(arguments: Bundle?) { super.onCreate(arguments); mode = arguments?.getString("mode") ?: "network"; start() }
+    private var runnerArgs = Bundle()
+    private var auditName: String? = null
+    private var auditRun = "baseline"
+    override fun onCreate(arguments: Bundle?) { super.onCreate(arguments); runnerArgs=arguments ?: Bundle(); mode = arguments?.getString("mode") ?: "network"; auditName=arguments?.getString("source"); auditRun=arguments?.getString("run") ?: "baseline"; start() }
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode=="licenses-ui") {
+                LicenseUiRegression.run(this);output.putString("stream","bundled_licenses_GPL_scroll_back=OK\n");finish(Activity.RESULT_OK,output);return
+            }
+            if(mode=="automatic-danmaku-ui") {
+                AutomaticDanmakuUiRegression.run(this); output.putString("stream","real_service_automatic_mapping_comments_overlay=OK\n");finish(Activity.RESULT_OK,output);return
+            }
+            if(mode in setOf("source-inventory","source-import","source-audit")) {
+                FullSourceAudit.run(this,mode,auditName,auditRun); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="source-page") {
+                SourcePageDiagnostic.run(this,runnerArgs); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="real-watch") {
+                RealWatchRegression.run(this,runnerArgs); output.putString("stream","real_time_episode_and_auto_next=OK\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="playback-recovery") {
+                PlaybackRecoveryRegression.run(this); output.putString("stream","road_cancel_pause_and_play, verification_POST_resume=OK\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="playback-restore") {
+                output.putString("stream",PlaybackRestoreRegression.run(this)+"\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="playback-expired") {
+                ExpiredPlaybackRegression.run(this); output.putString("stream","expired_media_position_intent_retry_cancel=OK\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="playback-background") {
+                BackgroundPlaybackRegression.run(this); output.putString("stream","HOME_pause_session_disconnect_return_resume=OK\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="episode-session") {
+                output.putString("stream",EpisodeMediaSessionRegression.run(this)+"\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="player-controls") {
+                PlayerControlsRegression.run(this); output.putString("stream","player_controls=OK\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="web-discovery") {
+                output.putString("stream",WebDiscoveryRegression.run(targetContext)+"\n"); finish(Activity.RESULT_OK,output); return
+            }
             if(mode=="real-ui-storage") {
                 val isolated=object:android.content.ContextWrapper(targetContext) {
                     override fun getSharedPreferences(name:String,mode:Int)=baseContext.getSharedPreferences("real_ui_test_$name",mode)
@@ -35,7 +74,7 @@ class TvNetworkInstrumentation : Instrumentation() {
                 finish(Activity.RESULT_OK,output);return
             }
             if(mode=="verification-live") {
-                VerificationLiveRegression.run(this)
+                VerificationLiveRegression.run(this,runnerArgs)
                 output.putString("stream","Real verification run complete.\n")
                 finish(Activity.RESULT_OK,output);return
             }
@@ -541,7 +580,7 @@ class TvNetworkInstrumentation : Instrumentation() {
             }
             finish(Activity.RESULT_OK, output)
         } catch (error: Exception) {
-            output.putString("stream", "TV smoke FAILED: ${error.javaClass.simpleName}\n")
+            output.putString("stream", "TV smoke FAILED: ${error.javaClass.simpleName} at ${error.stackTrace.take(5).joinToString()}\n")
             finish(Activity.RESULT_CANCELED, output)
         }
     }

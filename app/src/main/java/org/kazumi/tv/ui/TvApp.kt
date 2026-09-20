@@ -336,7 +336,7 @@ private fun SettingsScreen(oled: Boolean, onOled: (Boolean) -> Unit, onSetup: ()
     if (panel != null) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(onClick = { panel = null }) { Text("返回设置") }
-            if (panel == "network") NetworkOptions(onClearCache) else if(panel=="playback") PlaybackPreferencesPanel(Modifier.weight(1f)) else if(panel=="backup") LibraryBackupScreen() else if(panel=="webdav") WebDavSettings() else if(panel=="display") DisplayModePanel() else if(panel=="capabilities") DeviceCapabilitiesPanel() else if(panel=="downloads") DownloadsScreen() else DanmakuSettings()
+            if (panel == "licenses") LicensesScreen(Modifier.weight(1f)) else if (panel == "network") NetworkOptions(onClearCache) else if(panel=="playback") PlaybackPreferencesPanel(Modifier.weight(1f)) else if(panel=="backup") LibraryBackupScreen() else if(panel=="webdav") WebDavSettings() else if(panel=="display") DisplayModePanel() else if(panel=="capabilities") DeviceCapabilitiesPanel() else if(panel=="downloads") DownloadsScreen() else DanmakuSettings()
         }
         return
     }
@@ -377,5 +377,6 @@ private fun SettingsScreen(oled: Boolean, onOled: (Boolean) -> Unit, onSetup: ()
         Text("本地保存最多 100 条播放进度和 200 个收藏；选择历史记录可直接续播。")
         val installedVersion = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
         Text("KazumiTV · 原生电视版 $installedVersion\n基于 Kazumi · GPL-3.0 · 独立设计的应用图标与电视横幅")
+        Button(onClick = { panel = "licenses" }) { Text("开源许可与对应源码") }
     }
 }

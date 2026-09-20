@@ -98,7 +98,7 @@ object DisplayModeRegression {
             while(!ready && System.nanoTime()<deadline) { test.runOnMainSync { val window=dialogWindow.get(); val p=window?.let { player(it.decorView) }; ready=p?.playbackState==Player.STATE_READY && p.videoSize.width>0; if(ready)p?.pause() }; if(!ready)Thread.sleep(100) }
             check(ready && dialogWindow.get()!==activity.window && dialogSession.get()!=null)
             test.runOnMainSync { check(dialogWindow.get()!!.attributes.preferredDisplayModeId==id); check(activity.window.attributes.preferredDisplayModeId==original) }
-            click("显示模式"); click("系统默认"); find("保留显示选择"); shot("display-mode-player.png")
+            click("设置"); click("显示模式"); click("系统默认"); find("保留显示选择"); shot("display-mode-player.png")
             test.runOnMainSync { check(dialogWindow.get()!!.attributes.preferredDisplayModeId==0) }
             click("恢复原选择")
             test.runOnMainSync { check(dialogWindow.get()!!.attributes.preferredDisplayModeId==id); activity.setContent { Box(Modifier) } }

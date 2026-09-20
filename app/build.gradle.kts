@@ -16,8 +16,8 @@ android {
         applicationId = "com.znbsf.kazumi.compose.tv"
         minSdk = 24
         targetSdk = 36
-        versionCode = 45
-        versionName = "0.3.1-preview.1"
+        versionCode = 46
+        versionName = "0.3.2-preview.1"
         buildConfigField("String", "DANDAN_APP_ID", quoted(bundledDanmaku.getProperty("DANDANAPI_APPID", "")))
         buildConfigField("String", "DANDAN_APP_SECRET", quoted(bundledDanmaku.getProperty("DANDANAPI_KEY", "")))
         testInstrumentationRunner = "org.kazumi.tv.TvNetworkInstrumentation"
@@ -33,6 +33,7 @@ android {
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.05.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.webkit:webkit:1.12.0")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.tv:tv-material:1.0.0")

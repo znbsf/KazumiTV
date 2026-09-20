@@ -36,7 +36,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                  onNext: (() -> Unit)? = null, episodes: List<String> = emptyList(), currentEpisode: Int = -1,
                  onEpisodeSelected: ((Int) -> Unit)? = null, episodeKeys: List<String> = emptyList(), origin: PlaybackOrigin? = null,
                  initialPosition: Long? = null, initialPlayWhenReady:Boolean=true, sessionNotice: String = "",
-                 onResolveAgain: ((Long) -> Unit)? = null, onChooseRoad: ((Long) -> Unit)? = null, onChooseSource: ((Long,Boolean)->Unit)? = null,
+                 onResolveAgain: ((Long, Boolean) -> Unit)? = null, onChooseRoad: ((Long, Boolean) -> Unit)? = null, onChooseSource: ((Long,Boolean)->Unit)? = null,
                  sleepTimer: PlaybackSleepTimer = PlaybackSleepTimer.shared, displaySession:DisplayModeSession?=null, onClose: () -> Unit) {
     val displayModes=displaySession ?: rememberDisplayModeSession()
     val sleepStatus by sleepTimer.state.collectAsState()
@@ -71,6 +71,9 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
     var menu by remember(request) { mutableStateOf<String?>(null) }
     var visible by remember(request) { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
+    var seekFeedback by remember(request) { mutableStateOf<String?>(null) }
+    var seekFeedbackRevision by remember(request) { mutableIntStateOf(0) }
+    LaunchedEffect(seekFeedbackRevision) { if (seekFeedback != null) { delay(1600); seekFeedback = null } }
     var manualOverride by remember(request) { mutableStateOf(false) }
     LaunchedEffect(request, danmakuEnabled, manualOverride,mappingAttempt) {
         if(request.offlineId!=null) { danmakuStatus="离线内容暂不含弹幕"; return@LaunchedEffect }
@@ -101,6 +104,12 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
         if (rendered) store.save(HistoryEntry(request.resumeKey, subject, request.title,
             engine.player.currentPosition.coerceAtLeast(0), engine.player.duration.coerceAtLeast(0), latestOrigin,kind=if(request.offlineId!=null)HistoryKind.OFFLINE else HistoryKind.ONLINE))
     }
+    SideEffect {
+        engine.setEpisodeNavigation(
+            onPrevious?.let { select -> { saveProgress(); engine.player.pause(); select() } },
+            onNext?.let { select -> { saveProgress(); engine.player.pause(); select() } }
+        )
+    }
     var externalTargets by remember(request) { mutableStateOf<List<ExternalTarget>>(emptyList()) }
     var externalError by remember(request) { mutableStateOf("") }
     var externalPending by remember { mutableStateOf<Pair<PlaybackRequest,Boolean>?>(null) }
@@ -123,9 +132,12 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
         }
     }
     fun toggle() { if (engine.player.playWhenReady) engine.player.pause() else engine.player.play() }
+    fun handleBack() { when { menu != null -> menu = null; visible && playing -> visible = false; else -> onClose() } }
     LaunchedEffect(sleepStatus.expired) { if(sleepStatus.expired) { visible=true; menu="定时停止" } }
-    BackHandler { when { menu != null -> menu = null; visible && playing -> visible = false; else -> onClose() } }
-    LaunchedEffect(visible, menu) {
+    BackHandler { handleBack() }
+    LaunchedEffect(visible, menu, failed) {
+        // Lazy menu content must be laid out before moving focus from the removed controls row.
+        withFrameNanos { }
         withFrameNanos { }
         if (menu != null) menuFocus.requestFocus() else if (visible) controlsFocus.requestFocus() else rootFocus.requestFocus()
     }
@@ -148,7 +160,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
             override fun onPlayerError(error: PlaybackException) {
                 val http = generateSequence<Throwable>(error) { it.cause }.filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
                 status = "播放失败：${error.errorCodeName}" + (http?.let { " · HTTP ${it.responseCode}" } ?: "")
-                failed = true; visible = true
+                failed = true; menu = null; visible = true
             }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_BUFFERING) status = "正在缓冲…"
@@ -165,7 +177,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
         }
         engine.player.addListener(listener); lifecycle.addObserver(observer)
         val saved = store.history().firstOrNull { it.key == request.resumeKey }
-        val resume = initialPosition ?: saved?.position?.takeIf { preferences.resumePlayback && (saved.duration <= 0 || it < saved.duration - 5000) } ?: 0
+        val resume = initialPosition ?: PlaybackStateSavers.historyResumePosition(saved?.position, saved?.duration ?: 0, preferences.resumePlayback)
         android.util.Log.i("KazumiPlayback", "open resume_ms=$resume")
         engine.open(request, resume)
         if(!initialPlayWhenReady)engine.player.pause()
@@ -174,7 +186,12 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
     }
     Box(Modifier.fillMaxSize().background(Color.Black).onPreviewKeyEvent { event ->
         val key = event.nativeKeyEvent
-        if (key.action != KeyEvent.ACTION_DOWN) false else {
+        if(key.keyCode==KeyEvent.KEYCODE_BACK) {
+            // Older TV input dispatch may send BACK to the focused view before the dispatcher.
+            // Consume the matching UP too so one press cannot also close the restored controls.
+            if(key.action==KeyEvent.ACTION_DOWN&&key.repeatCount==0) { interaction++;handleBack() }
+            true
+        } else if (key.action != KeyEvent.ACTION_DOWN) false else {
             interaction++
             when (key.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { toggle(); visible = true; true }
@@ -182,9 +199,11 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 KeyEvent.KEYCODE_MEDIA_PAUSE -> { engine.player.pause(); visible = true; true }
                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> { engine.player.seekForward(); visible = true; true }
                 KeyEvent.KEYCODE_MEDIA_REWIND -> { engine.player.seekBack(); visible = true; true }
-                KeyEvent.KEYCODE_DPAD_LEFT -> if (!visible) { engine.player.seekBack(); true } else false
-                KeyEvent.KEYCODE_DPAD_RIGHT -> if (!visible) { engine.player.seekForward(); true } else false
-                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN ->
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (!visible) { engine.player.seekBack(); seekFeedback="快退 · ${clockTime(engine.player.currentPosition.coerceAtLeast(0))}"; seekFeedbackRevision++; true } else false
+                KeyEvent.KEYCODE_DPAD_RIGHT -> if (!visible) { engine.player.seekForward(); seekFeedback="快进 · ${clockTime(engine.player.currentPosition.coerceAtLeast(0))}"; seekFeedbackRevision++; true } else false
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER ->
+                    if (!visible) { toggle(); visible = true; true } else false
+                KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN ->
                     if (!visible) { visible = true; true } else false
                 else -> false
             }
@@ -195,7 +214,13 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
             factory = { DanmakuView(it) }, modifier = Modifier.fillMaxSize(),
             update = { it.player = engine.player; it.timeline = danmaku; it.offsetMs = danmakuOffset; it.invalidate() },
             onRelease = { it.player = null })
-        if (visible) {
+        if (!visible && seekFeedback != null) {
+            Text(seekFeedback!!, style=KazumiType.title, modifier=Modifier.align(Alignment.BottomCenter)
+                .padding(bottom=42.dp).background(Color.Black.copy(alpha=.78f)).padding(horizontal=20.dp, vertical=10.dp))
+        }
+        if (visible && menu == null) {
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(280.dp)
+                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.70f),Color.Black.copy(alpha=.85f)))))
             Column(Modifier.align(Alignment.TopStart).fillMaxWidth()
                 .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = .8f), Color.Transparent)))
                 .padding(horizontal = 30.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -203,41 +228,32 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 Text(request.title.substringAfterLast(" · "), style = KazumiType.caption, color = KazumiColors.muted)
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .93f))))
                 .padding(horizontal = 28.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (status.isNotBlank()) Text(status, style = KazumiType.caption)
+                if (failed) Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    PlayerAction("重新加载", Modifier.focusRequester(controlsFocus)) {
+                        if (onResolveAgain != null) onResolveAgain(engine.player.currentPosition.coerceAtLeast(0), playIntent)
+                        else { failed = false; engine.open(request, position) }
+                    }
+                    if (onChooseRoad != null) PlayerAction("更换线路") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseRoad(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
+                    if (onChooseSource != null) PlayerAction("更换来源") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseSource(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
+                }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("${clockTime(position)} / ${clockTime(duration)}", style = KazumiType.caption)
                     Text(if (danmakuEnabled) danmakuStatus else "弹幕已关闭", modifier = Modifier.weight(1f).padding(start = 24.dp), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = KazumiType.caption, color = KazumiColors.muted)
                 }
                 PlayerProgress(position, duration, engine.player.bufferedPosition,preferences.seekSeconds*1000L) { interaction++; engine.player.seekTo(it) }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PlayerAction(if (playIntent) "Ⅱ 暂停" else "▷ 播放", Modifier.focusRequester(controlsFocus)) { interaction++; toggle() }
+                    PlayerAction(if (playIntent) "Ⅱ 暂停" else "▷ 播放", if (failed) Modifier else Modifier.focusRequester(controlsFocus)) { interaction++; toggle() }
                     if (episodes.isNotEmpty()) PlayerAction("选集") { menu = "选集" }
-                    if (onPrevious != null) PlayerAction("上一集", onClick = onPrevious)
                     if (onNext != null) PlayerAction("下一集", onClick = onNext)
-                    if (onChooseRoad != null) PlayerAction("线路") { engine.player.pause(); onChooseRoad(engine.player.currentPosition.coerceAtLeast(0)) }
-                    if(request.offlineId==null)PlayerAction(if (danmakuEnabled) "弹幕 开" else "弹幕 关") { danmakuEnabled = !danmakuEnabled; preferences.danmakuEnabled = danmakuEnabled }
-                    if(request.offlineId==null)PlayerAction("弹幕设置") { menu = "弹幕" }
+                    if (onChooseRoad != null) PlayerAction("线路") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseRoad(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
                     if(onChooseSource!=null)PlayerAction("换源") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseSource(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
-                    PlayerAction("倍速") { menu = "播放速度" }
-                    PlayerAction("画面比例") { menu="画面比例" }
-                    if(displayModes!=null)PlayerAction("显示模式") { menu="显示模式" }
-                    PlayerAction("音轨 / 字幕") { menu = "音轨与字幕" }
-                    PlayerAction(if(sleepStatus.remainingMs>0) "定时 ${((sleepStatus.remainingMs+59999)/60000)}分" else "定时停止") { menu="定时停止" }
-                    PlayerAction("播放信息") { menu = "播放信息" }
-                    if(request.offlineId==null)PlayerAction("外部播放器") {
-                        externalError=""
-                        externalTargets=runCatching { ExternalPlayback.targets(context,request) }.getOrElse { externalError=it.message ?: "无法读取播放器"; emptyList() }
-                        menu="外部播放器"
-                    }
-                    if(request.offlineId==null)PlayerAction("下载本集") { downloadNotice=runCatching { org.kazumi.tv.download.OfflineDownloads.get(context).enqueue(request,subject,origin); "已加入下载，可在设置的离线下载中查看" }.getOrElse { it.message ?: "无法加入下载" } }
-                    if (failed) PlayerAction("重试") {
-                        if (onResolveAgain != null) onResolveAgain(engine.player.currentPosition.coerceAtLeast(0))
-                        else { failed = false; engine.open(request, position) }
-                    }
+                    if(request.offlineId==null)PlayerAction(if (danmakuEnabled) "弹幕 开" else "弹幕 关") { danmakuEnabled = !danmakuEnabled; preferences.danmakuEnabled = danmakuEnabled }
+                    PlayerAction("设置") { menu="设置" }
+
                 }
-                Text("方向键选择操作 · 进度条左右快进退 · 返回隐藏控制栏", style = KazumiType.caption, color = KazumiColors.muted)
+                Text("上下查看控制 · 进度条左右快进退", style = KazumiType.caption, color = KazumiColors.muted)
                 if(downloadNotice.isNotBlank())Text(downloadNotice,style=KazumiType.caption,color=KazumiColors.muted)
                 if (sessionNotice.isNotBlank()) Text(sessionNotice, style = KazumiType.caption, color = KazumiColors.muted)
             }
@@ -265,8 +281,28 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
         if (menu != null && menu != "弹幕" && menu != "选集" && menu != "显示模式") {
             LazyColumn(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(340.dp).background(Color(0xFF171D18)).padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Text(menu!!) }
-                item { if(menu=="定时停止")PlayerAction("返回播放",Modifier.focusRequester(menuFocus)) { menu=null } else Button(modifier = Modifier.focusRequester(menuFocus), onClick = { menu = null }) { Text("返回播放") } }
-                if(menu=="外部播放器") {
+                item { PlayerAction("返回播放",Modifier.focusRequester(menuFocus)) { menu=null } }
+                if(menu=="设置") {
+                    if(onPrevious!=null)item { PlayerAction("上一集",onClick=onPrevious) }
+                    if(request.offlineId==null)item { PlayerAction("弹幕设置") { menu="弹幕" } }
+                    item { PlayerAction("倍速 · ${engine.player.playbackParameters.speed}×") { menu="播放速度" } }
+                    item { PlayerAction("画面比例 · ${pictureMode.label}") { menu="画面比例" } }
+                    if(displayModes!=null)item { PlayerAction("显示模式") { menu="显示模式" } }
+                    item { PlayerAction("音轨 / 字幕") { menu="音轨与字幕" } }
+                    item { PlayerAction(if(sleepStatus.remainingMs>0) "定时 · ${((sleepStatus.remainingMs+59999)/60000)}分" else "定时停止") { menu="定时停止" } }
+                    item { PlayerAction("播放信息") { menu="播放信息" } }
+                    if(request.offlineId==null) {
+                        item { PlayerAction("外部播放器") {
+                            externalError=""
+                            externalTargets=runCatching { ExternalPlayback.targets(context,request) }.getOrElse { externalError=it.message ?: "无法读取播放器"; emptyList() }
+                            menu="外部播放器"
+                        } }
+                        item { PlayerAction("下载本集") {
+                            downloadNotice=runCatching { org.kazumi.tv.download.OfflineDownloads.get(context).enqueue(request,subject,origin); "已加入下载，可在设置的离线下载中查看" }.getOrElse { it.message ?: "无法加入下载" }
+                            menu=null
+                        } }
+                    }
+                } else if(menu=="外部播放器") {
                     item { Text("选择后会将本集地址交给该应用。MX Player 可接收请求头与当前位置；其他播放器可能从头播放。弹幕、定时和连播由外部应用管理。",style=KazumiType.caption) }
                     if(request.headers.isNotEmpty())item { Text("本来源需要请求头，选择 MX Player 时会一并传递。",style=KazumiType.caption) }
                     if(externalTargets.isEmpty())item { Text("没有找到可用的外部播放器",style=KazumiType.body) }
@@ -342,7 +378,12 @@ internal fun PlaybackVideoSurface(player: Player, playing: Boolean, pictureMode:
     }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black),contentAlignment=Alignment.Center) {
         val frame=PlaybackOptions.frame(maxWidth.value,maxHeight.value,pictureMode)
-        AndroidView(factory = { createPlaybackView(it) },
+        AndroidView(factory = { createPlaybackView(it).apply {
+            // Compose owns all remote controls. A native PlayerView/Surface must never steal focus
+            // when a LazyColumn menu replaces the controls, even with useController=false.
+            isFocusable=false;isFocusableInTouchMode=false
+            descendantFocusability=android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        } },
             update = {
                 it.player=player; it.keepScreenOn=playing
                 it.subtitleView?.visibility=android.view.View.GONE

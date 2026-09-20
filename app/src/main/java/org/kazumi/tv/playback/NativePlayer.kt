@@ -3,6 +3,8 @@ package org.kazumi.tv.playback
 import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.FlagSet
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaMetadata
@@ -34,6 +36,7 @@ class NativePlayer(context: Context, sourceUri: String? = null,
     private val appContext = context.applicationContext
     private val sessionId = "kazumitv-${UUID.randomUUID()}"
     private var released = false
+    private var foregroundActive = false
     private var session: MediaSession? = null
     private val mutableDiagnostics = MutableStateFlow(DecoderDiagnostics())
     val diagnostics = mutableDiagnostics.asStateFlow()
@@ -47,6 +50,65 @@ class NativePlayer(context: Context, sourceUri: String? = null,
             .setTargetBufferBytes(resourcePolicy.targetBytes).setPrioritizeTimeOverSizeThresholds(false).build())
         .setMediaSourceFactory(DefaultMediaSourceFactory(context).setDataSourceFactory((if(offlineId!=null)org.kazumi.tv.download.OfflineDownloads.get(context).offlineFactory(offlineId) else DefaultDataSource.Factory(context, http)))).build()
     private val detachSleep = sleepTimer.attach { player.pause() }
+    private val sessionPlayer = EpisodeSessionPlayer()
+    /** Catalogue ownership stays in PlaybackSessionScreen; MediaSession only requests selection. */
+    fun setEpisodeNavigation(previous: (() -> Unit)?, next: (() -> Unit)?) {
+        if(!released)sessionPlayer.update(previous,next)
+    }
+    private inner class EpisodeSessionPlayer : ForwardingPlayer(player) {
+        private var previous: (() -> Unit)? = null
+        private var next: (() -> Unit)? = null
+        private var pending = false
+        private val listeners = mutableMapOf<Player.Listener, Player.Listener>()
+        private fun canNavigate() = foregroundActive && !released && !pending
+        override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
+            .remove(Player.COMMAND_SEEK_TO_PREVIOUS).remove(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+            .remove(Player.COMMAND_SEEK_TO_NEXT).remove(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .addIf(Player.COMMAND_SEEK_TO_PREVIOUS,canNavigate()&&previous!=null)
+            .addIf(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,canNavigate()&&previous!=null)
+            .addIf(Player.COMMAND_SEEK_TO_NEXT,canNavigate()&&next!=null)
+            .addIf(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,canNavigate()&&next!=null).build()
+        override fun isCommandAvailable(command: Int) = availableCommands.contains(command)
+        override fun seekToPrevious() = navigate(previous)
+        override fun seekToPreviousMediaItem() = navigate(previous)
+        override fun seekToNext() = navigate(next)
+        override fun seekToNextMediaItem() = navigate(next)
+        private fun navigate(action: (() -> Unit)?) {
+            if(!canNavigate()||action==null)return
+            pending=true
+            notifyCommands()
+            this@NativePlayer.player.pause()
+            action()
+        }
+        fun update(previous: (() -> Unit)?, next: (() -> Unit)?) {
+            val before=availableCommands
+            this.previous=previous;this.next=next
+            if(before!=availableCommands)notifyCommands()
+        }
+        fun notifyCommands() {
+            val commands=availableCommands
+            val events=Player.Events(FlagSet.Builder().add(Player.EVENT_AVAILABLE_COMMANDS_CHANGED).build())
+            listeners.keys.toList().forEach { it.onAvailableCommandsChanged(commands);it.onEvents(this,events) }
+        }
+        override fun addListener(listener: Player.Listener) {
+            if(listeners.containsKey(listener))return
+            val forwarding=object : Player.Listener by listener {
+                override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+                    listener.onAvailableCommandsChanged(this@EpisodeSessionPlayer.availableCommands)
+                }
+            }
+            listeners[listener]=forwarding
+            super.addListener(forwarding)
+        }
+        override fun removeListener(listener: Player.Listener) {
+            listeners.remove(listener)?.let { super.removeListener(it) }
+        }
+        fun detach() {
+            previous=null;next=null
+            listeners.values.toList().forEach { super.removeListener(it) }
+            listeners.clear()
+        }
+    }
     fun applyTrackPreferences() {
         player.trackSelectionParameters=player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT)
@@ -98,9 +160,11 @@ class NativePlayer(context: Context, sourceUri: String? = null,
     /** Foreground-only playback: a stopped screen must not remain remotely playable. */
     fun setForegroundActive(active: Boolean) {
         if (released) return
+        foregroundActive=active
+        sessionPlayer.notifyCommands()
         if (active) {
             sleepTimer.refresh()
-            if (session == null) session = MediaSession.Builder(appContext, player).setId(sessionId).build()
+            if (session == null) session = MediaSession.Builder(appContext, sessionPlayer).setId(sessionId).build()
         } else {
             player.pause()
             session?.release()
@@ -121,9 +185,11 @@ class NativePlayer(context: Context, sourceUri: String? = null,
     override fun release() {
         if (released) return
         released = true
+        foregroundActive=false
         detachSleep()
         session?.release()
         session = null
+        sessionPlayer.detach()
         player.release()
     }
 }

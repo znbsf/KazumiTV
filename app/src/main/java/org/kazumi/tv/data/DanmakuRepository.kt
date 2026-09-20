@@ -37,13 +37,8 @@ object DanmakuProtocol {
 class DanmakuRepository(private val credentials: DanmakuCredentials, private val client: OkHttpClient = OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(25, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build()) {
     suspend fun automaticEpisode(subjectId: Int, number: Int): DanmakuEpisode? = withContext(Dispatchers.IO) {
-        val root = JSONObject(get("/api/v2/bangumi/bgmtv/$subjectId"))
-        val bangumi = root.optJSONObject("bangumi") ?: return@withContext null
-        val episodes = bangumi.optJSONArray("episodes") ?: return@withContext null
-        val matched = (0 until episodes.length()).map { episodes.getJSONObject(it) }.filter {
-            org.kazumi.tv.domain.EpisodeNumber.parse(it.optString("episodeNumber")) == number
-        }
-        matched.singleOrNull()?.let { DanmakuEpisode(it.getLong("episodeId"), it.optString("episodeTitle")) }
+        if(subjectId<=0||number<=0)return@withContext null
+        DanmakuMapping.automatic(get("/api/v2/bangumi/bgmtv/$subjectId"),subjectId,number)
     }
     // Manual redirects ensure signature headers never reach a CDN or another host.
     private val cache = ExpiringLruCache<Long, List<DanmakuComment>>(2, 600_000) { android.os.SystemClock.elapsedRealtime() }

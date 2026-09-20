@@ -34,7 +34,7 @@ internal fun DownloadRecoveryPanel(expected:Download,resolveOverride:(suspend ()
             if(java.net.URI(page).scheme !in listOf("http","https"))throw MediaResolutionFailure("原集数","原集数地址无效，请回原播放页选择该集。")
             WebMediaResolver(context).resolve(page,rule,metadata.title)
         }
-    },verification=if(rule!=null) ({ url,done -> VerificationScreen(rule,url,onDone=done) }) else null,onClose=onClose,closeLabel="返回下载列表") { resolved ->
+    },verification=if(rule!=null) ({ challenge,done -> VerificationScreen(rule,challenge.pageUrl,challenge=challenge,onDone=done) }) else null,onClose=onClose,closeLabel="返回下载列表") { resolved ->
         var problem by remember(resolved) { mutableStateOf("") }
         val first=remember { FocusRequester() }
         LaunchedEffect(resolved) { withFrameNanos { }; first.requestFocus() }

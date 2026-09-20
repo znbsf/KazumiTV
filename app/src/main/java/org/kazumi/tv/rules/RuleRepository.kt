@@ -33,12 +33,14 @@ class RuleRepository(context: Context):SourceCatalog {
         } else engine.chapters(rule,page(rule,rule.resolve(match.url)))
     }
     private suspend fun page(rule:SourceRule,url:String,method:String="GET",requestHeaders:Map<String,String> = headers(rule),body:String?=null):String {
-        suspend fun load():String {
+        val retryBudget = SourceRequestThrottle.RetryBudget()
+        val origin = URI(rule.baseUrl).let { "${it.scheme}://${it.rawAuthority}" }
+        suspend fun load():String = SourceRequestThrottle.shared.execute(origin,retryBudget) {
             val response=HttpText.pageAsync(url,method,requestHeaders,body)
             try { SourcePageChecks.check(rule,response.body,response.url) }
             catch(challenge:SourceVerificationRequired) { throw SourceVerificationRequired(challenge.pageUrl,response.method,if(response.method=="POST")body else null) }
             check(response.status in 200..299) { "服务返回 HTTP ${response.status}" }
-            return response.body
+            response.body
         }
         return try { load() } catch(challenge:SourceVerificationRequired) {
             if(!AutomaticVerification.run(appContext,rule,challenge.pageUrl,challenge.method,challenge.body))throw challenge

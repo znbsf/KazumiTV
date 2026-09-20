@@ -59,7 +59,7 @@ object ExternalPlaybackRegression {
             test.runOnMainSync { activity.setContent { CompositionLocalProvider(LocalContext provides context) { KazumiTheme(false) {
                 PlayerScreen(request,Subject(19000920,"外播测试","",""),initialPosition=3000,initialPlayWhenReady=false,onClose={})
             } } } }
-            click("外部播放器")
+            click("设置"); click("外部播放器")
             await("target list") { nodes().any { it.text?.toString()==mx.label } }
             screenshot("external-player-list.png")
             click(mx.label)

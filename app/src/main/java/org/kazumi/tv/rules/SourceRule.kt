@@ -8,7 +8,7 @@ import java.net.URLEncoder
 class SourceRule(val json: JSONObject) {
     val name = json.getString("name")
     val baseUrl = httpUrl(json.getString("baseURL"))
-    val userAgent = json.optString("userAgent").ifBlank { "Mozilla/5.0 KazumiTV/0.1" }
+    val userAgent = json.optString("userAgent").ifBlank { DEFAULT_USER_AGENT }
     val referer = json.optString("referer").ifBlank { baseUrl }
     val usePost = json.optBoolean("usePost")
     fun selector(field: String) = json.getString(field).also { require(it.isNotBlank()) { "$field 为空" } }
@@ -39,6 +39,9 @@ class SourceRule(val json: JSONObject) {
     fun searchUrl(keyword: String) = httpUrl(json.getString("searchURL").replace("@keyword", URLEncoder.encode(keyword, "UTF-8")))
     fun resolve(url: String) = httpUrl(URI(baseUrl).resolve(url.trim()).toString())
     companion object {
+        // Stable browser identity, matching an upstream UA option. HTTP, verification and media
+        // requests use the same value; never randomize between challenge and original retry.
+        const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
         fun httpUrl(url: String): String {
             val uri = URI(url)
             require(uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() && uri.userInfo == null) { "来源 URL 无效" }

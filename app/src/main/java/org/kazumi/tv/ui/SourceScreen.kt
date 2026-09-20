@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -29,20 +30,25 @@ data class SourceTransfer(val episode:Episode,val position:Long)
 data class SourcePlaybackSelection(val ruleName:String,val episode:Episode,val roads:List<Road>,val road:Int,val origin:org.kazumi.tv.data.PlaybackOrigin,val position:Long)
 
 @Composable
-fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((SourcePlaybackSelection)->Unit)?=null,onCancel:()->Unit={},catalog:SourceCatalog?=null) {
+fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((SourcePlaybackSelection)->Unit)?=null,onCancel:()->Unit={},catalog:SourceCatalog?=null,
+                 resolveEpisode:(suspend (String,Episode)->PlaybackRequest)?=null) {
     val context = LocalContext.current
     val repository = catalog ?: remember { RuleRepository(context) }
     if (repository.rules.isEmpty()) {
         Column { Text("没有启用的来源，请在设置的规则管理中启用规则。"); if(transfer!=null)PlayerAction("返回播放",onClick=onCancel) }
         BackHandler(transfer!=null,onBack=onCancel); return
     }
-    var query by remember(subject.id) { mutableStateOf(subject.title) }
-    var keyword by remember(subject.id) { mutableStateOf(subject.title) }
-    var source by remember(subject.id) { mutableIntStateOf(0) }
-    var match by remember { mutableStateOf<SourceMatch?>(null) }
+    var query by rememberSaveable(subject.id) { mutableStateOf(subject.title) }
+    var keyword by rememberSaveable(subject.id) { mutableStateOf(subject.title) }
+    var sourceName by rememberSaveable(subject.id) { mutableStateOf(repository.rules.first().name) }
+    var removedSourceName by rememberSaveable(subject.id) { mutableStateOf<String?>(null) }
+    val sourceExists = repository.rules.any { it.name == sourceName }
+    val source = repository.rules.indexOfFirst { it.name == sourceName }.coerceAtLeast(0)
+    var match by rememberSaveable(subject.id,stateSaver=PlaybackStateSavers.match) { mutableStateOf<SourceMatch?>(null) }
     var roads by remember { mutableStateOf(emptyList<Road>()) }
-    var road by remember { mutableIntStateOf(0) }
-    var episode by remember { mutableStateOf<Episode?>(null) }
+    var road by rememberSaveable(subject.id) { mutableIntStateOf(0) }
+    var roadTitle by rememberSaveable(subject.id) { mutableStateOf("") }
+    var episode by rememberSaveable(subject.id,stateSaver=PlaybackStateSavers.episode) { mutableStateOf<Episode?>(null) }
     var busy by remember { mutableStateOf(false) }
     var pageError by remember { mutableStateOf<String?>(null) }
     var refresh by remember { mutableIntStateOf(0) }
@@ -55,9 +61,17 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
     val roadFocus = remember { FocusRequester() }
     val grid = rememberLazyGridState()
     val episodeFocus = remember { mutableMapOf<Int, FocusRequester>() }
-    var returnEpisode by remember { mutableStateOf<Int?>(null) }
+    var returnEpisode by rememberSaveable(subject.id) { mutableStateOf<Int?>(null) }
+    var returnPage by rememberSaveable(subject.id) { mutableStateOf<String?>(null) }
     val currentEpisodes = roads.getOrNull(road)?.episodes.orEmpty()
-    LaunchedEffect(Unit) { withFrameNanos { }; sourceFocus.requestFocus() }
+    LaunchedEffect(Unit) { withFrameNanos { }; if(match==null)runCatching { sourceFocus.requestFocus() } }
+    LaunchedEffect(sourceExists) {
+        if(!sourceExists) {
+            match=null;episode=null;roads=emptyList();road=0;roadTitle="";returnEpisode=null;returnPage=null
+            val recovered=PlaybackStateSavers.recoverSource(sourceName,repository.rules.map { it.name },removedSourceName)
+            sourceName=recovered.selectedName;removedSourceName=recovered.removedName
+        }
+    }
     LaunchedEffect(keyword, refresh) {
         results.clear(); states.clear(); verificationPages.clear()
         val limit = Semaphore(3)
@@ -77,37 +91,59 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
         }
     }
     LaunchedEffect(match, source, chapterRetry) {
-        roads = emptyList(); road = 0; returnEpisode=null; pageError = null
+        roads = emptyList(); pageError = null
+        if(!sourceExists)return@LaunchedEffect
         val chosen = match ?: return@LaunchedEffect
         busy = true
-        try { roads = repository.chapters(repository.rules[source], chosen) }
+        try {
+            roads = repository.chapters(repository.rules[source], chosen)
+            road=PlaybackStateSavers.roadIndex(roads,roadTitle,road,episode?.pageUrl ?: returnPage)
+            roadTitle=roads.getOrNull(road)?.title.orEmpty()
+            val returnIndex=roads.getOrNull(road)?.episodes?.indexOfFirst { it.pageUrl==returnPage } ?: -1
+            returnEpisode=returnIndex.takeIf { it>=0 }
+        }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: SourceVerificationRequired) { pageError = failure.message; verificationPages[source] = failure }
         catch (error: Exception) { pageError = error.message ?: "线路加载失败" }
         finally { busy = false }
-        if (roads.isNotEmpty()) { withFrameNanos { }; roadFocus.requestFocus() }
+        if (roads.isNotEmpty()&&episode==null&&returnEpisode==null) { withFrameNanos { }; runCatching { roadFocus.requestFocus() } }
     }
     fun choose(index:Int,position:Long=0) {
         val selected=currentEpisodes[index]
+        returnPage=selected.pageUrl;returnEpisode=index;roadTitle=roads[road].title
         if(onSelect==null)episode=selected
         else onSelect(SourcePlaybackSelection(repository.rules[source].name,selected,roads,road,
             org.kazumi.tv.data.PlaybackOrigin(repository.rules[source].name,match!!.title,match!!.url,roads[road].title),position))
     }
     BackHandler(transfer!=null && match==null,onBack=onCancel)
-    fun closePlayer() { returnEpisode = currentEpisodes.indexOf(episode); episode = null }
+    fun closePlayer() { returnPage=episode?.pageUrl ?: returnPage; returnEpisode = currentEpisodes.indexOfFirst { it.pageUrl==returnPage }.takeIf { it>=0 }; episode = null }
     BackHandler(match != null) { match = null; episode = null; pageError = null }
     BackHandler(episode != null) { closePlayer() }
     if (verifying) Dialog(onDismissRequest = { verifying = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         VerificationScreen(repository.rules[source], verificationPages[source]?.pageUrl ?: match?.url ?: repository.rules[source].baseUrl, challenge=verificationPages[source]) { verifying = false; refresh++; chapterRetry++ }
     }
-    episode?.let { selected ->
+    episode?.takeIf { sourceExists }?.let { selected ->
         Dialog(onDismissRequest = { closePlayer() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
             PlaybackSessionScreen(subject, repository.rules[source].name, selected, roads, road,
-                sourceCatalog = repository,
-                initialOrigin = match?.let { org.kazumi.tv.data.PlaybackOrigin(repository.rules[source].name, it.title, it.url, roads[road].title) },
+                sourceCatalog = repository,resolveEpisode=resolveEpisode,
+                initialOrigin = match?.let { org.kazumi.tv.data.PlaybackOrigin(repository.rules[source].name, it.title, it.url, roads.getOrNull(road)?.title ?: roadTitle) },
                 onSelection = { next ->
-                    roads.indexOfFirst { line -> line.episodes.any { it.pageUrl == next.pageUrl } }.takeIf { it >= 0 }?.let { road = it }
-                    episode = next
+                    road=PlaybackStateSavers.roadIndex(roads,roadTitle,road,next.pageUrl)
+                    episode = next;returnPage=next.pageUrl;roadTitle=roads.getOrNull(road)?.title ?: roadTitle
+                }, onReturnContext = { selection ->
+                    // The active session may have switched source or advanced several episodes.
+                    // Return the complete context, not the original Dialog entry arguments.
+                    if(repository.rules.any { it.name==selection.ruleName }) {
+                        sourceName=selection.ruleName
+                        match=selection.origin?.let { SourceMatch(it.sourceTitle,it.sourceUrl) }
+                        roads=selection.roads;road=selection.road
+                        roadTitle=selection.roads.getOrNull(selection.road)?.title ?: selection.origin?.roadTitle.orEmpty()
+                        returnPage=selection.episode.pageUrl
+                        returnEpisode=selection.roads.getOrNull(selection.road)?.episodes?.indexOfFirst { it.pageUrl==returnPage }?.takeIf { it>=0 }
+                        episode=null;pageError=null;removedSourceName=null
+                    } else {
+                        removedSourceName=selection.ruleName;match=null;episode=null;roads=emptyList();returnEpisode=null;returnPage=null
+                    }
                 }, onClose = { closePlayer() })
         }
     }
@@ -129,8 +165,8 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
             LazyColumn(Modifier.width(166.dp).fillMaxHeight().background(KazumiColors.surface).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(repository.rules.indices.toList()) { index ->
-                    Button(onClick = { source = index; match = null; episode = null; pageError = null },
-                        modifier = Modifier.fillMaxWidth().then(if (index == 0) Modifier.focusRequester(sourceFocus) else Modifier),
+                    Button(onClick = { sourceName = repository.rules[index].name; removedSourceName=null; match = null; episode = null; pageError = null;road=0;roadTitle="";returnEpisode=null;returnPage=null },
+                        modifier = Modifier.fillMaxWidth().then(if (index == source) Modifier.focusRequester(sourceFocus) else Modifier),
                         colors = ButtonDefaults.colors(containerColor = if (source == index) KazumiColors.selected else KazumiColors.surface)) {
                         Column {
                             Text(repository.rules[index].name, style = KazumiType.control)
@@ -141,6 +177,7 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
             }
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (busy) Text(if (episode != null) "正在解析 ${episode!!.title}…" else "正在读取线路…", color = KazumiColors.accent)
+                removedSourceName?.let { Text("原来源 $it 已停用或移除，请重新选择来源",style=KazumiType.caption) }
                 pageError?.let { Text(it, style = KazumiType.caption) }
                 if (match == null) {
                     Text("${repository.rules[source].name} · ${states[source] ?: "正在搜索…"}", style = KazumiType.title)
@@ -150,7 +187,7 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
                     }
                     LazyColumn(contentPadding = PaddingValues(6.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(results[source].orEmpty(), key = { it.url }) { found ->
-                            Button(modifier = Modifier.fillMaxWidth(), onClick = { match = found }) {
+                            Button(modifier = Modifier.fillMaxWidth(), onClick = { road=0;roadTitle="";returnEpisode=null;returnPage=null;match = found }) {
                                 Column(Modifier.fillMaxWidth()) {
                                     Text(found.title, style = KazumiType.title, maxLines = 2)
                                     Text("查看线路与集数", style = KazumiType.caption, color = KazumiColors.muted)
@@ -173,8 +210,8 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
                     }
                     LazyRow(contentPadding = PaddingValues(6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(roads.indices.toList()) { index ->
-                            Button(modifier = if (index == 0) Modifier.focusRequester(roadFocus) else Modifier,
-                                onClick = { road = index; episode = null; returnEpisode=null; pageError = null },
+                            Button(modifier = if (index == road) Modifier.focusRequester(roadFocus) else Modifier,
+                                onClick = { road = index;roadTitle=roads[index].title; episode = null; returnEpisode=null;returnPage=null; pageError = null },
                                 colors = ButtonDefaults.colors(containerColor = if (road == index) KazumiColors.selected else KazumiColors.surface)) { Text(roads[index].title) }
                         }
                     }

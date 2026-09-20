@@ -4,6 +4,7 @@ package org.kazumi.tv.ui
 import android.view.KeyEvent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -19,6 +20,7 @@ import androidx.tv.material3.*
 fun PlayerAction(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(onClick = onClick, modifier = modifier.height(38.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         scale = ButtonDefaults.scale(focusedScale = 1f),
+        shape = ButtonDefaults.shape(shape = RoundedCornerShape(6.dp)),
         colors = ButtonDefaults.colors(containerColor = Color.Transparent, focusedContainerColor = Color.White.copy(alpha = .12f),
             contentColor = KazumiColors.text, focusedContentColor = KazumiColors.accent)) { Text(label, style = KazumiType.control) }
 }

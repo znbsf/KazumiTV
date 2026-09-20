@@ -28,7 +28,7 @@ fun SetupScreen(onCancel: (() -> Unit)? = null, catalogContent: @Composable () -
             when(step) {
                 0 -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("先准备好连接与播放来源", style = KazumiType.heading)
-                    Text("KazumiTV 是独立的原生电视版本，基于 Kazumi 开源项目开发。应用通过规则检索第三方站点，不提供或存储视频内容。")
+                    Text("KazumiTV 是独立的原生电视版本，基于 Kazumi 开源项目开发。应用通过规则检索第三方站点。本项目不托管影视资源；播放和离线下载内容来自所选第三方站点。")
                     Text("已提供 7sefun 和 DM84 两个内置来源。接下来可设置镜像、添加和更新来源；以后也能从设置重新进入。")
                     Text("当前测试版通过安装包更新，不会从上游手机应用渠道下载更新。", style = KazumiType.caption)
                 }

@@ -20,18 +20,18 @@ import org.kazumi.tv.rules.SourceVerificationRequired
 /** Owns one selection's resolver. Removing/changing the selection cancels its work. */
 @Composable
 fun ResolvingPlayback(selectionKey: String, title: String, resolve: suspend () -> PlaybackRequest,
-                      verification: (@Composable (String, () -> Unit) -> Unit)? = null,
+                      verification: (@Composable (SourceVerificationRequired, () -> Unit) -> Unit)? = null,
                       onClose: () -> Unit, closeLabel:String="返回选集 / 换源", content: @Composable (PlaybackRequest) -> Unit) {
     key(selectionKey) {
         var media by remember { mutableStateOf<PlaybackRequest?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
         var attempt by remember { mutableIntStateOf(0) }
-        var verificationUrl by remember { mutableStateOf<String?>(null) }
+        var verificationChallenge by remember { mutableStateOf<SourceVerificationRequired?>(null) }
         var showVerification by remember { mutableStateOf(false) }
         val currentResolver by rememberUpdatedState(resolve)
         val closeFocus = remember { FocusRequester() }
         LaunchedEffect(attempt) {
-            error = null; verificationUrl = null
+            error = null; verificationChallenge = null
             try {
                 val result = currentResolver()
                 currentCoroutineContext().ensureActive()
@@ -39,14 +39,15 @@ fun ResolvingPlayback(selectionKey: String, title: String, resolve: suspend () -
             } catch (_: TimeoutCancellationException) {
                 error = "解析超时，请重试或返回更换线路。"
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: SourceVerificationRequired) { error = failure.message; verificationUrl = failure.pageUrl }
+            catch (failure: SourceVerificationRequired) { error = failure.message; verificationChallenge = failure }
+            catch (failure: org.kazumi.tv.rules.SourceRateLimited) { error = failure.message }
             catch (failure: MediaResolutionFailure) { error = failure.message }
             catch (_: Exception) { error = "解析失败，请重试或返回更换来源。" }
         }
         val request = media
-        if (showVerification && verificationUrl != null && verification != null) {
+        if (showVerification && verificationChallenge != null && verification != null) {
             BackHandler { showVerification = false }
-            verification(verificationUrl!!) { showVerification = false; attempt++ }
+            verification(verificationChallenge!!) { showVerification = false; attempt++ }
         } else if (request != null) content(request)
         else {
             BackHandler(onBack = onClose)
@@ -58,7 +59,7 @@ fun ResolvingPlayback(selectionKey: String, title: String, resolve: suspend () -
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Button(onClick = onClose, modifier = Modifier.focusRequester(closeFocus)) { Text(closeLabel) }
                         if (error != null) Button(onClick = { attempt++ }) { Text("重新解析") }
-                        if (verificationUrl != null && verification != null) Button(onClick = { showVerification = true }) { Text("网页验证") }
+                        if (verificationChallenge != null && verification != null) Button(onClick = { showVerification = true }) { Text("网页验证") }
                     }
                 }
             }
