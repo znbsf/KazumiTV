@@ -2,11 +2,11 @@
 
 为电视遥控器设计的动画浏览与播放应用。当前主线使用 **Kotlin · Compose for TV · Media3**，延续深色、绿色和高密度海报浏览，独立于原 Flutter 工程开发。
 
-**当前公开测试版：0.3.1-preview.1；main 分支已推进到 0.3.2-preview.1 发布候选，尚未新增 Release。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
+**当前公开测试版：0.3.2-preview.1。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
 
-[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.1-preview.1) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本次暂停检查点](docs/PAUSE-CHECKPOINT-20260921.md)
+[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.2-preview.1) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本次暂停检查点](docs/PAUSE-CHECKPOINT-20260921.md)
 
-本轮代码（**0.3.2-preview.1 发布候选**）：对照固定上游目录检查全部17条来源，补齐XPath、浏览器请求上下文、验证码识别及旧WebView媒体发现；修复播放重试、恢复、系统换集和遥控焦点。新增完整一集自然结束与自动下一集的电视证据，保留各来源失败情况。详见[逐源验证表](docs/SOURCE-VALIDATION-20260920.md)和[本轮实现与证据](docs/PLAYBACK-EXECUTION-20260920.md)。
+本次发布（**0.3.2-preview.1**）：对照固定上游目录检查全部17条来源，补齐XPath、浏览器请求上下文、验证码识别及旧WebView媒体发现；修复播放重试、恢复、系统换集和遥控焦点。新增完整一集自然结束与自动下一集的电视证据，保留各来源失败情况。详见[逐源验证表](docs/SOURCE-VALIDATION-20260920.md)和[本轮实现与证据](docs/PLAYBACK-EXECUTION-20260920.md)。
 
 ## 界面
 
@@ -60,9 +60,9 @@
 | --- | --- | --- |
 | 定位 | 后续主要开发方向 | 保留比较和回退参考 |
 | 技术 | Kotlin / Compose / Media3 | Flutter / media-kit |
-| 版本 | 公开0.3.1-preview.1；当前代码0.3.2候选 | 2.3.1-tv-legacy.1 |
+| 版本 | 公开0.3.2-preview.1 | 2.3.1-tv-legacy.1 |
 | 源码 | `main` | `codex/upstream-tv-complete` |
-| 安装 | 通用APK：公开版10.13 MiB；当前候选约10.24 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
+| 安装 | 通用APK：约10.24 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
 
 更早的A线Preview 5使用 `com.znbsf.kazumi.tv`，保留在历史Releases；本次Legacy发布来自较新的Flutter完整适配分支，不冒充该A线的覆盖升级。
 

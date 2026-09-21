@@ -1,6 +1,6 @@
-# KazumiTV 0.3.2 Preview 1 发布候选记录
+# KazumiTV 0.3.2 Preview 1 发布记录
 
-状态：代码及本地APK已准备；用户要求先推送代码并暂停，尚未创建该版本的公开Release。
+状态：2026-09-21 用户授权发布，已发布 [v0.3.2-preview.1](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.2-preview.1)，保持 Pre-release。对应源码为 `8b3084ca769b799055445388dd0ee2a9dd2b4a79`；APK SHA256 为 `cc9696d0bd1f51370b24f748592c761405d37b47ac3b6d43f0fa26d5afa8c685`。此次仅发行与仓库展示维护，开发继续暂停。
 
 这是播放优先迁移的公开测试版，不是全功能稳定版。原生包名与已有0.3.x一致，保留开发签名，用户历史和收藏不重置。Legacy归档版保留原发布。
 
