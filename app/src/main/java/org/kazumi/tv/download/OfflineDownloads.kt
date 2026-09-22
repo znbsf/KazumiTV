@@ -33,7 +33,7 @@ class OfflineDownloads private constructor(private val context:Context) {
     val manager=DownloadManager(context,index,DownloaderFactory { request ->
         val metadata=DownloadMetadata.read(request.data)
         val origin=request.uri.toString().toHttpUrl()
-        val client=AppHttp.client.newBuilder().cookieJar(CookieJar.NO_COOKIES)
+        val client=AppHttp.streamingClient.newBuilder().cookieJar(CookieJar.NO_COOKIES)
             .addNetworkInterceptor { chain ->
                 val current=chain.request(); val target=current.url
                 val adjusted=if(target.scheme==origin.scheme && target.host==origin.host && target.port==origin.port) current else {

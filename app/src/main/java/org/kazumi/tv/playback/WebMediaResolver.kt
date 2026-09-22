@@ -49,10 +49,10 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         SourceRule.httpUrl(pageUrl)
         val defaults = mapOf("Referer" to rule.referer, "User-Agent" to rule.userAgent)
         var lastProbe: MediaResolutionFailure? = null
-        if (MediaAddress.isMedia(pageUrl)) return@withContext probe(PlaybackRequest(pageUrl,MediaRequestHeaders.forMedia(rule,rule.baseUrl),title))
+        if (MediaAddress.isMedia(pageUrl)) return@withContext probe(PlaybackRequest(pageUrl,MediaRequestHeaders.forMedia(rule,rule.baseUrl),title),rule)
         SoraniPlayback.resolveFromRule(pageUrl,rule,defaults,title)?.let {
             diagnostic("source_api resolved")
-            return@withContext probe(it.copy(headers = MediaRequestHeaders.forMedia(rule,pageUrl,it.headers)))
+            return@withContext probe(it.copy(headers = MediaRequestHeaders.forMedia(rule,pageUrl,it.headers)),rule)
         }
         // Some TV WebViews cannot execute modern site bundles even though player data is ordinary JSON.
         // A discovered address still has to pass the same HTTP/media probe as a WebView candidate.
@@ -64,9 +64,9 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         if(html!=null) {
             SourcePageChecks.check(rule,html,pageUrl)
             diagnostic("page_metadata direct=${PageMediaMetadata.extract(html).size} sorani=${SoraniPlayback.apiUrl(pageUrl,html)!=null}")
-            SoraniPlayback.resolve(pageUrl,html,defaults,title)?.let { return@withContext probe(it.copy(headers = MediaRequestHeaders.forMedia(rule,pageUrl,it.headers))) }
+            SoraniPlayback.resolve(pageUrl,html,defaults,title)?.let { return@withContext probe(it.copy(headers = MediaRequestHeaders.forMedia(rule,pageUrl,it.headers)),rule) }
             for(url in PageMediaMetadata.extract(html)) {
-                try { return@withContext probe(PlaybackRequest(url,MediaRequestHeaders.forMedia(rule,sourcePage?.url ?: pageUrl),title)) }
+                try { return@withContext probe(PlaybackRequest(url,MediaRequestHeaders.forMedia(rule,sourcePage?.url ?: pageUrl),title),rule) }
                 catch(cancelled:CancellationException) { throw cancelled }
                 catch(failure:MediaResolutionFailure) { lastProbe=failure; diagnostic("metadata: ${failure.message}") }
             }
@@ -308,7 +308,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     val candidate = confirmed ?: speculativeCandidates.tryReceive().getOrNull()
                     val speculative = confirmed == null
                     if(candidate==null)continue
-                    try { found = probe(candidate) }
+                    try { found = probe(candidate,rule) }
                     catch(cancelled: CancellationException) { throw cancelled }
                     catch(failure: MediaResolutionFailure) {
                         if(!speculative) lastProbe = failure
@@ -340,7 +340,23 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                 .none { path.endsWith(it) }
         }
     }
-    private suspend fun probe(request: PlaybackRequest): PlaybackRequest = suspendCancellableCoroutine { continuation ->
+    private class ProbeHttpFailure(val status: Int) : Exception()
+
+    private suspend fun probe(request: PlaybackRequest, rule: SourceRule): PlaybackRequest {
+        try {
+            return probeOnce(request)
+        } catch (failure: ProbeHttpFailure) {
+            val headers = MediaProbeFallback.headers(failure.status, rule.json.optString("referer"), request.headers)
+                ?: throw MediaResolutionFailure("媒体探测", "HTTP ${failure.status}")
+            diagnostic("media_probe retry=without_inferred_referer status=400")
+            // Exactly one extra request, with the same URL, Range, UA and target-aware CookieJar.
+            // Return the actually validated headers; NativePlayer must not restore the rejected Referer.
+            return try { probeOnce(request.copy(headers = headers)) }
+            catch (retry: ProbeHttpFailure) { throw MediaResolutionFailure("媒体探测", "HTTP ${retry.status}") }
+        }
+    }
+
+    private suspend fun probeOnce(request: PlaybackRequest): PlaybackRequest = suspendCancellableCoroutine { continuation ->
         val builder = Request.Builder().url(request.url).header("Range","bytes=0-1023")
         request.headers.forEach { (name,value) -> builder.header(name,value) }
         val call = AppHttp.client.newBuilder().callTimeout(5,TimeUnit.SECONDS).build().newCall(builder.build())
@@ -358,7 +374,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
             override fun onResponse(call: Call, response: Response) {
                 try {
                     val result = response.use {
-                        if(!it.isSuccessful) throw MediaResolutionFailure("媒体探测","HTTP ${it.code}")
+                        if(!it.isSuccessful) throw ProbeHttpFailure(it.code)
                         val body = it.body ?: throw MediaResolutionFailure("媒体探测","空响应")
                         val bytes = ByteArray(1024)
                         var count = 0
@@ -371,7 +387,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     }
                     if(continuation.isActive) continuation.resume(result)
                 } catch(e: Exception) {
-                    if(continuation.isActive) continuation.resumeWithException(if(e is MediaResolutionFailure) e else MediaResolutionFailure("媒体探测","读取失败"))
+                    if(continuation.isActive) continuation.resumeWithException(if(e is MediaResolutionFailure || e is ProbeHttpFailure) e else MediaResolutionFailure("媒体探测","读取失败"))
                 }
             }
         })

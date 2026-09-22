@@ -22,6 +22,18 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode=="streaming-timeout") {
+                output.putString("stream",StreamingTimeoutRegression.run()+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
+            if(mode=="media-probe-fallback") {
+                output.putString("stream",MediaProbeFallbackRegression.run(targetContext)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
+            if(mode=="real-transport-recovery") {
+                output.putString("stream",RealTransportRecoveryRegression.run(this)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="catalogue-recovery") {
                 output.putString("stream",CatalogueRecoveryRegression.run(this)+"\n")
                 finish(Activity.RESULT_OK,output);return

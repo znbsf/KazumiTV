@@ -6,6 +6,9 @@ import java.util.concurrent.TimeUnit
 
 /** Cookies are selected for each target URL, including redirected and HLS segment requests. */
 object AppHttp {
+    // Media bodies may remain open for minutes. Keep connect/read limits and cookies,
+    // but do not cancel healthy streams at the text client's whole-call deadline.
+    val streamingClient: OkHttpClient by lazy { client.newBuilder().callTimeout(0, TimeUnit.SECONDS).build() }
     val client: OkHttpClient by lazy {
         OkHttpClient.Builder().connectTimeout(12, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS)
             .callTimeout(30, TimeUnit.SECONDS).cookieJar(object : CookieJar {

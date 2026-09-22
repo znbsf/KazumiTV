@@ -40,7 +40,7 @@ class NativePlayer(context: Context, sourceUri: String? = null,
     private var session: MediaSession? = null
     private val mutableDiagnostics = MutableStateFlow(DecoderDiagnostics())
     val diagnostics = mutableDiagnostics.asStateFlow()
-    private val http = OkHttpDataSource.Factory(AppHttp.client)
+    private val http = OkHttpDataSource.Factory(AppHttp.streamingClient)
     override val player = ExoPlayer.Builder(context, DefaultRenderersFactory(context).setEnableDecoderFallback(true))
         .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
         .setHandleAudioBecomingNoisy(true)
