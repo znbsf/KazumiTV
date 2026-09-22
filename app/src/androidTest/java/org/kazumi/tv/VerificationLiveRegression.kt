@@ -12,7 +12,10 @@ object VerificationLiveRegression {
     fun run(test:Instrumentation,args:Bundle=Bundle())=runBlocking {
         val sourceName=args.getString("source") ?: "mutefun"
         val repo=RuleRepository(test.targetContext)
-        val rule=repo.rules.first { it.name.equals(sourceName,true) }
+        val rule=args.getString("candidateFile")?.let {
+            require(args.containsKey("source")) { "candidate requires explicit source" }
+            CandidateRuleFile.read(test.targetContext,it,sourceName)
+        } ?: repo.rules.first { it.name.equals(sourceName,true) }
         val challenge=try {
             val matches=repo.search(rule,"无职转生")
             check(matches.isNotEmpty()) { "Search empty; verification success not established" }

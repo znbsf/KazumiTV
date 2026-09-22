@@ -22,6 +22,10 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode == "candidate-rule") {
+                output.putString("stream",CandidateRuleRegression.run(this,runnerArgs)+"\n")
+                finish(Activity.RESULT_OK,output); return
+            }
             if(mode == "legacy-mac-cms-verification") {
                 LegacyMacCmsVerificationRegression.run(this)
                 output.putString("stream","Legacy MacCMS verification controls=OK\n")
