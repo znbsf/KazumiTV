@@ -71,8 +71,9 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                 catch(failure:MediaResolutionFailure) { lastProbe=failure; diagnostic("metadata: ${failure.message}") }
             }
         }
-        val candidates = Channel<PlaybackRequest>(24)
-        val speculativeCandidates = Channel<PlaybackRequest>(8)
+        data class PendingDiscovery(val request:PlaybackRequest,val current:()->Boolean)
+        val candidates = Channel<PendingDiscovery>(24)
+        val speculativeCandidates = Channel<PendingDiscovery>(8)
         data class DiscoveryKey(val url:String,val headers:Map<String,String>)
         val speculativeSeen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
         val computedSeen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
@@ -89,7 +90,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         // A later navigation/normal completed page invalidates that candidate's old challenge.
         val frameChallenges=linkedMapOf<Int,SourceVerificationRequired>()
         val frameWaitMs=(timeoutMs/4).coerceIn(2000,4000)
-        fun offer(url: String, headers: Map<String,String>, speculative: Boolean = false, computed: Boolean = false) {
+        fun offer(url: String, headers: Map<String,String>, speculative: Boolean = false, computed: Boolean = false, current:()->Boolean = {true}) {
             if(runCatching { SourceRule.httpUrl(url) }.isFailure)return
             val effectiveHeaders=MediaRequestHeaders.forMedia(rule,pageUrl,headers)
             val key=DiscoveryKey(url,effectiveHeaders.mapKeys { it.key.lowercase(java.util.Locale.ROOT) })
@@ -101,7 +102,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
             // Context is part of a request: a failed parent-page Referer must not suppress
             // a later iframe request for the same address. Keep a strict shared budget.
             if (synchronized(dedup) { dedup.size < limit && dedup.add(key) })
-                queue.trySend(PlaybackRequest(url,effectiveHeaders,title))
+                queue.trySend(PendingDiscovery(PlaybackRequest(url,effectiveHeaders,title),current))
         }
         val discoveryScope=this
         // One original page and at most one disposable candidate page. A candidate's
@@ -114,12 +115,15 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         var frameFailed=false
         val navigationStarted=android.os.SystemClock.elapsedRealtime()
         private var polling: Job? = null
+        private var inlineMetadata: Job? = null
+        private var inlineMetadataNavigation = -1
         var startScript: androidx.webkit.ScriptHandler? = null
         @Volatile var destroyed = false
         fun destroyWeb() {
             if (destroyed) return
             destroyed = true
             polling?.cancel()
+            inlineMetadata?.cancel()
             runCatching { startScript?.remove() }
             runCatching { web.stopLoading() }
             runCatching { web.webViewClient = WebViewClient(); web.webChromeClient = WebChromeClient() }
@@ -163,12 +167,40 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     // Polling still installs it if this callback precedes the new document.
                     if (!destroyed) {
                         navigation++
+                        inlineMetadata?.cancel()
                         if(currentDepth>0) {
                             if(frameChallenges.remove(candidateId)!=null)diagnostic("iframe_challenge_cleared depth=$currentDepth attempt=$candidateId")
                             frameFailed=false
                         }
                         if(url!=null&&runCatching { SourceRule.httpUrl(url) }.isSuccess)currentPage=url
                         view.evaluateJavascript(MediaDiscoveryScript.poll, null)
+                    }
+                }
+                override fun onPageFinished(view: WebView, url: String?) {
+                    if(destroyed || url!=currentPage || inlineMetadataNavigation==navigation)return
+                    inlineMetadataNavigation=navigation
+                    val documentNavigation=navigation
+                    val documentPage=currentPage
+                    inlineMetadata=discoveryScope.launch {
+                        try {
+                            // Let normal typed discovery win before considering a configuration guess.
+                            delay(8000)
+                            if(destroyed || documentNavigation!=navigation || frameFailed || frameChallenges.containsKey(candidateId))return@launch
+                            val raw=withTimeoutOrNull(2000) { org.kazumi.tv.rules.VerificationSession.evaluate(web,InlinePlayerMetadata.snapshotScript) } ?: return@launch
+                            if(destroyed || documentNavigation!=navigation)return@launch
+                            val snapshot=JSONObject(JSONTokener(raw).nextValue().toString())
+                            if(snapshot.optString("page")!=documentPage || SourcePageChecks.looksLikeChallengeTitle(snapshot.optString("title")))return@launch
+                            val reference=InlinePlayerMetadata.reference(snapshot.optJSONArray("scripts") ?: JSONArray()) ?: return@launch
+                            val matches=withTimeoutOrNull(2000) {
+                                org.kazumi.tv.rules.VerificationSession.evaluate(web,InlinePlayerMetadata.matchesCurrentScript(reference.first,reference.second,documentPage))
+                            }
+                            if(matches=="true" && !destroyed && documentNavigation==navigation && !frameFailed && !frameChallenges.containsKey(candidateId)) {
+                                diagnostic("inline_player_reference depth=$currentDepth")
+                                offer(reference.second,mapOf("Referer" to documentPage,"User-Agent" to rule.userAgent),speculative=true,computed=true,
+                                    current={ !destroyed && documentNavigation==navigation && currentPage==documentPage && !frameFailed && !frameChallenges.containsKey(candidateId) })
+                            }
+                        } catch(cancelled:CancellationException) { throw cancelled }
+                        catch(_:Exception) { /* Unsupported metadata leaves ordinary discovery running. */ }
                     }
                 }
                 override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
@@ -234,7 +266,8 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                             val guesses = snapshot.optJSONArray("speculative") ?: JSONArray()
                             for(i in 0 until guesses.length()) {
                                 val media = guesses.getJSONObject(i)
-                                offer(media.getString("url"), mapOf("Referer" to media.optString("referer",currentPage),"User-Agent" to rule.userAgent), speculative=true,computed=media.optBoolean("computed"))
+                                offer(media.getString("url"), mapOf("Referer" to media.optString("referer",currentPage),"User-Agent" to rule.userAgent), speculative=true,computed=media.optBoolean("computed"),
+                                    current={ !destroyed && snapshotNavigation==navigation && !frameFailed })
                             }
                             // Old providers cannot install hooks inside unrelated-origin frames.
                             // Probe visible player containers in a separate bounded candidate page,
@@ -310,12 +343,15 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     }
                     val candidate = confirmed ?: speculativeCandidates.tryReceive().getOrNull()
                     val speculative = confirmed == null
-                    if(candidate==null)continue
-                    try { found = probe(candidate,rule) }
+                    if(candidate==null || !candidate.current())continue
+                    try {
+                        val probed=probe(candidate.request,rule)
+                        if(candidate.current())found=probed
+                    }
                     catch(cancelled: CancellationException) { throw cancelled }
                     catch(failure: MediaResolutionFailure) {
                         if(!speculative) lastProbe = failure
-                        diagnostic("candidate=${if(speculative) "speculative" else "media"} host=${runCatching { java.net.URI(candidate.url).host }.getOrDefault("unknown")} ${failure.message}")
+                        diagnostic("candidate=${if(speculative) "speculative" else "media"} host=${runCatching { java.net.URI(candidate.request.url).host }.getOrDefault("unknown")} ${failure.message}")
                     }
                 }
                 found

@@ -22,6 +22,10 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode=="inline-player-metadata") {
+                output.putString("stream",InlinePlayerMetadataRegression.run(targetContext)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="computed-player-config") {
                 output.putString("stream",ComputedPlayerConfigRegression.run(targetContext)+"\n")
                 finish(Activity.RESULT_OK,output);return
