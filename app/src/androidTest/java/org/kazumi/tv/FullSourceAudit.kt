@@ -21,16 +21,23 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Explicit full-list device audit. Output excludes URLs, cookies, page bodies and exception messages. */
 object FullSourceAudit {
-    fun run(test: Instrumentation, mode: String, nameFilter: String? = null, runName: String = "default") = runBlocking {
+    fun run(test: Instrumentation, mode: String, nameFilter: String? = null, runName: String = "default", candidateFile: String? = null) = runBlocking {
         require(mode in setOf("source-inventory", "source-import", "source-audit"))
+        require(candidateFile == null || mode == "source-audit") { "candidateFile only supported for source-audit" }
+        val candidateRule = candidateFile?.let {
+            require(!nameFilter.isNullOrBlank() && '|' !in nameFilter) { "candidate requires one explicit source" }
+            CandidateRuleFile.read(test.targetContext, it, nameFilter)
+        }
         val folder = requireNotNull(test.targetContext.getExternalFilesDir(null))
-        val input = JSONArray(File(folder, "source-audit-rules.json").readText())
+        val input = candidateRule?.let { JSONArray().put(it.json) }
+            ?: JSONArray(File(folder, "source-audit-rules.json").readText())
         val label = runName.replace(Regex("[^A-Za-z0-9_-]"), "_").take(80).ifBlank { "default" }
         val output = File(folder, "source-audit-$label.jsonl")
         fun safe(value: String) = value.replace(Regex("https?://\\S+"), "[url]").replace(Regex("[\\p{Cntrl}]"), " ").take(160)
         fun report(source: String, stage: String, status: String, details: JSONObject = JSONObject()) {
             val row = JSONObject().put("run", label).put("timeMs", System.currentTimeMillis())
                 .put("source", safe(source)).put("stage", stage).put("status", status)
+            if (candidateRule != null) row.put("candidate", true).put("fixedSnapshotTested", false)
             details.keys().forEach { key -> row.put(key, details.get(key)) }
             output.appendText(row.toString() + "\n")
             test.sendStatus(0, Bundle().apply { putString("stream", row.toString() + "\n") })
@@ -66,7 +73,7 @@ object FullSourceAudit {
             check(JSONObject(file.readText()).toString() == backup.toString())
             report("", "backup", "saved", JSONObject().put("file", file.name).put("keys", backup.length()))
         }
-        val installed = store.all().associateBy { it.name.lowercase() }
+        val installed = if (candidateRule == null) store.all().associateBy { it.name.lowercase() } else emptyMap()
         val filter = nameFilter?.split('|')?.filter { it.isNotBlank() }?.map { it.lowercase() }?.toSet()
         fun hash(json: JSONObject): String = java.security.MessageDigest.getInstance("SHA-256").digest(json.toString().toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
         val canonical = mutableListOf<SourceRule>()
@@ -75,6 +82,12 @@ object FullSourceAudit {
                 val rule = SourceRule(input.getJSONObject(index))
                 if (filter != null && rule.name.lowercase() !in filter) continue
                 canonical += rule
+                if (candidateRule != null) {
+                    report(rule.name, "candidate_inventory", "loaded_without_import", JSONObject()
+                        .put("candidateHash", hash(rule.json)).put("candidateVersion", safe(rule.json.optString("version")))
+                        .put("api", safe(rule.json.optString("api"))).put("playbackVerified", false))
+                    continue
+                }
                 val existing = installed[rule.name.lowercase()]
                 report(rule.name, "inventory", if (existing == null) "missing" else "installed", JSONObject()
                     .put("enabled", existing?.let { store.isEnabled(it) } ?: JSONObject.NULL)
@@ -89,8 +102,9 @@ object FullSourceAudit {
         installed.values.filter { it.name.lowercase() !in canonicalNames }.forEach {
             report(it.name, "inventory_extra", "installed_not_canonical", JSONObject().put("enabled", store.isEnabled(it)).put("installedHash", hash(it.json)).put("installedVersion", safe(it.json.optString("version"))))
         }
-        report("", "inventory_summary", "complete", JSONObject().put("canonicalCount", input.length())
+        if (candidateRule == null) report("", "inventory_summary", "complete", JSONObject().put("canonicalCount", input.length())
             .put("selectedCount", canonical.size).put("installedCount", installed.size))
+        else report(candidateRule.name, "candidate_summary", "single_candidate_only", JSONObject().put("selectedCount", canonical.size).put("imported", false))
         if (mode == "source-inventory") return@runBlocking
         if (mode == "source-import") {
             val disabled = prefs.getStringSet("disabled", emptySet()).orEmpty().toSet()
@@ -109,7 +123,7 @@ object FullSourceAudit {
             return@runBlocking
         }
         // Explicit canonical rules are tested even when disabled or locally customized. Never write library data.
-        val repository = RuleRepository(test.targetContext)
+        val repository = RuleRepository(test.targetContext, rulesOverride = candidateRule?.let { listOf(it) })
         val power=test.targetContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
         fun requireInteractive() {
             if(!power.isInteractive) {

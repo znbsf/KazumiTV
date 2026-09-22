@@ -7,10 +7,12 @@ import org.kazumi.tv.data.HttpText
 import java.net.URI
 
 class RuleRepository(context: Context,
+    // Temporary diagnostic rules bypass persistent RuleStore reads and repairs; normal callers use the store.
+    rulesOverride: List<SourceRule>? = null,
     private val responseObserver: ((SourceRule, HttpText.Page) -> Unit)? = null
 ):SourceCatalog {
     private val appContext=context.applicationContext
-    override val rules = RuleStore(context).enabled()
+    override val rules = rulesOverride?.toList() ?: RuleStore(context).enabled()
     private val engine = XPathRuleEngine()
     private val api = ApiRuleEngine()
     override suspend fun search(rule: SourceRule, keyword: String) = withContext(Dispatchers.IO) {

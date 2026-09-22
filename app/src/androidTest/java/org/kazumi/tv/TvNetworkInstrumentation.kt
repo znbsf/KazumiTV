@@ -69,7 +69,7 @@ class TvNetworkInstrumentation : Instrumentation() {
                 AutomaticDanmakuUiRegression.run(this); output.putString("stream","real_service_automatic_mapping_comments_overlay=OK\n");finish(Activity.RESULT_OK,output);return
             }
             if(mode in setOf("source-inventory","source-import","source-audit")) {
-                FullSourceAudit.run(this,mode,auditName,auditRun); finish(Activity.RESULT_OK,output); return
+                FullSourceAudit.run(this,mode,auditName,auditRun,runnerArgs.getString("candidateFile")); finish(Activity.RESULT_OK,output); return
             }
             if(mode=="source-page") {
                 SourcePageDiagnostic.run(this,runnerArgs); finish(Activity.RESULT_OK,output); return
