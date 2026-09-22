@@ -22,6 +22,11 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode == "mac-cms-verification") {
+                MacCmsVerificationRegression.run(this)
+                output.putString("stream", "mac_cms_verification=PASS\n")
+                finish(Activity.RESULT_OK, output); return
+            }
             if(mode == "recent-watch-navigation") {
                 RecentWatchNavigationRegression.run(this)
                 output.putString("stream", "recent_watch_navigation=PASS\n")

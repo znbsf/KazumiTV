@@ -34,13 +34,29 @@
 - `recent-watch-navigation-48-verified.txt`：生产组件配隔离数据/受控来源，最近入口→详情、续播参数、原来源集表定位、无自动解析/无全源搜索、历史详情、记录更新与去重、隐身和来源移除回退通过。
 - `verification-layout-48-verified.txt`：图像/输入/提交控件均在屏内且彼此/网页不重叠；网页模式扩大区域、真实Back恢复工具栏及焦点；已知测试输入提交，带Cookie恢复原搜索通过。
 - `verification-48-verified.txt`：按钮/脚本/图片提交、假成功防护、取消、原POST和Cookie重试通过。
-- 最终只改来源说明文字的发行APK，再跑`verification-layout-48-published.txt`与`recent-watch-navigation-48-published.txt`均通过。
+- 提交兼容修复之前、只改来源说明文字的候选APK，再跑`verification-layout-48-published.txt`与`recent-watch-navigation-48-published.txt`均通过。
 - 初期布局测试错误地只检查按钮内文字节点焦点；设备诊断证明按钮父节点已获焦，修正检查后通过。保留失败日志，不将该测试断言错误描述为真实站点已修复。
 
 以上受控测试不证明所有真实验证码都能通过，也未重复整集测试。
 
 正常应用入口另有实际数据验收：主页最近观看可遥控聚焦并进入原番剧详情，显示继续第13集与原来源选集；点击选集读取baimao原目录，六条线路、13项集数，定位第13集且未自动播放。两次Back回详情后焦点位于原来源选集按钮，再Back回首页原最近观看链接。截图/XML分别为`recent-home`、`recent-detail-final`、`recent-episodes-loaded`、`detail-back-focus`及`recent-return-focus`，均只存本地。
 
-最终code48 giri真实验证页面可见，但本轮未完成人工输入；等待后由主代理结束该次测试，工具日志的Process crashed为主动停止，并非证明应用自行崩溃。仍列真实提交待验，不沿用旧截图提交验证码。
+提交兼容修复之前的code48 giri真实验证页面可见，但本轮未完成人工输入；等待后由主代理结束该次测试，工具日志的Process crashed为主动停止，并非证明应用自行崩溃。仍列真实提交待验，不沿用旧截图提交验证码。
 
-最终发行APK正常详情“继续第13集”短测：从既有00:29续播至00:34，实际画面及6140条匹配弹幕可见（`detail-real-resume.png`），随后结束测试。`user-data-restored-final.txt`确认设置、历史、搜索历史三份检查点恢复且逐项相等，电视返回正常首页。没有执行整集播放。
+提交兼容修复之前的code48候选APK正常详情“继续第13集”短测：从既有00:29续播至00:34，实际画面及6140条匹配弹幕可见（`detail-real-resume.png`），随后结束测试。`user-data-restored-final.txt`确认设置、历史、搜索历史三份检查点恢复且逐项相等，电视返回正常首页。没有执行整集播放。
+
+
+## 用户补充：提交可点但无响应
+
+真实电视WebView为66。giriGiriLove页面的DS/MacCMS脚本含可选链语法，设备探测不支持该语法；页面输入、按钮与jQuery存在，但EC对象未定义、按钮click处理程序数为0。这与用户反馈的点击无响应一致。页面配置使用词法const/let，检查不能只看window属性。
+
+新增有限的兼容提交：仅在旧语法不支持、已知同源DS模板路径/配置/控件匹配、没有现有事件处理程序等条件全部满足时启用。用户按应用“提交验证码”后，以当前WebView会话向原模板的同源验证接口发送用户输入；服务器code=1仅触发页面刷新，最终仍需原验证检测与原请求重试，不伪造通过。错误、超时、非法响应分别提示并允许重新输入；网页内填写时也可使用应用提交按钮。没有识别、猜测或自动破解验证码。
+
+- `build48-submit.txt`：最终生产代码release构建、189项单测、lint通过。APK SHA256为`2d05bf52ab15a4b9aeae70029c3b7e69b4636303fa3ebc9f2ba80e6038ab47d1`。
+- `mac-cms-verification-submit-fixed.txt`：8种本地受控场景通过，包括成功、拒绝/超时/非法响应及重试，未知模板、模拟现代语法能力、已有处理程序与工作模板的保护。模拟现代能力不是现代设备实测。
+- `verification-layout-submit-final.txt`：布局、网页模式/Back焦点、网页输入启用提交、清空后禁用、固定输入提交并带Cookie恢复原搜索通过。初次新增禁用断言仅看文字子节点而失败；检查按钮父节点后通过，保留原日志。
+- `giri-submit-rejection-final.txt`：最终APK真实站点fallback可用、按钮原有处理程序为0；只提交一次明确无效的测试字符串，服务器返回验证码拒绝，显示“验证码未通过，请重新输入”并保留挑战。此项证明请求与失败反馈通路，**不代表正确验证码通过，也不代表原搜索恢复已验收**。
+
+原始站点脚本、页面和测试截图只留在本地忽略目录。Preview 2保持测试版定位，未把此次修复扩大为全来源迁移完成。
+
+最终APK另外通过`verification-submit-final.txt`（普通按钮/脚本/图片、假成功防护、取消和原POST/Cookie重试）与`recent-watch-navigation-submit-final.txt`（最近观看/详情/原选集导航）。`user-data-restored-submit-final.txt`确认设置、历史、搜索历史三份备份恢复后相等，并回到正常首页。

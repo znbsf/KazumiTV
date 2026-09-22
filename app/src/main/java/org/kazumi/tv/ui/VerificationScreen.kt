@@ -44,6 +44,8 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
     var browserGeneration by remember { mutableIntStateOf(0) }
     var lifetime by remember { mutableStateOf<VerificationWebLifetime?>(null) }
     var code by remember { mutableStateOf("") }
+    var webHasInput by remember { mutableStateOf(false) }
+    var submitting by remember { mutableStateOf(false) }
     var image by remember { mutableStateOf("") }
     var submittedImage by remember { mutableStateOf("") }
     var inputNotice by remember { mutableStateOf("") }
@@ -59,6 +61,8 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
         try {
             withTimeout(60000) {
                 VerificationSession.await(web,rule,progress,failure={ owner.failure ?: if(owner.released||loadFailed) "验证页面加载失败" else null }) { snapshot ->
+                    webHasInput=snapshot.optBoolean("hasInput")
+                    submitting=snapshot.optBoolean("submitting")
                     val nextImage=snapshot.optString("image")
                     if(submittedImage.isNotEmpty()&&nextImage.isNotEmpty()&&nextImage!=submittedImage&&snapshot.optBoolean("challenge")) {
                         code="";submittedImage="";inputNotice="验证码已更新，请重新输入"
@@ -67,8 +71,11 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
                     status=when {
                         loadFailed -> "验证页面加载失败，请重试"
                         snapshot.optBoolean("throttled") -> "来源限制了请求频率，请稍候再重新加载验证页面"
+                        snapshot.optString("submitError").isNotBlank() -> snapshot.optString("submitError")
+                        submitting -> "正在提交验证码，请稍候…"
                         snapshot.optBoolean("failed") -> "验证规则执行失败，可在网页中操作或重试"
                         inputNotice.isNotBlank() -> inputNotice
+                        imageMode && webHasInput && code.isBlank() -> "已在网页输入验证码，可选择提交验证码"
                         imageMode && image.isNotBlank() -> "输入图中验证码后提交；通过后会自动继续"
                         snapshot.optBoolean("acted") -> "已执行验证操作，正在确认结果…"
                         else -> "正在检测验证页面，可使用网页完成验证"
@@ -90,7 +97,7 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
             Button(enabled=!loadFailed&&view!=null,onClick = { generation++ }) { Text("重新检测") }
             Button(onClick = {
                 lifetime?.release();view=null;lifetime=null
-                loadFailed=false;image="";inputNotice="";submittedImage="";code=""
+                loadFailed=false;image="";inputNotice="";submittedImage="";code="";webHasInput=false;submitting=false
                 progress=org.kazumi.tv.rules.VerificationProgress();delivered=false
                 status="正在重新加载验证页面…";browserGeneration++
             }) { Text("重新加载") }
@@ -106,15 +113,15 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
                     coil.compose.AsyncImage(model,contentDescription="验证码图片",modifier=Modifier.size(140.dp,52.dp))
                 }
                 TvTextInput(code,{ code=it.take(32);inputNotice="" },modifier=Modifier.width(180.dp).semantics { contentDescription="验证码输入框" })
-                Button(enabled=code.isNotBlank()&&!loadFailed&&view!=null,onClick={ scope.launch {
+                Button(enabled=(code.isNotBlank()||webHasInput)&&!submitting&&!loadFailed&&view!=null,onClick={ keyboard?.hide();scope.launch {
                     val web=view ?: return@launch
                     val owner=lifetime ?: return@launch
                     try {
-                    submittedImage=image;inputNotice=""
+                    submittedImage=image;inputNotice="";submitting=true
                     val result=withTimeoutOrNull(3000) { VerificationSession.evaluate(web,VerificationScript.submit(rule,code)) }
                     if(owner.released||owner!==lifetime||loadFailed)return@launch
                     if(result=="true") { progress.markAction();status="已提交，正在确认验证结果…";generation++ }
-                    else { inputNotice="未找到验证码输入框或提交按钮，请重新加载";status=inputNotice;submittedImage="" }
+                    else { submitting=false;inputNotice="无法提交，请检查验证码或重新加载页面";status=inputNotice;submittedImage="" }
                     } catch(cancelled:CancellationException) { throw cancelled }
                     catch(_:RuntimeException) { if(owner===lifetime) { loadFailed=true;status="提交失败，请重新加载验证页面" } }
                 } }) { Text("提交验证码") }

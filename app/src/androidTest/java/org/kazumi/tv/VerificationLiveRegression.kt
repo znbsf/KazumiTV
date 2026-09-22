@@ -24,6 +24,8 @@ object VerificationLiveRegression {
         Thread.sleep(3500)
         val activity=test.startActivitySync(Intent(test.targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         val done=java.util.concurrent.atomic.AtomicBoolean()
+        val expectedRejection=args.getString("expectReject")=="true"
+        val rejected=java.util.concurrent.atomic.AtomicBoolean()
         val inputFile=java.io.File(test.targetContext.getExternalFilesDir(null),"verification-fixture-input.txt")
         inputFile.delete()
         test.runOnMainSync { activity.setContent { KazumiTheme(false) { VerificationScreen(rule,challenge.pageUrl,challenge) { done.set(true) } } } }
@@ -34,15 +36,26 @@ object VerificationLiveRegression {
         try {
             val deadline=System.currentTimeMillis()+(args.getString("waitMs")?.toLongOrNull() ?: 300000).coerceIn(1000,300000)
             var nextSnapshot=0L
-            while(!done.get()&&System.currentTimeMillis()<deadline) {
+            while(!done.get()&&!rejected.get()&&System.currentTimeMillis()<deadline) {
                 if(System.currentTimeMillis()>=nextSnapshot) {
-                    nextSnapshot=System.currentTimeMillis()+30000
+                    nextSnapshot=System.currentTimeMillis()+5000
                     fun find(view:android.view.View):android.webkit.WebView? {
                         if(view is android.webkit.WebView)return view
                         if(view is android.view.ViewGroup)for(i in 0 until view.childCount)find(view.getChildAt(i))?.let { return it }
                         return null
                     }
                     test.runOnMainSync {
+                        find(activity.window.decorView)?.evaluateJavascript(VerificationScript.poll(rule)) { raw ->
+                            val snapshot=runCatching { org.json.JSONObject(org.json.JSONTokener(raw).nextValue().toString()) }.getOrNull()
+                            snapshot?.let {
+                                val error=it.optString("submitError")
+                                test.sendStatus(0,Bundle().apply { putString("stream","${rule.name} submit diagnostic: fallback=${it.optBoolean("fallbackAvailable")} pending=${it.optBoolean("submitting")} hasInput=${it.optBoolean("hasInput")} error=$error\n") })
+                                if(expectedRejection&&it.optBoolean("serverRejected")&&error=="验证码未通过，请重新输入")rejected.set(true)
+                            }
+                        }
+                        find(activity.window.decorView)?.evaluateJavascript("""(function(){var optional=true;try{new Function('return ({a:1})?.a')}catch(e){optional=false}var b=document.querySelector('.verify-submit');var events=b&&window.jQuery&&jQuery._data?jQuery._data(b,'events'):null;return JSON.stringify({ready:document.readyState,optionalChaining:optional,templateApi:typeof window.EC,jquery:!!window.jQuery,templateConfig:typeof ds_cms!=='undefined',macConfig:typeof maccms!=='undefined',button:!!b,clickHandlers:events&&events.click?events.click.length:0,input:!!document.querySelector('input[name="verify"]')})})()""") { raw ->
+                            test.sendStatus(0,Bundle().apply { putString("stream","${rule.name} verification capability diagnostic=$raw\n") })
+                        }
                         find(activity.window.decorView)?.evaluateJavascript("JSON.stringify({url:location.href,html:document.documentElement.outerHTML})") { raw ->
                             // Private local diagnostic only; never included in public test output.
                             java.io.File(test.targetContext.getExternalFilesDir(null),"verification-live-${rule.name}.private.json").writeText(raw)
@@ -68,6 +81,11 @@ object VerificationLiveRegression {
                     check(button.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
                 }
                 Thread.sleep(200)
+            }
+            if(expectedRejection) {
+                check(rejected.get()&&!done.get()) { "expected rejection not observed; not a successful verification" }
+                test.sendStatus(0,Bundle().apply { putString("stream","${rule.name} explicit invalid-input request rejected; challenge retained=OK (not verification success)\n") })
+                return@runBlocking
             }
             check(done.get()) { "manual verification not completed" }
             val matches=repo.search(rule,"无职转生")

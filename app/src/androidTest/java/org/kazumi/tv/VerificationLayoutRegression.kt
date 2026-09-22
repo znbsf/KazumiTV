@@ -134,12 +134,22 @@ object VerificationLayoutRegression {
             }
             check(!host.isFinishing&&!done.get()) { "Back left verification instead of pointer mode" }
             report(test,"operating mode enlarges browser; real Back restores toolbar/focus=OK")
+            // Website input must also enable the native submit action; no OCR is involved.
+            test.runOnMainSync { findWeb(host.window.decorView)?.evaluateJavascript("document.getElementById('code').value='1357'",null) }
+            waitFor("web input did not enable native submit") {
+                nodes().any { it.text?.toString()=="提交验证码"&&it.isEnabled&&it.parent?.isEnabled!=false }
+            }
+            test.runOnMainSync { findWeb(host.window.decorView)?.evaluateJavascript("document.getElementById('code').value=''",null) }
+            waitFor("cleared web input left native submit enabled") {
+                nodes().any { it.text?.toString()=="提交验证码"&&(!it.isEnabled||it.parent?.isEnabled==false) }
+            }
+            report(test,"web input enables native submit; clearing disables it=OK")
             val input=toolbar().first { it.isEditable }
             check(input.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"2468")
             }))
             waitFor("submit not enabled after controlled input") {
-                nodes().any { it.text?.toString()=="提交验证码"&&it.isEnabled }
+                nodes().any { it.text?.toString()=="提交验证码"&&it.isEnabled&&it.parent?.isEnabled!=false }
             }
             click("提交验证码")
             waitFor("controlled verification did not complete") { done.get() }

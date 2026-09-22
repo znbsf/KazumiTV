@@ -13,6 +13,7 @@ object VerificationScript {
           var c=$config;
           var s=window.__kazumiVerification;
           if(!s)s=window.__kazumiVerification={acted:false,done:false,failed:false,focused:false,script:false};
+          ${MacCmsVerificationCompat.script}
           function node(x){return x?document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue:null;}
           try {
             var html=document.documentElement?document.documentElement.outerHTML:'';
@@ -49,7 +50,10 @@ object VerificationScript {
               var canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
               canvas.getContext('2d').drawImage(img,0,0);image=canvas.toDataURL('image/png');}}catch(e){}}
             return JSON.stringify({ready:document.readyState==='complete'&&!!document.body&&document.body.childNodes.length>0,
-              throttled:false,challenge:challenge,acted:s.acted,done:s.done,failed:s.failed,image:image,url:location.href});
+              throttled:false,challenge:challenge,acted:s.acted,done:s.done,failed:s.failed,image:image,url:location.href,
+              submitting:!!s.submitting,submitError:s.submitError||'',hasInput:!!(input&&(input.value||'').trim()),
+              serverRejected:!!s.serverRejected,
+              fallbackAvailable:!!compatEndpoint(input,button,img)});
           }catch(e){return JSON.stringify({failed:true,ready:false});}
         })();
         """.trimIndent()
@@ -58,12 +62,22 @@ object VerificationScript {
         val config=rule.json.optJSONObject("antiCrawlerConfig") ?: JSONObject()
         return """
         (function(){try{
+          var c=$config;
+          var s=window.__kazumiVerification;
+          if(!s)s=window.__kazumiVerification={acted:false,done:false,failed:false,focused:false,script:false};
+          ${MacCmsVerificationCompat.script}
           function node(x){return document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue;}
           var input=node(${JSONObject.quote(config.optString("captchaInput"))}),button=node(${JSONObject.quote(config.optString("captchaButton"))});
-          if(!input||!button)return false;
-          input.focus();var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-          setter.call(input,${JSONObject.quote(code)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
-          window.__kazumiVerification.acted=true;button.click();return true;
+          if(!input||!button||s.submitting)return false;
+          var supplied=${JSONObject.quote(code)};
+          if(supplied.trim()) {
+            input.focus();var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+            setter.call(input,supplied);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
+          }
+          if(!(input.value||'').trim())return false;
+          var img=c.captchaImage?node(c.captchaImage):null,endpoint=compatEndpoint(input,button,img);
+          if(endpoint)return compatSubmit(endpoint,input,img);
+          s.submitError='';s.serverRejected=false;s.acted=true;button.click();return true;
         }catch(e){return false;}})();
         """.trimIndent()
     }
