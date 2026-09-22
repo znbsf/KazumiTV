@@ -22,6 +22,14 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode == "real-source-switch") {
+                output.putString("stream",RealSourceSwitchRegression.run(this,runnerArgs)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
+            if(mode == "real-road-switch") {
+                output.putString("stream",RealRoadSwitchRegression.run(this,runnerArgs)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode == "mac-cms-verification") {
                 MacCmsVerificationRegression.run(this)
                 output.putString("stream", "mac_cms_verification=PASS\n")
@@ -33,7 +41,7 @@ class TvNetworkInstrumentation : Instrumentation() {
                 finish(Activity.RESULT_OK, output); return
             }
             if(mode == "verification-layout") {
-                VerificationLayoutRegression.run(this)
+                VerificationLayoutRegression.run(this,runnerArgs.getString("waitBeforeInputMs")?.toLongOrNull()?.coerceIn(0,120000) ?: 0)
                 output.putString("stream", "verification_layout=PASS\n")
                 finish(Activity.RESULT_OK, output); return
             }

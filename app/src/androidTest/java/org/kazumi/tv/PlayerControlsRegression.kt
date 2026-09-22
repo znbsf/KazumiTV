@@ -56,6 +56,13 @@ object PlayerControlsRegression {
         }
         fun await(label:String,condition:()->Boolean) { repeat(150) { if(condition())return;Thread.sleep(100) };error("timeout $label") }
         fun has(label:String)=nodes().any { it.text?.toString()==label }
+        fun focused(label:String):Boolean {
+            var node=nodes().firstOrNull { it.text?.toString()==label } ?: return false
+            while (true) {
+                if(node.isFocused)return true
+                node=node.parent ?: return false
+            }
+        }
         fun click(label:String) {
             await(label) { has(label) }
             var n=nodes().first { it.text?.toString()==label }
@@ -77,6 +84,7 @@ object PlayerControlsRegression {
         try {
             mount("controls.mp4")
             await("ready duration") { playbackReady() }
+            await("initial control focus after mount") { focused("▷ 播放") }
             click("▷ 播放")
             await("rendered frame and advancing position") { playbackReady(requireRendered=true) }
             // A hardware media key pauses even if slow decoding outlasts the controls timer.
@@ -105,7 +113,9 @@ object PlayerControlsRegression {
             mount("broken.mp4")
             await("failed") { nodes().any { it.text?.toString()?.startsWith("播放失败：")==true } }
             check(has("重新加载"));shot("player-controls-error.png")
-            click("重新加载");await("single retry callback") { retries==1 }
+            await("failure moves focus to attached retry control") { focused("重新加载") }
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+            await("single retry callback") { retries==1 }
         } catch(failure:Throwable) {
             runCatching { shot("player-controls-failure.png") }
             test.sendStatus(0,android.os.Bundle().apply { putString("stream","Player controls failure: ${failure.javaClass.simpleName}: ${failure.message}\n") })

@@ -2,11 +2,11 @@
 
 为电视遥控器设计的动画浏览与播放应用。当前主线使用 **Kotlin · Compose for TV · Media3**，延续深色、绿色和高密度海报浏览，独立于原 Flutter 工程开发。
 
-**当前公开测试版：0.3.3-preview.2。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
+**当前公开测试版：0.3.3-preview.3。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
 
-[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.2) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-NAVIGATION-20260922.md)
+[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.3) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-MIDDAY-20260922.md)
 
-本次发布（**0.3.3-preview.2**）：补首页最近观看、历史番剧详情和详情续播/原来源选集入口；选集不自动播放，返回恢复操作焦点。验证网页操作模式收起顶部工具区，补输入与返回布局验收；为旧版WebView无法解析DS/MacCMS模板脚本的验证页增加有限的手动提交兼容，真实站点已确认错误验证码能收到明确拒绝响应。延续Preview 1的系统回收和静态媒体发现修复。17源前轮为7源14线短测通过，真实验证码仍有未完成项，不将受控UI验证当成全源通过。详见[本轮实现与证据](docs/PLAYBACK-NAVIGATION-20260922.md)和[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)。
+本次发布（**0.3.3-preview.3**）：修复播放器在焦点目标尚未挂载时偶发崩溃；修复人工验证等待60秒后不再检测的问题，支持退后台暂停、回前台继续；旧WebView媒体发现保留原嵌入页面，单独尝试iframe候选，并保留验证码恢复入口。延续Preview 2的最近观看、番剧详情与原来源选集入口。最终包通过189项单测及电视受控验证；真实来源短测、失败和待人工验证项分别记录，不把短时或受控通过当完整迁移完成。详见[本轮实现与证据](docs/PLAYBACK-MIDDAY-20260922.md)和[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)。
 
 ## 界面
 
@@ -60,9 +60,9 @@
 | --- | --- | --- |
 | 定位 | 后续主要开发方向 | 保留比较和回退参考 |
 | 技术 | Kotlin / Compose / Media3 | Flutter / media-kit |
-| 版本 | 公开0.3.2-preview.1 | 2.3.1-tv-legacy.1 |
+| 版本 | 公开0.3.3-preview.3 | 2.3.1-tv-legacy.1 |
 | 源码 | `main` | `codex/upstream-tv-complete` |
-| 安装 | 通用APK：约10.24 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
+| 安装 | 通用APK：约10.27 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
 
 更早的A线Preview 5使用 `com.znbsf.kazumi.tv`，保留在历史Releases；本次Legacy发布来自较新的Flutter完整适配分支，不冒充该A线的覆盖升级。
 

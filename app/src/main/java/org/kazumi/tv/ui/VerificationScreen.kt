@@ -13,6 +13,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -30,6 +34,7 @@ import org.kazumi.tv.rules.SourceRule
 @Composable
 fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challenge:org.kazumi.tv.rules.SourceVerificationRequired?=null, onDone: () -> Unit) {
     val context=LocalContext.current
+    val lifecycle=LocalLifecycleOwner.current.lifecycle
     val scope=rememberCoroutineScope()
     val currentDone by rememberUpdatedState(onDone)
     val pointerFocus=remember { FocusRequester() }
@@ -55,12 +60,29 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
     var progress by remember { mutableStateOf(org.kazumi.tv.rules.VerificationProgress()) }
     val config=rule.json.optJSONObject("antiCrawlerConfig")
     val imageMode=config?.optBoolean("enabled")==true && config.optInt("captchaType",1)==1
-    LaunchedEffect(view,generation) {
+    DisposableEffect(view,lifecycle) {
+        val browser=view
+        val owner=lifetime
+        val observer=LifecycleEventObserver { _,event ->
+            if(owner?.released!=false)return@LifecycleEventObserver
+            when(event) {
+                Lifecycle.Event.ON_START -> browser?.onResume()
+                Lifecycle.Event.ON_STOP -> browser?.onPause()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(view,generation,lifecycle) {
         val web=view ?: return@LaunchedEffect
         val owner=lifetime ?: return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+        if(delivered||loadFailed)return@repeatOnLifecycle
         try {
-            withTimeout(60000) {
-                VerificationSession.await(web,rule,progress,failure={ owner.failure ?: if(owner.released||loadFailed) "验证页面加载失败" else null }) { snapshot ->
+            // Human input has no deadline. Each JS evaluation remains bounded;
+            // backgrounding, leaving or reloading cancels this polling session.
+            VerificationSession.await(web,rule,progress,failure={ owner.failure ?: if(owner.released||loadFailed) "验证页面加载失败" else null }) { snapshot ->
                     webHasInput=snapshot.optBoolean("hasInput")
                     submitting=snapshot.optBoolean("submitting")
                     val nextImage=snapshot.optString("image")
@@ -81,11 +103,10 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
                         else -> "正在检测验证页面，可使用网页完成验证"
                     }
                 }
-            }
             if(owner===lifetime&&!owner.released&&!loadFailed&&!delivered) { delivered=true; currentDone() }
-        } catch(_:TimeoutCancellationException) { status="验证尚未通过，可继续操作网页后重新检测，或重新加载" }
-        catch(cancelled:CancellationException) { throw cancelled }
-        catch(_:RuntimeException) { loadFailed=true;status="验证页面不可用，请重新加载后重试" }
+        } catch(cancelled:CancellationException) { throw cancelled }
+        catch(_:RuntimeException) { if(owner===lifetime&&!owner.released) { loadFailed=true;status="验证页面不可用，请重新加载后重试" } }
+        }
     }
     Column(Modifier.fillMaxSize().background(Color(0xFF111713)).imePadding().padding(if(operating) 8.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if(operating) {

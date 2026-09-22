@@ -110,8 +110,16 @@ object FullSourceAudit {
         }
         // Explicit canonical rules are tested even when disabled or locally customized. Never write library data.
         val repository = RuleRepository(test.targetContext)
+        val power=test.targetContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        fun requireInteractive() {
+            if(!power.isInteractive) {
+                report("", "device_state", "not_interactive_audit_cancelled")
+                throw CancellationException("TV is asleep; device playback evidence is unavailable")
+            }
+        }
         for (rule in canonical) {
             ensureActive()
+            requireInteractive()
             var stage = "search"
             try {
                 var matches = emptyList<SourceMatch>()
@@ -119,6 +127,7 @@ object FullSourceAudit {
                 for (candidate in listOf("无职转生", "海贼王", "柯南")) {
                     keyword = candidate
                     matches = withTimeout(65_000) { repository.search(rule, candidate) }
+                    requireInteractive()
                     report(rule.name, "search", if (matches.isEmpty()) "empty" else "found",
                         JSONObject().put("keyword", candidate).put("count", matches.size))
                     if (matches.isNotEmpty()) break
@@ -130,10 +139,12 @@ object FullSourceAudit {
                 val match = preferred ?: matches.first()
                 stage = "chapters"
                 val roads = withTimeout(65_000) { repository.chapters(rule, match) }
+                requireInteractive()
                 report(rule.name, stage, if (roads.isEmpty()) "empty" else "found", JSONObject()
                     .put("title", safe(match.title)).put("fallbackTitle", preferred == null).put("roads", roads.size))
                 for ((roadIndex, road) in roads.withIndex()) {
                     ensureActive()
+                    requireInteractive()
                     val episode12 = if (preferred != null) road.episodes.firstOrNull {
                         org.kazumi.tv.domain.EpisodeNumber.parse(it.title) == 12
                     } else null
@@ -162,21 +173,30 @@ object FullSourceAudit {
                             report(rule.name, checkName, status, JSONObject().put("road", roadIndex))
                         } }
                         report(rule.name, "road_done", "short_playback_passed", JSONObject().put("road", roadIndex))
-                    } catch (error: Exception) { failure(rule.name, roadStage, error, roadIndex) }
+                    } catch (error: Exception) { requireInteractive(); failure(rule.name, roadStage, error, roadIndex) }
                 }
                 report(rule.name, "source_done", "inspected_not_universal_acceptance")
-            } catch (error: Exception) { failure(rule.name, stage, error); report(rule.name, "source_done", "incomplete") }
+            } catch (error: Exception) { requireInteractive(); failure(rule.name, stage, error); report(rule.name, "source_done", "incomplete") }
         }
         report("", "audit_summary", "finished_see_each_result_not_all_pass", JSONObject().put("selectedCount", canonical.size))
     }
 
     private suspend fun play(test: Instrumentation, request: PlaybackRequest, report: (String, String) -> Unit) {
+        val power=test.targetContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        fun requireInteractive() {
+            if(!power.isInteractive) {
+                report("device_state", "not_interactive_audit_cancelled")
+                throw CancellationException("TV is asleep; device playback evidence is unavailable")
+            }
+        }
+        requireInteractive()
         val activity = test.startActivitySync(Intent(test.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         val rendered = AtomicBoolean()
         val errorCode = AtomicInteger()
         var engine: NativePlayer? = null
         suspend fun await(limit: Long, predicate: () -> Boolean) = withTimeout(limit) {
             while (true) {
+                requireInteractive()
                 check(errorCode.get() == 0) { "player_error" }
                 if (predicate()) break
                 delay(100)
@@ -185,6 +205,7 @@ object FullSourceAudit {
         fun position(): Long { var result = 0L; test.runOnMainSync { result = engine!!.player.currentPosition }; return result }
         try {
             test.runOnMainSync {
+                activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 val view = TextureView(activity)
                 activity.setContentView(view)
                 engine = NativePlayer(activity, request.url)

@@ -17,6 +17,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -135,12 +137,6 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
     fun handleBack() { when { menu != null -> menu = null; visible && playing -> visible = false; else -> onClose() } }
     LaunchedEffect(sleepStatus.expired) { if(sleepStatus.expired) { visible=true; menu="定时停止" } }
     BackHandler { handleBack() }
-    LaunchedEffect(visible, menu, failed) {
-        // Lazy menu content must be laid out before moving focus from the removed controls row.
-        withFrameNanos { }
-        withFrameNanos { }
-        if (menu != null) menuFocus.requestFocus() else if (visible) controlsFocus.requestFocus() else rootFocus.requestFocus()
-    }
     LaunchedEffect(visible, playing, interaction, menu) {
         if (visible && playing && menu == null) { delay(preferences.controlsSeconds*1000L); visible = false }
     }
@@ -208,7 +204,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 else -> false
             }
         }
-    }.focusRequester(rootFocus).focusable()) {
+    }.then(playerEntryFocus(rootFocus, request, active = !visible && menu == null)).focusable()) {
         PlaybackVideoSurface(engine.player, playing,pictureMode)
         if (danmakuEnabled && danmaku.scheduled.isNotEmpty()) AndroidView(
             factory = { DanmakuView(it) }, modifier = Modifier.fillMaxSize(),
@@ -231,7 +227,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 .padding(horizontal = 28.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (status.isNotBlank()) Text(status, style = KazumiType.caption)
                 if (failed) Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    PlayerAction("重新加载", Modifier.focusRequester(controlsFocus)) {
+                    PlayerAction("重新加载", playerEntryFocus(controlsFocus, request to failed)) {
                         if (onResolveAgain != null) onResolveAgain(engine.player.currentPosition.coerceAtLeast(0), playIntent)
                         else { failed = false; engine.open(request, position) }
                     }
@@ -244,7 +240,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 }
                 PlayerProgress(position, duration, engine.player.bufferedPosition,preferences.seekSeconds*1000L) { interaction++; engine.player.seekTo(it) }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PlayerAction(if (playIntent) "Ⅱ 暂停" else "▷ 播放", if (failed) Modifier else Modifier.focusRequester(controlsFocus)) { interaction++; toggle() }
+                    PlayerAction(if (playIntent) "Ⅱ 暂停" else "▷ 播放", if (failed) Modifier else playerEntryFocus(controlsFocus, request to failed)) { interaction++; toggle() }
                     if (episodes.isNotEmpty()) PlayerAction("选集") { menu = "选集" }
                     if (onNext != null) PlayerAction("下一集", onClick = onNext)
                     if (onChooseRoad != null) PlayerAction("线路") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseRoad(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
@@ -259,13 +255,14 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
             }
         }
         if (menu == "弹幕") DanmakuPanel(danmakuRepository, subject.title, danmakuTitle, danmakuEnabled, danmakuOffset,
-            menuFocus, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(460.dp),
+            menuFocus, Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(460.dp)
+                .then(playerEntryFocus(menuFocus, request to menu, attachRequester = false)),
             onClose = { menu = null }, onToggle = { danmakuEnabled = !danmakuEnabled; preferences.danmakuEnabled = danmakuEnabled }, onOffset = { danmakuOffset = it; selections.save(subject.id,request.resumeKey,selections.read(subject.id,request.resumeKey).copy(offset=it)) },
             onLoaded = { selected, comments -> selections.save(subject.id,request.resumeKey,DanmakuSelection(selected,danmakuOffset)); manualOverride = true; danmakuTitle = selected.title; danmaku = DanmakuTimeline(comments); danmakuEnabled = true; preferences.danmakuEnabled = true; danmakuStatus = "弹幕 ${comments.size} 条 · 手动选择" },
             onAutomatic={ selections.clear(subject.id,request.resumeKey); danmakuOffset=0; manualOverride=false; danmaku=DanmakuTimeline(emptyList()); mappingAttempt++ })
         if(menu=="选集") {
             Column(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(650.dp).background(KazumiColors.surface).padding(24.dp)) {
-                PlayerAction("返回播放",Modifier.focusRequester(menuFocus)) { menu=null }
+                PlayerAction("返回播放",playerEntryFocus(menuFocus, request to menu)) { menu=null }
                 val seen=store.history().filter { it.subject.id==subject.id && it.position>0 }.map { it.key }.toSet()
                 EpisodeBrowser(episodes,currentEpisode,episodeKeys.indices.filter { episodeKeys[it] in seen }.toSet(),Modifier.weight(1f),restoreIndex=currentEpisode) {
                     onEpisodeSelected?.invoke(it); menu=null
@@ -274,14 +271,14 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
         }
         if(menu=="显示模式") {
             Column(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(480.dp).background(KazumiColors.background).padding(24.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                PlayerAction("返回播放",Modifier.focusRequester(menuFocus)) { menu=null }
+                PlayerAction("返回播放",playerEntryFocus(menuFocus, request to menu)) { menu=null }
                 DisplayModePanel(displayModes,duringPlayback=true)
             }
         }
         if (menu != null && menu != "弹幕" && menu != "选集" && menu != "显示模式") {
             LazyColumn(Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(340.dp).background(Color(0xFF171D18)).padding(28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Text(menu!!) }
-                item { PlayerAction("返回播放",Modifier.focusRequester(menuFocus)) { menu=null } }
+                item { PlayerAction("返回播放",playerEntryFocus(menuFocus, request to menu)) { menu=null } }
                 if(menu=="设置") {
                     if(onPrevious!=null)item { PlayerAction("上一集",onClick=onPrevious) }
                     if(request.offlineId==null)item { PlayerAction("弹幕设置") { menu="弹幕" } }
@@ -400,3 +397,28 @@ internal fun PlaybackVideoSurface(player: Player, playing: Boolean, pictureMode:
 }
 
 private fun clockTime(ms: Long): String = "%02d:%02d".format(ms / 60000, ms / 1000 % 60)
+
+/** Focus only after this entry target is attached; a fixed frame delay is not a mount signal.
+ * The effect belongs to the actual control, so removing it cancels a pending request.
+ * Layout changes after a successful request must not pull focus away from remote navigation.
+ */
+@Composable
+private fun playerEntryFocus(
+    requester: FocusRequester,
+    entry: Any?,
+    active: Boolean = true,
+    attachRequester: Boolean = true,
+): Modifier {
+    var coordinates by remember(requester) { mutableStateOf<LayoutCoordinates?>(null) }
+    var requested by remember(requester, entry, active) { mutableStateOf(false) }
+    LaunchedEffect(requester, entry, active, coordinates) {
+        // No suspension between checking attachment and requesting on the UI thread.
+        // A new control/menu gets its own layout callback and therefore another attempt.
+        while (active && !requested && coordinates?.isAttached == true) {
+            requested = requester.requestFocus()
+            if (!requested) withFrameNanos { }
+        }
+    }
+    return (if (attachRequester) Modifier.focusRequester(requester) else Modifier)
+        .onGloballyPositioned { coordinates = it }
+}

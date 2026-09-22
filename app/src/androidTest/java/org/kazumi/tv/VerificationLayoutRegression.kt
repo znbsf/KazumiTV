@@ -10,15 +10,19 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.webkit.WebView
 import androidx.activity.compose.setContent
+import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.kazumi.tv.rules.*
 import org.kazumi.tv.ui.*
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /** Local fixture only: layout, real Back, known test input and original-request recovery. */
 object VerificationLayoutRegression {
-    fun run(test:Instrumentation)=runBlocking {
+    fun run(test:Instrumentation,waitBeforeInputMs:Long=0)=runBlocking {
         val server=FixtureServer()
         val repo=RuleRepository(test.targetContext)
         val rule=SourceRule(JSONObject().put("name","verification layout fixture").put("baseURL",server.url)
@@ -134,6 +138,55 @@ object VerificationLayoutRegression {
             }
             check(!host.isFinishing&&!done.get()) { "Back left verification instead of pointer mode" }
             report(test,"operating mode enlarges browser; real Back restores toolbar/focus=OK")
+            if(waitBeforeInputMs>0) {
+                report(test,"waiting ${waitBeforeInputMs}ms before human-input simulation")
+                kotlinx.coroutines.delay(waitBeforeInputMs)
+                check(!done.get()&&!host.isFinishing) { "waiting completed or closed verification" }
+                var originalWeb:WebView?=null
+                test.runOnMainSync { originalWeb=findWeb(host.window.decorView) }
+                val watchedWeb=checkNotNull(originalWeb)
+                fun evaluateFixture(script:String):String {
+                    val value=AtomicReference<String>()
+                    val callback=CountDownLatch(1)
+                    test.runOnMainSync { watchedWeb.evaluateJavascript(script) { value.set(it);callback.countDown() } }
+                    check(callback.await(4,TimeUnit.SECONDS)) { "Fixture JS diagnostic callback timed out" }
+                    return value.get()
+                }
+                // Count production VerificationScript.poll reads, without reading cookies/page text.
+                check(evaluateFixture("""(function(){
+                    var state=window.__kazumiVerification;
+                    window.__layoutPollCount=0;
+                    Object.defineProperty(window,'__kazumiVerification',{configurable:true,
+                      get:function(){window.__layoutPollCount++;return state;},
+                      set:function(value){state=value;}});
+                    return true;
+                })()""")=="true")
+                fun pollCount()=evaluateFixture("window.__layoutPollCount").toInt()
+                waitFor("polling did not continue beyond human-input deadline") { pollCount()>0 }
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(test.uiAutomation.executeShellCommand("input keyevent 3")).use { it.readBytes() }
+                waitFor("HOME did not stop verification Activity") {
+                    var stopped=false
+                    test.runOnMainSync { stopped=!host.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) }
+                    stopped
+                }
+                // Allow any already-dispatched single JS evaluation to settle before comparison.
+                kotlinx.coroutines.delay(1800)
+                val stoppedCount=pollCount()
+                kotlinx.coroutines.delay(1600)
+                val laterCount=pollCount()
+                check(laterCount==stoppedCount && !done.get()) { "Verification polled or completed while Activity stopped" }
+                report(test,"real HOME pauses polling count=$stoppedCount->$laterCount; done remains false=OK")
+                test.targetContext.startActivity(Intent(test.targetContext,MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                waitFor("same verification Activity/WebView did not resume") {
+                    var resumed=false
+                    test.runOnMainSync { resumed=host.lifecycle.currentState==Lifecycle.State.RESUMED&&findWeb(host.window.decorView)===watchedWeb }
+                    resumed
+                }
+                waitFor("foreground verification did not restart polling") { pollCount()>laterCount }
+                check(!done.get())
+                report(test,"same Activity/WebView resumes polling without remount=OK")
+            }
             // Website input must also enable the native submit action; no OCR is involved.
             test.runOnMainSync { findWeb(host.window.decorView)?.evaluateJavascript("document.getElementById('code').value='1357'",null) }
             waitFor("web input did not enable native submit") {

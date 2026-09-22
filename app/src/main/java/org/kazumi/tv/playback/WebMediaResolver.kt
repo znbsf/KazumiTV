@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-/** One isolated WebView per attempt; dynamic ES5 discovery and bounded, cancellable probes. */
+/** Original page plus one bounded candidate WebView; ES5 discovery and cancellable probes. */
 class WebMediaResolver(private val context: Context, private val timeoutMs: Long = 25000,
     private val diagnostic: (String) -> Unit = {}, private val forceCompatibility: Boolean = false,
     private val privateConsoleDiagnostic: ((JSONObject) -> Unit)? = null) {
@@ -73,38 +73,46 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         }
         val candidates = Channel<PlaybackRequest>(24)
         val speculativeCandidates = Channel<PlaybackRequest>(8)
-        val speculativeSeen = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-        val seen = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        data class DiscoveryKey(val url:String,val headers:Map<String,String>)
+        val speculativeSeen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
+        val seen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
         val fatal = AtomicReference<Exception?>(null)
         var scriptError = false
-        var lastFrameSummary = ""
         data class Frame(val url:String,val referer:String,val depth:Int)
         val pendingFrames=java.util.ArrayDeque<Frame>()
         val visitedFrames=mutableSetOf(pageUrl)
         val queuedFrames=mutableSetOf<String>()
-        var currentPage=pageUrl
-        var currentDepth=0
-        var navigation=0
         var followedFrames=0
-        var frameFailed=false
         var lastFrameFailure:MediaResolutionFailure?=null
-        var navigationStarted=android.os.SystemClock.elapsedRealtime()
+        // At most one unresolved challenge per attempted candidate (maximum three).
+        // A later navigation/normal completed page invalidates that candidate's old challenge.
+        val frameChallenges=linkedMapOf<Int,SourceVerificationRequired>()
         val frameWaitMs=(timeoutMs/4).coerceIn(2000,4000)
-        val web = try { WebView(context) } catch (_: RuntimeException) {
-            candidates.close()
-            speculativeCandidates.close()
-            throw MediaResolutionFailure("网页初始化", "WebView 无法启动，请检查系统 WebView 后重试")
-        }
         fun offer(url: String, headers: Map<String,String>, speculative: Boolean = false) {
+            if(runCatching { SourceRule.httpUrl(url) }.isFailure)return
+            val effectiveHeaders=MediaRequestHeaders.forMedia(rule,pageUrl,headers)
+            val key=DiscoveryKey(url,effectiveHeaders.mapKeys { it.key.lowercase(java.util.Locale.ROOT) })
             val dedup = if(speculative) speculativeSeen else seen
             val limit = if(speculative) 8 else 24
             val queue = if(speculative) speculativeCandidates else candidates
-            if (runCatching { SourceRule.httpUrl(url) }.isSuccess && dedup.size < limit && dedup.add(url))
-                queue.trySend(PlaybackRequest(url,MediaRequestHeaders.forMedia(rule,pageUrl,headers),title))
+            // Context is part of a request: a failed parent-page Referer must not suppress
+            // a later iframe request for the same address. Keep a strict shared budget.
+            if (synchronized(dedup) { dedup.size < limit && dedup.add(key) })
+                queue.trySend(PlaybackRequest(url,effectiveHeaders,title))
         }
-        var polling: Job? = null
+        val discoveryScope=this
+        // One original page and at most one disposable candidate page. A candidate's
+        // top-level navigation must never stop the source page's embedded player.
+        class DiscoveryPage(val currentDepth:Int,initialPage:String,val candidateId:Int=0) {
+        val web=WebView(context)
+        @Volatile var currentPage=initialPage
+        private var navigation=0
+        private var lastFrameSummary=""
+        var frameFailed=false
+        val navigationStarted=android.os.SystemClock.elapsedRealtime()
+        private var polling: Job? = null
         var startScript: androidx.webkit.ScriptHandler? = null
-        var destroyed = false
+        @Volatile var destroyed = false
         fun destroyWeb() {
             if (destroyed) return
             destroyed = true
@@ -113,18 +121,20 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
             runCatching { web.stopLoading() }
             runCatching { web.webViewClient = WebViewClient(); web.webChromeClient = WebChromeClient() }
             runCatching { web.destroy() }
+            diagnostic("web_released depth=$currentDepth")
         }
         fun pageFailure(request:WebResourceRequest,failure:MediaResolutionFailure) {
             if(destroyed||!request.isForMainFrame)return
             if(currentDepth==0)fatal.set(failure)
             else if(request.url.toString()==currentPage) {
+                frameChallenges.remove(candidateId)
                 // A promoted iframe is only one discovery candidate. Keep sibling fallbacks.
                 frameFailed=true
                 lastFrameFailure=failure
                 diagnostic("iframe_load_failed depth=$currentDepth attempt=$followedFrames ${failure.message}")
             }
         }
-        try {
+        fun start(referer:String) {
             web.settings.javaScriptEnabled = true
             web.settings.domStorageEnabled = true
             web.settings.allowFileAccess = false
@@ -149,12 +159,23 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     // Best-effort early hook on providers without document-start support.
                     // Polling still installs it if this callback precedes the new document.
                     if (!destroyed) {
+                        navigation++
+                        if(currentDepth>0) {
+                            if(frameChallenges.remove(candidateId)!=null)diagnostic("iframe_challenge_cleared depth=$currentDepth attempt=$candidateId")
+                            frameFailed=false
+                        }
                         if(url!=null&&runCatching { SourceRule.httpUrl(url) }.isSuccess)currentPage=url
                         view.evaluateJavascript(MediaDiscoveryScript.poll, null)
                     }
                 }
                 override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
-                    fatal.set(MediaResolutionFailure("网页渲染", "WebView 进程已退出，请重试或更换来源"))
+                    if(destroyed)return true
+                    val failure=MediaResolutionFailure("网页渲染", "WebView 进程已退出，请重试或更换来源")
+                    if(currentDepth==0)fatal.set(failure) else {
+                        frameChallenges.remove(candidateId)
+                        frameFailed=true;lastFrameFailure=failure
+                        diagnostic("iframe_renderer_failed depth=$currentDepth attempt=$followedFrames")
+                    }
                     destroyWeb()
                     return true
                 }
@@ -166,7 +187,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     pageFailure(request,MediaResolutionFailure("网页加载", "HTTP ${response.statusCode}"))
                 }
                 override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                    if(isMediaCandidate(request.url.toString(), request.requestHeaders)) {
+                    if(!destroyed&&isMediaCandidate(request.url.toString(), request.requestHeaders)) {
                         val headers = request.requestHeaders.filterKeys { it.equals("Referer",true)||it.equals("User-Agent",true)||it.equals("Origin",true) }.toMutableMap()
                         if(headers.keys.none { it.equals("Referer",true) }) headers["Referer"] = currentPage
                         if(headers.keys.none { it.equals("User-Agent",true) }) headers["User-Agent"] = rule.userAgent
@@ -177,8 +198,8 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
             }
             startScript = if(forceCompatibility)null else WebDiscoveryCapabilities.install(web, diagnostic)
             if(forceCompatibility)diagnostic("web_discovery mode=compatibility forced")
-            web.loadUrl(pageUrl,mapOf("Referer" to rule.referer))
-            polling = launch {
+            web.loadUrl(currentPage,mapOf("Referer" to referer))
+            polling = discoveryScope.launch {
                 while(isActive && !destroyed) {
                     val snapshotNavigation=navigation
                     web.evaluateJavascript(MediaDiscoveryScript.poll) { raw ->
@@ -188,13 +209,24 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                             val frameSummary = "frames=${snapshot.optJSONArray("frames")?.length() ?: 0} inaccessible=${snapshot.optInt("inaccessibleFrames")} candidates=${snapshot.optJSONArray("urls")?.length() ?: 0}"
                             if (frameSummary != lastFrameSummary) {
                                 lastFrameSummary = frameSummary
-                                diagnostic("web_snapshot $frameSummary")
+                                diagnostic("web_snapshot $frameSummary depth=$currentDepth")
                             }
-                            if(SourcePageChecks.looksLikeChallengeTitle(snapshot.optString("title"))) fatal.set(SourceVerificationRequired(currentPage))
+                            if(SourcePageChecks.looksLikeChallengeTitle(snapshot.optString("title"))) {
+                                val challenge=SourceVerificationRequired(currentPage)
+                                if(currentDepth==0)fatal.set(challenge) else {
+                                    if(!frameChallenges.containsKey(candidateId))diagnostic("iframe_challenge depth=$currentDepth attempt=$candidateId")
+                                    frameChallenges[candidateId]=challenge;frameFailed=true
+                                }
+                            } else if(currentDepth>0&&snapshot.optString("ready")=="complete") {
+                                if(frameChallenges.remove(candidateId)!=null) {
+                                    frameFailed=false
+                                    diagnostic("iframe_challenge_cleared depth=$currentDepth attempt=$candidateId")
+                                }
+                            }
                             val urls = snapshot.optJSONArray("urls") ?: JSONArray()
                             for(i in 0 until urls.length()) {
                                 val media = urls.getJSONObject(i)
-                                offer(media.getString("url"), mapOf("Referer" to media.optString("referer",pageUrl),"User-Agent" to rule.userAgent))
+                                offer(media.getString("url"), mapOf("Referer" to media.optString("referer",currentPage),"User-Agent" to rule.userAgent))
                             }
                             val guesses = snapshot.optJSONArray("speculative") ?: JSONArray()
                             for(i in 0 until guesses.length()) {
@@ -202,8 +234,8 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                                 offer(media.getString("url"), mapOf("Referer" to media.optString("referer",currentPage),"User-Agent" to rule.userAgent), speculative=true)
                             }
                             // Old providers cannot install hooks inside unrelated-origin frames.
-                            // Follow only visible player containers, one WebView, at most three pages
-                            // and two nesting levels. This remains discovery, never proof of playback.
+                            // Probe visible player containers in a separate bounded candidate page,
+                            // at most three pages and two nesting levels, retaining the source page.
                             if(startScript==null&&currentDepth<2) {
                                 val frames=snapshot.optJSONArray("frames") ?: JSONArray()
                                 for(i in 0 until frames.length()) {
@@ -231,6 +263,16 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     delay(300)
                 }
             }
+        }
+        }
+        var primary:DiscoveryPage?=null
+        var fallback:DiscoveryPage?=null
+        try {
+            val source=try { DiscoveryPage(0,pageUrl) } catch(_:RuntimeException) {
+                throw MediaResolutionFailure("网页初始化", "WebView 无法启动，请检查系统 WebView 后重试")
+            }
+            primary=source
+            source.start(rule.referer)
             val resolved = withTimeoutOrNull(timeoutMs) {
                 var found: PlaybackRequest? = null
                 while(found == null) {
@@ -241,17 +283,25 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                         ?: withTimeoutOrNull(300) { candidates.receive() }
                     // Once the frame wait expires, a bounded iframe navigation takes priority
                     // over more untyped API guesses. A failed promoted page skips its wait.
-                    if(confirmed==null&&startScript==null&&followedFrames<3&&pendingFrames.isNotEmpty()&&
-                        (frameFailed||android.os.SystemClock.elapsedRealtime()-navigationStarted>=frameWaitMs)) {
+                    val activeFallback=fallback
+                    val fallbackStarted=activeFallback?.navigationStarted ?: source.navigationStarted
+                    if(confirmed==null&&source.startScript==null&&followedFrames<3&&pendingFrames.isNotEmpty()&&
+                        (activeFallback?.frameFailed==true||android.os.SystemClock.elapsedRealtime()-fallbackStarted>=frameWaitMs)) {
                         val frame=pendingFrames.removeFirst()
                         if(visitedFrames.add(frame.url)) {
-                            followedFrames++;currentDepth=frame.depth;currentPage=frame.url;navigation++
-                            frameFailed=false
-                            navigationStarted=android.os.SystemClock.elapsedRealtime()
-                            web.stopLoading()
+                            followedFrames++
+                            fallback?.destroyWeb();fallback=null
                             CookieManager.getInstance().flush()
-                            diagnostic("iframe_fallback depth=$currentDepth attempt=$followedFrames")
-                            web.loadUrl(frame.url,mapOf("Referer" to frame.referer))
+                            diagnostic("iframe_fallback depth=${frame.depth} attempt=$followedFrames")
+                            try {
+                                val next=DiscoveryPage(frame.depth,frame.url,followedFrames)
+                                fallback=next
+                                next.start(frame.referer)
+                            } catch(_:RuntimeException) {
+                                fallback?.destroyWeb();fallback=null
+                                lastFrameFailure=MediaResolutionFailure("网页初始化", "候选网页无法启动，继续等待原页面")
+                                diagnostic("iframe_init_failed depth=${frame.depth} attempt=$followedFrames")
+                            }
                         }
                         continue
                     }
@@ -269,10 +319,11 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
             }
             // A third-party analytics SyntaxError is not proof the player failed to run.
             // Keep it in diagnostics; report the observed discovery/probe failure instead.
-            resolved ?: throw (fatal.get() ?: lastProbe ?: lastFrameFailure ?:
+            resolved ?: throw (fatal.get() ?: frameChallenges.values.lastOrNull() ?: lastProbe ?: lastFrameFailure ?:
                 MediaResolutionFailure("媒体发现", "等待超时，未找到可用媒体（候选 ${seen.size}）"))
         } finally {
-            destroyWeb()
+            fallback?.destroyWeb()
+            primary?.destroyWeb()
             candidates.close()
             speculativeCandidates.close()
         }
