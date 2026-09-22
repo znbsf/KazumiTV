@@ -36,10 +36,14 @@ object UserDataCheckpoint {
             check(stores.all { (name, prefs) -> decode(JSONObject(file.readText()).getJSONObject(name)) == prefs.all })
             return "user_data_checkpoint_saved stores=${names.size} label=$label"
         }
-        require(mode == "user-data-restore")
+        require(mode in setOf("user-data-restore", "user-data-verify"))
         val data = JSONObject(file.readText())
         // Decode every store before making any writes; malformed checkpoints remain untouched.
         val decoded = names.associateWith { decode(data.getJSONObject(it)) }
+        if(mode == "user-data-verify") {
+            check(stores.all { (name,prefs)->prefs.all==decoded.getValue(name) }) { "User data changed since checkpoint" }
+            return "user_data_checkpoint_unchanged stores=${names.size} label=$label"
+        }
         stores.forEach { (name, prefs) -> restore(prefs, decoded.getValue(name)) }
         check(stores.all { (name, prefs) -> prefs.all == decoded.getValue(name) })
         return "user_data_checkpoint_restored_and_equal stores=${names.size} label=$label"
