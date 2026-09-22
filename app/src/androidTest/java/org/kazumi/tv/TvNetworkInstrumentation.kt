@@ -22,6 +22,10 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode=="catalogue-verification") {
+                output.putString("stream",CatalogueVerificationRegression.run(this)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="streaming-timeout") {
                 output.putString("stream",StreamingTimeoutRegression.run()+"\n")
                 finish(Activity.RESULT_OK,output);return

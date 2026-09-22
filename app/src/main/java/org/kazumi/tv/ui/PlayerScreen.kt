@@ -40,7 +40,8 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                  initialPosition: Long? = null, initialPlayWhenReady:Boolean=true, sessionNotice: String = "",
                  onResolveAgain: ((Long, Boolean) -> Unit)? = null, onChooseRoad: ((Long, Boolean) -> Unit)? = null, onChooseSource: ((Long,Boolean)->Unit)? = null,
                  sleepTimer: PlaybackSleepTimer = PlaybackSleepTimer.shared, displaySession:DisplayModeSession?=null,
-                 catalogueLoading:Boolean=false, onRetryCatalogue:(()->Unit)?=null, onClose: () -> Unit) {
+                 catalogueLoading:Boolean=false, onRetryCatalogue:(()->Unit)?=null,
+                 catalogueVerificationShowing:Boolean=false,onVerifyCatalogue:(()->Unit)?=null,onClose: () -> Unit) {
     val displayModes=displaySession ?: rememberDisplayModeSession()
     val sleepStatus by sleepTimer.state.collectAsState()
     var sleepMinutes by remember { mutableStateOf("") }
@@ -105,6 +106,28 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
     val menuFocus = remember { FocusRequester() }
     var catalogueFocusPending by remember(request) { mutableStateOf(false) }
     var controlsFocusRevision by remember(request) { mutableIntStateOf(0) }
+    var catalogueResumeIntent by remember(request) { mutableStateOf<Boolean?>(null) }
+    var catalogueReturnPending by remember(request) { mutableStateOf(false) }
+    var backKeyDown by remember(request) { mutableStateOf(false) }
+    DisposableEffect(lifecycle) {
+        val observer=LifecycleEventObserver { _,event -> if(event==Lifecycle.Event.ON_STOP) { catalogueResumeIntent=false;backKeyDown=false } }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(catalogueVerificationShowing) {
+        if(catalogueVerificationShowing) {
+            catalogueReturnPending=true
+            catalogueResumeIntent=engine.player.playWhenReady
+            engine.player.pause()
+        } else catalogueResumeIntent?.let { resume ->
+            catalogueResumeIntent=null
+            if(resume && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) && !failed && !sleepTimer.refresh().expired)engine.player.play()
+            visible=true;interaction++
+            // Let the modal window and its BACK key sequence finish before restoring background focus.
+            withFrameNanos { };withFrameNanos { }
+            catalogueReturnPending=false;controlsFocusRevision++
+        }
+    }
     LaunchedEffect(catalogueLoading,onRetryCatalogue!=null) {
         if(catalogueFocusPending && !catalogueLoading) {
             catalogueFocusPending=false
@@ -146,7 +169,10 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
     fun toggle() { if (engine.player.playWhenReady) engine.player.pause() else engine.player.play() }
     fun handleBack() { when { menu != null -> menu = null; visible && playing -> visible = false; else -> onClose() } }
     LaunchedEffect(sleepStatus.expired) { if(sleepStatus.expired) { visible=true; menu="定时停止" } }
-    BackHandler { handleBack() }
+    BackHandler(enabled=!catalogueVerificationShowing && !catalogueReturnPending) {
+        // Dispatcher-only devices (or an UP delivered outside Compose) own this press here.
+        backKeyDown=false;handleBack()
+    }
     LaunchedEffect(visible, playing, interaction, menu) {
         if (visible && playing && menu == null) { delay(preferences.controlsSeconds*1000L); visible = false }
     }
@@ -191,11 +217,16 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
         onDispose { saveProgress(); lifecycle.removeObserver(observer); engine.player.removeListener(listener); engine.release() }
     }
     Box(Modifier.fillMaxSize().background(Color.Black).onPreviewKeyEvent { event ->
+        if(catalogueVerificationShowing || catalogueReturnPending) { backKeyDown=false;return@onPreviewKeyEvent true }
         val key = event.nativeKeyEvent
         if(key.keyCode==KeyEvent.KEYCODE_BACK) {
-            // Older TV input dispatch may send BACK to the focused view before the dispatcher.
-            // Consume the matching UP too so one press cannot also close the restored controls.
-            if(key.action==KeyEvent.ACTION_DOWN&&key.repeatCount==0) { interaction++;handleBack() }
+            // Keep the focused subtree mounted throughout DOWN. Removing a menu on DOWN lets
+            // its UP escape to the dispatcher, which would close the paused session a second time.
+            if(key.action==KeyEvent.ACTION_DOWN && key.repeatCount==0)backKeyDown=true
+            if(key.action==KeyEvent.ACTION_UP) {
+                val matched=backKeyDown;backKeyDown=false
+                if(matched && !key.isCanceled) { interaction++;handleBack() }
+            }
             true
         } else if (key.action != KeyEvent.ACTION_DOWN) false else {
             interaction++
@@ -256,6 +287,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                     if(onRetryCatalogue!=null)Button(enabled=!catalogueLoading,onClick={
                         interaction++;catalogueFocusPending=true;onRetryCatalogue()
                     }) { Text(if(catalogueLoading) "正在恢复集表…" else "重试集表") }
+                    if(onVerifyCatalogue!=null)PlayerAction("验证并恢复集表") { interaction++;onVerifyCatalogue() }
                     if (onChooseRoad != null) PlayerAction("线路") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseRoad(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
                     if(onChooseSource!=null)PlayerAction("换源") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseSource(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
                     if(request.offlineId==null)PlayerAction(if (danmakuEnabled) "弹幕 开" else "弹幕 关") { danmakuEnabled = !danmakuEnabled; preferences.danmakuEnabled = danmakuEnabled }

@@ -17,4 +17,6 @@ HTTP 状态、验证码及节流的分类位于回退外部，不触发改协议
 - 同一轮第一条线路的媒体解析仍为 MediaResolutionFailure，未到实际播放。这项修复只证明集表通路恢复，不代表 AGE 播放通过。
 - 本地日志：`artifacts/recovery-20260922/age-page-followup-tv.txt`、`age-https-details-tv.txt`、`age-fallback-resolve-tv.txt`。电脑端协议对照为辅助证据，不能替代电视结果。
 
+后续现代 TV 模拟器 WebView 143 使用本地候选 `704287653848244495d306b18de6b39e9642f3cb8dd382afe65ef2c78adc4fce`，固定 AGE 1.5 规则与安装规则 canonical hash 一致，搜索 5 条、集表 5 线；第 12 集全部 5 条线路均完成首帧、短时推进、拖动及暂停/继续。记录为 `artifacts/recovery-20260922/age-roads-modern.txt`。这不是旧电视的通过证据，也不等于整集、全站或完整迁移验收。
+
 固定上游规则保持不变。该改动晚于公开 Preview 4；额外请求仍受原 HttpText 超时约束，失败时最多增加一次请求的等待，不做无限重试。

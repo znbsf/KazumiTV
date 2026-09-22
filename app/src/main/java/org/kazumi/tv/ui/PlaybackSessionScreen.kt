@@ -11,6 +11,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -31,6 +33,7 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
                           onSelection: (Episode) -> Unit = {}, sourceCatalog:SourceCatalog?=null,
                           resolveEpisode:(suspend (String,Episode)->org.kazumi.tv.playback.PlaybackRequest)?=null,
                           onReturnContext:((PlaybackSessionContext)->Unit)?=null,
+                          sleepTimer:org.kazumi.tv.playback.PlaybackSleepTimer=org.kazumi.tv.playback.PlaybackSleepTimer.shared,
                           onClose: () -> Unit) {
     val displayModes=rememberDisplayModeSession()
     val context = LocalContext.current
@@ -45,6 +48,8 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
     var restoring by remember { mutableStateOf(restored||initialRoads.isEmpty()) }
     var retry by remember { mutableIntStateOf(0) }
     var catalogueAttempt by remember { mutableIntStateOf(0) }
+    var catalogueChallenge by remember(activeRule,episode.pageUrl,sourceRevision) { mutableStateOf<SourceVerificationRequired?>(null) }
+    var verifyingCatalogue by remember(activeRule,episode.pageUrl,sourceRevision) { mutableStateOf(false) }
     var startPosition by remember { mutableStateOf<Long?>(
         if(restored) {
             val settings=TvPreferences(context)
@@ -60,6 +65,7 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
     LaunchedEffect(activeRule,sourceRevision,catalogueAttempt,choosingSource,episode.pageUrl) {
         if (roads.isNotEmpty() || choosingSource) { restoring=false;return@LaunchedEffect }
         restoring=true
+        catalogueChallenge=null
         val requestedRule=activeRule
         val requestedPage=episode.pageUrl
         try {
@@ -76,6 +82,10 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
             roads = restored; road = selectedRoad
             origin = PlaybackOrigin(activeRule, found.title, found.url, restored[selectedRoad].title)
         } catch (cancelled: CancellationException) { throw cancelled }
+        catch (challenge: SourceVerificationRequired) {
+            currentCoroutineContext().ensureActive()
+            if(activeRule==requestedRule && episode.pageUrl==requestedPage && !choosingSource)catalogueChallenge=challenge
+        }
         catch (_: Exception) { /* Single episode remains usable while the catalogue is unavailable. */ }
         finally { if(currentCoroutineContext().isActive)restoring = false }
     }
@@ -110,17 +120,29 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
         val rule = repository.rules.firstOrNull { it.name == activeRule }
         if (rule != null) VerificationScreen(rule, challenge.pageUrl, challenge=challenge, onDone=done)
     }, onClose = { closeSession() }) { media ->
-        PlayerScreen(media, subject, displaySession=displayModes,
+        PlayerScreen(media, subject, displaySession=displayModes,sleepTimer=sleepTimer,
             onPrevious = if (index > 0) ({ select(episodes[index - 1]) }) else null,
             onNext = if (index in 0 until episodes.lastIndex) ({ select(episodes[index + 1]) }) else null,
             episodes = episodes.map { it.title }, currentEpisode = index, episodeKeys=episodes.map { "$activeRule|${it.pageUrl}" },
             onEpisodeSelected = { select(episodes[it]) }, origin = origin, initialPosition = startPosition, initialPlayWhenReady=startPlaying,
             sessionNotice = if (restoring) "正在恢复集表…" else if (roads.isEmpty()) "集表暂未恢复，当前仅支持单集播放" else "",
             catalogueLoading=restoring,
+            catalogueVerificationShowing=verifyingCatalogue,
+            onVerifyCatalogue=if(catalogueChallenge!=null) ({ verifyingCatalogue=true }) else null,
             onRetryCatalogue=if(roads.isEmpty()) ({ if(!restoring) { restoring=true;catalogueAttempt++ } }) else null,
             onResolveAgain = { position,resumePlay -> startPosition = position; startPlaying=resumePlay; retry++ },
             onChooseRoad = if (roads.size > 1) ({ position,resumePlay -> startPosition = position; startPlaying=resumePlay; choosingRoad = true }) else null,
-            onChooseSource = { position,resumePlay -> startPosition=position; startPlaying=resumePlay; choosingSource=true },
+            onChooseSource = { position,resumePlay -> catalogueChallenge=null;verifyingCatalogue=false;startPosition=position; startPlaying=resumePlay; choosingSource=true },
             onClose = { closeSession() })
+    }
+    val challenge=catalogueChallenge
+    val verificationRule=repository.rules.firstOrNull { it.name==activeRule }
+    if(verifyingCatalogue && challenge!=null && verificationRule!=null) {
+        Dialog(onDismissRequest={ verifyingCatalogue=false },properties=DialogProperties(usePlatformDefaultWidth=false)) {
+            BackHandler { verifyingCatalogue=false }
+            VerificationScreen(verificationRule,challenge.pageUrl,challenge=challenge) {
+                verifyingCatalogue=false;catalogueChallenge=null;catalogueAttempt++
+            }
+        }
     }
 }
