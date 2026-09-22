@@ -128,6 +128,10 @@ class TvNetworkInstrumentation : Instrumentation() {
                 output.putString("stream","Real source diagnosis finished; per-source results above are not playback acceptance.\n")
                 finish(Activity.RESULT_OK,output); return
             }
+            if(mode=="credential-free-release") {
+                output.putString("stream",CredentialFreeReleaseRegression.run(this)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="release-danmaku") {
                 check(targetContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE==0)
                 val isolated=object:android.content.ContextWrapper(targetContext) {

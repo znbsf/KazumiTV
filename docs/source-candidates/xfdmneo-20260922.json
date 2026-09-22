@@ -1,0 +1,30 @@
+{
+  "api": "6",
+  "type": "anime",
+  "name": "xfdmneo-candidate-20260922",
+  "version": "1.1-tv-candidate.1",
+  "muliSources": true,
+  "useWebview": true,
+  "useNativePlayer": true,
+  "usePost": false,
+  "useLegacyParser": true,
+  "adBlocker": false,
+  "userAgent": "",
+  "baseURL": "https://anime.xifanacg.com/",
+  "searchURL": "https://anime.xifanacg.com/search.html?wd=@keyword",
+  "searchList": "//div[@class='public-list-box search-box flex rel']",
+  "searchName": "//div[3]/div[1]/div[1]",
+  "searchResult": "//div[3]/div[2]/a[1]",
+  "chapterRoads": "//ul[@class='anthology-list-play size']",
+  "chapterResult": "//li/a",
+  "referer": "",
+  "antiCrawlerConfig": {
+    "enabled": true,
+    "captchaType": 1,
+    "captchaDetectType": 1,
+    "captchaDetectValue": "//img[contains(concat(' ', normalize-space(@class), ' '), ' ds-verify-img ')]",
+    "captchaImage": "//img[contains(concat(' ', normalize-space(@class), ' '), ' ds-verify-img ')]",
+    "captchaInput": "//input[@type='text' and @name='verify' and contains(concat(' ', normalize-space(@class), ' '), ' ds-verify ')]",
+    "captchaButton": "//button[contains(concat(' ', normalize-space(@class), ' '), ' verify-submit ')]"
+  }
+}

@@ -22,6 +22,7 @@ import kotlin.math.abs
 /** Cross-source production UI, real rules/search/chapters/media. No injected playback state.
  * A durable checkpoint protects the real stores used by Compose Dialog; not full-watch evidence.
  */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object RealSourceSwitchRegression {
     fun run(test:Instrumentation,args:Bundle=Bundle()):String {
         val context=test.targetContext
@@ -29,6 +30,12 @@ object RealSourceSwitchRegression {
         val targetName=args.getString("targetName") ?: "MXdm"
         val episodeIndex=(args.getString("episodeIndex")?.toIntOrNull() ?: 11).coerceAtLeast(0)
         val targetRoad=(args.getString("targetRoad")?.toIntOrNull() ?: 0).coerceAtLeast(0)
+        val verifyReentry=args.getString("verifyReentry")=="true"
+        val verifyStandby=args.getString("verifyStandby")=="true"
+        require(!verifyStandby||verifyReentry)
+        val power=context.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+        var powerOwned=false
+        fun shell(command:String) { android.os.ParcelFileDescriptor.AutoCloseInputStream(test.uiAutomation.executeShellCommand(command)).use { it.readBytes() } }
         val start=SystemClock.elapsedRealtime()
         val budget=(args.getString("maxMs")?.toLongOrNull() ?: 240_000L).coerceIn(90_000L,300_000L)
         val snapshots=listOf("tv_settings","tv_library","search_history").associateWith { context.getSharedPreferences(it,0).all.toMap() }
@@ -107,7 +114,7 @@ object RealSourceSwitchRegression {
             val sourceKey="${from.name}|${first.pageUrl}";val targetKey="${to.name}|${target.pageUrl}"
             val library=LibraryStore(context)
             check(library.history().none { it.subject.id==subject.id }) { "restore_stale_acceptance_checkpoint_first" }
-            TvPreferences(context).apply { incognito=false;resumePlayback=false;autoNext=false;speed=1f;danmakuEnabled=false;controlsSeconds=10;seekSeconds=10 }
+            TvPreferences(context).apply { incognito=false;resumePlayback=verifyReentry;autoNext=false;speed=1f;danmakuEnabled=false;controlsSeconds=10;seekSeconds=10 }
             report("source=${from.name} target=${to.name} episode=${first.title} target_road=$targetRoad; real network; no full-watch claim")
             activity=test.startActivitySync(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val host=activity!!
@@ -172,10 +179,58 @@ object RealSourceSwitchRegression {
             check(saved.origin?.rule==to.name&&saved.origin?.roadTitle==nextRoad.title)
             report("return=PASS source=${to.name} road=${nextRoad.title} episode=${target.title}")
             shot("03-return-target-episodes")
-            return "real_source_switch=PASS cancel_pause=PASS same_episode_progress=PASS real_target_advance=PASS return_target_context=PASS"
+            if(verifyReentry) {
+                phase="reenter_target_episode"
+                val savedAt=saved.position
+                val label=nodes().first { it.text?.toString()?.let { s->s.startsWith("${targetIndex+1}.")&&s.contains(target.title)&&s.contains("当前") }==true }.text.toString()
+                click(label)
+                await("reentered_target_advance") { library.history().any { it.key==targetKey&&it.position>=savedAt+3000 } }
+                test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)
+                await("reentered_target_pause",10_000) { has("▷ 播放")&&clockMs()!=null }
+                val reenteredAt=clockMs()!!
+                check(reenteredAt in savedAt..(savedAt+20_000)) { "reentry_lost_saved_position" }
+                report("reentry=PASS saved_ms=$savedAt reentered_ms=$reenteredAt source=${to.name} episode=${target.title}")
+                shot("04-target-reentry")
+                if(verifyStandby) {
+                    phase="power_standby"
+                    check(power.isInteractive) { "standby_requires_initially_awake_device" }
+                    // Resolve only this app's single active test session, never another app's media.
+                    lateinit var activePlayer:androidx.media3.common.Player
+                    test.runOnMainSync {
+                        val type=androidx.media3.session.MediaSession::class.java
+                        val lock=type.getDeclaredField("STATIC_LOCK").apply { isAccessible=true }.get(null)
+                        val sessions=type.getDeclaredField("SESSION_ID_TO_SESSION_MAP").apply { isAccessible=true }
+                        activePlayer=synchronized(lock) {
+                            (sessions.get(null) as Map<*,*>).values.filterIsInstance<androidx.media3.session.MediaSession>()
+                                .single { it.player.mediaMetadata.title?.toString()=="${subject.title} · ${target.title}" }.player
+                        }
+                    }
+                    fun playerState():Pair<Long,Boolean> { var result=0L to false;test.runOnMainSync { result=activePlayer.currentPosition to activePlayer.playWhenReady };return result }
+                    test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PLAY)
+                    await("playing_before_standby",10_000) { playerState().let { it.second&&it.first>reenteredAt+1000 } }
+                    powerOwned=true;shell("input keyevent 26")
+                    await("device_became_noninteractive",10_000) { !power.isInteractive }
+                    await("playback_paused_on_screen_off",10_000) { !playerState().second }
+                    val stoppedAt=playerState().first
+                    Thread.sleep(2000)
+                    check(abs(playerState().first-stoppedAt)<350) { "playback_advanced_while_screen_off" }
+                    if(!power.isInteractive)shell("input keyevent 26")
+                    await("device_awake",15_000) { power.isInteractive };powerOwned=false
+                    context.startActivity(Intent(context,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                    await("same_activity_resumed",15_000) { var resumed=false;test.runOnMainSync { resumed=host.lifecycle.currentState==androidx.lifecycle.Lifecycle.State.RESUMED };resumed }
+                    check(!playerState().second&&abs(playerState().first-stoppedAt)<1000) { "wake_did_not_preserve_pause_position" }
+                    test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PLAY)
+                    await("explicit_continue_after_standby",20_000) { playerState().let { it.second&&it.first>stoppedAt+3000 } }
+                    test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)
+                    report("standby=PASS noninteractive=true stable_pause=true explicit_resume=true before_ms=$stoppedAt after_ms=${playerState().first}; short_screen_off_not_deep_power_cycle")
+                    shot("05-standby-resumed")
+                }
+            }
+            return "real_source_switch=PASS cancel_pause=PASS same_episode_progress=PASS real_target_advance=PASS return_target_context=PASS reentry=${if(verifyReentry)"PASS" else "NOT_RUN"} standby=${if(verifyStandby)"PASS" else "NOT_RUN"}"
         } catch(failure:Exception) {
             report("result=FAIL phase=$phase error=${failure.javaClass.simpleName}");shot("failure");throw failure
         } finally {
+            if(powerOwned&&!power.isInteractive)runCatching { shell("input keyevent 26") }
             try {
                 activity?.let { host->
                     test.runOnMainSync { host.finish() };test.waitForIdleSync()
