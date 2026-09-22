@@ -75,6 +75,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         val speculativeCandidates = Channel<PlaybackRequest>(8)
         data class DiscoveryKey(val url:String,val headers:Map<String,String>)
         val speculativeSeen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
+        val computedSeen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
         val seen = java.util.concurrent.ConcurrentHashMap.newKeySet<DiscoveryKey>()
         val fatal = AtomicReference<Exception?>(null)
         var scriptError = false
@@ -88,12 +89,14 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         // A later navigation/normal completed page invalidates that candidate's old challenge.
         val frameChallenges=linkedMapOf<Int,SourceVerificationRequired>()
         val frameWaitMs=(timeoutMs/4).coerceIn(2000,4000)
-        fun offer(url: String, headers: Map<String,String>, speculative: Boolean = false) {
+        fun offer(url: String, headers: Map<String,String>, speculative: Boolean = false, computed: Boolean = false) {
             if(runCatching { SourceRule.httpUrl(url) }.isFailure)return
             val effectiveHeaders=MediaRequestHeaders.forMedia(rule,pageUrl,headers)
             val key=DiscoveryKey(url,effectiveHeaders.mapKeys { it.key.lowercase(java.util.Locale.ROOT) })
-            val dedup = if(speculative) speculativeSeen else seen
-            val limit = if(speculative) 8 else 24
+            val dedup = if(speculative && computed) computedSeen else if(speculative) speculativeSeen else seen
+            // Reserve one of the eight speculative probes for an observed driver contract.
+            // Untyped resource requests must not exhaust that slot before its eight-second wait.
+            val limit = if(speculative && computed) 1 else if(speculative) 7 else 24
             val queue = if(speculative) speculativeCandidates else candidates
             // Context is part of a request: a failed parent-page Referer must not suppress
             // a later iframe request for the same address. Keep a strict shared budget.
@@ -231,7 +234,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                             val guesses = snapshot.optJSONArray("speculative") ?: JSONArray()
                             for(i in 0 until guesses.length()) {
                                 val media = guesses.getJSONObject(i)
-                                offer(media.getString("url"), mapOf("Referer" to media.optString("referer",currentPage),"User-Agent" to rule.userAgent), speculative=true)
+                                offer(media.getString("url"), mapOf("Referer" to media.optString("referer",currentPage),"User-Agent" to rule.userAgent), speculative=true,computed=media.optBoolean("computed"))
                             }
                             // Old providers cannot install hooks inside unrelated-origin frames.
                             // Probe visible player containers in a separate bounded candidate page,
@@ -278,7 +281,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                 while(found == null) {
                     fatal.get()?.let { throw it }
                     // Typed/Range discoveries retain their own budget and always win the next
-                    // probe. Resource Timing guesses get at most eight probes per attempt.
+                    // probe. Resource Timing and computed guesses share at most eight probes.
                     val confirmed = candidates.tryReceive().getOrNull()
                         ?: withTimeoutOrNull(300) { candidates.receive() }
                     // Once the frame wait expires, a bounded iframe navigation takes priority

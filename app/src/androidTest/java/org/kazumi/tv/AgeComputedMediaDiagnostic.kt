@@ -210,6 +210,9 @@ object AgeComputedMediaDiagnostic {
                     catch(error:Exception) { summary.put("probeErrorType",error.javaClass.simpleName) }
                 } else summary.put("probeErrorType","IneligibleSnapshot")
             }
+            if(args.getString("playAnonymous")=="true" && summary.optInt("probeStatus")==206 && summary.optString("probeMime")=="video/mp4") {
+                summary.put("anonymousPlayback",AgeAnonymousPlaybackDiagnostic.run(test,snapshot.getString("value"),rule.userAgent,folder))
+            }
             File(folder,"summary.json").writeText(summary.toString(),Charsets.UTF_8)
             return@runBlocking summary.toString()
         } finally {

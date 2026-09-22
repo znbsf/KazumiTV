@@ -4,9 +4,10 @@ package org.kazumi.tv.playback
 object MediaDiscoveryScript {
     val poll = """
         (function(){
+          var computedPlayer=${ComputedPlayerMetadataScript.reader};
           function setup(w,depth){try{
             if(!w.__kazumiMedia){
-              var q=[]; w.__kazumiMedia=q; w.__kazumiRemote=[];
+              var q=[]; w.__kazumiMedia=q; w.__kazumiRemote=[]; w.__kazumiComputedState={};
               if(w===w.top)w.addEventListener('message',function(e){try{
                 var m=e.data;if(!m||m.kind!=='kazumi-media-v1'||typeof m.url!=='string'||typeof m.referer!=='string')return;
                 if(m.url.length>16384||m.referer.length>16384||!/^https?:/i.test(m.url)||!/^https?:/i.test(m.referer))return;
@@ -41,11 +42,14 @@ object MediaDiscoveryScript {
                 }
               }
             }
+            var computed=computedPlayer(w,w.__kazumiComputedState,Date.now());
+            w.__kazumiComputedUrl=computed;
             if(depth<3)for(var i=0;i<w.frames.length;i++)setup(w.frames[i],depth+1);
           }catch(e){}}
           setup(window,0);
-          var urls=[],speculative=[],frames=[],seen=[],inaccessibleFrames=0;
+          var urls=[],speculative=[],computed=[],frames=[],seen=[],inaccessibleFrames=0;
           function collect(w,d){try{var q=w.__kazumiMedia||[];for(var i=0;i<q.length;i++)if(seen.indexOf(q[i])<0&&urls.length<24){seen.push(q[i]);urls.push({url:q[i],referer:w.location.href});}
+            if(w.__kazumiComputedUrl&&computed.length<1)computed.push({url:w.__kazumiComputedUrl,referer:w.location.href,computed:true});
             var guesses=w.__kazumiSpeculative||[];for(var g=0;g<guesses.length&&speculative.length<24;g++)speculative.push({url:guesses[g],referer:w.location.href});
             var nodes=w.document.querySelectorAll('iframe[src]');for(var k=0;k<nodes.length&&frames.length<24;k++){var n=nodes[k],src=n.getAttribute('src');if(src&&src.trim()&&/^https?:/i.test(n.src)){
               var cross=false;try{var loc=n.contentWindow.location.href;}catch(blocked){cross=true;}
@@ -55,6 +59,7 @@ object MediaDiscoveryScript {
               frames.push({url:n.src,referer:w.location.href,crossOrigin:cross,playerLike:large&&visible&&player});}}
             if(d<3)for(var j=0;j<w.frames.length;j++)collect(w.frames[j],d+1);}catch(e){inaccessibleFrames++;}}
           collect(window,0);
+          if(computed.length){if(speculative.length>=24)speculative.pop();speculative.push(computed[0]);}
           var remote=window.__kazumiRemote||[];for(var r=0;r<remote.length&&urls.length<24;r++)if(seen.indexOf(remote[r].url)<0){seen.push(remote[r].url);urls.push(remote[r]);}
           return JSON.stringify({urls:urls,speculative:speculative,frames:frames,inaccessibleFrames:inaccessibleFrames,title:document.title||'',ready:document.readyState});
         })();
