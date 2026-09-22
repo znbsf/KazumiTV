@@ -22,6 +22,10 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode=="catalogue-recovery") {
+                output.putString("stream",CatalogueRecoveryRegression.run(this)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode == "candidate-rule") {
                 output.putString("stream",CandidateRuleRegression.run(this,runnerArgs)+"\n")
                 finish(Activity.RESULT_OK,output); return

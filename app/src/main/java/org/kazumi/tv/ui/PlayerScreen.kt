@@ -39,7 +39,8 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                  onEpisodeSelected: ((Int) -> Unit)? = null, episodeKeys: List<String> = emptyList(), origin: PlaybackOrigin? = null,
                  initialPosition: Long? = null, initialPlayWhenReady:Boolean=true, sessionNotice: String = "",
                  onResolveAgain: ((Long, Boolean) -> Unit)? = null, onChooseRoad: ((Long, Boolean) -> Unit)? = null, onChooseSource: ((Long,Boolean)->Unit)? = null,
-                 sleepTimer: PlaybackSleepTimer = PlaybackSleepTimer.shared, displaySession:DisplayModeSession?=null, onClose: () -> Unit) {
+                 sleepTimer: PlaybackSleepTimer = PlaybackSleepTimer.shared, displaySession:DisplayModeSession?=null,
+                 catalogueLoading:Boolean=false, onRetryCatalogue:(()->Unit)?=null, onClose: () -> Unit) {
     val displayModes=displaySession ?: rememberDisplayModeSession()
     val sleepStatus by sleepTimer.state.collectAsState()
     var sleepMinutes by remember { mutableStateOf("") }
@@ -102,6 +103,15 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
     val rootFocus = remember { FocusRequester() }
     val controlsFocus = remember { FocusRequester() }
     val menuFocus = remember { FocusRequester() }
+    var catalogueFocusPending by remember(request) { mutableStateOf(false) }
+    var controlsFocusRevision by remember(request) { mutableIntStateOf(0) }
+    LaunchedEffect(catalogueLoading,onRetryCatalogue!=null) {
+        if(catalogueFocusPending && !catalogueLoading) {
+            catalogueFocusPending=false
+            // The retry action may disappear after success; restore an attached main control.
+            controlsFocusRevision++
+        }
+    }
     fun saveProgress() {
         if (rendered) store.save(HistoryEntry(request.resumeKey, subject, request.title,
             engine.player.currentPosition.coerceAtLeast(0), engine.player.duration.coerceAtLeast(0), latestOrigin,kind=if(request.offlineId!=null)HistoryKind.OFFLINE else HistoryKind.ONLINE))
@@ -227,7 +237,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 .padding(horizontal = 28.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (status.isNotBlank()) Text(status, style = KazumiType.caption)
                 if (failed) Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    PlayerAction("重新加载", playerEntryFocus(controlsFocus, request to failed)) {
+                    PlayerAction("重新加载", playerEntryFocus(controlsFocus, Triple(request,failed,controlsFocusRevision))) {
                         if (onResolveAgain != null) onResolveAgain(engine.player.currentPosition.coerceAtLeast(0), playIntent)
                         else { failed = false; engine.open(request, position) }
                     }
@@ -240,9 +250,12 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
                 }
                 PlayerProgress(position, duration, engine.player.bufferedPosition,preferences.seekSeconds*1000L) { interaction++; engine.player.seekTo(it) }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PlayerAction(if (playIntent) "Ⅱ 暂停" else "▷ 播放", if (failed) Modifier else playerEntryFocus(controlsFocus, request to failed)) { interaction++; toggle() }
+                    PlayerAction(if (playIntent) "Ⅱ 暂停" else "▷ 播放", if (failed) Modifier else playerEntryFocus(controlsFocus, Triple(request,failed,controlsFocusRevision))) { interaction++; toggle() }
                     if (episodes.isNotEmpty()) PlayerAction("选集") { menu = "选集" }
                     if (onNext != null) PlayerAction("下一集", onClick = onNext)
+                    if(onRetryCatalogue!=null)Button(enabled=!catalogueLoading,onClick={
+                        interaction++;catalogueFocusPending=true;onRetryCatalogue()
+                    }) { Text(if(catalogueLoading) "正在恢复集表…" else "重试集表") }
                     if (onChooseRoad != null) PlayerAction("线路") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseRoad(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
                     if(onChooseSource!=null)PlayerAction("换源") { val resumePlay=engine.player.playWhenReady; engine.player.pause(); onChooseSource(engine.player.currentPosition.coerceAtLeast(0),resumePlay) }
                     if(request.offlineId==null)PlayerAction(if (danmakuEnabled) "弹幕 开" else "弹幕 关") { danmakuEnabled = !danmakuEnabled; preferences.danmakuEnabled = danmakuEnabled }

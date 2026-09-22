@@ -13,6 +13,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import org.kazumi.tv.data.*
 import org.kazumi.tv.domain.PlaybackIdentity
 import org.kazumi.tv.playback.WebMediaResolver
@@ -41,6 +44,7 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
     var origin by rememberSaveable(stateSaver=PlaybackStateSavers.origin) { mutableStateOf(initialOrigin) }
     var restoring by remember { mutableStateOf(restored||initialRoads.isEmpty()) }
     var retry by remember { mutableIntStateOf(0) }
+    var catalogueAttempt by remember { mutableIntStateOf(0) }
     var startPosition by remember { mutableStateOf<Long?>(
         if(restored) {
             val settings=TvPreferences(context)
@@ -53,14 +57,19 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
     var choosingSource by rememberSaveable { mutableStateOf(false) }
     val episodes = roads.getOrNull(road)?.episodes.orEmpty()
     val index = episodes.indexOfFirst { it.pageUrl == episode.pageUrl }
-    LaunchedEffect(activeRule,sourceRevision) {
-        if (roads.isNotEmpty())return@LaunchedEffect
+    LaunchedEffect(activeRule,sourceRevision,catalogueAttempt,choosingSource,episode.pageUrl) {
+        if (roads.isNotEmpty() || choosingSource) { restoring=false;return@LaunchedEffect }
+        restoring=true
+        val requestedRule=activeRule
+        val requestedPage=episode.pageUrl
         try {
             val rule = repository.rules.firstOrNull { it.name == activeRule } ?: return@LaunchedEffect
             val found = origin?.takeIf { it.rule==activeRule&&it.sourceUrl.isNotBlank() }?.let { SourceMatch(it.sourceTitle, it.sourceUrl) }
                 ?: repository.search(rule, subject.title).filter { it.title.trim() == subject.title.trim() }.singleOrNull()
                 ?: return@LaunchedEffect
             val restored = repository.chapters(rule, found)
+            currentCoroutineContext().ensureActive()
+            if(activeRule!=requestedRule || episode.pageUrl!=requestedPage || choosingSource)return@LaunchedEffect
             // Do not infer a season or episode from list position; require the persisted page.
             if(restored.none { r -> r.episodes.any { it.pageUrl == episode.pageUrl } })return@LaunchedEffect
             val selectedRoad = PlaybackStateSavers.roadIndex(restored,origin?.roadTitle.orEmpty(),road,episode.pageUrl)
@@ -68,7 +77,7 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
             origin = PlaybackOrigin(activeRule, found.title, found.url, restored[selectedRoad].title)
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { /* Single episode remains usable while the catalogue is unavailable. */ }
-        finally { restoring = false }
+        finally { if(currentCoroutineContext().isActive)restoring = false }
     }
     fun select(next: Episode, position: Long? = null) {
         episode = next; startPosition = position; startPlaying=true; retry = 0; if(activeRule==ruleName && origin?.sourceUrl==initialOrigin?.sourceUrl)onSelection(next)
@@ -107,6 +116,8 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
             episodes = episodes.map { it.title }, currentEpisode = index, episodeKeys=episodes.map { "$activeRule|${it.pageUrl}" },
             onEpisodeSelected = { select(episodes[it]) }, origin = origin, initialPosition = startPosition, initialPlayWhenReady=startPlaying,
             sessionNotice = if (restoring) "正在恢复集表…" else if (roads.isEmpty()) "集表暂未恢复，当前仅支持单集播放" else "",
+            catalogueLoading=restoring,
+            onRetryCatalogue=if(roads.isEmpty()) ({ if(!restoring) { restoring=true;catalogueAttempt++ } }) else null,
             onResolveAgain = { position,resumePlay -> startPosition = position; startPlaying=resumePlay; retry++ },
             onChooseRoad = if (roads.size > 1) ({ position,resumePlay -> startPosition = position; startPlaying=resumePlay; choosingRoad = true }) else null,
             onChooseSource = { position,resumePlay -> startPosition=position; startPlaying=resumePlay; choosingSource=true },
