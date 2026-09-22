@@ -22,6 +22,14 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode == "navigation-parcel") {
+                output.putString("stream", NavigationParcelRegression.run(this) + "\n")
+                finish(Activity.RESULT_OK, output); return
+            }
+            if(mode in setOf("user-data-backup", "user-data-restore", "user-data-restore-watch")) {
+                output.putString("stream", UserDataCheckpoint.run(this, mode, auditRun) + "\n")
+                finish(Activity.RESULT_OK, output); return
+            }
             if(mode=="licenses-ui") {
                 LicenseUiRegression.run(this);output.putString("stream","bundled_licenses_GPL_scroll_back=OK\n");finish(Activity.RESULT_OK,output);return
             }

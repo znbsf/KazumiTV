@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -17,7 +16,9 @@ import org.kazumi.tv.rules.*
 
 @Composable
 internal fun RoadSelectionScreen(roads:List<Road>,currentRoad:Int,current:Episode,position:Long?,onBack:()->Unit,onSelect:(Int,Int,Long?)->Unit) {
-    var unmatched by rememberSaveable { mutableStateOf<Int?>(null) }
+    // A list index is valid only for this catalogue snapshot. Reloading after process
+    // restoration may temporarily supply no roads, or reorder/remove a road.
+    var unmatched by remember(roads) { mutableStateOf<Int?>(null) }
     val backFocus=remember { FocusRequester() }
     BackHandler { if(unmatched!=null)unmatched=null else onBack() }
     LaunchedEffect(unmatched) { withFrameNanos { }; backFocus.requestFocus() }
@@ -25,6 +26,7 @@ internal fun RoadSelectionScreen(roads:List<Road>,currentRoad:Int,current:Episod
         if(unmatched==null) {
             PlayerAction("返回播放",Modifier.focusRequester(backFocus),onClick=onBack)
             Text("选择线路 · 仅确认同一集时继承进度",style=KazumiType.title)
+            if(roads.isEmpty())Text("集表暂未恢复，可返回播放后重试。",style=KazumiType.caption)
             LazyColumn(verticalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.weight(1f)) {
                 items(roads.indices.toList()) { index ->
                     PlayerAction((if(index==currentRoad) "✓ " else "")+roads[index].title.ifBlank { "线路 ${index+1}" }) {

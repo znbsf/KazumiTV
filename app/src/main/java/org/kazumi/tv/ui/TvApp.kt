@@ -66,8 +66,8 @@ fun TvApp(searchModel: SearchViewModel? = null) {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
-    var selected by rememberSaveable { mutableStateOf<Subject?>(null) }
-    var resumeEntry by rememberSaveable { mutableStateOf<HistoryEntry?>(null) }
+    var selected by rememberSaveable(stateSaver=NavigationStateSavers.subject) { mutableStateOf<Subject?>(null) }
+    var resumeEntry by rememberSaveable(stateSaver=NavigationStateSavers.history) { mutableStateOf<HistoryEntry?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var library by rememberSaveable { mutableStateOf<String?>(null) }
     var returningLibrary by remember { mutableStateOf(false) }

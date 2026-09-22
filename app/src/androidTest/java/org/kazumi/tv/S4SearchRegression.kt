@@ -41,6 +41,15 @@ object S4SearchRegression {
             while(node!=null && !node.isClickable)node=node.parent
             check(node?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true); Thread.sleep(700)
         }
+        fun awaitRestore(value: SearchViewModel) {
+            repeat(50) {
+                var done=false
+                test.runOnMainSync { done=!value.restoringPages }
+                if(done)return
+                Thread.sleep(100)
+            }
+            error("Search window restoration did not settle")
+        }
         try {
             test.runOnMainSync {
                 saved=SavedStateHandle(mapOf("query" to "fixture","text" to "fixture"))
@@ -63,13 +72,58 @@ object S4SearchRegression {
             repeat(7) { test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN); Thread.sleep(180) }
             Thread.sleep(600)
             check(model.pager.state.value.pages.size>=2) { "Remote browsing did not auto-load next page" }
+            lateinit var restored: SearchViewModel
+            val requestedOffsets=mutableListOf<Int>()
             test.runOnMainSync {
-                check(saved.get<String>("query")=="fixture" && saved.get<Int>("focus")==987000)
-                val restored=SearchViewModel(SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })) { _,offset,_ ->
+                check(saved.get<String>("query")=="fixture")
+                check(model.focusId!=987000) { "Remote browsing did not persist focused result" }
+                model.scrolled(12,37)
+                check(saved.get<Int>("scrollAnchor")==model.pager.state.value.items[12].id)
+                check(saved.get<Int>("windowFirst")==model.pager.state.value.firstOffset)
+                check(saved.get<Int>("windowLast")==model.pager.state.value.pages.last().offset)
+                model.selected(987000,12,37)
+                restored=SearchViewModel(SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })) { _,offset,_ ->
+                    requestedOffsets.add(offset)
                     List(48) { Subject(987000+offset+it,"restored","","") }
                 }
                 check(restored.text=="fixture" && restored.focusId==987000 && restored.restoreFocus)
+                check(restored.scrollIndex==12 && restored.scrollOffset==37)
             }
+            awaitRestore(restored)
+            test.runOnMainSync {
+                check(!restored.restoringPages)
+                val first=saved.get<Int>("windowFirst")!!
+                val last=saved.get<Int>("windowLast")!!
+                check(requestedOffsets==(first..last step 20).toList())
+                check(restored.pager.state.value.pages.size<=5)
+                check(restored.pager.state.value.items[restored.scrollIndex].id==restored.scrollAnchorId)
+                restored.submit("new fixture","score")
+                check(restored.scrollIndex==0 && restored.scrollOffset==0 && restored.focusId==null)
+            }
+            // A failed later page must remain retryable without losing the saved window.
+            var failOnce=true
+            test.runOnMainSync {
+                restored=SearchViewModel(SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })) { _,offset,_ ->
+                    if(offset==saved.get<Int>("windowFirst")!!+20 && failOnce) { failOnce=false; error("offline") }
+                    List(20) { Subject(987000+offset+it,"retried","","") }
+                }
+            }
+            awaitRestore(restored)
+            test.runOnMainSync {
+                check(restored.pager.state.value.failedOffset!=null && restored.restoreFocus)
+                restored.retry()
+            }
+            awaitRestore(restored)
+            test.runOnMainSync {
+                check(restored.pager.state.value.failedOffset==null)
+                check(restored.pager.state.value.pages.last().offset==saved.get<Int>("windowLast"))
+                restored=SearchViewModel(SavedStateHandle(saved.keys().associateWith { saved.get<Any?>(it) })) { _,_,_ -> emptyList() }
+                activity.setContent { KazumiTheme(false) { SearchScreen(restored) {} } }
+            }
+            awaitRestore(restored)
+            find("没有找到匹配番剧")
+            test.waitForIdleSync()
+            test.runOnMainSync { check(!restored.restoreFocus && restored.focusId==null) }
         } finally { test.runOnMainSync { activity.finish() } }
     }
 }

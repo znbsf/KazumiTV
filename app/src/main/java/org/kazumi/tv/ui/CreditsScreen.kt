@@ -27,7 +27,7 @@ internal fun CreditsScreen(subject:Subject,load:suspend(Int,Boolean)->List<Credi
     var retry by remember { mutableIntStateOf(0) }
     var rows by remember { mutableStateOf<List<CreditEntry>?>(null) }
     var failed by remember { mutableStateOf(false) }
-    var path by rememberSaveable { mutableStateOf(arrayListOf<CreditEntry>()) }
+    var path by rememberSaveable(stateSaver=NavigationStateSavers.credits) { mutableStateOf(arrayListOf<CreditEntry>()) }
     var query by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     val grid=rememberLazyGridState(); val focus=remember { mutableMapOf<String,FocusRequester>() }

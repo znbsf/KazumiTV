@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
@@ -38,7 +39,8 @@ fun SearchScreen(model: SearchViewModel = viewModel(), onSelect: (Subject) -> Un
         if(text.isBlank())return
         query=text; model.text=text; store.add(text); history=store.read(); model.submit(text,sort)
     }
-    LaunchedEffect(state.pages) {
+    LaunchedEffect(state.pages,state.loading,model.restoringPages) {
+        if(model.restoringPages)return@LaunchedEffect
         val anchor=displayed.getOrNull(grid.firstVisibleItemIndex)?.id
         val index=results.indexOfFirst { it.id==anchor }
         if(index>=0 && displayed!=results)grid.scrollToItem(index,grid.firstVisibleItemScrollOffset)
@@ -46,18 +48,40 @@ fun SearchScreen(model: SearchViewModel = viewModel(), onSelect: (Subject) -> Un
         displayed=results
         focus.keys.retainAll(results.map { it.id }.toSet())
         if(model.restoreFocus) {
+            // Retain the original anchor until the failed window can be retried.
+            if(state.failedOffset!=null)return@LaunchedEffect
             val selected=results.indexOfFirst { it.id==model.focusId }
-            if(selected>=0) {
-                grid.scrollToItem(selected)
+            val restoredAnchor=results.indexOfFirst { it.id==model.scrollAnchorId }
+            if(results.isNotEmpty() && !state.loading) {
+                grid.scrollToItem(if(restoredAnchor>=0)restoredAnchor else selected.coerceAtLeast(0),
+                    if(restoredAnchor>=0)model.scrollOffset else 0)
                 withFrameNanos { }; withFrameNanos { }
-                focus[model.focusId]?.requestFocus()
+                // Preserve the saved viewport. Scroll to the focused item only if
+                // changed server results moved it outside that viewport.
+                if(selected>=0) {
+                    if(grid.layoutInfo.visibleItemsInfo.none { it.index==selected }) {
+                        grid.scrollToItem(selected)
+                        withFrameNanos { }; withFrameNanos { }
+                    }
+                    focus[model.focusId]?.requestFocus()
+                }
                 model.restoreFocus=false
-            } else if(!state.loading && results.isNotEmpty()) model.restoreFocus=false
+            } else if(!state.loading && results.isEmpty()) {
+                model.restoreFocus=false
+                model.focusId=null
+                model.scrollIndex=0; model.scrollOffset=0
+            }
+        }
+    }
+    LaunchedEffect(grid,state.pages,model.restoringPages) {
+        if(model.restoringPages)return@LaunchedEffect
+        snapshotFlow { grid.firstVisibleItemIndex to grid.firstVisibleItemScrollOffset }.collect { (index,offset) ->
+            model.scrolled(index,offset)
         }
     }
     LaunchedEffect(grid,state.pages,state.loading,state.failedOffset) {
         snapshotFlow { grid.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1 }.collect { last ->
-            if(last >= results.size-12 && results.isNotEmpty() && !state.loading)model.pager.next()
+            if(last >= results.size-12 && results.isNotEmpty() && !state.loading && !model.restoringPages && !model.restoreFocus)model.pager.next()
         }
     }
     Column(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -82,7 +106,7 @@ fun SearchScreen(model: SearchViewModel = viewModel(), onSelect: (Subject) -> Un
                 state.endReached -> "已到结果末尾"
                 else -> "向下浏览自动加载更多"
             },style=KazumiType.caption)
-            if(state.failedOffset!=null)PlayerAction("重试搜索") { model.pager.retry() }
+            if(state.failedOffset!=null)PlayerAction("重试搜索") { model.retry() }
             if(state.firstOffset>0)PlayerAction("更早结果") { model.pager.previous() }
         }
         LazyVerticalGrid(columns=GridCells.Fixed(6),state=grid,modifier=Modifier.weight(1f),contentPadding=PaddingValues(8.dp),
@@ -90,7 +114,7 @@ fun SearchScreen(model: SearchViewModel = viewModel(), onSelect: (Subject) -> Un
             items(results,key={it.id}) { item ->
                 val requester=focus.getOrPut(item.id) { FocusRequester() }
                 Card(onClick={ model.selected(item.id,grid.firstVisibleItemIndex,grid.firstVisibleItemScrollOffset); onSelect(item) },
-                    modifier=Modifier.height(180.dp).focusRequester(requester)) {
+                    modifier=Modifier.height(180.dp).focusRequester(requester).onFocusChanged { if(it.isFocused)model.focused(item.id) }) {
                     CoverImage(item.cover,item.title,contentScale=ContentScale.Crop,modifier=Modifier.fillMaxWidth().weight(1f))
                     Text(item.title,maxLines=2,minLines=2,modifier=Modifier.padding(8.dp),style=KazumiType.caption)
                 }

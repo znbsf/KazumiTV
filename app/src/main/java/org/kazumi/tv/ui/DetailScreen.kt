@@ -26,7 +26,7 @@ import org.kazumi.tv.data.*
 
 @Composable
 internal fun DetailScreen(subject: Subject, loadRelations:suspend(Int)->RelationResult={ RelationRepository().load(it) },loadDetail: suspend (Int) -> Subject = { CatalogRepository().detail(it) }) {
-    var path by rememberSaveable(subject.id) { mutableStateOf(arrayListOf(subject)) }
+    var path by rememberSaveable(subject.id,stateSaver=NavigationStateSavers.subjects) { mutableStateOf(arrayListOf(subject)) }
     val states=rememberSaveableStateHolder()
     var depthNotice by remember { mutableStateOf(false) }
     fun back() { depthNotice=false; val removed=path.last(); path=ArrayList(path.dropLast(1)); states.removeState(removed.id) }

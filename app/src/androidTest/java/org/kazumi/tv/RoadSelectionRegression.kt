@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -26,6 +27,7 @@ object RoadSelectionRegression {
             Road("长篇线路",List(201) { Episode("SP","https://fixture.invalid/$it") }),Road("空线路",emptyList()),
             Road("重号线路",listOf(Episode("第10集","https://fixture.invalid/a"),Episode("第10集","https://fixture.invalid/b"))))
         val activity=test.startActivitySync(Intent(test.targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+        val catalogue=mutableStateOf(roads)
         try {
             fun nodes():List<AccessibilityNodeInfo> {
                 val result=mutableListOf<AccessibilityNodeInfo>()
@@ -44,7 +46,7 @@ object RoadSelectionRegression {
 
             test.runOnMainSync { activity.setContent { KazumiTheme(false) {
                 Box(Modifier.fillMaxSize().background(KazumiColors.background).padding(30.dp)) {
-                    RoadSelectionScreen(roads,0,current,65000L,{ closed.incrementAndGet() }) { road,index,position -> selected.set(Triple(road,index,position)) }
+                    RoadSelectionScreen(catalogue.value,0,current,65000L,{ closed.incrementAndGet() }) { road,index,position -> selected.set(Triple(road,index,position)) }
                 }
             } } }
             click("对应线路"); check(selected.get()==Triple(1,0,65000L))
@@ -69,6 +71,13 @@ object RoadSelectionRegression {
             java.io.File(test.targetContext.getExternalFilesDir(null),"road-selection-fixture.png").outputStream().use {
                 screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)
             }; screenshot.recycle()
+            // The old unmatched index must not address an empty or replaced catalogue.
+            // This checks the production composable reload boundary, not OS process death.
+            test.runOnMainSync { catalogue.value=emptyList() }
+            find("集表暂未恢复，可返回播放后重试。")
+            check(nodes().none { it.text?.toString()=="无法确认同一集，请手动选择；所选集将从头播放。" })
+            test.runOnMainSync { catalogue.value=listOf(roads[1],roads[0]) }
+            click("✓ 对应线路"); check(selected.get()==Triple(0,0,65000L))
             check(original==test.targetContext.getSharedPreferences("tv_library",0).all)
         } finally { test.runOnMainSync { activity.finish() } }
     }
