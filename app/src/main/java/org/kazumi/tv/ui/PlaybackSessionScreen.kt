@@ -113,9 +113,20 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
         return
     }
     ResolvingPlayback("$activeRule|${episode.pageUrl}|$retry", "${subject.title} · ${episode.title}", resolve = {
-        val rule = repository.rules.firstOrNull { it.name == activeRule } ?: error("来源未启用")
-        (resolveEpisode?.invoke(activeRule,episode) ?: WebMediaResolver(context).resolve(episode.pageUrl, rule, "${subject.title} · ${episode.title}"))
-            .copy(resumeKey = "$activeRule|${episode.pageUrl}")
+        val log=DiagnosticLog.shared
+        log.record(DiagnosticLog.Kind.RESOLVE_START)
+        try {
+            val rule = repository.rules.firstOrNull { it.name == activeRule } ?: error("来源未启用")
+            (resolveEpisode?.invoke(activeRule,episode) ?: WebMediaResolver(context,diagnostic=log::resolver).resolve(episode.pageUrl, rule, "${subject.title} · ${episode.title}"))
+                .copy(resumeKey = "$activeRule|${episode.pageUrl}").also { log.record(DiagnosticLog.Kind.RESOLVE_SUCCESS) }
+        } catch(cancelled:CancellationException) {
+            log.record(DiagnosticLog.Kind.RESOLVE_CANCELLED);throw cancelled
+        } catch(challenge:SourceVerificationRequired) {
+            log.record(DiagnosticLog.Kind.VERIFICATION_REQUIRED);throw challenge
+        } catch(failure:Exception) {
+            val stage=(failure as? org.kazumi.tv.playback.MediaResolutionFailure)?.stage?.let { DiagnosticLog.stage(it) } ?: DiagnosticLog.Stage.NONE
+            log.record(DiagnosticLog.Kind.RESOLVE_FAILURE,stage);throw failure
+        }
     }, verification = { challenge, done ->
         val rule = repository.rules.firstOrNull { it.name == activeRule }
         if (rule != null) VerificationScreen(rule, challenge.pageUrl, challenge=challenge, onDone=done)

@@ -94,6 +94,9 @@ class TvNetworkInstrumentation : Instrumentation() {
                 output.putString("stream", UserDataCheckpoint.run(this, mode, auditRun) + "\n")
                 finish(Activity.RESULT_OK, output); return
             }
+            if(mode=="diagnostics-ui") {
+                output.putString("stream", DiagnosticsUiRegression.run(this)+"\n");finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="licenses-ui") {
                 LicenseUiRegression.run(this);output.putString("stream","bundled_licenses_GPL_scroll_back=OK\n");finish(Activity.RESULT_OK,output);return
             }

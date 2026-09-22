@@ -191,6 +191,7 @@ fun PlayerScreen(request: PlaybackRequest, subject: Subject, onPrevious: (() -> 
             }
             override fun onPlayerError(error: PlaybackException) {
                 val http = generateSequence<Throwable>(error) { it.cause }.filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull()
+                org.kazumi.tv.data.DiagnosticLog.shared.record(org.kazumi.tv.data.DiagnosticLog.Kind.PLAYER_ERROR,code=error.errorCode,http=http?.responseCode)
                 status = "播放失败：${error.errorCodeName}" + (http?.let { " · HTTP ${it.responseCode}" } ?: "")
                 failed = true; menu = null; visible = true
             }

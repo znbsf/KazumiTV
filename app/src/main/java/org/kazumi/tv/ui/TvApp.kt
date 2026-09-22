@@ -363,7 +363,7 @@ private fun SettingsScreen(oled: Boolean, onOled: (Boolean) -> Unit, onSetup: ()
     if (panel != null) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(onClick = { panel = null }) { Text("返回设置") }
-            if (panel == "licenses") LicensesScreen(Modifier.weight(1f)) else if (panel == "network") NetworkOptions(onClearCache) else if(panel=="playback") PlaybackPreferencesPanel(Modifier.weight(1f)) else if(panel=="backup") LibraryBackupScreen() else if(panel=="webdav") WebDavSettings() else if(panel=="display") DisplayModePanel() else if(panel=="capabilities") DeviceCapabilitiesPanel() else if(panel=="downloads") DownloadsScreen() else DanmakuSettings()
+            if (panel == "licenses") LicensesScreen(Modifier.weight(1f)) else if (panel == "network") NetworkOptions(onClearCache) else if(panel=="playback") PlaybackPreferencesPanel(Modifier.weight(1f)) else if(panel=="backup") LibraryBackupScreen() else if(panel=="webdav") WebDavSettings() else if(panel=="display") DisplayModePanel() else if(panel=="capabilities") DeviceCapabilitiesPanel() else if(panel=="downloads") DownloadsScreen() else if(panel=="diagnostics") DiagnosticsScreen() else DanmakuSettings()
         }
         return
     }
@@ -375,6 +375,7 @@ private fun SettingsScreen(oled: Boolean, onOled: (Boolean) -> Unit, onSetup: ()
         PlayerAction("播放偏好") { panel="playback" }
         PlayerAction("显示模式") { panel="display" }
         PlayerAction("设备与音画能力") { panel="capabilities" }
+        PlayerAction("播放诊断") { panel="diagnostics" }
         PlayerAction("离线下载") { panel="downloads" }
         PlayerAction("收藏与历史备份") { panel="backup" }
         PlayerAction("WebDAV 收藏同步") { panel="webdav" }
