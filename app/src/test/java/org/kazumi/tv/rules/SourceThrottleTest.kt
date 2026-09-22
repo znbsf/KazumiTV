@@ -27,6 +27,13 @@ class SourceThrottleTest {
             assertEquals(html,SourcePageChecks.check(source,html,source.baseUrl))
         }
     }
+    @Test fun compactSystemPanelWithSeparateGreetingIsRateLimited() {
+        val html="<html><title>系统提示......</title><div class='jump'><div class='tit'>系统提示</div><div>亲爱的用户：</div><div>请不要频繁操作，搜索时间间隔为3秒</div><div>页面自动关闭 等待时间：3</div></div></html>"
+        assertEquals(3000L,assertThrows(SourceRateLimited::class.java) { SourcePageChecks.check(source,html,source.baseUrl) }.retryAfterMillis)
+        for(other in listOf(html.replace("class='jump'","class='article'"),html.replace("class='tit'>系统提示","class='tit'>剧情介绍"),html.replace("<div>请不要","<div>剧情中提到请不要"))) {
+            assertEquals(other,SourcePageChecks.check(source,other,source.baseUrl))
+        }
+    }
     @Test fun rateLimitAfterActionCannotBeVerificationSuccess() {
         val state=VerificationProgress();state.markAction()
         repeat(5) { assertFalse(state.observe(JSONObject().put("ready",true).put("throttled",true))) }

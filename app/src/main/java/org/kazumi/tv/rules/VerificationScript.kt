@@ -17,12 +17,21 @@ object VerificationScript {
           function node(x){return x?document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue:null;}
           try {
             var html=document.documentElement?document.documentElement.outerHTML:'';
-            var panels=document.querySelectorAll('.msg-jump'),throttled=false;
+            var panels=document.querySelectorAll('.msg-jump,.jump'),throttled=false;
             for(var pi=0;pi<panels.length;pi++){
-              var heading=panels[pi].querySelector('.window-title'),message=panels[pi].querySelector('.msg-content p');
+              var compact=!panels[pi].classList.contains('msg-jump');
+              var heading=compact?null:panels[pi].querySelector('.window-title');
+              var messages=compact?[]:panels[pi].querySelectorAll('.msg-content p');
+              if(compact)for(var ci=0;ci<panels[pi].children.length;ci++){
+                var child=panels[pi].children[ci];
+                if(child.classList.contains('tit'))heading=heading||child;
+                else if(child.tagName==='DIV')messages.push(child);
+              }
               var headingText=heading?(heading.textContent||'').trim():'';
-              var messageText=message?(message.textContent||'').trim():'';
-              if((headingText==='系统提示'||headingText==='系統提示')&&new RegExp(${JSONObject.quote(SourcePageChecks.THROTTLE_TEXT_PATTERN)}).test(messageText))throttled=true;
+              for(var mi=0;mi<messages.length&&(compact||mi===0);mi++){
+                var messageText=(messages[mi].textContent||'').trim();
+                if((headingText==='系统提示'||headingText==='系統提示')&&new RegExp(${JSONObject.quote(SourcePageChecks.THROTTLE_TEXT_PATTERN)}).test(messageText))throttled=true;
+              }
             }
             if(throttled)return JSON.stringify({ready:false,throttled:true,challenge:false,acted:s.acted,done:false,failed:false,image:'',url:location.href});
             var value=c.captchaDetectValue||'', challenge=false;

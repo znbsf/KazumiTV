@@ -6,7 +6,9 @@ import kotlinx.coroutines.withContext
 import org.kazumi.tv.data.HttpText
 import java.net.URI
 
-class RuleRepository(context: Context):SourceCatalog {
+class RuleRepository(context: Context,
+    private val responseObserver: ((SourceRule, HttpText.Page) -> Unit)? = null
+):SourceCatalog {
     private val appContext=context.applicationContext
     override val rules = RuleStore(context).enabled()
     private val engine = XPathRuleEngine()
@@ -37,6 +39,8 @@ class RuleRepository(context: Context):SourceCatalog {
         val origin = URI(rule.baseUrl).let { "${it.scheme}://${it.rawAuthority}" }
         suspend fun load():String = SourceRequestThrottle.shared.execute(origin,retryBudget) {
             val response=HttpText.pageAsync(url,method,requestHeaders,body)
+            // Opt-in, instance-local diagnostics observe the actual response without replaying it.
+            responseObserver?.let { observer -> runCatching { observer(rule,response) } }
             try { SourcePageChecks.check(rule,response.body,response.url) }
             catch(challenge:SourceVerificationRequired) { throw SourceVerificationRequired(challenge.pageUrl,response.method,if(response.method=="POST")body else null) }
             check(response.status in 200..299) { "服务返回 HTTP ${response.status}" }

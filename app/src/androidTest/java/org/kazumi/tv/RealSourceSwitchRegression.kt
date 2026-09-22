@@ -67,7 +67,17 @@ object RealSourceSwitchRegression {
         try {
             report("checkpoint_label=$checkpoint; temporary real-store writes; original stores restored in finally")
             report(UserDataCheckpoint.run(test,"user-data-backup",checkpoint));checkpointSaved=true
-            val repository=RuleRepository(context)
+            val sequence=java.util.concurrent.atomic.AtomicInteger()
+            val repository=RuleRepository(context) { rule,page ->
+                if(args.getString("captureResponses")=="true") {
+                    val id=sequence.incrementAndGet()
+                    val prefix="response-$id-${rule.name.replace(Regex("[^A-Za-z0-9_-]"),"_")}"
+                    // App-private diagnostic artifacts only; never emit bodies, URLs or cookies.
+                    File(folder,"$prefix.html").writeText(page.body)
+                    val digest=java.security.MessageDigest.getInstance("SHA-256").digest(page.body.toByteArray()).joinToString("") { "%02x".format(it) }
+                    report("response=$id source=${rule.name} phase=$phase http=${page.status} chars=${page.body.length} sha256=$digest")
+                }
+            }
             val from=repository.rules.firstOrNull { it.name.equals(sourceName,true) } ?: error("source_missing")
             val to=repository.rules.firstOrNull { it.name.equals(targetName,true) } ?: error("target_missing")
             check(from.name!=to.name)

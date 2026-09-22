@@ -51,7 +51,9 @@ internal fun DetailScreen(subject: Subject, loadRelations:suspend(Int)->Relation
 private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadRelations:suspend(Int)->RelationResult,
                           sourceCatalog:org.kazumi.tv.rules.SourceCatalog?,onResume:((HistoryEntry)->Unit)?,
                           resolveEpisode:(suspend (String,org.kazumi.tv.rules.Episode)->org.kazumi.tv.playback.PlaybackRequest)?,onRelated:(Subject)->Unit) {
-    val latest=rememberWatchHistory().firstOrNull { it.subject.id==subject.id }
+    val history=rememberWatchHistory()
+    val latest=history.firstOrNull { it.subject.id==subject.id }
+    val latestOnline=history.firstOrNull { it.subject.id==subject.id && it.kind==HistoryKind.ONLINE }
     var resume by rememberSaveable(subject.id,stateSaver=NavigationStateSavers.history) { mutableStateOf<HistoryEntry?>(null) }
     var sourceHistory by rememberSaveable(subject.id,stateSaver=NavigationStateSavers.history) { mutableStateOf<HistoryEntry?>(null) }
     var detail by remember(subject.id) { mutableStateOf(subject) }
@@ -86,7 +88,7 @@ private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadR
             withFrameNanos { }
             withFrameNanos { }
             (when(restore) { "summary" -> summaryFocus; "relations" -> relationsFocus; "credits" -> creditsFocus;
-                "episodes" -> if(latest?.kind==HistoryKind.ONLINE)episodesFocus else sourceChoiceFocus;
+                "episodes" -> if(latestOnline!=null)episodesFocus else sourceChoiceFocus;
                 "source" -> sourceChoiceFocus; else -> if(latest!=null)playFocus else sourceChoiceFocus }).requestFocus()
             restore = null
         }
@@ -128,7 +130,7 @@ private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadR
                     PlayerAction("继续 ${latest.episode.substringAfterLast(" · ")}",Modifier.focusRequester(playFocus)) {
                         if(onResume!=null)onResume(latest) else resume=latest
                     }
-                    if(latest.kind==HistoryKind.ONLINE)PlayerAction("查看原来源选集",Modifier.focusRequester(episodesFocus)) { sourceHistory=latest; sources=true }
+                    if(latestOnline!=null)PlayerAction("查看原来源选集",Modifier.focusRequester(episodesFocus)) { sourceHistory=latestOnline; sources=true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PlayerAction(if(latest==null) "搜索播放来源" else "更换播放来源",

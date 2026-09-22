@@ -97,6 +97,30 @@ object RecentWatchNavigationRegression {
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);find("继续 第12集")
             test.runOnMainSync { screen="history" }
             click("番剧详情");find("继续 第12集")
+            // A newer cached watch must not hide the last online directory or change
+            // which history entry the independent Continue action opens.
+            val offline=previous.copy(key="offline|recent-navigation",episode="第20集",position=85000,
+                origin=null,kind=HistoryKind.OFFLINE)
+            store.save(offline)
+            find("继续 第20集")
+            click("继续 第20集")
+            check(resumed.get()?.key==offline.key && resumed.get()?.kind==HistoryKind.OFFLINE)
+            val chapterCount=chapters.get()
+            val searchCount=searches.get()
+            click("查看原来源选集")
+            find("线路与选集")
+            await("online directory retained after cached watch") {
+                nodes().any { it.text?.toString()?.let { t->t.contains("第12集")&&t.contains("当前") }==true }
+            }
+            check(chapters.get()==chapterCount+1 && searches.get()==searchCount && resolves.get()==0)
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);find("选择播放来源")
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);find("继续 第20集")
+            await("return focus to online directory action") {
+                var node=nodes().firstOrNull { it.text?.toString()=="查看原来源选集" }
+                var focused=false
+                while(node!=null) { if(node.isFocused) { focused=true;break };node=node.parent }
+                focused
+            }
             // No remount is needed: a new progress write must update the detail shortcut.
             store.save(previous.copy(key="原来源|https://recent.invalid/play/13",episode="第13集",position=75000))
             find("继续 第13集")
@@ -111,7 +135,7 @@ object RecentWatchNavigationRegression {
             find("原来源 原来源 已停用或移除，请重新选择来源")
             check(resolves.get()==0)
             check(original==test.targetContext.getSharedPreferences("tv_library",0).all)
-            return "recent_watch=PASS detail_resume=PASS original_episode_browser=PASS no_autoplay=PASS history_detail=PASS live_refresh=PASS missing_source=PASS incognito=PASS"
+            return "recent_watch=PASS detail_resume=PASS original_episode_browser=PASS no_autoplay=PASS history_detail=PASS mixed_online_offline_directory=PASS live_refresh=PASS missing_source=PASS incognito=PASS"
         } finally {
             test.runOnMainSync { activity.finish() }; test.waitForIdleSync()
             libraryPrefs.edit().clear().commit(); settingsPrefs.edit().clear().commit()

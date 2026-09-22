@@ -14,11 +14,14 @@ object SourcePageChecks {
     // Deliberately narrow: a MacCMS system-message panel and its first message,
     // not arbitrary article text mentioning search limits.
     const val THROTTLE_TEXT_PATTERN = "^(?:[亲親][爱愛]的[：:]\\s*)?[请請]不要[频頻]繁操作[，,]?\\s*(?:搜索|搜尋)[时時][间間][间間]隔[为為爲]?\\s*([0-9]{1,4})\\s*秒(?:[后後前])?[。.!！]?$"
-    private fun throttleDelay(document: org.jsoup.nodes.Document): Long? = document.select(".msg-jump").firstNotNullOfOrNull { panel ->
-        val title = panel.selectFirst(".window-title")?.text()?.trim().orEmpty()
-        val message = panel.selectFirst(".msg-content p")?.text()?.trim().orEmpty()
+    private fun throttleDelay(document: org.jsoup.nodes.Document): Long? = document.select(".msg-jump, .jump").firstNotNullOfOrNull { panel ->
+        val compact = !panel.hasClass("msg-jump")
+        val title = if(compact) panel.children().firstOrNull { it.hasClass("tit") }?.text()?.trim().orEmpty()
+            else panel.selectFirst(".window-title")?.text()?.trim().orEmpty()
+        val messages = if(compact) panel.children().filter { it.tagName()=="div" && !it.hasClass("tit") }.map { it.text().trim() }
+            else listOf(panel.selectFirst(".msg-content p")?.text()?.trim().orEmpty())
         if (title !in listOf("系统提示", "系統提示")) null
-        else Regex(THROTTLE_TEXT_PATTERN).matchEntire(message)?.groupValues?.get(1)?.toLongOrNull()?.times(1000L)
+        else messages.firstNotNullOfOrNull { message -> Regex(THROTTLE_TEXT_PATTERN).matchEntire(message)?.groupValues?.get(1)?.toLongOrNull()?.times(1000L) }
     }
     fun looksLikeChallengeTitle(title: String): Boolean = title.trim().lowercase().let { value ->
         value in listOf("系统安全验证", "安全验证", "人机验证", "just a moment...", "just a moment…", "security verification")

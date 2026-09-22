@@ -41,6 +41,9 @@ object VerificationRegression {
         exercise(3,"<html><body><div id='challenge'>still blocked</div></body></html>","KazumiCaptcha.done()",shouldPass=false)
         exercise(3,"<html><body><p>result</p></body></html>","KazumiCaptcha.fail('test')",shouldPass=false)
         exercise(2,"<html><body></body></html>",shouldPass=false)
+        // A successful action callback followed by a rate-limit page is not verification success.
+        exercise(3,"<html><body><div id='challenge'>wait</div></body></html>",
+            "setTimeout(function(){document.body.innerHTML=\"<div class='jump'><div class='tit'>系统提示</div><div>亲爱的用户：</div><div>请不要频繁操作，搜索时间间隔为3秒</div><div>页面自动关闭 等待时间：3</div></div>\";KazumiCaptcha.done()},200)",shouldPass=false)
         val activity=test.startActivitySync(android.content.Intent(test.targetContext,MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         val exited=java.util.concurrent.atomic.AtomicBoolean()
         var pointer:org.kazumi.tv.ui.VerificationWebView?=null
