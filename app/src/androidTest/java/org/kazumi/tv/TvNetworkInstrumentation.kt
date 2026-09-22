@@ -22,6 +22,10 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode=="age-computed-media") {
+                output.putString("stream",AgeComputedMediaDiagnostic.run(this,runnerArgs)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="catalogue-verification") {
                 output.putString("stream",CatalogueVerificationRegression.run(this)+"\n")
                 finish(Activity.RESULT_OK,output);return
