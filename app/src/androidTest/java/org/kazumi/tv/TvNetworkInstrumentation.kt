@@ -22,6 +22,11 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode == "legacy-mac-cms-verification") {
+                LegacyMacCmsVerificationRegression.run(this)
+                output.putString("stream","Legacy MacCMS verification controls=OK\n")
+                finish(Activity.RESULT_OK,output); return
+            }
             if(mode == "real-source-switch") {
                 output.putString("stream",RealSourceSwitchRegression.run(this,runnerArgs)+"\n")
                 finish(Activity.RESULT_OK,output);return

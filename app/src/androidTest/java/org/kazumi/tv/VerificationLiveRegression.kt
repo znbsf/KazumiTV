@@ -28,7 +28,10 @@ object VerificationLiveRegression {
         val rejected=java.util.concurrent.atomic.AtomicBoolean()
         val inputFile=java.io.File(test.targetContext.getExternalFilesDir(null),"verification-fixture-input.txt")
         inputFile.delete()
-        test.runOnMainSync { activity.setContent { KazumiTheme(false) { VerificationScreen(rule,challenge.pageUrl,challenge) { done.set(true) } } } }
+        val diagnosticFile=java.io.File(test.targetContext.getExternalFilesDir(null),"verification-live-${rule.name}-${System.currentTimeMillis()}.private.jsonl")
+        test.runOnMainSync { activity.setContent { KazumiTheme(false) { VerificationScreen(rule,challenge.pageUrl,challenge,
+            privateDiagnostic=if(args.getString("captureResources")=="true") ({ record -> diagnosticFile.appendText(record.toString()+"\n") }) else null) { done.set(true) } } } }
+        if(args.getString("captureResources")=="true")test.sendStatus(0,Bundle().apply { putString("stream","private_resource_file=${diagnosticFile.name}\n") })
         test.uiAutomation.serviceInfo=test.uiAutomation.serviceInfo.apply {
             flags=flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
@@ -45,6 +48,9 @@ object VerificationLiveRegression {
                         return null
                     }
                     test.runOnMainSync {
+                        find(activity.window.decorView)?.evaluateJavascript("""JSON.stringify({jquery:typeof window.jQuery,mac:typeof window.MAC,verify:typeof window.MAC!=='undefined'?typeof MAC.Verify:'undefined',init:typeof window.MAC!=='undefined'&&MAC.Verify?typeof MAC.Verify.Init:'undefined',refresh:typeof window.MAC!=='undefined'&&MAC.Verify?typeof MAC.Verify.Refresh:'undefined',images:document.querySelectorAll('.mac_verify_img').length})""") { raw ->
+                            test.sendStatus(0,Bundle().apply { putString("stream","${rule.name} MAC capability diagnostic=$raw\n") })
+                        }
                         find(activity.window.decorView)?.evaluateJavascript(VerificationScript.poll(rule)) { raw ->
                             val snapshot=runCatching { org.json.JSONObject(org.json.JSONTokener(raw).nextValue().toString()) }.getOrNull()
                             snapshot?.let {
@@ -56,7 +62,7 @@ object VerificationLiveRegression {
                         find(activity.window.decorView)?.evaluateJavascript("""(function(){var optional=true;try{new Function('return ({a:1})?.a')}catch(e){optional=false}var b=document.querySelector('.verify-submit');var events=b&&window.jQuery&&jQuery._data?jQuery._data(b,'events'):null;return JSON.stringify({ready:document.readyState,optionalChaining:optional,templateApi:typeof window.EC,jquery:!!window.jQuery,templateConfig:typeof ds_cms!=='undefined',macConfig:typeof maccms!=='undefined',button:!!b,clickHandlers:events&&events.click?events.click.length:0,input:!!document.querySelector('input[name="verify"]')})})()""") { raw ->
                             test.sendStatus(0,Bundle().apply { putString("stream","${rule.name} verification capability diagnostic=$raw\n") })
                         }
-                        find(activity.window.decorView)?.evaluateJavascript("JSON.stringify({url:location.href,html:document.documentElement.outerHTML})") { raw ->
+                        find(activity.window.decorView)?.evaluateJavascript("""(function(){var methods={};if(typeof window.MAC==='object'&&MAC.Verify)for(var name in MAC.Verify)if(typeof MAC.Verify[name]==='function')methods[name]=String(MAC.Verify[name]);return JSON.stringify({url:location.href,html:document.documentElement.outerHTML,verifyMethods:methods})})()""") { raw ->
                             // Private local diagnostic only; never included in public test output.
                             java.io.File(test.targetContext.getExternalFilesDir(null),"verification-live-${rule.name}.private.json").writeText(raw)
                         }

@@ -56,6 +56,9 @@ object VerificationLayoutRegression {
                 return rect
             }
             fun nodes():List<AccessibilityNodeInfo> {
+                // Re-read current semantics after Compose updates instead of retained
+                // accessibility nodes; older TV versions do not expose this API.
+                if(android.os.Build.VERSION.SDK_INT>=33)test.uiAutomation.clearCache()
                 val found=mutableListOf<AccessibilityNodeInfo>()
                 fun walk(node:AccessibilityNodeInfo?) {
                     if(node==null)return
@@ -66,6 +69,36 @@ object VerificationLayoutRegression {
                     .filter { it.packageName?.toString()==test.targetContext.packageName }
                 if(roots.isEmpty())walk(test.uiAutomation.rootInActiveWindow) else roots.forEach(::walk)
                 return found
+            }
+            fun evaluateFixture(script:String):String {
+                val value=AtomicReference<String>()
+                val callback=CountDownLatch(1)
+                test.runOnMainSync {
+                    checkNotNull(findWeb(host.window.decorView)).evaluateJavascript(script) { value.set(it);callback.countDown() }
+                }
+                check(callback.await(4,TimeUnit.SECONDS)) { "Fixture JS diagnostic callback timed out" }
+                return value.get()
+            }
+            fun ancestors(node:AccessibilityNodeInfo):List<AccessibilityNodeInfo> {
+                val result=mutableListOf<AccessibilityNodeInfo>()
+                var current:AccessibilityNodeInfo?=node
+                while(current!=null) { result.add(current);current=current.parent }
+                return result
+            }
+            fun button(label:String):AccessibilityNodeInfo? {
+                val labelNode=nodes().firstOrNull { it.text?.toString()==label } ?: return null
+                val chain=ancestors(labelNode)
+                // Disabled Compose buttons may omit clickable/actions; role class remains
+                // the same. Never mistake an enabled child Text for its disabled Button.
+                return chain.firstOrNull { it.className?.toString()=="android.widget.Button" }
+                    ?: chain.firstOrNull { it.isClickable || it.actionList.any { action -> action.id==AccessibilityNodeInfo.ACTION_CLICK } }
+            }
+            fun reportSubmitState(phase:String) {
+                nodes().firstOrNull { it.text?.toString()=="提交验证码" }?.let { label ->
+                    report(test,"$phase submit ancestors="+ancestors(label).mapIndexed { depth,node ->
+                        "$depth:class=${node.className}:enabled=${node.isEnabled}:clickable=${node.isClickable}:focused=${node.isFocused}:actions=${node.actionList.map { it.id }}"
+                    }.joinToString(" | "))
+                }
             }
             fun bounds(node:AccessibilityNodeInfo)=Rect().also { node.getBoundsInScreen(it) }
             fun waitFor(message:String,condition:()->Boolean) {
@@ -79,6 +112,11 @@ object VerificationLayoutRegression {
                 report(test,"failure toolbarRestored=$toolbarRestored labels="+labelNodes.joinToString { node ->
                     "${node.text}:focused=${node.isFocused}:parentFocused=${node.parent?.isFocused}:bounds=${bounds(node)}"
                 })
+                reportSubmitState("failure")
+                runCatching {
+                    evaluateFixture("JSON.stringify({inputLength:document.getElementById('code').value.length,pollCount:window.__layoutPollCount||0})")
+                }.onSuccess { report(test,"failure fixture input/poll=$it") }
+                    .onFailure { report(test,"failure fixture diagnostic=${it.javaClass.simpleName}") }
                 test.runOnMainSync {
                     val web=findWeb(host.window.decorView)
                     val rect=Rect();web?.getGlobalVisibleRect(rect)
@@ -96,8 +134,8 @@ object VerificationLayoutRegression {
                 error(message)
             }
             fun click(label:String) {
-                var node=nodes().first { it.text?.toString()==label }
-                while(!node.isClickable)node=node.parent ?: error("No clickable parent for $label")
+                val node=checkNotNull(button(label)) { "No button ancestor for $label" }
+                check(node.isEnabled) { "Button disabled: $label" }
                 check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) { "Could not click $label" }
             }
             fun toolbar()=nodes().filter { bounds(it).bottom<=webBounds().top }
@@ -145,13 +183,6 @@ object VerificationLayoutRegression {
                 var originalWeb:WebView?=null
                 test.runOnMainSync { originalWeb=findWeb(host.window.decorView) }
                 val watchedWeb=checkNotNull(originalWeb)
-                fun evaluateFixture(script:String):String {
-                    val value=AtomicReference<String>()
-                    val callback=CountDownLatch(1)
-                    test.runOnMainSync { watchedWeb.evaluateJavascript(script) { value.set(it);callback.countDown() } }
-                    check(callback.await(4,TimeUnit.SECONDS)) { "Fixture JS diagnostic callback timed out" }
-                    return value.get()
-                }
                 // Count production VerificationScript.poll reads, without reading cookies/page text.
                 check(evaluateFixture("""(function(){
                     var state=window.__kazumiVerification;
@@ -188,21 +219,27 @@ object VerificationLayoutRegression {
                 report(test,"same Activity/WebView resumes polling without remount=OK")
             }
             // Website input must also enable the native submit action; no OCR is involved.
-            test.runOnMainSync { findWeb(host.window.decorView)?.evaluateJavascript("document.getElementById('code').value='1357'",null) }
+            check(evaluateFixture("(function(){var input=document.getElementById('code');input.value='1357';return input.value.length;})()") == "4") {
+                "Fixture web input did not become four characters"
+            }
             waitFor("web input did not enable native submit") {
-                nodes().any { it.text?.toString()=="提交验证码"&&it.isEnabled&&it.parent?.isEnabled!=false }
+                button("提交验证码")?.isEnabled==true
             }
-            test.runOnMainSync { findWeb(host.window.decorView)?.evaluateJavascript("document.getElementById('code').value=''",null) }
+            reportSubmitState("web-input-filled")
+            check(evaluateFixture("(function(){var input=document.getElementById('code');input.value='';return input.value.length;})()") == "0") {
+                "Fixture web input did not clear"
+            }
             waitFor("cleared web input left native submit enabled") {
-                nodes().any { it.text?.toString()=="提交验证码"&&(!it.isEnabled||it.parent?.isEnabled==false) }
+                button("提交验证码")?.isEnabled==false
             }
-            report(test,"web input enables native submit; clearing disables it=OK")
+            reportSubmitState("web-input-cleared")
+            report(test,"fixture DOM length 4->0; native Button enabled->disabled=OK")
             val input=toolbar().first { it.isEditable }
             check(input.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"2468")
             }))
             waitFor("submit not enabled after controlled input") {
-                nodes().any { it.text?.toString()=="提交验证码"&&it.isEnabled&&it.parent?.isEnabled!=false }
+                button("提交验证码")?.isEnabled==true
             }
             click("提交验证码")
             waitFor("controlled verification did not complete") { done.get() }

@@ -15,6 +15,7 @@ object VerificationScript {
           if(!s)s=window.__kazumiVerification={acted:false,done:false,failed:false,focused:false,script:false};
           ${MacCmsVerificationCompat.script}
           function node(x){return x?document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue:null;}
+          ${LegacyMacCmsControls.script}
           try {
             var html=document.documentElement?document.documentElement.outerHTML:'';
             var panels=document.querySelectorAll('.msg-jump,.jump'),throttled=false;
@@ -42,10 +43,18 @@ object VerificationScript {
             }
             var title=(document.title||'').toLowerCase().replace(/^\s+|\s+$/g,'');
             if(/^(系统安全验证|安全验证|人机验证|just a moment\.\.\.|just a moment…|security verification)$/.test(title))challenge=true;
-            var img=node(c.captchaImage), input=node(c.captchaInput), button=node(c.captchaButton);
+            var controls=verificationControls(),img=controls.img,input=controls.input,button=controls.button;
+            if(controls.legacy)challenge=true;
             if(c.captchaType===1&&img)challenge=true;
             if(c.captchaType===2&&button)challenge=true;
-            if(c.captchaType===1&&input&&!s.focused){s.focused=true;input.focus();input.dispatchEvent(new Event('focus',{bubbles:true}));}
+            if(c.captchaType===1&&input&&!s.focused){s.focused=true;
+              if(controls.legacy){
+                var focusDelivered=false,onFocus=function(){focusDelivered=true;};
+                input.addEventListener('focus',onFocus);
+                try{input.focus();}finally{input.removeEventListener('focus',onFocus);}
+                if(!focusDelivered)input.dispatchEvent(new Event('focus',{bubbles:true}));
+              }
+              else{input.focus();input.dispatchEvent(new Event('focus',{bubbles:true}));}}
             if(c.captchaType===2&&button&&!s.acted){s.acted=true;button.click();}
             if(c.captchaType===3&&c.captchaScript&&!s.script&&document.readyState!=='loading'){
               s.script=true;s.acted=true;
@@ -62,21 +71,24 @@ object VerificationScript {
               throttled:false,challenge:challenge,acted:s.acted,done:s.done,failed:s.failed,image:image,url:location.href,
               submitting:!!s.submitting,submitError:s.submitError||'',hasInput:!!(input&&(input.value||'').trim()),
               serverRejected:!!s.serverRejected,
-              fallbackAvailable:!!compatEndpoint(input,button,img)});
+              fallbackAvailable:controls.legacy||!!compatEndpoint(input,button,img)});
           }catch(e){return JSON.stringify({failed:true,ready:false});}
         })();
         """.trimIndent()
     }
     fun submit(rule:SourceRule,code:String):String {
-        val config=rule.json.optJSONObject("antiCrawlerConfig") ?: JSONObject()
+        val config=rule.json.optJSONObject("antiCrawlerConfig")?.let {
+            JSONObject(it.toString()).put("captchaType",it.optInt("captchaType",1))
+        } ?: JSONObject()
         return """
         (function(){try{
           var c=$config;
           var s=window.__kazumiVerification;
           if(!s)s=window.__kazumiVerification={acted:false,done:false,failed:false,focused:false,script:false};
           ${MacCmsVerificationCompat.script}
-          function node(x){return document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue;}
-          var input=node(${JSONObject.quote(config.optString("captchaInput"))}),button=node(${JSONObject.quote(config.optString("captchaButton"))});
+          function node(x){return x?document.evaluate(x,document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue:null;}
+          ${LegacyMacCmsControls.script}
+          var controls=verificationControls(),input=controls.input,button=controls.button;
           if(!input||!button||s.submitting)return false;
           var supplied=${JSONObject.quote(code)};
           if(supplied.trim()) {
@@ -84,7 +96,7 @@ object VerificationScript {
             setter.call(input,supplied);input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));
           }
           if(!(input.value||'').trim())return false;
-          var img=c.captchaImage?node(c.captchaImage):null,endpoint=compatEndpoint(input,button,img);
+          var img=controls.img,endpoint=controls.legacy?null:compatEndpoint(input,button,img);
           if(endpoint)return compatSubmit(endpoint,input,img);
           s.submitError='';s.serverRejected=false;s.acted=true;button.click();return true;
         }catch(e){return false;}})();

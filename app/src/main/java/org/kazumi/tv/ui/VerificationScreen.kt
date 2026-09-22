@@ -32,7 +32,8 @@ import org.kazumi.tv.rules.SourceRule
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challenge:org.kazumi.tv.rules.SourceVerificationRequired?=null, onDone: () -> Unit) {
+fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challenge:org.kazumi.tv.rules.SourceVerificationRequired?=null,
+                       privateDiagnostic:((org.json.JSONObject)->Unit)?=null,onDone: () -> Unit) {
     val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     val scope=rememberCoroutineScope()
@@ -158,10 +159,21 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
             browser.apply {
             onExitPointer={ operating=false }
             VerificationSession.configure(this,rule)
+            // Opt-in local diagnostics can contain page URLs; callers must not publish them.
+            fun diagnose(event:String,url:String,code:Int) { privateDiagnostic?.let { sink ->
+                runCatching { sink(org.json.JSONObject().put("event",event).put("url",url).put("code",code)) }
+            } }
+            if(privateDiagnostic!=null)webChromeClient=object:WebChromeClient() {
+                override fun onConsoleMessage(message:ConsoleMessage):Boolean {
+                    runCatching { privateDiagnostic(org.json.JSONObject().put("event","console").put("url",message.sourceId())
+                        .put("line",message.lineNumber()).put("message",message.message())) }
+                    return false
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = request.url.scheme !in listOf("http", "https")
-                override fun onReceivedError(view:WebView,request:WebResourceRequest,error:WebResourceError) { if(request.isForMainFrame) { owner.fail("验证页面加载失败");loadFailed=true;status="验证页面加载失败，请重新加载" } }
-                override fun onReceivedHttpError(view:WebView,request:WebResourceRequest,response:WebResourceResponse) { if(request.isForMainFrame&&response.statusCode !in listOf(403,429)) { owner.fail("验证页面加载失败");loadFailed=true;status="验证页面加载失败，请重新加载" } }
+                override fun onReceivedError(view:WebView,request:WebResourceRequest,error:WebResourceError) { diagnose("resource_error",request.url.toString(),error.errorCode);if(request.isForMainFrame) { owner.fail("验证页面加载失败");loadFailed=true;status="验证页面加载失败，请重新加载" } }
+                override fun onReceivedHttpError(view:WebView,request:WebResourceRequest,response:WebResourceResponse) { diagnose("http_error",request.url.toString(),response.statusCode);if(request.isForMainFrame&&response.statusCode !in listOf(403,429)) { owner.fail("验证页面加载失败");loadFailed=true;status="验证页面加载失败，请重新加载" } }
                 override fun onRenderProcessGone(view:WebView,detail:RenderProcessGoneDetail):Boolean {
                     owner.fail("验证页面渲染进程已退出",rendererGone=true)
                     loadFailed=true;status="验证页面已退出，请重新加载后继续";return true
