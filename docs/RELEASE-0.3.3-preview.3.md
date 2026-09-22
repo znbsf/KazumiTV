@@ -1,4 +1,6 @@
-# KazumiTV 0.3.3 Preview 3
+# KazumiTV 0.3.3 Preview 3 候选
+
+状态：源码提交和标签已推送，APK尚未公开发布。当前已验收候选内置开发者弹幕应用凭证，公开包发行配置待确认。
 
 versionCode 49。在Preview 2基础上修复人工验证的等待与后台恢复、旧WebView的iframe媒体发现上下文，以及播放器初始焦点偶发崩溃。
 
