@@ -71,10 +71,20 @@ object SourcePageDiagnostic {
                 else XPathRuleEngine().search(rule, page.body)
             report("search_parse", "complete", JSONObject().put("engine", if (isApi) "api" else "xpath").put("count", matches.size))
             if (matches.isEmpty()) { report("done", "search_empty_see_private_page"); return@runBlocking }
-            val match = matches.firstOrNull { keyword == "无职转生" && it.title.contains("第三季") } ?: matches.first()
+            val originalMatch = matches.firstOrNull { keyword == "无职转生" && it.title.contains("第三季") } ?: matches.first()
+            val match = if(args.getString("diagnosticHttpsDetails")=="true") {
+                val originalUri=URI(originalMatch.url)
+                val baseUri=URI(rule.baseUrl)
+                require(originalUri.scheme=="http" && baseUri.scheme=="https" && originalUri.host==baseUri.host && originalUri.port in listOf(-1,80))
+                report("detail_transport_override","diagnostic_only",JSONObject().put("scheme","https").put("fixed_rule_changed",false))
+                originalMatch.copy(url=URI("https",originalUri.userInfo,originalUri.host,-1,originalUri.path,originalUri.query,originalUri.fragment).toString())
+            } else originalMatch
             File(folder, "matches-private.json").writeText(JSONArray(matches.map { JSONObject().put("title", it.title).put("url", it.url) }).toString())
             stage = "chapters"
-            val roads = withTimeout(65_000) { RuleRepository(test.targetContext).chapters(rule, match) }
+            val roads = withTimeout(65_000) { RuleRepository(test.targetContext,responseObserver={ _,response ->
+                report("chapter_transport","received",JSONObject().put("httpStatus",response.status)
+                    .put("requestedScheme",URI(match.url).scheme).put("responseScheme",URI(response.url).scheme))
+            }).chapters(rule, match) }
             report(stage, "complete", JSONObject().put("roads", roads.size))
             File(folder, "roads-private.json").writeText(JSONArray(roads.map { road -> JSONObject().put("title", road.title)
                 .put("episodes", JSONArray(road.episodes.map { JSONObject().put("title", it.title).put("url", it.pageUrl) })) }).toString())

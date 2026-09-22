@@ -34,13 +34,16 @@ class RuleRepository(context: Context,
             val config = rule.json.getJSONObject("chapterApiConfig")
             val request = api.request(config.getJSONObject("request"), mapOf("source" to match.url))
             api.chapters(rule, config, page(rule,request.url,request.method,headers(rule)+request.headers,request.body), match.url)
-        } else engine.chapters(rule,page(rule,rule.resolve(match.url)))
+        } else engine.chapters(rule,page(rule,rule.resolve(match.url),chapterGet=true))
     }
-    private suspend fun page(rule:SourceRule,url:String,method:String="GET",requestHeaders:Map<String,String> = headers(rule),body:String?=null):String {
+    private suspend fun page(rule:SourceRule,url:String,method:String="GET",requestHeaders:Map<String,String> = headers(rule),body:String?=null,chapterGet:Boolean=false):String {
         val retryBudget = SourceRequestThrottle.RetryBudget()
+        val chapterTransport=if(chapterGet && method=="GET" && body==null)ChapterGetTransport(url,rule.baseUrl) else null
         val origin = URI(rule.baseUrl).let { "${it.scheme}://${it.rawAuthority}" }
         suspend fun load():String = SourceRequestThrottle.shared.execute(origin,retryBudget) {
-            val response=HttpText.pageAsync(url,method,requestHeaders,body)
+            // Keep response classification outside the IO-only transport fallback.
+            val response=chapterTransport?.load { actualUrl -> HttpText.pageAsync(actualUrl,method,requestHeaders,body) }
+                ?: HttpText.pageAsync(url,method,requestHeaders,body)
             // Opt-in, instance-local diagnostics observe the actual response without replaying it.
             responseObserver?.let { observer -> runCatching { observer(rule,response) } }
             try { SourcePageChecks.check(rule,response.body,response.url) }
