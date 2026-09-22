@@ -65,3 +65,5 @@
 ### 发布受阻
 
 源码提交`fc0f32824ebfe976d662c99451ad5da4ab2e5c7e`和标签`v0.3.3-preview.3`已推送。上传APK前自动审批拒绝执行：当前包含私有弹幕API凭证，现有发布授权没有明确涵盖公开这些凭证。因此APK未上传、Release未创建，不能称已发布。已请求用户选择不内置凭证的公开包或明确允许现包公开；无论是否收到回复，14:00仍停止。README暂保留Preview 2的有效公开下载入口，源码功能修改保留。
+
+安全替代准备：已在不设置`KAZUMITV_DANMAKU_FILE`的独立构建进程中重新执行全部release构建任务。`build49-public-no-credentials.txt`通过；生成与编译后的`BuildConfig`均核对App ID/Secret为空。无内置凭证候选SHA256为`0516a45496bbf4e4284766ade89433be535dccbd7f14583f3815380ee2d98b38`，保存在本地`artifacts/public-candidate-0.3.3-preview.3`；未上传、未覆盖电视、未额外宣称已做这份配置APK的真机验收。弹幕需使用用户自行配置的凭证。原电视仍是已验收`f62680d3…`配置版，三份用户数据恢复状态不变。两种配置不能共用APK校验值。
