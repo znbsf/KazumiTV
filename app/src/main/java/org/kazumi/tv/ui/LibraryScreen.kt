@@ -56,7 +56,9 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
     val cancelFocus=remember { FocusRequester() }
     val list=rememberLazyListState()
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedAction by rememberSaveable { mutableStateOf("resume") }
     val requesters=remember { mutableMapOf<String,FocusRequester>() }
+    val detailRequesters=remember { mutableMapOf<String,FocusRequester>() }
     val history=rememberWatchHistory()
     val grouping=HistoryGrouping.entries[groupingIndex]
     val visible=remember(history,query,kindIndex) { HistoryQuery.filter(history,query,HistoryKind.entries.getOrNull(kindIndex-1)) }
@@ -69,13 +71,16 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
         else if(managing && marked.isNotEmpty()) { withFrameNanos { }; withFrameNanos { }; deleteFocus.requestFocus() }
     }
     LaunchedEffect(revision) { if(revision>0) { withFrameNanos { }; managementFocus.requestFocus() } }
-    LaunchedEffect(selectedKey) {
+    LaunchedEffect(selectedKey,selectedAction) {
         selectedKey?.let { key ->
             val index=rowKeys.indexOf(key)
-            if(index>=0) { list.scrollToItem(index); withFrameNanos { }; withFrameNanos { }; requesters[key]?.requestFocus() }
+            if(index>=0) {
+                list.scrollToItem(index); withFrameNanos { }; withFrameNanos { }
+                (if(selectedAction=="detail" && !managing)detailRequesters[key] else requesters[key])?.requestFocus()
+            }
         }
     }
-    fun clearSelection() { marked=arrayListOf(); selectedKey=null }
+    fun clearSelection() { marked=arrayListOf(); selectedKey=null; selectedAction="resume" }
     Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("历史 · ${visible.size} / ${history.size}",style=KazumiType.heading)
         if(confirm) {
@@ -118,7 +123,7 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                         Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                             Text("${group.label} · ${group.entries.size}条",style=KazumiType.title,modifier=Modifier.padding(vertical=8.dp))
                             if(grouping==HistoryGrouping.SUBJECT && !managing)PlayerAction("继续最近观看") {
-                                val latest=group.entries.first(); selectedKey=latest.key; onResume(latest)
+                                val latest=group.entries.first(); selectedAction="resume"; selectedKey=latest.key; onResume(latest)
                             }
                         }
                     }
@@ -130,14 +135,16 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                             colors=ButtonDefaults.colors(containerColor=Color.Transparent,focusedContainerColor=Color.White.copy(alpha=.12f),contentColor=KazumiColors.text,focusedContentColor=KazumiColors.accent),
                             onClick={
                                 if(managing) marked=ArrayList(if(entry.key in marked)marked-entry.key else marked+entry.key)
-                                else { selectedKey=entry.key; onResume(entry) }
+                                else { selectedAction="resume"; selectedKey=entry.key; onResume(entry) }
                             }) {
                             Column(Modifier.fillMaxWidth()) {
                                 Text("${if(managing) if(entry.key in marked) "已选 · " else "未选 · " else ""}${entry.subject.title} · ${entry.episode}",style=KazumiType.body,maxLines=1,overflow=TextOverflow.Ellipsis)
                                 Text("${entry.position/60000}分${entry.position/1000%60}秒 · ${entry.kind.label} · $source",style=KazumiType.caption,maxLines=1,overflow=TextOverflow.Ellipsis)
                             }
                         }
-                        if(!managing)PlayerAction("番剧详情") { selectedKey=entry.key; onSelect(entry.subject) }
+                        if(!managing)PlayerAction("番剧详情",Modifier.focusRequester(detailRequesters.getOrPut(entry.key) { FocusRequester() })) {
+                            selectedAction="detail"; selectedKey=entry.key; onSelect(entry.subject)
+                        }
                         }
                     }
                 }

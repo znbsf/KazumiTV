@@ -7,6 +7,8 @@ import android.content.Intent
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -49,6 +51,7 @@ object RecentWatchNavigationRegression {
         }
         val sources=catalog("原来源")
         var screen by mutableStateOf("recent")
+        var parentScreen by mutableStateOf("recent")
         var chosen by mutableStateOf(subject)
         val activity=test.startActivitySync(Intent(test.targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         fun nodes():List<AccessibilityNodeInfo> {
@@ -72,12 +75,16 @@ object RecentWatchNavigationRegression {
             store.save(previous)
             test.runOnMainSync { activity.setContent {
                 CompositionLocalProvider(LocalContext provides context) { KazumiTheme(false) {
+                    val libraryStates=rememberSaveableStateHolder()
+                    BackHandler(screen=="detail") { screen=parentScreen }
                     Box(Modifier.fillMaxSize().padding(24.dp)) {
                         when(screen) {
-                            "recent" -> RecentWatchLinks(rememberWatchHistory()) { chosen=it;screen="detail" }
+                            "recent" -> RecentWatchLinks(rememberWatchHistory()) { chosen=it;parentScreen="recent";screen="detail" }
                             "detail" -> DetailScreen(chosen,sourceCatalog=sources,onResume={ resumed.set(it) },loadDetail={ chosen },
                                 resolveEpisode={ _,_ -> resolves.incrementAndGet();error("Browsing must not resolve media") })
-                            "history" -> LibraryScreen("历史",{ resumed.set(it) }) { chosen=it;screen="detail" }
+                            "history" -> libraryStates.SaveableStateProvider("历史") {
+                                LibraryScreen("历史",{ resumed.set(it) }) { chosen=it;parentScreen="history";screen="detail" }
+                            }
                             "missing" -> SourceScreen(subject,catalog=catalog("其他来源"),initialHistory=previous,
                                 resolveEpisode={ _,_ -> resolves.incrementAndGet();error("Browsing must not resolve media") })
                         }
@@ -96,7 +103,24 @@ object RecentWatchNavigationRegression {
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);find("选择播放来源")
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);find("继续 第12集")
             test.runOnMainSync { screen="history" }
+            resumed.set(null)
             click("番剧详情");find("继续 第12集")
+            // Match TvApp's saved library subtree, then use real remote Back/Confirm.
+            // Confirm after returning must reopen details, never invoke resume.
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            find("历史 · 2 / 2")
+            await("history detail action regains focus") {
+                nodes().filter { it.text?.toString()=="番剧详情" }.any { detail ->
+                    var node:AccessibilityNodeInfo?=detail
+                    var focused=false
+                    while(node!=null) { if(node.isFocused) { focused=true;break };node=node.parent }
+                    focused
+                }
+            }
+            check(resumed.get()==null && resolves.get()==0)
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+            find("继续 第12集")
+            check(resumed.get()==null && resolves.get()==0)
             // A newer cached watch must not hide the last online directory or change
             // which history entry the independent Continue action opens.
             val offline=previous.copy(key="offline|recent-navigation",episode="第20集",position=85000,
@@ -135,7 +159,7 @@ object RecentWatchNavigationRegression {
             find("原来源 原来源 已停用或移除，请重新选择来源")
             check(resolves.get()==0)
             check(original==test.targetContext.getSharedPreferences("tv_library",0).all)
-            return "recent_watch=PASS detail_resume=PASS original_episode_browser=PASS no_autoplay=PASS history_detail=PASS mixed_online_offline_directory=PASS live_refresh=PASS missing_source=PASS incognito=PASS"
+            return "recent_watch=PASS detail_resume=PASS original_episode_browser=PASS no_autoplay=PASS history_detail=PASS history_detail_return_focus=PASS mixed_online_offline_directory=PASS live_refresh=PASS missing_source=PASS incognito=PASS"
         } finally {
             test.runOnMainSync { activity.finish() }; test.waitForIdleSync()
             libraryPrefs.edit().clear().commit(); settingsPrefs.edit().clear().commit()
