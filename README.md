@@ -2,11 +2,11 @@
 
 为电视遥控器设计的动画浏览与播放应用。当前主线使用 **Kotlin · Compose for TV · Media3**，延续深色、绿色和高密度海报浏览，独立于原 Flutter 工程开发。
 
-**当前公开测试版：0.3.3-preview.5。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
+**当前公开测试版：0.3.3-preview.6。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
 
-[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.5) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-MIDDAY-20260922.md)
+[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.6) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-MIDDAY-20260922.md)
 
-本轮测试版（**0.3.3-preview.5，code51**）：补齐历史集表重试与显式验证码恢复、修复返回菜单误退播放器及验证后睡眠/暂停状态；修复媒体请求头兼容、流式请求期限和同域集表HTTPS回退。公开APK不内置弹幕凭证，可在设置自行填写。204项单测及lint通过；真实来源、受控能力和不同构建的验证范围分别记录，不把短时通过当作完整迁移。详见[发行说明](docs/RELEASE-0.3.3-preview.5.md)、[晚间证据](docs/PLAYBACK-EVENING-20260922.md)和[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)。
+本轮测试版（**0.3.3-preview.6，code52**）：补齐旧WebView的受限播放器配置发现与导航失效保护，新增设置中的脱敏播放诊断。最终公开包在旧电视和现代端均完成AGE第12集5线短测、无凭证播放和诊断专项；217项单测及lint通过。覆盖升级保留设置、片库和搜索历史，公开APK不内置弹幕凭证。其他来源失败及未验证能力仍单列，不把短测当作完整迁移。详见[发行说明](docs/RELEASE-0.3.3-preview.6.md)、[发布核验](docs/RELEASE-VERIFICATION-20260923-PREVIEW6.md)和[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)。
 
 ## 界面
 
@@ -60,7 +60,7 @@
 | --- | --- | --- |
 | 定位 | 后续主要开发方向 | 保留比较和回退参考 |
 | 技术 | Kotlin / Compose / Media3 | Flutter / media-kit |
-| 版本 | 0.3.3-preview.5 | 2.3.1-tv-legacy.1 |
+| 版本 | 0.3.3-preview.6 | 2.3.1-tv-legacy.1 |
 | 源码 | `main` | `codex/upstream-tv-complete` |
 | 安装 | 通用APK：约10.27 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
 
