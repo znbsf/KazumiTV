@@ -21,6 +21,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import org.kazumi.tv.data.*
 
+/** Observe progress writes so returning from playback refreshes shortcuts immediately. */
+@Composable
+internal fun rememberWatchHistory(): List<HistoryEntry> {
+    val context=LocalContext.current
+    val store=remember(context) { LibraryStore(context) }
+    val prefs=remember(context) { context.getSharedPreferences("tv_library",0) }
+    var revision by remember(context) { mutableIntStateOf(0) }
+    DisposableEffect(prefs) {
+        val listener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,key ->
+            if(key=="history" || key==null)revision++
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return remember(context,revision) { HistoryQuery.filter(store.history()) }
+}
+
 @Composable
 fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Subject) -> Unit) {
     if(mode=="收藏") { CollectionScreen(onSelect); return }
@@ -40,7 +57,7 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
     val list=rememberLazyListState()
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
     val requesters=remember { mutableMapOf<String,FocusRequester>() }
-    val history=remember(revision) { store.history() }
+    val history=rememberWatchHistory()
     val grouping=HistoryGrouping.entries[groupingIndex]
     val visible=remember(history,query,kindIndex) { HistoryQuery.filter(history,query,HistoryKind.entries.getOrNull(kindIndex-1)) }
     val groups=remember(visible,grouping) { HistoryQuery.groups(visible,grouping) }
@@ -107,7 +124,8 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                     }
                     items(group.entries,key={it.key}) { entry ->
                         val source=entry.origin?.rule?.takeIf { it.isNotBlank() } ?: "来源未记录"
-                        Button(modifier=Modifier.fillMaxWidth().height(64.dp).focusRequester(requesters.getOrPut(entry.key) { FocusRequester() }),
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                        Button(modifier=Modifier.weight(1f).height(64.dp).focusRequester(requesters.getOrPut(entry.key) { FocusRequester() }),
                             scale=ButtonDefaults.scale(focusedScale=1f),
                             colors=ButtonDefaults.colors(containerColor=Color.Transparent,focusedContainerColor=Color.White.copy(alpha=.12f),contentColor=KazumiColors.text,focusedContentColor=KazumiColors.accent),
                             onClick={
@@ -118,6 +136,8 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                                 Text("${if(managing) if(entry.key in marked) "已选 · " else "未选 · " else ""}${entry.subject.title} · ${entry.episode}",style=KazumiType.body,maxLines=1,overflow=TextOverflow.Ellipsis)
                                 Text("${entry.position/60000}分${entry.position/1000%60}秒 · ${entry.kind.label} · $source",style=KazumiType.caption,maxLines=1,overflow=TextOverflow.Ellipsis)
                             }
+                        }
+                        if(!managing)PlayerAction("番剧详情") { selectedKey=entry.key; onSelect(entry.subject) }
                         }
                     }
                 }

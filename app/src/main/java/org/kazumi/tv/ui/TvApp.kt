@@ -52,6 +52,7 @@ import org.kazumi.tv.domain.ChannelNumber
 fun TvApp(searchModel: SearchViewModel? = null) {
     val context = LocalContext.current
     val preferences = remember { TvPreferences(context) }
+    val recent=rememberWatchHistory().distinctBy { it.subject.id }.take(2)
     var oled by remember { mutableStateOf(preferences.oled) }
     var setup by remember { mutableStateOf(!preferences.setupComplete) }
     if (setup) {
@@ -77,7 +78,9 @@ fun TvApp(searchModel: SearchViewModel? = null) {
     val grid = rememberLazyGridState()
     val firstFocus = remember { FocusRequester() }
     val cardFocus = remember { mutableMapOf<Int, FocusRequester>() }
+    val recentFocus = remember { mutableMapOf<Int, FocusRequester>() }
     var returnCard by rememberSaveable { mutableStateOf<Int?>(null) }
+    var returnRecentId by rememberSaveable { mutableStateOf<Int?>(null) }
     var restoreHome by remember { mutableStateOf(false) }
     fun returnToParent() {
         resumeEntry = null
@@ -120,8 +123,7 @@ fun TvApp(searchModel: SearchViewModel? = null) {
         if (number != null && !loading) {
             val item = items.getOrNull(number - 1)
             if (item != null) {
-                returnCard = item.id; selected = item
-                resumeEntry = LibraryStore(context).history().firstOrNull { it.subject.id == item.id }
+                returnRecentId=null; returnCard = item.id; selected = item
             } else notice = "当前分类没有 $number 号节目"
             pendingNumber = null
         }
@@ -140,6 +142,13 @@ fun TvApp(searchModel: SearchViewModel? = null) {
             if (!returningLibrary) backFocus.requestFocus()
             returningLibrary = false
         } else if (restoreHome) {
+            val recentId=returnRecentId?.takeIf { id -> recent.any { it.subject.id==id } }
+            if(recentId!=null) {
+                withFrameNanos { }; withFrameNanos { }
+                recentFocus[recentId]?.requestFocus()
+                restoreHome=false
+                return@LaunchedEffect
+            }
             val index = items.indexOfFirst { it.id == returnCard }
             if (index >= 0) {
                 grid.scrollToItem(index / 6 * 6)
@@ -160,7 +169,7 @@ fun TvApp(searchModel: SearchViewModel? = null) {
             } else {
                 val item = items.getOrNull(number - 1)
                 if (item == null) notice = "当前分类没有 $number 号节目"
-                else { returnCard = item.id; selected = item; resumeEntry = LibraryStore(context).history().firstOrNull { it.subject.id == item.id } }
+                else { returnRecentId=null; returnCard = item.id; selected = item }
             }
             digits = ""
         }
@@ -225,7 +234,7 @@ fun TvApp(searchModel: SearchViewModel? = null) {
                     }
                     }
                     Spacer(Modifier.height(6.dp))
-                    SpotlightHeader(spotlight, repository)
+                    SpotlightHeader(spotlight, repository,recent,recentFocus) { returnRecentId=it.id; selected=it }
                     if (digits.isNotEmpty()) Text("转到 $digits 号…", color = Color(0xFFB8E8A4), fontSize = 24.sp)
                     notice?.let { Text(it) }
                     if (loading && items.isEmpty()) Text("正在加载节目…")
@@ -242,7 +251,7 @@ fun TvApp(searchModel: SearchViewModel? = null) {
                             contentPadding = PaddingValues(8.dp)) {
                             itemsIndexed(items, key = { index, subject -> "$index:${subject.id}" }) { index, subject ->
                                 DisposableEffect(subject.id) { onDispose { cardFocus.remove(subject.id) } }
-                                Card(onClick = { returnCard = subject.id; selected = subject },
+                                Card(onClick = { returnRecentId=null; returnCard = subject.id; selected = subject },
                                     colors = CardDefaults.colors(containerColor = KazumiColors.surface, focusedContainerColor = KazumiColors.selected,
                                         contentColor = KazumiColors.text, focusedContentColor = KazumiColors.text),
                                     scale = CardDefaults.scale(focusedScale = 1.035f), modifier = Modifier.height(cardHeight - 8.dp)
@@ -301,7 +310,7 @@ private fun TextNavigationItem(label: String, selected: Boolean, modifier: Modif
 }
 
 @Composable
-private fun SpotlightHeader(subject: Subject?, repository: CatalogRepository) {
+private fun SpotlightHeader(subject: Subject?, repository: CatalogRepository,recent:List<HistoryEntry>,recentFocus:MutableMap<Int,FocusRequester>,onRecent:(Subject)->Unit) {
     var summary by remember(subject?.id) { mutableStateOf(subject?.summary.orEmpty()) }
     val catalogRevision by NetworkSettings.catalogRevision.collectAsState()
     LaunchedEffect(subject?.id,catalogRevision) {
@@ -315,8 +324,26 @@ private fun SpotlightHeader(subject: Subject?, repository: CatalogRepository) {
     Column(Modifier.fillMaxWidth().height(64.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(subject?.title ?: "探索番组", maxLines = 1, overflow = TextOverflow.Ellipsis,
             style = KazumiType.heading, color = KazumiColors.text)
-        Text(summary.replace(Regex("\\s+"), " ").ifBlank { "选择节目查看详情" },
+        if(recent.isEmpty())Text(summary.replace(Regex("\\s+"), " ").ifBlank { "选择节目查看详情" },
             maxLines = 1, overflow = TextOverflow.Ellipsis, style = KazumiType.caption, color = KazumiColors.muted)
+        else RecentWatchLinks(recent,recentFocus,onRecent)
+    }
+}
+
+@Composable
+internal fun RecentWatchLinks(entries:List<HistoryEntry>,focusRequesters:MutableMap<Int,FocusRequester>?=null,onSelect:(Subject)->Unit) {
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+        Text("最近观看",style=KazumiType.caption,color=KazumiColors.muted)
+        entries.distinctBy { it.subject.id }.take(2).forEach { entry ->
+            val requester=focusRequesters?.getOrPut(entry.subject.id) { FocusRequester() }
+            DisposableEffect(entry.subject.id) { onDispose { focusRequesters?.remove(entry.subject.id) } }
+            Button(onClick={ onSelect(entry.subject) },modifier=Modifier.height(30.dp).widthIn(max=270.dp)
+                .then(if(requester!=null)Modifier.focusRequester(requester) else Modifier),
+                contentPadding=PaddingValues(horizontal=10.dp,vertical=0.dp),scale=ButtonDefaults.scale(focusedScale=1f)) {
+                Text("${entry.subject.title} · ${entry.episode.substringAfterLast(" · ")}",maxLines=1,
+                    overflow=TextOverflow.Ellipsis,style=KazumiType.caption)
+            }
+        }
     }
 }
 

@@ -25,7 +25,10 @@ import kotlinx.coroutines.launch
 import org.kazumi.tv.data.*
 
 @Composable
-internal fun DetailScreen(subject: Subject, loadRelations:suspend(Int)->RelationResult={ RelationRepository().load(it) },loadDetail: suspend (Int) -> Subject = { CatalogRepository().detail(it) }) {
+internal fun DetailScreen(subject: Subject, loadRelations:suspend(Int)->RelationResult={ RelationRepository().load(it) },
+                          sourceCatalog:org.kazumi.tv.rules.SourceCatalog?=null,onResume:((HistoryEntry)->Unit)?=null,
+                          resolveEpisode:(suspend (String,org.kazumi.tv.rules.Episode)->org.kazumi.tv.playback.PlaybackRequest)?=null,
+                          loadDetail: suspend (Int) -> Subject = { CatalogRepository().detail(it) }) {
     var path by rememberSaveable(subject.id,stateSaver=NavigationStateSavers.subjects) { mutableStateOf(arrayListOf(subject)) }
     val states=rememberSaveableStateHolder()
     var depthNotice by remember { mutableStateOf(false) }
@@ -35,7 +38,7 @@ internal fun DetailScreen(subject: Subject, loadRelations:suspend(Int)->Relation
         if(depthNotice)Text("已打开较多关联作品，请先返回上个作品。",style=KazumiType.caption)
         if(path.size>1)PlayerAction("返回上个作品") { back() }
         states.SaveableStateProvider(path.last().id) {
-            DetailContent(path.last(),loadDetail,loadRelations) { next ->
+            DetailContent(path.last(),loadDetail,loadRelations,sourceCatalog,onResume,resolveEpisode) { next ->
                 val index=path.indexOfFirst { it.id==next.id }
                 if(index>=0) { path.drop(index+1).forEach { states.removeState(it.id) }; path=ArrayList(path.take(index+1)) }
                 else if(path.size<32)path=ArrayList(path+next) else depthNotice=true
@@ -45,7 +48,12 @@ internal fun DetailScreen(subject: Subject, loadRelations:suspend(Int)->Relation
 }
 
 @Composable
-private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadRelations:suspend(Int)->RelationResult,onRelated:(Subject)->Unit) {
+private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadRelations:suspend(Int)->RelationResult,
+                          sourceCatalog:org.kazumi.tv.rules.SourceCatalog?,onResume:((HistoryEntry)->Unit)?,
+                          resolveEpisode:(suspend (String,org.kazumi.tv.rules.Episode)->org.kazumi.tv.playback.PlaybackRequest)?,onRelated:(Subject)->Unit) {
+    val latest=rememberWatchHistory().firstOrNull { it.subject.id==subject.id }
+    var resume by rememberSaveable(subject.id,stateSaver=NavigationStateSavers.history) { mutableStateOf<HistoryEntry?>(null) }
+    var sourceHistory by rememberSaveable(subject.id,stateSaver=NavigationStateSavers.history) { mutableStateOf<HistoryEntry?>(null) }
     var detail by remember(subject.id) { mutableStateOf(subject) }
     var error by remember(subject.id) { mutableStateOf(false) }
     var loading by remember(subject.id) { mutableStateOf(true) }
@@ -64,25 +72,31 @@ private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadR
     var relations by rememberSaveable(subject.id) { mutableStateOf(false) }
     val relationsFocus=remember { FocusRequester() }
     var reading by rememberSaveable(subject.id) { mutableStateOf(false) }
-    var restore by remember { mutableStateOf<String?>(null) }
+    var restore by rememberSaveable(subject.id) { mutableStateOf<String?>(null) }
     val playFocus = remember { FocusRequester() }
+    val episodesFocus = remember { FocusRequester() }
+    val sourceChoiceFocus = remember { FocusRequester() }
     val summaryFocus = remember { FocusRequester() }
-    BackHandler(sources) { sources = false; restore = "play" }
+    BackHandler(sources) { sources = false; restore = if(sourceHistory!=null) "episodes" else "source" }
     BackHandler(credits) { credits=false; restore="credits" }
     BackHandler(relations) { relations=false; restore="relations" }
     BackHandler(reading) { reading = false; restore = "summary" }
     LaunchedEffect(sources, reading, relations, credits, restore) {
         if (!sources && !reading && !relations && !credits && restore != null && restore != "collection") {
             withFrameNanos { }
-            (when(restore) { "summary" -> summaryFocus; "relations" -> relationsFocus; "credits" -> creditsFocus; else -> playFocus }).requestFocus()
+            withFrameNanos { }
+            (when(restore) { "summary" -> summaryFocus; "relations" -> relationsFocus; "credits" -> creditsFocus;
+                "episodes" -> if(latest?.kind==HistoryKind.ONLINE)episodesFocus else sourceChoiceFocus;
+                "source" -> sourceChoiceFocus; else -> if(latest!=null)playFocus else sourceChoiceFocus }).requestFocus()
             restore = null
         }
     }
     val summary = remember(detail.summary) { SynopsisText.clean(detail.summary) }
-    if (sources) { SourceScreen(detail); return }
+    if (sources) { SourceScreen(detail,catalog=sourceCatalog,initialHistory=sourceHistory,resolveEpisode=resolveEpisode); return }
     if(credits) { CreditsScreen(detail) { credits=false; restore="credits" }; return }
     if(relations) { RelationsScreen(detail,loadRelations,{ relations=false; restore="relations" },onRelated); return }
     if (reading) { SynopsisReader(detail.title,summary) { reading = false; restore = "summary" }; return }
+    resume?.let { entry -> ResumeScreen(entry) { resume=null; restore="play" } }
     val context = LocalContext.current
     val library = remember { LibraryStore(context) }
     var collection by remember(subject.id) { mutableStateOf(library.collections().firstOrNull { it.subject.id==subject.id }?.type) }
@@ -110,10 +124,18 @@ private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadR
                 info.rank?.let { add("排名 #$it") }
             }
             if(facts.isNotEmpty()) Text(facts.joinToString(" · "),style = KazumiType.caption,color = KazumiColors.muted)
+            if(latest!=null)Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PlayerAction("继续 ${latest.episode.substringAfterLast(" · ")}",Modifier.focusRequester(playFocus)) {
+                        if(onResume!=null)onResume(latest) else resume=latest
+                    }
+                    if(latest.kind==HistoryKind.ONLINE)PlayerAction("查看原来源选集",Modifier.focusRequester(episodesFocus)) { sourceHistory=latest; sources=true }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                PlayerAction("搜索播放来源",Modifier.focusRequester(playFocus)) { sources = true }
+                PlayerAction(if(latest==null) "搜索播放来源" else "更换播放来源",
+                    Modifier.focusRequester(sourceChoiceFocus)) { sourceHistory=null; sources = true }
                 PlayerAction(collection?.let { "收藏 · ${it.label}" } ?: "收藏节目",Modifier.focusRequester(collectionFocus)) { restore="collection"; choosingCollection=true }
             }
+            latest?.let { Text("上次看到 ${it.episode.substringAfterLast(" · ")} · ${it.position/60000}分${it.position/1000%60}秒",style=KazumiType.caption,color=KazumiColors.muted) }
             if(loading) Text("正在加载完整资料…",style = KazumiType.caption,color = KazumiColors.muted)
             if(error) {
                 Text("完整资料加载失败，仍可搜索播放来源。",style = KazumiType.caption)

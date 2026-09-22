@@ -22,6 +22,16 @@ class TvNetworkInstrumentation : Instrumentation() {
     override fun onStart() {
         val output = Bundle()
         try {
+            if(mode == "recent-watch-navigation") {
+                RecentWatchNavigationRegression.run(this)
+                output.putString("stream", "recent_watch_navigation=PASS\n")
+                finish(Activity.RESULT_OK, output); return
+            }
+            if(mode == "verification-layout") {
+                VerificationLayoutRegression.run(this)
+                output.putString("stream", "verification_layout=PASS\n")
+                finish(Activity.RESULT_OK, output); return
+            }
             if(mode == "navigation-parcel") {
                 output.putString("stream", NavigationParcelRegression.run(this) + "\n")
                 finish(Activity.RESULT_OK, output); return

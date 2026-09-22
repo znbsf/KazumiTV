@@ -3,6 +3,7 @@ package org.kazumi.tv.ui
 
 import android.annotation.SuppressLint
 import android.webkit.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -11,9 +12,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import kotlinx.coroutines.*
 import org.kazumi.tv.rules.VerificationScript
 import org.kazumi.tv.rules.VerificationSession
@@ -29,7 +33,13 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
     val scope=rememberCoroutineScope()
     val currentDone by rememberUpdatedState(onDone)
     val pointerFocus=remember { FocusRequester() }
+    val keyboard=LocalSoftwareKeyboardController.current
+    var operating by remember { mutableStateOf(false) }
     var view by remember { mutableStateOf<WebView?>(null) }
+    BackHandler(operating) {
+        (view as? VerificationWebView)?.pointerEnabled=false
+        operating=false
+    }
     var generation by remember { mutableIntStateOf(0) }
     var browserGeneration by remember { mutableIntStateOf(0) }
     var lifetime by remember { mutableStateOf<VerificationWebLifetime?>(null) }
@@ -70,10 +80,13 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
         catch(cancelled:CancellationException) { throw cancelled }
         catch(_:RuntimeException) { loadFailed=true;status="验证页面不可用，请重新加载后重试" }
     }
-    Column(Modifier.fillMaxSize().background(Color(0xFF111713)).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF111713)).imePadding().padding(if(operating) 8.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if(operating) {
+            Text("网页操作 · 方向键移动，确定点击，长按拖动 · 返回恢复工具栏",style=KazumiType.caption)
+        } else {
         Text("${rule.name} · 网页验证")
         Text(status)
-        Row(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=Alignment.CenterVertically) {
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Button(enabled=!loadFailed&&view!=null,onClick = { generation++ }) { Text("重新检测") }
             Button(onClick = {
                 lifetime?.release();view=null;lifetime=null
@@ -81,7 +94,7 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
                 progress=org.kazumi.tv.rules.VerificationProgress();delivered=false
                 status="正在重新加载验证页面…";browserGeneration++
             }) { Text("重新加载") }
-            Button(enabled=!loadFailed&&view!=null,onClick = { (view as? VerificationWebView)?.pointerEnabled=true;view?.requestFocus() },modifier=Modifier.focusRequester(pointerFocus)) { Text("操作网页") }
+            Button(enabled=!loadFailed&&view!=null,onClick = { keyboard?.hide();operating=true;(view as? VerificationWebView)?.pointerEnabled=true },modifier=Modifier.focusRequester(pointerFocus)) { Text("操作网页") }
             if(imageMode) {
                 if(image.isNotBlank()) {
                     val model=remember(image) {
@@ -92,7 +105,7 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
                     }
                     coil.compose.AsyncImage(model,contentDescription="验证码图片",modifier=Modifier.size(140.dp,52.dp))
                 }
-                TvTextInput(code,{ code=it.take(32);inputNotice="" },modifier=Modifier.width(180.dp))
+                TvTextInput(code,{ code=it.take(32);inputNotice="" },modifier=Modifier.width(180.dp).semantics { contentDescription="验证码输入框" })
                 Button(enabled=code.isNotBlank()&&!loadFailed&&view!=null,onClick={ scope.launch {
                     val web=view ?: return@launch
                     val owner=lifetime ?: return@launch
@@ -108,13 +121,14 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
             }
         }
         Text("网页操作：方向键移动 · 确定点击 · 长按确定拖动，再按确定松开 · 返回退出光标",style=KazumiType.caption)
+        }
         key(browserGeneration) { AndroidView(factory = { hostContext -> android.widget.FrameLayout(hostContext).apply {
             var owned:VerificationWebLifetime?=null
             try {
             val browser=VerificationWebView(hostContext)
             val owner=VerificationWebLifetime(browser);owned=owner;tag=owner
             browser.apply {
-            onExitPointer={ pointerFocus.requestFocus() }
+            onExitPointer={ operating=false }
             VerificationSession.configure(this,rule)
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = request.url.scheme !in listOf("http", "https")
@@ -138,5 +152,9 @@ fun VerificationScreen(rule: SourceRule, startUrl: String = rule.baseUrl, challe
             owner?.release()
             if(lifetime===owner) { view=null;lifetime=null }
         }) }
+    }
+    LaunchedEffect(operating) {
+        withFrameNanos { }; withFrameNanos { }
+        if(operating)view?.requestFocus() else runCatching { pointerFocus.requestFocus() }
     }
 }

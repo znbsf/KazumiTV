@@ -31,23 +31,25 @@ data class SourcePlaybackSelection(val ruleName:String,val episode:Episode,val r
 
 @Composable
 fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((SourcePlaybackSelection)->Unit)?=null,onCancel:()->Unit={},catalog:SourceCatalog?=null,
-                 resolveEpisode:(suspend (String,Episode)->PlaybackRequest)?=null) {
+                 resolveEpisode:(suspend (String,Episode)->PlaybackRequest)?=null,initialHistory:org.kazumi.tv.data.HistoryEntry?=null) {
     val context = LocalContext.current
     val repository = catalog ?: remember { RuleRepository(context) }
+    val previous=initialHistory?.takeIf { it.subject.id==subject.id && it.kind==org.kazumi.tv.data.HistoryKind.ONLINE }
+    val previousOrigin=previous?.origin?.takeIf { it.sourceUrl.isNotBlank() }
     if (repository.rules.isEmpty()) {
         Column { Text("没有启用的来源，请在设置的规则管理中启用规则。"); if(transfer!=null)PlayerAction("返回播放",onClick=onCancel) }
         BackHandler(transfer!=null,onBack=onCancel); return
     }
     var query by rememberSaveable(subject.id) { mutableStateOf(subject.title) }
     var keyword by rememberSaveable(subject.id) { mutableStateOf(subject.title) }
-    var sourceName by rememberSaveable(subject.id) { mutableStateOf(repository.rules.first().name) }
+    var sourceName by rememberSaveable(subject.id) { mutableStateOf(previousOrigin?.rule ?: repository.rules.first().name) }
     var removedSourceName by rememberSaveable(subject.id) { mutableStateOf<String?>(null) }
     val sourceExists = repository.rules.any { it.name == sourceName }
     val source = repository.rules.indexOfFirst { it.name == sourceName }.coerceAtLeast(0)
-    var match by rememberSaveable(subject.id,stateSaver=PlaybackStateSavers.match) { mutableStateOf<SourceMatch?>(null) }
+    var match by rememberSaveable(subject.id,stateSaver=PlaybackStateSavers.match) { mutableStateOf(previousOrigin?.let { SourceMatch(it.sourceTitle,it.sourceUrl) }) }
     var roads by remember { mutableStateOf(emptyList<Road>()) }
     var road by rememberSaveable(subject.id) { mutableIntStateOf(0) }
-    var roadTitle by rememberSaveable(subject.id) { mutableStateOf("") }
+    var roadTitle by rememberSaveable(subject.id) { mutableStateOf(previousOrigin?.roadTitle.orEmpty()) }
     var episode by rememberSaveable(subject.id,stateSaver=PlaybackStateSavers.episode) { mutableStateOf<Episode?>(null) }
     var busy by remember { mutableStateOf(false) }
     var pageError by remember { mutableStateOf<String?>(null) }
@@ -62,7 +64,7 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
     val grid = rememberLazyGridState()
     val episodeFocus = remember { mutableMapOf<Int, FocusRequester>() }
     var returnEpisode by rememberSaveable(subject.id) { mutableStateOf<Int?>(null) }
-    var returnPage by rememberSaveable(subject.id) { mutableStateOf<String?>(null) }
+    var returnPage by rememberSaveable(subject.id) { mutableStateOf(previous?.key?.substringAfter('|',"")?.takeIf { it.isNotBlank() }) }
     val currentEpisodes = roads.getOrNull(road)?.episodes.orEmpty()
     LaunchedEffect(Unit) { withFrameNanos { }; if(match==null)runCatching { sourceFocus.requestFocus() } }
     LaunchedEffect(sourceExists) {
@@ -72,7 +74,8 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
             sourceName=recovered.selectedName;removedSourceName=recovered.removedName
         }
     }
-    LaunchedEffect(keyword, refresh) {
+    LaunchedEffect(keyword, refresh,match==null) {
+        if(match!=null)return@LaunchedEffect
         results.clear(); states.clear(); verificationPages.clear()
         val limit = Semaphore(3)
         coroutineScope {
@@ -157,6 +160,7 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
         } else {
             Text(if (match == null) "选择播放来源" else "线路与选集", style = KazumiType.heading)
             Text(subject.title, style = KazumiType.caption, color = KazumiColors.muted, maxLines = 1)
+            if(previous!=null && previousOrigin==null)Text("旧记录缺少来源目录，请重新选择来源。",style=KazumiType.caption)
         }
         if (match == null) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             TvTextInput(query, { query = it.take(150) }, modifier = Modifier.weight(1f))
@@ -170,7 +174,8 @@ fun SourceScreen(subject: Subject,transfer:SourceTransfer?=null,onSelect:((Sourc
                         colors = ButtonDefaults.colors(containerColor = if (source == index) KazumiColors.selected else KazumiColors.surface)) {
                         Column {
                             Text(repository.rules[index].name, style = KazumiType.control)
-                            Text(states[index] ?: "等待搜索", style = KazumiType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(if(match!=null) { if(index==source) "当前来源" else "切换后搜索" } else states[index] ?: "等待搜索",
+                                style = KazumiType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }

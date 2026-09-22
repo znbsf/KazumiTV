@@ -2,11 +2,11 @@
 
 为电视遥控器设计的动画浏览与播放应用。当前主线使用 **Kotlin · Compose for TV · Media3**，延续深色、绿色和高密度海报浏览，独立于原 Flutter 工程开发。
 
-**当前公开测试版：0.3.3-preview.1。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
+**当前公开测试版：0.3.3-preview.2。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
 
-[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.1) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-EXECUTION-20260922.md)
+[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.2) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-NAVIGATION-20260922.md)
 
-本次发布（**0.3.3-preview.1**）：修复Android 9系统回收后导航状态反序列化崩溃，补顶层Artplayer静态媒体发现，改善搜索焦点/滚动窗口恢复和空目录换线。17源新一轮抽测为7源14线短测通过，失败与验证项逐条保留；最终包另做MXdm两线与真实系统恢复专项。按本轮要求不再做整集播放测试。详见[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)和[本轮实现与证据](docs/PLAYBACK-EXECUTION-20260922.md)。
+本次发布（**0.3.3-preview.2**）：补首页最近观看、历史番剧详情和详情续播/原来源选集入口；选集不自动播放，返回恢复操作焦点。验证网页操作模式收起顶部工具区，补输入与返回布局验收。延续Preview 1的系统回收和静态媒体发现修复。17源前轮为7源14线短测通过，真实验证码仍有未完成项，不将受控UI验证当成全源通过。详见[本轮实现与证据](docs/PLAYBACK-NAVIGATION-20260922.md)和[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)。
 
 ## 界面
 
