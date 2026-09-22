@@ -36,7 +36,7 @@ object RealTransportRecoveryRegression {
     private data class Reading(val player:ExoPlayer?,val position:Long=0,val buffered:Long=0,val duration:Long=0,
         val ready:Boolean=false,val playing:Boolean=false,val intent:Boolean=false,val frames:Int=0,val error:Int?=null,
         val state:Int=Player.STATE_IDLE,val suppression:Int=0,val videoWidth:Int=0,val videoHeight:Int=0)
-    fun run(test:Instrumentation):String {
+    fun run(test:Instrumentation, delayedRetry:Boolean=false):String {
         val started=SystemClock.elapsedRealtime()
         val deadline=started+360_000
         val actual=test.targetContext
@@ -220,6 +220,29 @@ object RealTransportRecoveryRegression {
             check(await(35_000) { command()=="restored" }) { "Host restore command missing" }
             click("重新解析")
             publish("restoring_media")
+            var recoveryAttempts=1
+            if(delayedRetry) {
+                // Separate diagnostic scenario: do not relabel a failed immediate retry as a pass.
+                Thread.sleep(1000)
+                check(await(35_000) { reading().ready || has("重新解析") }) { "First restored attempt did not settle" }
+                if(has("重新解析") && !reading().ready) {
+                    val code=nodes().mapNotNull { it.text?.toString() }
+                        .firstNotNullOfOrNull { Regex("（(-?[0-9]+)）").find(it)?.groupValues?.get(1) }
+                    report("transport immediate_retry=FAIL web_error_code=${code ?: "unknown"}; delayed retry is a separate diagnostic")
+                    publish("delayed_retry_wait")
+                    Thread.sleep(15_000)
+                    val probeStarted=SystemClock.elapsedRealtime()
+                    try {
+                        val page=runBlocking { withTimeout(8000) { HttpText.pageAsync(episode.pageUrl,
+                            headers=mapOf("User-Agent" to rule.userAgent,"Referer" to rule.referer)) } }
+                        report("transport restored_http status=${page.status} elapsed_ms=${SystemClock.elapsedRealtime()-probeStarted}")
+                    } catch(error:Exception) {
+                        report("transport restored_http failure=${error.javaClass.simpleName} elapsed_ms=${SystemClock.elapsedRealtime()-probeStarted}")
+                    }
+                    click("重新解析");recoveryAttempts++
+                    publish("restoring_media_delayed")
+                }
+            }
             check(await(70_000) { reading().let { it.ready&&it.frames>0&&!it.intent&&abs(it.position-targetPosition)<=2500 } }) { "Paused retry did not restore target position" }
             val restored=reading()
             publish("restored_paused")
@@ -233,7 +256,7 @@ object RealTransportRecoveryRegression {
             click("选集")
             check(await(8000) { nodes().any { it.text?.toString()?.let { value->value.contains(episode.title)&&value.contains("当前") }==true } }) { "Recovered episode selection changed" }
             result="PASS";publish("passed")
-            return "real_transport_recovery=PASS real_error_code=$errorCode paused_position=PASS explicit_advance_5s=PASS same_episode=PASS physical_outage=NOT_TESTED"
+            return "real_transport_recovery=PASS scenario=${if(delayedRetry) "delayed_retry_diagnostic" else "immediate_retry"} recovery_attempts=$recoveryAttempts real_error_code=$errorCode paused_position=PASS explicit_advance_5s=PASS same_episode=PASS physical_outage=NOT_TESTED"
         } catch(error:Exception) {
             result="FAIL"
             diagnose("failure_before_cleanup")

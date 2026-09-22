@@ -31,7 +31,7 @@ class TvNetworkInstrumentation : Instrumentation() {
                 finish(Activity.RESULT_OK,output);return
             }
             if(mode=="real-transport-recovery") {
-                output.putString("stream",RealTransportRecoveryRegression.run(this)+"\n")
+                output.putString("stream",RealTransportRecoveryRegression.run(this,runnerArgs.getString("delayedRetry")=="true")+"\n")
                 finish(Activity.RESULT_OK,output);return
             }
             if(mode=="catalogue-recovery") {
