@@ -17,7 +17,8 @@ import java.net.URI
 object SourcePageDiagnostic {
     fun run(test: Instrumentation, args: Bundle) = runBlocking {
         val source = requireNotNull(args.getString("source")) { "source required" }
-        val rule = RuleStore(test.targetContext).all().firstOrNull { it.name.equals(source, true) }
+        val candidateRule = args.getString("candidateFile")?.let { CandidateRuleFile.read(test.targetContext,it,source) }
+        val rule = candidateRule ?: RuleStore(test.targetContext).all().firstOrNull { it.name.equals(source, true) }
             ?: error("source missing")
         val keyword = args.getString("keyword") ?: "无职转生"
         val label = rule.name.replace(Regex("[^A-Za-z0-9_-]"), "_").take(60)
@@ -27,6 +28,7 @@ object SourcePageDiagnostic {
         fun safe(value: String) = value.replace(Regex("https?://\\S+"), "[url]").replace(Regex("[\\p{Cntrl}]"), " ").take(100)
         fun report(stage: String, status: String, details: JSONObject = JSONObject()) {
             val row = JSONObject().put("source", safe(rule.name)).put("stage", stage).put("status", status)
+            if(candidateRule != null)row.put("candidate",true).put("fixedSnapshotTested",false)
             details.keys().forEach { row.put(it, details.get(it)) }
             File(folder, "summary.jsonl").appendText(row.toString() + "\n")
             test.sendStatus(0, Bundle().apply { putString("stream", row.toString() + "\n") })
@@ -81,7 +83,8 @@ object SourcePageDiagnostic {
             } else originalMatch
             File(folder, "matches-private.json").writeText(JSONArray(matches.map { JSONObject().put("title", it.title).put("url", it.url) }).toString())
             stage = "chapters"
-            val roads = withTimeout(65_000) { RuleRepository(test.targetContext,responseObserver={ _,response ->
+            val roads = withTimeout(65_000) { RuleRepository(test.targetContext,rulesOverride=candidateRule?.let { listOf(it) },responseObserver={ _,response ->
+                if(candidateRule != null)File(folder,"chapters.html").writeText(response.body)
                 report("chapter_transport","received",JSONObject().put("httpStatus",response.status)
                     .put("requestedScheme",URI(match.url).scheme).put("responseScheme",URI(response.url).scheme))
             }).chapters(rule, match) }

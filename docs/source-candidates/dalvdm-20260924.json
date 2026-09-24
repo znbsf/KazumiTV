@@ -1,0 +1,28 @@
+{
+  "api": "6",
+  "type": "anime",
+  "name": "dalvdm-candidate-20260924",
+  "version": "1.0-tv-candidate.2",
+  "muliSources": true,
+  "useWebview": true,
+  "useNativePlayer": true,
+  "usePost": false,
+  "useLegacyParser": false,
+  "adBlocker": false,
+  "userAgent": "",
+  "baseURL": "https://www.dalvdm.cc/",
+  "searchURL": "https://www.dalvdm.cc/index.php/vod/search.html?wd=@keyword",
+  "searchList": "//main[contains(concat(' ', normalize-space(@class), ' '), ' search ')]//a[starts-with(@href,'/index.php/vod/detail/id/')]",
+  "searchName": "//div[contains(concat(' ', normalize-space(@class), ' '), ' title ')]",
+  "searchResult": "//",
+  "chapterRoads": "//div[contains(concat(' ', normalize-space(@class), ' '), ' tab-pane ') and contains(concat(' ', normalize-space(@class), ' '), ' lists-box ')]",
+  "chapterResult": "//a[starts-with(@href,'/index.php/vod/play/id/')]",
+  "referer": "",
+  "antiCrawlerConfig": {
+    "enabled": true,
+    "captchaType": 1,
+    "captchaImage": "//img[@class='ds-verify-img']",
+    "captchaInput": "//div[4]/div[2]/div/div/input",
+    "captchaButton": "//div[4]/div[2]/button"
+  }
+}
