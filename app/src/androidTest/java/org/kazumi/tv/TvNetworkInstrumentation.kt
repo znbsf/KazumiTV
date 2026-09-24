@@ -98,7 +98,16 @@ class TvNetworkInstrumentation : Instrumentation() {
                 finish(Activity.RESULT_OK, output); return
             }
             if(mode == "home-ui-acceptance") {
-                output.putString("stream", HomeUiAcceptanceRegression.run(this) + "\n")
+                try {
+                    output.putString("stream", HomeUiAcceptanceRegression.run(this) + "\n")
+                } catch (failure: Exception) {
+                    output.putString(
+                        "stream",
+                        "home-ui-acceptance=FAIL ${failure.message}\n${failure.stackTrace.take(5).joinToString()}\n"
+                    )
+                    finish(Activity.RESULT_CANCELED, output)
+                    return
+                }
                 finish(Activity.RESULT_OK, output); return
             }
             if(mode in setOf("user-data-backup", "user-data-restore", "user-data-restore-watch", "user-data-verify")) {
