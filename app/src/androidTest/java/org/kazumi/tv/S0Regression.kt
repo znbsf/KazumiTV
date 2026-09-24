@@ -2,6 +2,7 @@ package org.kazumi.tv
 
 import android.app.Instrumentation
 import android.content.Intent
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.compose.setContent
@@ -10,6 +11,7 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.*
 import org.kazumi.tv.playback.NativePlayer
 import org.kazumi.tv.playback.PlaybackRequest
+import org.kazumi.tv.playback.MediaResolutionFailure
 import org.kazumi.tv.ui.*
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -30,6 +32,7 @@ object S0Regression {
             return null
         }
         fun nodesContaining(text: String): List<android.view.accessibility.AccessibilityNodeInfo> {
+            if (android.os.Build.VERSION.SDK_INT >= 33) test.uiAutomation.clearCache()
             val found = mutableListOf<android.view.accessibility.AccessibilityNodeInfo>()
             fun visit(node: android.view.accessibility.AccessibilityNodeInfo?) {
                 if (node == null) return
@@ -40,6 +43,8 @@ object S0Regression {
             return found
         }
         fun settle() { Thread.sleep(600); test.waitForIdleSync() }
+        val releasePending = CompletableDeferred<Unit>()
+        val lateProduced = AtomicInteger()
         try {
             test.runOnMainSync {
                 first = NativePlayer(activity); second = NativePlayer(activity)
@@ -63,33 +68,78 @@ object S0Regression {
             test.runOnMainSync { activity.setContent { KazumiTheme(false) {
                 if (open.value) ResolvingPlayback(selection.value, "S0 解析回归", resolve = {
                     calls.incrementAndGet()
-                    withContext(NonCancellable) { delay(2200) }
-                    PlaybackRequest("https://example.invalid/unused.mp4", emptyMap(), "fixture")
+                    withContext(NonCancellable) {
+                        releasePending.await()
+                        lateProduced.incrementAndGet()
+                        PlaybackRequest("https://example.invalid/unused.mp4", emptyMap(), "fixture")
+                    }
                 }, onClose = { open.value = false }) { SideEffect { delivered.incrementAndGet() } }
             } } }
-            settle()
-            check(calls.get() == 1)
-            check(nodesContaining("正在解析播放地址").isNotEmpty())
+            test.waitForIdleSync()
+            val callDeadline=SystemClock.elapsedRealtime()+2500
+            while(calls.get()==0 && SystemClock.elapsedRealtime()<callDeadline) Thread.sleep(50)
+            check(calls.get()==1) { "Pending resolver did not start calls=${calls.get()} delivered=${delivered.get()}" }
+            val loadingDeadline=SystemClock.elapsedRealtime()+2500
+            while(nodesContaining("正在解析播放地址").isEmpty() && SystemClock.elapsedRealtime()<loadingDeadline) Thread.sleep(50)
+            val rootOwned=test.uiAutomation.rootInActiveWindow?.packageName?.toString()==test.targetContext.packageName
+            check(nodesContaining("正在解析播放地址").isNotEmpty()) {
+                "Pending shell not visible calls=${calls.get()} delivered=${delivered.get()} open=${open.value} rootOwnedByApp=$rootOwned"
+            }
+            check(!releasePending.isCompleted && lateProduced.get()==0) { "Pending resolver completed before cancellation" }
             test.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
-            Thread.sleep(2400)
+            test.waitForIdleSync()
+            check(!open.value) { "Back did not close pending resolver" }
+            releasePending.complete(Unit)
+            val lateDeadline=SystemClock.elapsedRealtime()+1500
+            while(lateProduced.get()==0 && SystemClock.elapsedRealtime()<lateDeadline) Thread.sleep(50)
+            check(lateProduced.get()==1) { "Late provider result was not produced" }
+            test.waitForIdleSync()
             check(delivered.get() == 0) { "Cancelled result opened media" }
 
             test.runOnMainSync { activity.setContent { KazumiTheme(false) {
                 ResolvingPlayback("retry", "S0 错误回归", resolve = {
-                    calls.incrementAndGet(); delay(150); error("fixture")
+                    calls.incrementAndGet(); delay(150)
+                    throw MediaResolutionFailure("网页加载", "域名解析失败；网络恢复后请重新解析（-2）")
                 }, onClose = {}) { error("failed resolver delivered media") }
             } } }
             settle()
-            check(nodesContaining("解析失败").isNotEmpty())
+            check(nodesContaining("域名解析失败").isNotEmpty())
+            check(nodesContaining("证书").isEmpty())
             val before = calls.get()
-            val nodes = nodesContaining("重新解析")
+            // The explanatory error text also says "重新解析"; target the button label exactly.
+            val nodes = nodesContaining("重新解析").filter { it.text?.toString() == "重新解析" }
             check(nodes.isNotEmpty())
             var node = nodes.first()
             while (!node.isClickable && node.parent != null) node = node.parent
             check(node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
             settle()
             check(calls.get() == before + 1) { "Retry did not restart resolver" }
+
+            // A cancelled old selection may still return from an uncooperative provider.
+            // It must not replace the new selection's media after a switch.
+            val selectionKey = mutableStateOf("old")
+            val oldStarted = AtomicInteger()
+            val oldDelivered = AtomicInteger()
+            val newDelivered = AtomicInteger()
+            test.runOnMainSync { activity.setContent { KazumiTheme(false) {
+                ResolvingPlayback(selectionKey.value, "S0 切集回归", resolve = {
+                    val requested = selectionKey.value
+                    if (requested == "old") {
+                        oldStarted.incrementAndGet()
+                        withContext(NonCancellable) { delay(1400) }
+                    }
+                    PlaybackRequest("https://example.invalid/$requested.mp4",emptyMap(),requested)
+                }, onClose = {}) { request -> SideEffect {
+                    if (request.title == "old") oldDelivered.incrementAndGet() else newDelivered.incrementAndGet()
+                } }
+            } } }
+            for (i in 0 until 40) { if (oldStarted.get()>0) break; Thread.sleep(25) }
+            check(oldStarted.get()==1) { "Old selection did not start" }
+            test.runOnMainSync { selectionKey.value="new" }
+            Thread.sleep(1700);test.waitForIdleSync()
+            check(oldDelivered.get()==0 && newDelivered.get()>0) { "Cancelled selection replaced current media" }
         } finally {
+            releasePending.complete(Unit)
             test.runOnMainSync {
                 activity.setContent {}
                 first.release(); second.release(); activity.finish()

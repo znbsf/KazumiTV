@@ -47,7 +47,14 @@ class TvNetworkInstrumentation : Instrumentation() {
                 finish(Activity.RESULT_OK,output);return
             }
             if(mode=="real-transport-recovery") {
-                output.putString("stream",RealTransportRecoveryRegression.run(this,runnerArgs.getString("delayedRetry")=="true")+"\n")
+                output.putString("stream",RealTransportRecoveryRegression.run(this,
+                    delayedRetry=runnerArgs.getString("delayedRetry")=="true",
+                    phaseDiagnostics=runnerArgs.getString("phaseDiagnostics")=="true",
+                    sourceName=runnerArgs.getString("sourceName") ?: "baimao",
+                    pauseAfterError=runnerArgs.getString("pauseAfterError")!="false",
+                    initialOutage=runnerArgs.getString("initialOutage")=="true",
+                    interruption=runnerArgs.getString("interruption") ?: "none",
+                    repeatOutage=runnerArgs.getString("repeatOutage")=="true")+"\n")
                 finish(Activity.RESULT_OK,output);return
             }
             if(mode=="catalogue-recovery") {
@@ -129,6 +136,9 @@ class TvNetworkInstrumentation : Instrumentation() {
             }
             if(mode=="player-controls") {
                 PlayerControlsRegression.run(this); output.putString("stream","player_controls=OK\n"); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="player-controls-dialog") {
+                PlayerControlsRegression.run(this,inDialog=true); output.putString("stream","player_controls_dialog_focus=OK\n"); finish(Activity.RESULT_OK,output); return
             }
             if(mode=="web-discovery") {
                 output.putString("stream",WebDiscoveryRegression.run(targetContext)+"\n"); finish(Activity.RESULT_OK,output); return
@@ -476,7 +486,7 @@ class TvNetworkInstrumentation : Instrumentation() {
                     output.putString("stream", "S0 regression failed: ${failure.stackTraceToString()}\n")
                     finish(Activity.RESULT_CANCELED, output); return
                 }
-                output.putString("stream", "S0: same_view_rebind, detach, pending_shell, failure_retry, cancellation_late_result=OK\n")
+                output.putString("stream", "S0: same_view_rebind, detach, pending_shell, failure_retry, cancellation_late_result, selection_switch_late_result=OK\n")
                 finish(Activity.RESULT_OK, output); return
             }
             if (mode == "catalog") {

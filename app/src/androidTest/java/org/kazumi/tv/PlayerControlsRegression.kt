@@ -11,8 +11,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import org.kazumi.tv.data.*
 import org.kazumi.tv.playback.*
 import org.kazumi.tv.ui.*
@@ -20,7 +23,7 @@ import org.kazumi.tv.ui.*
 /** Controlled playback and failure interaction, with no source/cookie or user-history mutation. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object PlayerControlsRegression {
-    fun run(test: Instrumentation) {
+    fun run(test: Instrumentation, inDialog:Boolean=false) {
         val original=test.targetContext
         val beforeSettings=original.getSharedPreferences("tv_settings",0).all.toMap()
         val beforeLibrary=original.getSharedPreferences("tv_library",0).all.toMap()
@@ -74,18 +77,30 @@ object PlayerControlsRegression {
         var retries=0
         fun mount(path:String) {
             test.runOnMainSync { activity.setContent { CompositionLocalProvider(LocalContext provides isolated) { KazumiTheme(false) {
-                PlayerScreen(PlaybackRequest("http://127.0.0.1:${server.port}/$path",emptyMap(),"控制测试",mimeType="video/mp4"),
-                    Subject(19000921,"播放器控制回归","",""),initialPosition=0,initialPlayWhenReady=false,
-                    onNext={}, episodes=listOf("第1集","第2集"),currentEpisode=0,onEpisodeSelected={},
-                    onChooseRoad={ _,_-> },onChooseSource={ _,_-> },
-                    onResolveAgain={ _,_-> retries++ },onClose={})
+                @Composable fun player() {
+                    PlayerScreen(PlaybackRequest("http://127.0.0.1:${server.port}/$path",emptyMap(),"控制测试",mimeType="video/mp4"),
+                        Subject(19000921,"播放器控制回归","",""),initialPosition=0,initialPlayWhenReady=false,
+                        onNext={}, episodes=listOf("第1集","第2集"),currentEpisode=0,onEpisodeSelected={},
+                        onChooseRoad={ _,_-> },onChooseSource={ _,_-> },
+                        onResolveAgain={ _,_-> retries++ },onClose={})
+                }
+                if(inDialog)Dialog(onDismissRequest={},properties=DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)) { player() }
+                else player()
             } } } }
         }
         try {
             mount("controls.mp4")
-            await("ready duration") { playbackReady() }
+            if(inDialog)await("dialog mounted") { has("▷ 播放") }
+            else await("ready duration") { playbackReady() }
             await("initial control focus after mount") { focused("▷ 播放") }
             click("▷ 播放")
+            if(inDialog) {
+                Thread.sleep(11_000)
+                await("dialog controls auto-hide") { !has("设置") }
+                test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
+                await("dialog controls reappear") { has("设置")&&has("Ⅱ 暂停") }
+                return
+            }
             await("rendered frame and advancing position") { playbackReady(requireRendered=true) }
             // A hardware media key pauses even if slow decoding outlasts the controls timer.
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)

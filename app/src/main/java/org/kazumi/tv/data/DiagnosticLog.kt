@@ -13,7 +13,8 @@ class DiagnosticLog(private val capacity:Int=200, private val byteLimit:Int=64*1
         RESOLVE_CANCELLED("解析取消"), VERIFICATION_REQUIRED("需要网页验证"),
         WEB_MODERN("网页提前注入"), WEB_COMPATIBILITY("网页兼容模式"),
         METADATA("已读取页面信息"), INLINE_REFERENCE("当前页面播放器配置"),
-        IFRAME_CANDIDATE("尝试播放器子页面"), PROBE_HEADER_RETRY("媒体请求头兼容重试"), PLAYER_ERROR("播放错误")
+        IFRAME_CANDIDATE("尝试播放器子页面"), PROBE_HEADER_RETRY("媒体请求头兼容重试"),
+        HOST_LOOKUP_RETRY("域名解析恢复尝试"), PLAYER_ERROR("播放错误")
     }
     enum class Stage { NONE, INITIALIZATION, DISCOVERY, PROBE }
     data class Event(val time:Long,val kind:Kind,val stage:Stage,val code:Int?,val http:Int?) {
@@ -48,9 +49,12 @@ class DiagnosticLog(private val capacity:Int=200, private val byteLimit:Int=64*1
             message.matches(Regex("inline_player_reference depth=[0-2]")) -> Kind.INLINE_REFERENCE
             message.matches(Regex("iframe_fallback depth=[1-2] attempt=[1-3]")) -> Kind.IFRAME_CANDIDATE
             message=="media_probe retry=without_inferred_referer status=400" -> Kind.PROBE_HEADER_RETRY
+            message=="host_lookup_recovery start" -> Kind.HOST_LOOKUP_RETRY
+            message.matches(Regex("host_lookup_retry attempt=[1-5]")) -> Kind.HOST_LOOKUP_RETRY
             else -> return
         }
-        record(kind)
+        val attempt=if(kind==Kind.HOST_LOOKUP_RETRY)message.substringAfter("attempt=", "0").toIntOrNull() else null
+        record(kind,code=attempt)
     }
 
     fun clear()=synchronized(lock) { mutableEvents.value=emptyList();dropped=0 }

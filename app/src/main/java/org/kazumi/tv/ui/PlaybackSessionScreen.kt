@@ -62,6 +62,7 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
     var choosingSource by rememberSaveable { mutableStateOf(false) }
     val episodes = roads.getOrNull(road)?.episodes.orEmpty()
     val index = episodes.indexOfFirst { it.pageUrl == episode.pageUrl }
+    var recoveryMessage by remember(activeRule,episode.pageUrl,sourceRevision) { mutableStateOf<String?>(null) }
     LaunchedEffect(activeRule,sourceRevision,catalogueAttempt,choosingSource,episode.pageUrl) {
         if (roads.isNotEmpty() || choosingSource) { restoring=false;return@LaunchedEffect }
         restoring=true
@@ -112,12 +113,18 @@ fun PlaybackSessionScreen(subject: Subject, ruleName: String, initialEpisode: Ep
         }
         return
     }
-    ResolvingPlayback("$activeRule|${episode.pageUrl}|$retry", "${subject.title} · ${episode.title}", resolve = {
+    ResolvingPlayback("$activeRule|${episode.pageUrl}|$retry", "${subject.title} · ${episode.title}",
+        progressText=recoveryMessage, resolve = {
+        recoveryMessage=null
         val log=DiagnosticLog.shared
         log.record(DiagnosticLog.Kind.RESOLVE_START)
         try {
             val rule = repository.rules.firstOrNull { it.name == activeRule } ?: error("来源未启用")
-            (resolveEpisode?.invoke(activeRule,episode) ?: WebMediaResolver(context,diagnostic=log::resolver).resolve(episode.pageUrl, rule, "${subject.title} · ${episode.title}"))
+            (resolveEpisode?.invoke(activeRule,episode) ?: WebMediaResolver(context,diagnostic=log::resolver,
+                onHostLookupRetry={ attempt -> recoveryMessage=if(attempt==0)
+                    "域名暂不可解析，正在有限重试；按返回可取消。"
+                    else "域名暂不可解析，正在重试（$attempt/5）；按返回可取消。" }
+            ).resolve(episode.pageUrl, rule, "${subject.title} · ${episode.title}"))
                 .copy(resumeKey = "$activeRule|${episode.pageUrl}").also { log.record(DiagnosticLog.Kind.RESOLVE_SUCCESS) }
         } catch(cancelled:CancellationException) {
             log.record(DiagnosticLog.Kind.RESOLVE_CANCELLED);throw cancelled

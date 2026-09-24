@@ -99,9 +99,14 @@ object RealSourceSwitchRegression {
                 }
                 override suspend fun chapters(rule:SourceRule,match:SourceMatch)=repository.chapters(rule,match)
             }
+            fun thirdSeason(title:String)=title.contains("第三季")||title.contains("Ⅲ")||
+                Regex("(?i)(?<![a-z])III(?![a-z])").containsMatchIn(title)
             val prepared=runBlocking { withTimeout(80_000) {
-                val firstMatch=repository.search(from,"无职转生").filter { it.title.contains("第三季") }.singleOrNull() ?: error("source_season_ambiguous")
-                val targetMatch=repository.search(to,"无职转生").filter { it.title.contains("第三季") }.singleOrNull() ?: error("target_season_ambiguous")
+                val firstCandidates=repository.search(from,"无职转生").filter { thirdSeason(it.title) }
+                val targetCandidates=repository.search(to,"无职转生").filter { thirdSeason(it.title) }
+                report("season_candidates source=${firstCandidates.size} target=${targetCandidates.size}; selecting first matching result")
+                val firstMatch=firstCandidates.firstOrNull() ?: error("source_season_missing")
+                val targetMatch=targetCandidates.firstOrNull() ?: error("target_season_missing")
                 Triple(firstMatch to repository.chapters(from,firstMatch),targetMatch,repository.chapters(to,targetMatch))
             } }
             val firstMatch=prepared.first.first;val firstRoad=prepared.first.second.firstOrNull() ?: error("source_road_missing")
@@ -167,6 +172,7 @@ object RealSourceSwitchRegression {
             check(targetFirst in (before-2000)..(before+15000)) { "cross_source_started_outside_saved_position" }
             await("target_short_advance",20_000) { library.history().any { it.key==targetKey&&it.position>=targetFirst+3000 } }
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
             await("target_pause",10_000) { has("▷ 播放")&&clockMs()!=null }
             report("cross_source=PASS before_ms=$before target_first_ms=$targetFirst after_ms=${clockMs()} source=${to.name}")
             shot("02-target-source")
@@ -186,6 +192,7 @@ object RealSourceSwitchRegression {
                 click(label)
                 await("reentered_target_advance") { library.history().any { it.key==targetKey&&it.position>=savedAt+3000 } }
                 test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)
+                test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
                 await("reentered_target_pause",10_000) { has("▷ 播放")&&clockMs()!=null }
                 val reenteredAt=clockMs()!!
                 check(reenteredAt in savedAt..(savedAt+20_000)) { "reentry_lost_saved_position" }

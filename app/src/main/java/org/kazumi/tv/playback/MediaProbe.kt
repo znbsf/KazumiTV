@@ -16,4 +16,5 @@ object MediaProbe {
     }
 }
 
-class MediaResolutionFailure(val stage: String, detail: String) : IllegalStateException("解析失败 · $stage：$detail")
+class MediaResolutionFailure(val stage: String, detail: String, val webErrorCode:Int?=null) :
+    IllegalStateException("解析失败 · $stage：$detail")

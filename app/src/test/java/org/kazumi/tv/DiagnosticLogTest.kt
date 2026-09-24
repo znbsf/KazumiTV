@@ -49,4 +49,17 @@ class DiagnosticLogTest {
         assertEquals(DiagnosticLog.Stage.NONE,DiagnosticLog.stage("媒体探测 token=secret"))
         assertEquals(DiagnosticLog.Stage.PROBE,DiagnosticLog.stage("媒体探测"))
     }
+
+    @Test fun hostLookupRecoveryKeepsOnlyBoundedAttemptNumbers() {
+        val log=DiagnosticLog(clock={42})
+        log.resolver("host_lookup_recovery start")
+        log.resolver("host_lookup_retry attempt=3")
+        log.resolver("host_lookup_retry attempt=6")
+        log.resolver("host_lookup_retry attempt=2 https://example.invalid/?token=private")
+        val events=log.events.value
+        assertEquals(2,events.size)
+        assertTrue(events.all { it.kind==DiagnosticLog.Kind.HOST_LOOKUP_RETRY })
+        assertEquals(listOf(0,3),events.map { it.code })
+        assertFalse(log.report("0.3.3-preview.6","143.0.1.2",36).contains("private"))
+    }
 }

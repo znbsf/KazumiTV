@@ -15,10 +15,22 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/** WebView's numeric errors only. Remote descriptions may contain page data and are not displayed. */
+internal object WebLoadFailure {
+    fun detail(code:Int):String = when(code) {
+        WebViewClient.ERROR_HOST_LOOKUP -> "域名解析失败；网络恢复后请重新解析（$code）"
+        WebViewClient.ERROR_CONNECT -> "无法连接服务器；网络恢复后请重新解析（$code）"
+        WebViewClient.ERROR_TIMEOUT -> "网页连接超时；请重新解析（$code）"
+        WebViewClient.ERROR_FAILED_SSL_HANDSHAKE -> "安全连接失败；请重试或更换来源（$code）"
+        else -> "网页连接失败；请重试或更换来源（$code）"
+    }
+}
+
 /** Original page plus one bounded candidate WebView; ES5 discovery and cancellable probes. */
 class WebMediaResolver(private val context: Context, private val timeoutMs: Long = 25000,
     private val diagnostic: (String) -> Unit = {}, private val forceCompatibility: Boolean = false,
-    private val privateConsoleDiagnostic: ((JSONObject) -> Unit)? = null) {
+    private val privateConsoleDiagnostic: ((JSONObject) -> Unit)? = null,
+    private val onHostLookupRetry: (Int) -> Unit = {}) {
     // Test-only opt-in sink. Never forward these records to the public diagnostic callback.
     private var privateConsoleCount = 0
     private fun capturePrivateConsole(message: ConsoleMessage) {
@@ -39,11 +51,23 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         runCatching { sink(event) } // Private debug-file failures cannot affect playback.
     }
     suspend fun resolve(pageUrl:String,rule:SourceRule,title:String):PlaybackRequest = try {
-        resolveOnce(pageUrl,rule,title)
+        resolveWithHostLookupRecovery(pageUrl,rule,title)
     } catch(challenge:SourceVerificationRequired) {
         if(!AutomaticVerification.run(context,rule,challenge.pageUrl))throw challenge
-        resolveOnce(pageUrl,rule,title)
+        resolveWithHostLookupRecovery(pageUrl,rule,title)
     }
+    private suspend fun resolveWithHostLookupRecovery(pageUrl:String,rule:SourceRule,title:String):PlaybackRequest =
+        try { resolveOnce(pageUrl,rule,title) }
+        catch(cancelled:CancellationException) { throw cancelled }
+        catch(failure:MediaResolutionFailure) {
+            if(failure.webErrorCode!=WebViewClient.ERROR_HOST_LOOKUP)throw failure
+            diagnostic("host_lookup_recovery start")
+            onHostLookupRetry(0)
+            HostLookupRecovery.run(failure,retry={ resolveOnce(pageUrl,rule,title) },onRetry={ attempt ->
+                diagnostic("host_lookup_retry attempt=$attempt")
+                onHostLookupRetry(attempt)
+            })
+        }
     @SuppressLint("SetJavaScriptEnabled")
     private suspend fun resolveOnce(pageUrl: String, rule: SourceRule, title: String): PlaybackRequest = withContext(Dispatchers.Main) {
         SourceRule.httpUrl(pageUrl)
@@ -58,6 +82,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         // A discovered address still has to pass the same HTTP/media probe as a WebView candidate.
         val sourcePage=try { withTimeoutOrNull(12000) { org.kazumi.tv.data.HttpText.pageAsync(pageUrl,headers=defaults) } }
             catch(cancelled:CancellationException) { throw cancelled } catch(_:Exception) { null }
+        val preflightUnavailable=sourcePage==null
         if(sourcePage!=null)SourcePageChecks.check(rule,sourcePage.body,sourcePage.url)
         val html=sourcePage?.takeIf { it.status in 200..299 }?.body
         diagnostic("page_metadata bytes=${html?.length ?: 0}")
@@ -110,6 +135,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
         class DiscoveryPage(val currentDepth:Int,initialPage:String,val candidateId:Int=0) {
         val web=WebView(context)
         @Volatile var currentPage=initialPage
+        @Volatile var mainPageFinished=false
         private var navigation=0
         private var lastFrameSummary=""
         var frameFailed=false
@@ -167,6 +193,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                     // Polling still installs it if this callback precedes the new document.
                     if (!destroyed) {
                         navigation++
+                        if(currentDepth==0)mainPageFinished=false
                         inlineMetadata?.cancel()
                         if(currentDepth>0) {
                             if(frameChallenges.remove(candidateId)!=null)diagnostic("iframe_challenge_cleared depth=$currentDepth attempt=$candidateId")
@@ -178,6 +205,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                 }
                 override fun onPageFinished(view: WebView, url: String?) {
                     if(destroyed || url!=currentPage || inlineMetadataNavigation==navigation)return
+                    if(currentDepth==0 && fatal.get()==null)mainPageFinished=true
                     inlineMetadataNavigation=navigation
                     val documentNavigation=navigation
                     val documentPage=currentPage
@@ -216,7 +244,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
                 }
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = request.url.scheme !in listOf("http","https")
                 override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                    pageFailure(request,MediaResolutionFailure("网页加载", "连接或证书错误（${error.errorCode}）"))
+                    pageFailure(request,MediaResolutionFailure("网页加载", WebLoadFailure.detail(error.errorCode),error.errorCode))
                 }
                 override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
                     pageFailure(request,MediaResolutionFailure("网页加载", "HTTP ${response.statusCode}"))
@@ -359,7 +387,7 @@ class WebMediaResolver(private val context: Context, private val timeoutMs: Long
             // A third-party analytics SyntaxError is not proof the player failed to run.
             // Keep it in diagnostics; report the observed discovery/probe failure instead.
             resolved ?: throw (fatal.get() ?: frameChallenges.values.lastOrNull() ?: lastProbe ?: lastFrameFailure ?:
-                MediaResolutionFailure("媒体发现", "等待超时，未找到可用媒体（候选 ${seen.size}）"))
+                DiscoveryTimeoutFailure.fromEvidence(preflightUnavailable,source.mainPageFinished,seen.size))
         } finally {
             fallback?.destroyWeb()
             primary?.destroyWeb()
