@@ -5,7 +5,7 @@
 ## 固定输入与保全
 
 - 上游 [KazumiRules 当前目录](https://github.com/Predidit/KazumiRules/blob/0d85fc80ab6c208548d9ee9c9e81271b08ff7f39/index.json) HEAD 于本轮核对仍为 `0d85fc80ab6c208548d9ee9c9e81271b08ff7f39`，目录 17 项。模拟器 `source-audit-rules.json` 的 17 个规则对象与该提交相应 JSON 文件逐项相等，已安装 17/17、均启用且规范规则与安装规则相等；未导入或修改来源。
-- 生产 APK SHA-256 `9EFBBEFCC5F2F42345F6F5CA4ED7B371A941621F1405828EF10FA0E1592E8FED`；最新音轨诊断轮的测试 APK SHA-256 `5A39F16F0B022BFFFE9D5685390CA228114E391985862A5F30D1BA2C933D2A17`。Git 基线 `c8f1ab3fda324574c9b5a48fb3c7a53550da975c` 加未提交网络恢复改动。生产 APK 在首轮、复测及真实 UI 测试间未变，焦点推测性改动已撤回；测试 APK 更新了复测入口、API 33+ 无障碍缓存刷新、真实换集/历史/主页最近观看及音频解码信息检查。设备为 `Kazumi_Playback_Audit_API36` / `emulator-5560`，Android API 36、WebView 143.0.7499.24。较早执行的测试 APK 分别为 `EA5296DC…`（历史页）及随后主页轮，不将旧测试包执行记录贴为新测试包的全部结果；最新 `5A39F16F…` 已重新执行完整同源换线、换集、历史、主页及音轨路径。
+- 生产 APK SHA-256 `9EFBBEFCC5F2F42345F6F5CA4ED7B371A941621F1405828EF10FA0E1592E8FED`；最新音轨诊断轮的测试 APK SHA-256 `5A39F16F0B022BFFFE9D5685390CA228114E391985862A5F30D1BA2C933D2A17`。这两个 APK 由 `c8f1ab3fda324574c9b5a48fb3c7a53550da975c` 加本阶段源码构建；源码及本文随后收入独立内部分支 `codex/p1-playback-20260924` 的 `b9686bc550c72c2d70a62ada5ad11630f7012d2f`，首次 P1 测试时尚未提交。生产 APK 在首轮、复测及真实 UI 测试间未变，焦点推测性改动已撤回；测试 APK 更新了复测入口、API 33+ 无障碍缓存刷新、真实换集/历史/主页最近观看及音频解码信息检查。设备为 `Kazumi_Playback_Audit_API36` / `emulator-5560`，Android API 36、WebView 143.0.7499.24。较早执行的测试 APK 分别为 `EA5296DC…`（历史页）及随后主页轮，不将旧测试包执行记录贴为新测试包的全部结果；最新 `5A39F16F…` 已重新执行完整同源换线、换集、历史、主页及音轨路径。
 - 测试前已备份设备原 APK、规则文件及三项用户数据。全部复测后 `p1-20260924-before` 检查点读回 `stores=3` 未变。原始规则、日志、截图和私有控制台文件只在被 Git 忽略的 `artifacts/p1-source-snapshot` 与设备应用私有目录。
 - 最终复核的 `:app:testReleaseUnitTest :app:assembleRelease :app:assembleDebugAndroidTest :app:lintRelease` 成功，55 份单测报告合计 225 项、失败/错误 0；生产与测试 APK 的 SHA-256 仍分别为上列 `9EFBBEFC…` 和 `5A39F16F…`。最新真实主页/音轨测试后的全局三项用户数据检查点再次读回未变。
 - 每个可进入集表的来源，按目录线路逐条抽样一个节目的一集；优先“无职转生”第三季第 12 集，缺第 12 集时取该线路首集并标为回退。通过仅表示本次样本解析、首帧、播放推进超过 5 秒、可用时拖动及暂停继续；没有整集播放，也未独立验证实际听到声音、正式应用全部遥控页面或站点全节目。
@@ -41,13 +41,18 @@
 | 线路 | 网页与解析候选 | 媒体请求或播放器结果 | 当前归因及替代 |
 | --- | --- | --- | --- |
 | AGE 3 | 详情/集表正常，WebView 捕获媒体候选 | `fengbao12.com` 连接失败或超时 | 媒体主机可达性问题，不能据此判客户端解析通用缺陷；同源 1、2、4、5 线最近一次可用。 |
-| akianime 2 | 详情页有 `player_aaaa`，`from=xinpan` 的不透明 `Doki-` 值；无静态媒体或 iframe，需外部解析页面，WebView 未捕获可播放候选 | 媒体发现失败；未直接请求第三方解析服务 | 外部线路解析依赖待验，尚无可行动客户端根因；同源 1 线可用。 |
+| akianime 2 | 详情页有 `player_aaaa`，`from=xinpan` 的不透明 `Doki-` 值；无静态媒体或 iframe；站点自身脚本选用 `ps=1`，加载同站 `parse.js` 后才创建第三方解析 iframe | WebView 未捕获可播放候选，媒体发现失败；未直接请求第三方解析服务 | 转交第三方解析页是站点的原始通路，解析页是否返回媒体仍未获证；不能将不透明值塞入原生播放器。同源 1 线可用。 |
 | baimao 4、6 | 详情/集表正常，WebView 已捕获媒体候选 | 分别在 `fengbao12.com`、`v14.qqqrst.com` 连接失败或超时，两轮相同 | 候选已发现，疑似媒体端可达性；同源 1、2、3、5 线可用。 |
 | DM84 1、LMM 1 | 搜索/集表正常，WebView 已捕获媒体候选 | `groupvideo.photo.qq.com` 返回 HTTP 404 | 媒体资源无效或上游链路失效；DM84 2线、LMM 2/3线可用。 |
 | ezdmw 3 | 详情页含两个 iframe，但主播放器 iframe 的 `src` 查询值为字面量 `null`，直接取得的播放器页也生成 `<video src="null">`；WebView 见 TypeError | 探测返回播放器 HTML，非视频/清单 | 本次网页自身未给有效媒体地址；同源 2线可用，1线在两轮间波动。未把可能的站点脚本故障写成客户端修复。 |
 | ezdmw 1 | 首轮媒体发现并短播通过，复测 WebView 未再观察到媒体候选 | 复测媒体发现失败 | 暂标波动，缺少固定复现与客户端根因；同源 2线两轮可用。 |
 
 `xfdmneo` 未进入线路统计：旧规则的 `search.html` 被重定向到新的站点入口页，新搜索页由客户端脚本渲染，旧 XPath 页面结构不存在。简单换域名不会得到等价结果；需独立调查新 API/页面并作为另一个规则版本验证，不能改写本轮固定上游快照。对已定位为媒体端 404/连接失败的线路，到此停止重复探测。
+
+### 两个剩余来源的有限静态取证
+
+- `xfdmneo`：已存在独立[旧版站候选规则](source-candidates/xfdmneo-20260922.md)，与固定 17 源快照隔离；此前生产导入器校验和真实验证码页面已验证，人工验证码未完成。2026-09-24 另查站点提供的 Next 搜索页：带关键词的 `/search?q=…` 返回 HTTP 200，初始 HTML 没有旧版 `search-box` 或节目详情链接；页面客户端脚本调用 `search_animes`、`has_gated_anime_search_match` 的 JSON RPC。只更换 `searchURL` 和 XPath 无法把这种客户端 JSON 搜索变成当前 API 6 规则的网页列表。没有调用 RPC、没有引入新接口或将候选导入固定规则；下一步是旧版候选经人工验证后的列表/播放验收，或单独设计并验证新版接口适配。
+- `akianime` 第 2 线：只读取站点节目 HTML、同站 `/static/js/playerconfig.js`、`/static/js/player.js` 和 `/static/player/parse.js`。节目元数据的 `from=xinpan` 与 `Doki-…` 值不是媒体地址；站点配置为 `ps=1`，同站 `player.js` 选 `parse` 播放器，同站 `parse.js` 将配置解析地址与 `PlayUrl` 拼接为 iframe。该 iframe 属于外部解析依赖，页面静态 HTML 自身没有媒体/iframe。既有真实回归里，现代 WebView 运行后观察到 2 个 iframe、均不可跨域读取，4 个投机候选的探测结果都是非视频/清单，没有可播放候选；第 1 线在同 APK 通过。未向第三方解析服务单独发送节目参数；既有自动审批拒绝了该直接请求，因此不能断定第三方解析页是站点故障还是客户端捕获缺口。需要明确授权后才可实测该边界，或继续使用已通过的第 1 线。
 
 ## 真实 UI 与熄屏短测
 
@@ -62,7 +67,7 @@
 ## 后续 P1 验收入口
 
 1. 完成四个图片源的新鲜人工验证码“输入 → 实际提交 → 服务端结果 → 原搜索/播放恢复”闭环；先重点核对 giriGiriLove，页面、Cookie 或旧验证码不能代替新提交。2026-09-24 再次展示的 giri 新图无人输入、页面已超时，后续必须重新取图。
-2. 对 akianime 第 2 线、ezdmw 第 3 线等仍失败的路径做有限页面/媒体分层归因；gugu3 与 ezdmw 第 1 线保留波动标签，xfdmneo 记录为旧规则遇站点迁移；保留可用替代线路，不通过静默删源改变统计。
+2. akianime 第 2 线、ezdmw 第 3 线已有上述页面/媒体分层归因；前者第三方解析结果未获证，后者网站本轮给出 `null` 媒体参数。gugu3 与 ezdmw 第 1 线保留波动标签，xfdmneo 原规则记录为站点迁移；保留可用替代线路，不通过静默删源改变统计。
 3. 当前生产主页最近观看及音轨/解码器证据已补；实际听音和 UI 集成候选重测仍需目标设备与 P2/P3。用户随后允许旧电视测试，并希望熄屏睡觉。本轮重新连接确认电视前台为系统 HOME、已安装版为 `0.3.3-preview.6` code 52，发送一次 POWER 后读回 `mWakefulness=Asleep`、显示 `OFF`；随后复查仍为该状态。关屏时没有启动播放或 UI instrumentation，因此旧电视真实画面、焦点和扬声器验收仍待亮屏窗口。
 
-证据索引：`artifacts/p1-source-snapshot/inventory.txt`、每源 `audit-<来源>.txt`（giri 为 `giri-audit.txt`）、六源 `audit-<来源>-recheck.txt`、`audit-gugu3-recheck.txt`、`lmm-verification-live.txt`、`audit-LMM-after-verify.txt`、`xfdmneo-page-diagnostic`、设备侧 `source-audit-p1-<来源>-20260924.jsonl`、真实 UI 的 `real-source-switch-3.txt`、`real-road-switch-next-recent.txt`、`real-road-switch-home-audio.txt` 及设备侧 `real-road-switch-*` / `source-switch-*`。私有控制台、音视频截图和验证码截图仅留忽略目录，不写入 Git。
+证据索引：`artifacts/p1-source-snapshot/inventory.txt`、每源 `audit-<来源>.txt`（giri 为 `giri-audit.txt`）、六源 `audit-<来源>-recheck.txt`、`audit-gugu3-recheck.txt`、`lmm-verification-live.txt`、`audit-LMM-after-verify.txt`、`xfdmneo-page-diagnostic`、Next HTML/相关脚本本地只读快照、`akianime-playerconfig-private.js` / `akianime-player-private.js` / `akianime-parse-private.js`、设备侧 `source-audit-p1-<来源>-20260924.jsonl`、真实 UI 的 `real-source-switch-3.txt`、`real-road-switch-next-recent.txt`、`real-road-switch-home-audio.txt` 及设备侧 `real-road-switch-*` / `source-switch-*`。私有控制台、音视频截图和验证码截图仅留忽略目录，不写入 Git。
