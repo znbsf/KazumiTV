@@ -30,3 +30,5 @@
 ## 拟用 Release 摘要
 
 `0.3.3` 整合播放恢复和电视首页：真实来源换线/换源、选集、续播与返回路径的修复及六列电视首页；支持从 `0.3.3-preview.6` 直接覆盖升级并保留设置与观看记录。测试范围包括 Android9 小米电视与 Android16 Google TV 模拟器。第三方站点可用性会变化，本次未验证所有来源或整集播放。
+
+P4 已备好独立的 [Release 文案草稿](RELEASE-0.3.3-DRAFT.md)及忽略目录 `artifacts/p3-release-candidate/SHA256SUMS.txt`。交接后只读重查 `origin` 的 `v0.3.3` tag 得到空结果，GitHub 对应 Release API 得到 404；发布时仍须再查一次。完整候选提交 `26a17fb60b4808a471daffd265b99471dfbfc2d0`，工作树干净时交接。新增干净模拟器 `emulator-5570` 已通过 `adb emu kill` 关闭并从 `adb devices` 消失，AVD 与测试数据保留；预先运行的 `emulator-5560` 保持原状态。
