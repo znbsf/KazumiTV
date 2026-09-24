@@ -10,9 +10,10 @@ import java.io.File
  * Test APK only. Never emits preference values, and never overwrites an existing checkpoint.
  */
 object UserDataCheckpoint {
-    private val names = listOf("tv_settings", "tv_library", "search_history")
     fun run(test: Instrumentation, mode: String, label: String): String {
         require(label.matches(Regex("[A-Za-z0-9_-]{1,64}")))
+        val names = listOf("tv_settings", "tv_library", "search_history") +
+            if (label.startsWith("p3four-")) listOf("tv_rules") else emptyList()
         val context = test.targetContext
         if (mode == "user-data-restore-watch") {
             require(label.matches(Regex("real-watch-[0-9]+")))

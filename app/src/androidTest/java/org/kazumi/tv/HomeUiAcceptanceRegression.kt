@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import org.kazumi.tv.data.NetworkSettings
 import org.kazumi.tv.data.Subject
 import org.kazumi.tv.data.TvCatalog
+import org.kazumi.tv.data.TvPreferences
 import org.kazumi.tv.ui.TvApp
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -20,15 +21,53 @@ object HomeUiAcceptanceRegression {
     private fun sample(index: Int, name: String = "首页样本$index") = Subject(sampleIds[index - 1], name, "", "")
 
     fun run(test: Instrumentation): String {
+        val settings = test.targetContext.getSharedPreferences("tv_settings", 0)
+        val originalSettings = settings.all.toMap()
+        val library = test.targetContext.getSharedPreferences("tv_library", 0)
+        val originalLibrary = library.all.toMap()
+        fun restore(prefs: android.content.SharedPreferences, values: Map<String, *>) {
+            val editor = prefs.edit().clear()
+            for ((key, value) in values) when (value) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                is Set<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    editor.putStringSet(key, value as Set<String>)
+                }
+            }
+            check(editor.commit() && prefs.all == values) { "home test changed user preferences" }
+        }
+        TvPreferences(test.targetContext).setupComplete = true
+        check(library.edit().clear().commit())
         val catalog = MutableCatalog()
         catalog.setRows("", (1..12).map(::sample))
         catalog.setRows("日常", listOf(sample(1, "日常迟到数据")))
         catalog.setRows("原创", listOf(sample(2, "原创旧数据")))
         catalog.setDelay("日常", 1_000)
         catalog.setDelay("原创", 40)
-        val activity = test.startActivitySync(
-            Intent(test.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ) as MainActivity
+        val activity = try {
+            test.startActivitySync(
+                Intent(test.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            ) as MainActivity
+        } catch (failure: Exception) {
+            restore(settings, originalSettings)
+            restore(library, originalLibrary)
+            throw failure
+        }
+        val evidence = java.io.File(test.targetContext.getExternalFilesDir(null), "p3-home-ui-${System.currentTimeMillis()}").apply {
+            check(mkdirs())
+        }
+        fun screenshot(name: String) {
+            test.uiAutomation.takeScreenshot()?.let { bitmap ->
+                java.io.File(evidence, "$name.png").outputStream().use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                }
+                bitmap.recycle()
+            }
+        }
 
         fun nodes(): List<AccessibilityNodeInfo> {
             val result = mutableListOf<AccessibilityNodeInfo>()
@@ -37,6 +76,7 @@ object HomeUiAcceptanceRegression {
                 result.add(node)
                 for (index in 0 until node.childCount) visit(node.getChild(index))
             }
+            if (android.os.Build.VERSION.SDK_INT >= 33) test.uiAutomation.clearCache()
             visit(test.uiAutomation.rootInActiveWindow)
             return result
         }
@@ -64,6 +104,7 @@ object HomeUiAcceptanceRegression {
 
         fun sendKey(keyCode: Int) = test.sendKeyDownUpSync(keyCode)
         fun openFocusedDetail(label: String) {
+            awaitText("热门")
             sendKey(KeyEvent.KEYCODE_DPAD_CENTER)
             awaitText("搜索播放来源")
             awaitText(label)
@@ -73,6 +114,7 @@ object HomeUiAcceptanceRegression {
             test.runOnMainSync { activity.setContent { TvApp(homeCatalog = catalog) } }
             awaitText("首页样本3")
             awaitText("热门")
+            screenshot("01-home")
 
             // Navigate with the same D-pad path as a TV remote, then verify the focused-card detail path.
             sendKey(KeyEvent.KEYCODE_DPAD_DOWN)
@@ -81,9 +123,13 @@ object HomeUiAcceptanceRegression {
             val focusedId = sampleIds[focusedIndex - 1]
             await("home synopsis request for focused subject") { catalog.detailStarted.contains(focusedId) }
             openFocusedDetail(focusedLabel)
+            screenshot("02-detail")
             await("home synopsis request cancellation on detail entry") { catalog.detailCancelled.contains(focusedId) }
             sendKey(KeyEvent.KEYCODE_BACK)
-            awaitText(focusedLabel)
+            awaitText("热门")
+            awaitText("选择节目查看详情")
+            Thread.sleep(250)
+            screenshot("03-return")
 
             // Remove the focused subject during detail and return to the nearest surviving card.
             openFocusedDetail(focusedLabel)
@@ -137,8 +183,24 @@ object HomeUiAcceptanceRegression {
             awaitText("原创")
 
             return "home_hot_focus=PASS empty_catalog=PASS deleted_card_nearest_focus=PASS rapid_category_stale_result=PASS cache_refresh=PASS home_summary_cancelled_on_exit=PASS"
+        } catch (failure: Exception) {
+            val folder = java.io.File(test.targetContext.getExternalFilesDir(null), "p3-home-ui-${System.currentTimeMillis()}")
+            if (folder.mkdirs()) {
+                test.uiAutomation.takeScreenshot()?.let { screenshot ->
+                    java.io.File(folder, "failure.png").outputStream().use {
+                        screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                    }
+                    screenshot.recycle()
+                }
+                java.io.File(folder, "nodes-private.txt").writeText(nodes().mapNotNull {
+                    it.text?.toString() ?: it.contentDescription?.toString()
+                }.take(80).joinToString("\n"))
+            }
+            throw failure
         } finally {
             test.runOnMainSync { activity.finish() }
+            restore(settings, originalSettings)
+            restore(library, originalLibrary)
         }
     }
 
