@@ -127,7 +127,7 @@ object PlayerControlsRegression {
             // A separate invalid media request exercises visible recovery without a website dependency.
             mount("broken.mp4")
             await("failed") { nodes().any { it.text?.toString()?.startsWith("播放失败：")==true } }
-            check(has("重新加载"));shot("player-controls-error.png")
+            await("reload control after player error") { has("重新加载") };shot("player-controls-error.png")
             await("failure moves focus to attached retry control") { focused("重新加载") }
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
             await("single retry callback") { retries==1 }

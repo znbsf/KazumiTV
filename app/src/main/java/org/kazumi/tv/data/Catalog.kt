@@ -9,13 +9,19 @@ import java.net.URLEncoder
 data class Subject(val id: Int, val title: String, val cover: String, val summary: String,
     val metadata: SubjectMetadata = SubjectMetadata()) : java.io.Serializable
 
+interface TvCatalog {
+    suspend fun detail(id: Int): Subject
+    suspend fun popular(tag: String, page: Int = 0): List<Subject>
+    fun clearCache()
+}
+
 /** Bounded process cache; no account data or playback URLs are persisted here. */
-class CatalogRepository {
+class CatalogRepository : TvCatalog {
     private val cache = ExpiringLruCache<String, List<Subject>>(5, 600_000) { android.os.SystemClock.elapsedRealtime() }
     private val details = ExpiringLruCache<String, Subject>(24, 600_000) { android.os.SystemClock.elapsedRealtime() }
-    fun clearCache() { cache.clear(); details.clear() }
+    override fun clearCache() { cache.clear(); details.clear() }
     private fun subject(value: JSONObject) = CatalogCodec.subject(value)
-    suspend fun detail(id: Int): Subject = withContext(Dispatchers.IO) {
+    override suspend fun detail(id: Int): Subject = withContext(Dispatchers.IO) {
         val key="${NetworkSettings.catalogRevision.value}|${NetworkSettings.apiBase}|$id"
         details.get(key) ?: subject(JSONObject(HttpText.requestAsync("${NetworkSettings.apiBase}/v0/subjects/$id"))).also { details.put(key, it) }
     }
@@ -26,7 +32,7 @@ class CatalogRepository {
         val list = root.getJSONArray("data")
         List(minOf(list.length(), 20)) { subject(list.getJSONObject(it)) }
     }
-    suspend fun popular(tag: String, page: Int = 0): List<Subject> = withContext(Dispatchers.IO) {
+    override suspend fun popular(tag: String, page: Int): List<Subject> = withContext(Dispatchers.IO) {
         require(page in 0..20)
         val key = "${NetworkSettings.catalogRevision.value}|$tag|$page"
         cache.get(key)?.let { return@withContext it }

@@ -97,6 +97,10 @@ class TvNetworkInstrumentation : Instrumentation() {
                 output.putString("stream", NavigationParcelRegression.run(this) + "\n")
                 finish(Activity.RESULT_OK, output); return
             }
+            if(mode == "home-ui-acceptance") {
+                output.putString("stream", HomeUiAcceptanceRegression.run(this) + "\n")
+                finish(Activity.RESULT_OK, output); return
+            }
             if(mode in setOf("user-data-backup", "user-data-restore", "user-data-restore-watch", "user-data-verify")) {
                 output.putString("stream", UserDataCheckpoint.run(this, mode, auditRun) + "\n")
                 finish(Activity.RESULT_OK, output); return
