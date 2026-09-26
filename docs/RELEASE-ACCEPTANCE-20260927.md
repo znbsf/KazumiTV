@@ -27,3 +27,5 @@
 第三方来源、真实验证码、网络恢复和剩余迁移能力按[逐源矩阵](PLAYBACK-P1-MATRIX-20260924.md)、[P3记录](P3-RELEASE-ACCEPTANCE-20260924.md)及[迁移台账](MIGRATION-STATUS.md)保持各自状态。dalvdm/xfdmneo 等失败不隐藏；这次不扩展屏保、系统频道、默认 Launcher 或完整迁移声明。
 
 正式发布使用[公开说明](RELEASE-0.3.3-STABLE.md)，附件只包含最终 APK 和校验文件。发布后另记 tag/Release/远程下载校验，不能以创建命令启动代替成功。
+
+发布后核对已完成：正式 Release 为 Latest，远程重新下载 APK 的哈希和签名相等；详见[发布核验](RELEASE-VERIFICATION-20260927.md)。
