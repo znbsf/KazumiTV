@@ -20,7 +20,7 @@ object HomeUiAcceptanceRegression {
     private val sampleIds = (1..12).map { 99024000 + it }
     private fun sample(index: Int, name: String = "首页样本$index") = Subject(sampleIds[index - 1], name, "", "")
 
-    fun run(test: Instrumentation): String {
+    fun run(test: Instrumentation, navigationEdgesOnly: Boolean = false): String {
         val settings = test.targetContext.getSharedPreferences("tv_settings", 0)
         val originalSettings = settings.all.toMap()
         val library = test.targetContext.getSharedPreferences("tv_library", 0)
@@ -95,6 +95,17 @@ object HomeUiAcceptanceRegression {
         }
 
         fun awaitText(label: String) = await("visible $label") { findOrNull(label) != null }
+        fun isFocused(label: String): Boolean {
+            for (match in nodes().filter { it.text?.toString() == label || it.contentDescription?.toString() == label }) {
+                var node: AccessibilityNodeInfo? = match
+                repeat(4) {
+                    if (node?.isFocused == true) return true
+                    node = node?.parent
+                }
+            }
+            return false
+        }
+        fun awaitFocus(label: String) = await("focused $label") { isFocused(label) }
 
         fun click(label: String) {
             var node = findOrNull(label) ?: error("Missing clickable label $label")
@@ -115,6 +126,68 @@ object HomeUiAcceptanceRegression {
             awaitText("首页样本3")
             awaitText("热门")
             screenshot("01-home")
+
+            if (navigationEdgesOnly) {
+                awaitFocus("热门")
+                // Exact real-device crash path: Hot scrolls out, then return via fixed navigation.
+                repeat(9) { sendKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                awaitFocus("热血")
+                check(findOrNull("热门") == null) { "Hot must be unmounted to exercise the regression" }
+                sendKey(KeyEvent.KEYCODE_DPAD_DOWN)
+                awaitFocus("首页样本6")
+                repeat(5) { sendKey(KeyEvent.KEYCODE_DPAD_LEFT) }
+                awaitFocus("首页样本1")
+                sendKey(KeyEvent.KEYCODE_DPAD_UP)
+                await("fixed navigation after poster up") {
+                    listOf("设置", "搜索", "排期", "历史", "收藏").any(::isFocused)
+                }
+                repeat(4) { if (!isFocused("收藏")) sendKey(KeyEvent.KEYCODE_DPAD_RIGHT) }
+                awaitFocus("收藏")
+                check(findOrNull("热门") == null) { "Hot unexpectedly attached before cross-group key" }
+                screenshot("nav-before-cross")
+                sendKey(KeyEvent.KEYCODE_DPAD_RIGHT)
+                awaitFocus("热门")
+                screenshot("nav-after-cross")
+
+                // Ordinary crossing both ways and category stepping must still respond.
+                sendKey(KeyEvent.KEYCODE_DPAD_LEFT); awaitFocus("收藏")
+                sendKey(KeyEvent.KEYCODE_DPAD_RIGHT); awaitFocus("热门")
+                sendKey(KeyEvent.KEYCODE_DPAD_RIGHT); awaitFocus("日常")
+                sendKey(KeyEvent.KEYCODE_DPAD_LEFT); awaitFocus("热门")
+
+                // Multiple events in one UI turn: last navigation wins; a page exit cancels it.
+                sendKey(KeyEvent.KEYCODE_DPAD_LEFT); awaitFocus("收藏")
+                test.runOnMainSync {
+                    repeat(6) {
+                        activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+                        activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+                    }
+                }
+                awaitFocus("热门")
+                sendKey(KeyEvent.KEYCODE_DPAD_LEFT); awaitFocus("收藏")
+                test.runOnMainSync {
+                    for (code in listOf(KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_CENTER)) {
+                        activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                        activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+                    }
+                }
+                awaitText("返回浏览")
+                Thread.sleep(350)
+                check(findOrNull("热门") == null) { "Pending cross-group focus survived leaving home" }
+                sendKey(KeyEvent.KEYCODE_BACK); awaitFocus("收藏")
+
+                // Real remote history entry/back restores its navigation identity.
+                sendKey(KeyEvent.KEYCODE_DPAD_LEFT); awaitFocus("历史")
+                sendKey(KeyEvent.KEYCODE_DPAD_CENTER); awaitText("返回浏览")
+                sendKey(KeyEvent.KEYCODE_BACK); awaitFocus("历史")
+                sendKey(KeyEvent.KEYCODE_DPAD_RIGHT); awaitFocus("收藏")
+                sendKey(KeyEvent.KEYCODE_DPAD_RIGHT); awaitFocus("热门")
+                sendKey(KeyEvent.KEYCODE_DPAD_DOWN); awaitFocus("首页样本3")
+                openFocusedDetail("首页样本3")
+                sendKey(KeyEvent.KEYCODE_BACK)
+                awaitText("热门"); awaitFocus("首页样本3")
+                return "offscreen_hot_cross=PASS ordinary_navigation=PASS rapid_navigation=PASS page_exit_cancellation=PASS history_return=PASS detail_return=PASS"
+            }
 
             // Navigate with the same D-pad path as a TV remote, then verify the focused-card detail path.
             sendKey(KeyEvent.KEYCODE_DPAD_DOWN)

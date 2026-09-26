@@ -97,9 +97,9 @@ class TvNetworkInstrumentation : Instrumentation() {
                 output.putString("stream", NavigationParcelRegression.run(this) + "\n")
                 finish(Activity.RESULT_OK, output); return
             }
-            if(mode == "home-ui-acceptance") {
+            if(mode in setOf("home-ui-acceptance", "home-navigation-edges")) {
                 try {
-                    output.putString("stream", HomeUiAcceptanceRegression.run(this) + "\n")
+                    output.putString("stream", HomeUiAcceptanceRegression.run(this, mode == "home-navigation-edges") + "\n")
                 } catch (failure: Exception) {
                     output.putString(
                         "stream",

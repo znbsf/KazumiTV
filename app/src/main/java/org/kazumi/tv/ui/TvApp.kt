@@ -43,6 +43,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
@@ -119,6 +120,8 @@ fun TvApp(searchModel: SearchViewModel? = null, homeCatalog: TvCatalog? = null) 
     var restoreHome by rememberSaveable { mutableStateOf(false) }
     var autoFocusIntent by remember { mutableStateOf<String?>(null) }
     var userFocusEpoch by remember { mutableIntStateOf(0) }
+    var navigationFocusIntent by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    val placedNavigationKeys = remember { mutableStateMapOf<String, Boolean>() }
     var focusRetryToken by remember { mutableIntStateOf(0) }
     fun returnToParent() {
         resumeEntry = null
@@ -228,12 +231,12 @@ fun TvApp(searchModel: SearchViewModel? = null, homeCatalog: TvCatalog? = null) 
         }
     }
     suspend fun requestHomeFocus(key: String, expectedUserEpoch: Int): Boolean {
+        if (!homeVisible || expectedUserEpoch != userFocusEpoch) return false
         when {
             key.startsWith("category:") -> {
                 val index = categories.indexOf(key.removePrefix("category:"))
                 if (index < 0) return false
                 categoryStrip.scrollToItem(index)
-                repeat(2) { withFrameNanos { } }
             }
             key.startsWith("poster:") -> {
                 val id = key.substringAfter(':').toIntOrNull() ?: return false
@@ -253,12 +256,24 @@ fun TvApp(searchModel: SearchViewModel? = null, homeCatalog: TvCatalog? = null) 
             key.startsWith("recent:") -> key.substringAfter(':').toIntOrNull()?.let { recentFocus[it] }
             else -> topFocusRequesters[key]
         } ?: return false
-        if (expectedUserEpoch != userFocusEpoch) return false
-        requester.requestFocus()
+        if (key.startsWith("category:") || key.startsWith("menu:")) {
+            val placed = withTimeoutOrNull(1000L) {
+                snapshotFlow { Triple(placedNavigationKeys[key] == true, homeVisible, userFocusEpoch) }
+                    .first { it.first || !it.second || it.third != expectedUserEpoch }
+            } ?: return false
+            if (!placed.first || !placed.second || placed.third != expectedUserEpoch) return false
+        }
+        if (!homeVisible || expectedUserEpoch != userFocusEpoch) return false
+        if (!requester.requestFocus()) return false
         return withTimeoutOrNull(1000L) {
             snapshotFlow { actualHomeFocus to userFocusEpoch }.first { it.first == key || it.second != expectedUserEpoch }
                 .let { it.first == key && it.second == expectedUserEpoch }
         } ?: false
+    }
+    LaunchedEffect(homeVisible, navigationFocusIntent, userFocusEpoch) {
+        val intent = navigationFocusIntent ?: return@LaunchedEffect
+        if (homeVisible && intent.second == userFocusEpoch) requestHomeFocus(intent.first, intent.second)
+        if (navigationFocusIntent == intent) navigationFocusIntent = null
     }
     LaunchedEffect(homeVisible, loading, items.size, error, endReached, restoreHome, homeFocusRestored, userFocusEpoch, focusRetryToken) {
         if (!homeVisible || (homeFocusRestored && !restoreHome)) return@LaunchedEffect
@@ -344,6 +359,7 @@ fun TvApp(searchModel: SearchViewModel? = null, homeCatalog: TvCatalog? = null) 
                     if (homeVisible && native.action == AndroidKey.ACTION_DOWN &&
                         native.keyCode in AndroidKey.KEYCODE_DPAD_UP..AndroidKey.KEYCODE_DPAD_CENTER) {
                         userFocusEpoch++
+                        navigationFocusIntent = null
                         autoFocusIntent = null
                         restoreHome = false
                         homeFocusRestored = true
@@ -368,6 +384,10 @@ fun TvApp(searchModel: SearchViewModel? = null, homeCatalog: TvCatalog? = null) 
                         settingsSelected = settings,
                         categoryState = categoryStrip,
                         actionRequesters = topFocusRequesters,
+                        onPlaced = { key, placed ->
+                            if (placed) placedNavigationKeys[key] = true else placedNavigationKeys.remove(key)
+                        },
+                        onNavigateFocus = { key -> navigationFocusIntent = key to userFocusEpoch },
                         onFocused = ::recordHomeFocus,
                         onAction = { action ->
                             userFocusEpoch++
@@ -560,6 +580,8 @@ private fun HomeNavigation(
     settingsSelected: Boolean,
     categoryState: androidx.compose.foundation.lazy.LazyListState,
     actionRequesters: Map<String, FocusRequester>,
+    onPlaced: (String, Boolean) -> Unit,
+    onNavigateFocus: (String) -> Unit,
     onFocused: (String, Boolean) -> Unit,
     onAction: (HomeNavAction) -> Unit,
     onCategory: (String) -> Unit
@@ -576,6 +598,7 @@ private fun HomeNavigation(
             HomeNavAction.entries.forEach { action ->
                 val focusKey = homeActionFocusKey(action)
                 val requester = actionRequesters.getValue(focusKey)
+                DisposableEffect(focusKey) { onDispose { onPlaced(focusKey, false) } }
                 val selected = when (action) {
                     HomeNavAction.Settings -> settingsSelected
                     HomeNavAction.Search -> selectedPage == "搜索"
@@ -588,13 +611,14 @@ private fun HomeNavigation(
                     selected = selected,
                     modifier = Modifier.weight(1f).fillMaxHeight()
                         .focusRequester(requester)
+                        .onGloballyPositioned { onPlaced(focusKey, it.isAttached) }
                         .onFocusChanged { onFocused(focusKey, it.isFocused) }
                         .onPreviewKeyEvent { event ->
                             val native = event.nativeKeyEvent
                             if (action == HomeNavAction.Favorites &&
                                 native.action == AndroidKey.ACTION_DOWN &&
                                 native.keyCode == AndroidKey.KEYCODE_DPAD_RIGHT) {
-                                actionRequesters.getValue(homeCategoryFocusKey("")).requestFocus()
+                                onNavigateFocus(homeCategoryFocusKey(""))
                                 true
                             } else false
                         },
@@ -617,18 +641,20 @@ private fun HomeNavigation(
             items(categories, key = { homeCategoryFocusKey(it) }) { tag ->
                 val focusKey = homeCategoryFocusKey(tag)
                 val requester = actionRequesters.getValue(focusKey)
+                DisposableEffect(focusKey) { onDispose { onPlaced(focusKey, false) } }
                 HomeNavigationButton(
                     label = tag.ifBlank { "热门" },
                     selected = category == tag,
                     modifier = Modifier.height(42.dp)
                         .focusRequester(requester)
+                        .onGloballyPositioned { onPlaced(focusKey, it.isAttached) }
                         .onFocusChanged { onFocused(focusKey, it.isFocused) }
                         .onPreviewKeyEvent { event ->
                             val native = event.nativeKeyEvent
                             if (tag.isBlank() &&
                                 native.action == AndroidKey.ACTION_DOWN &&
                                 native.keyCode == AndroidKey.KEYCODE_DPAD_LEFT) {
-                                actionRequesters.getValue(homeActionFocusKey(HomeNavAction.Favorites)).requestFocus()
+                                onNavigateFocus(homeActionFocusKey(HomeNavAction.Favorites))
                                 true
                             } else false
                         },
