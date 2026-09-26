@@ -2,15 +2,15 @@
 
 为电视遥控器设计的动画浏览与播放应用。当前主线使用 **Kotlin · Compose for TV · Media3**，延续深色、绿色和高密度海报浏览，独立于原 Flutter 工程开发。
 
-**当前公开测试版：0.3.3-preview.6。** 基础浏览和内置播放已可试用，仍在迁移与验证阶段；不是上游官方TV版，也不是全功能稳定版。
+**当前正式版：0.3.3。** 本版整合原生播放恢复与电视首页，并修复分类导航崩溃。适用 TV 的完整功能迁移仍在继续；不是上游官方 TV 版。
 
-[下载原生测试版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3-preview.6) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本轮执行记录](docs/PLAYBACK-MIDDAY-20260922.md)
+[下载原生正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本版验收](docs/RELEASE-ACCEPTANCE-20260927.md)
 
-本轮测试版（**0.3.3-preview.6，code52**）：补齐旧WebView的受限播放器配置发现与导航失效保护，新增设置中的脱敏播放诊断。最终公开包在旧电视和现代端均完成AGE第12集5线短测、无凭证播放和诊断专项；217项单测及lint通过。覆盖升级保留设置、片库和搜索历史，公开APK不内置弹幕凭证。其他来源失败及未验证能力仍单列，不把短测当作完整迁移。详见[发行说明](docs/RELEASE-0.3.3-preview.6.md)、[发布核验](docs/RELEASE-VERIFICATION-20260923-PREVIEW6.md)和[逐源验证表](docs/SOURCE-VALIDATION-20260922.md)。
+本版（**0.3.3，code53**）：整合同集换线/换源、选集、历史续播与最近观看路径，更新单行导航和六列电视首页。发布前发现并修复“热门”离屏后从收藏向右导致的崩溃；最终 APK 经独立模拟器复测、短时真实播放及数据恢复核对，229 项单测和 Lint 通过。Android 9 电视证据来自此前集成候选，最新焦点修复在 Android 16 模拟器验证。详见[发行说明](docs/RELEASE-0.3.3-STABLE.md)、[验收与版本边界](docs/RELEASE-ACCEPTANCE-20260927.md)、[逐源矩阵](docs/PLAYBACK-P1-MATRIX-20260924.md)和[声画录制方法](docs/AV-ACCEPTANCE-20260927.md)。
 
 ## 界面
 
-以下为小米Android 9电视1920×1080实机截图。目录封面属于在线节目资料，不是本项目的品牌素材；播放器截图使用自制测试视频，不代表截图中的节目资源可播放。
+以下为此前版本的小米 Android 9 电视 1920×1080 实机截图；0.3.3 首页已改为单行导航与最近观看入口。目录封面属于在线节目资料，不是本项目的品牌素材；播放器截图使用自制测试视频，不代表截图中的节目资源可播放。
 
 ![首页：高密度海报浏览](docs/screenshots/home.png)
 
@@ -33,7 +33,7 @@
 | 下载 | 持久任务、暂停/条件续传、地址重解析、删除、普通MP4/已结束HLS/静态DASH离线播放、清单错误说明 |
 | 电视与设备 | 方向键导航、低内存策略、输出兼容、解码信息、显示模式试用/回退、HDR及音频输出能力页 |
 
-“已实现”不等于所有路径和设备均已验收。当前204项单元测试通过，真机新增系统回收后恢复原集/位置并保持暂停、显式继续播放的证据；搜索、换线及会话组件恢复专项通过。既有真实选集续播、弹幕、过期地址重解析、系统换集等证据按各自构建记录。真实站点、受控测试和未验证项分别列在台账中。
+“已实现”不等于所有路径和设备均已验收。本版 229 项单元测试通过；系统回收恢复、选集续播、弹幕、过期地址重解析和系统换集等证据按各自构建记录。真实站点、受控测试和未验证项分别列在台账中。
 
 ## 安装与使用
 
@@ -42,7 +42,7 @@
 - 下载Release中的APK侧载。原生包名 `com.znbsf.kazumi.compose.tv`；本次Legacy版为 `com.predidit.kazumi.tv`，两者可以并存，数据不自动迁移。
 - 首次打开按引导准备播放来源，在设置选择可用镜像，然后从作品详情搜索来源。目录能展示节目不代表对应播放站点可用。
 - 遥控器方向键移动，确认选择；播放进度条支持左右调整，返回关闭面板或返回上页。
-- 本轮测试包延续本机已有开发签名，Release构建不可调试；签名不同的APK不能直接覆盖。正式签名与长期升级方案尚未收口，升级前备份收藏/历史。
+- 本版延续已有开发签名，Release 构建不可调试；证书与公开 Preview6 相同，覆盖升级保数据已验证。长期签名管理方案仍需完善，升级前建议备份收藏/历史。
 
 ## 已知限制
 
@@ -60,13 +60,13 @@
 | --- | --- | --- |
 | 定位 | 后续主要开发方向 | 保留比较和回退参考 |
 | 技术 | Kotlin / Compose / Media3 | Flutter / media-kit |
-| 版本 | 0.3.3-preview.6 | 2.3.1-tv-legacy.1 |
+| 版本 | 0.3.3 | 2.3.1-tv-legacy.1 |
 | 源码 | `main` | `codex/upstream-tv-complete` |
-| 安装 | 通用APK：约10.27 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
+| 安装 | 通用APK：约10.34 MiB | armeabi-v7a：29.26 MiB；arm64-v8a：30.23 MiB |
 
 更早的A线Preview 5使用 `com.znbsf.kazumi.tv`，保留在历史Releases；本次Legacy发布来自较新的Flutter完整适配分支，不冒充该A线的覆盖升级。
 
-旧路线沿用较多原应用功能与TV适配，新路线的迁移仍未达到完整功能等价。两版均为Pre-release；旧发布和源码分支保留，不通过更换默认分支抹除历史。
+旧路线沿用较多原应用功能与 TV 适配，新路线的迁移仍未达到完整功能等价。原生 0.3.3 为正式发布，旧 Flutter 版仍为 Pre-release；旧发布和源码分支保留。
 
 <details>
 <summary>旧Flutter路线界面对照</summary>
