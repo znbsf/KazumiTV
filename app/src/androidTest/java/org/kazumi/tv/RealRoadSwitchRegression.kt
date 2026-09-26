@@ -117,6 +117,21 @@ object RealRoadSwitchRegression {
             await("episode_browser") { nodes().any { it.text?.toString()?.let { value->value.startsWith("${episodeIndex+1}.")&&value.contains(first.title) }==true } }
             click(nodes().first { it.text?.toString()?.let { value->value.startsWith("${episodeIndex+1}.")&&value.contains(first.title) }==true }.text.toString())
             await("rendered_progress") { library.history().any { it.subject.id==subject.id&&it.key==firstKey&&it.position>=6000&&it.duration>60_000 } }
+            if(args.getString("captureOnly")=="true") {
+                phase="continuous_capture"
+                val initial=library.history().first { it.key==firstKey }.position
+                val captureStart=SystemClock.elapsedRealtime()
+                report("continuous_capture_start wall_ms=${System.currentTimeMillis()} elapsed_ms=$captureStart position_ms=$initial; no_pause_seek_or_input")
+                repeat(6) { index ->
+                    Thread.sleep(10_000)
+                    val position=library.history().first { it.key==firstKey }.position
+                    report("continuous_capture_tick seconds=${(index+1)*10} wall_ms=${System.currentTimeMillis()} position_ms=$position")
+                    check(position>=initial+(index+1)*10_000-6000) { "continuous_capture_progress_stalled" }
+                }
+                val final=library.history().first { it.key==firstKey }.position
+                report("continuous_capture_end wall_ms=${System.currentTimeMillis()} position_ms=$final")
+                return "continuous_real_playback=PASS duration_ms=${SystemClock.elapsedRealtime()-captureStart} start_ms=$initial end_ms=$final; no_pause_seek_or_input"
+            }
             test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)
             await("initial_pause",10_000) { has("▷ 播放") && clockMs()!=null }
             val paused=clockMs()!!
