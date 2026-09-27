@@ -48,7 +48,7 @@ object RealTransportRecoveryRegression {
         sourceName:String="baimao", pauseAfterError:Boolean=true, initialOutage:Boolean=false,
         interruption:String="none", repeatOutage:Boolean=false):String {
         require(sourceName in setOf("baimao","AGE")) { "Unsupported transport source" }
-        require(interruption in setOf("none","back","home")) { "Unsupported interruption" }
+        require(interruption in setOf("none","back","home","episode","source","process")) { "Unsupported interruption" }
         require(!initialOutage || interruption=="none")
         require(!repeatOutage || (!initialOutage && interruption=="none" && pauseAfterError))
         val started=SystemClock.elapsedRealtime()
@@ -167,6 +167,8 @@ object RealTransportRecoveryRegression {
             var value=Reading(null)
             test.runOnMainSync {
                 val player=host?.let { find(it.window.decorView) }
+                    ?: if(android.os.Build.VERSION.SDK_INT>=29)
+                        android.view.inspector.WindowInspector.getGlobalWindowViews().firstNotNullOfOrNull(::find) else null
                 if(player!=null) {
                     player.videoDecoderCounters?.ensureUpdated()
                     value=Reading(player,player.currentPosition,player.bufferedPosition,player.duration,
@@ -304,7 +306,10 @@ object RealTransportRecoveryRegression {
             val input=JSONArray(File(actual.getExternalFilesDir(null),"source-audit-rules.json").readText())
             val rule=(0 until input.length()).map { SourceRule(input.getJSONObject(it)) }
                 .singleOrNull { it.name.equals(sourceName,true) } ?: error("Fixed audit input lacks unique transport source")
-            val repository=RuleRepository(actual,rulesOverride=listOf(rule))
+            val switching=interruption in setOf("episode","source","process")
+            val targetRule=if(interruption=="source") (0 until input.length()).map { SourceRule(input.getJSONObject(it)) }
+                .single { it.name=="MXdm" } else null
+            val repository=RuleRepository(actual,rulesOverride=listOfNotNull(rule,targetRule))
             val (match,roads)=runBlocking { withTimeout(65_000) {
                 val matches=repository.search(rule,"无职转生").filter {
                     it.title.contains("第三季") || it.title.contains("Ⅲ") ||
@@ -314,7 +319,11 @@ object RealTransportRecoveryRegression {
                 found to repository.chapters(rule,found)
             } }
             val episode=roads.firstOrNull()?.episodes?.getOrNull(11) ?: error("Episode 12 missing")
-            val subject=Subject(19000927,match.title,"","")
+            val subject=Subject(if(interruption=="process")501963 else 19000927,match.title,"","")
+            val sourceKey="${rule.name}|${episode.pageUrl}"
+            if(switching)TvPreferences(actual).apply {
+                incognito=false;resumePlayback=true;setupComplete=true
+            }
             displayedTitle="${subject.title} · ${episode.title}"
             if(initialOutage) {
                 // The catalogue was fetched while online; only the first media resolution is impaired.
@@ -326,10 +335,16 @@ object RealTransportRecoveryRegression {
             host=activity
             test.runOnMainSync {
                 activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                activity.setContent { CompositionLocalProvider(LocalContext provides isolated) { KazumiTheme(false) {
-                    PlaybackSessionScreen(subject,rule.name,episode,initialRoads=roads,initialRoad=0,
+                activity.setContent { CompositionLocalProvider(LocalContext provides if(switching)actual else isolated) { KazumiTheme(false) {
+                    if(switching)SourceScreen(subject,catalog=repository,initialHistory=HistoryEntry(sourceKey,subject,episode.title,0,0,
+                        PlaybackOrigin(rule.name,match.title,match.url,roads.first().title)))
+                    else PlaybackSessionScreen(subject,rule.name,episode,initialRoads=roads,initialRoad=0,
                         initialOrigin=PlaybackOrigin(rule.name,match.title,match.url,roads.first().title),sourceCatalog=repository,onClose={ activity.finish() })
                 } } }
+            }
+            if(switching) {
+                check(await(30_000) { nodes().any { it.text?.toString()?.let { label -> label.startsWith("12.")&&label.contains(episode.title) }==true } })
+                click(nodes().first { it.text?.toString()?.let { label -> label.startsWith("12.")&&label.contains(episode.title) }==true }.text.toString())
             }
             if(initialOutage) {
                 check(await(100_000) { has("重新解析") }) { "Initial resolver did not reach the retryable error screen" }
@@ -397,6 +412,71 @@ object RealTransportRecoveryRegression {
                 click("重新解析")
                 check(await(5000) { !has("重新解析") }) { "Interrupted retry did not start" }
                 publish("retrying_interrupted")
+                if(interruption=="process") {
+                    val saved=LibraryStore(actual).history().single { it.key==sourceKey&&it.subject.id==subject.id }
+                    check(abs(saved.position-targetPosition)<=2500) { "History did not retain failed playback progress" }
+                    File(actual.getExternalFilesDir(null),"transport-process-private.json").writeText(JSONObject()
+                        .put("key",sourceKey).put("episode",episode.title).put("subjectId",subject.id)
+                        .put("title",subject.title).put("position",saved.position).put("pid",android.os.Process.myPid())
+                        .put("checkpoint",checkpoint).toString())
+                    publish("process_kill_requested")
+                    // Host forcibly ends this process while resolution is pending. The outer durable
+                    // p3four checkpoint, not this process's finally, owns restoration for this mode.
+                    check(await(30_000) { false }) { "Host did not kill pending recovery process" }
+                }
+                if(interruption=="episode" || interruption=="source") {
+                    test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                    check(await(8000) { has("返回匹配结果")&&reading().player==null }) { "Recovery did not return to real episode browser" }
+                    publish("restore_requested")
+                    check(await(35_000) { command()=="restored" }) { "Host restore command missing" }
+                    waitDelay(8000)
+                    check(reading().player==null) { "Cancelled recovery created a late player" }
+                    check(DiagnosticLog.shared.events.value.count {
+                        it.time>=diagnosticStarted&&it.kind==DiagnosticLog.Kind.RESOLVE_SUCCESS
+                    }==previousSuccesses) { "Cancelled recovery resolved late" }
+                    val targetEpisode:org.kazumi.tv.rules.Episode
+                    val targetName:String
+                    if(interruption=="episode") {
+                        targetEpisode=roads.first().episodes[12];targetName=rule.name
+                        click(nodes().first { it.text?.toString()?.let { label -> label.startsWith("13.")&&label.contains(targetEpisode.title) }==true }.text.toString())
+                    } else {
+                        targetName=checkNotNull(targetRule).name
+                        click(targetName)
+                        check(await(8000) { nodes().any { it.isEditable } }) { "Source search input did not mount" }
+                        val editable=nodes().first { it.isEditable }
+                        check(editable.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT,Bundle().apply {
+                            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,"无职转生")
+                        }))
+                        check(await(8000) { nodes().any { it.isEditable&&it.text?.toString()=="无职转生" } }) { "Source search input did not update" }
+                        click("重新搜索")
+                        val found=runBlocking { withTimeout(45_000) { repository.search(targetRule,"无职转生").first {
+                            it.title.contains("第三季")||it.title.contains("Ⅲ")
+                        } } }
+                        click(found.title)
+                        val targetRoads=runBlocking { withTimeout(45_000) { repository.chapters(targetRule,found) } }
+                        targetEpisode=targetRoads.first().episodes[11]
+                        check(await(30_000) { nodes().any { it.text?.toString()?.let { label -> label.startsWith("12.")&&label.contains(targetEpisode.title) }==true } })
+                        click(nodes().first { it.text?.toString()?.let { label -> label.startsWith("12.")&&label.contains(targetEpisode.title) }==true }.text.toString())
+                    }
+                    val targetKey="$targetName|${targetEpisode.pageUrl}"
+                    check(await(70_000) { reading().let { it.ready&&it.playing&&it.frames>0&&it.position>=5000 } }) { "New target did not advance" }
+                    check(await(8000) { LibraryStore(actual).history().any {
+                        it.key==targetKey&&it.subject.id==subject.id&&it.position>=5000
+                    } }) { "Target history did not reach its asynchronous progress checkpoint" }
+                    val selected=LibraryStore(actual).history().single { it.key==targetKey&&it.subject.id==subject.id }
+                    // Manual selection of another episode/source starts at its own progress, not the
+                    // failed episode's remote-seek checkpoint. No resolver/player state is injected.
+                    check(selected.position in 5000..25000) { "Old recovery progress leaked into manual target" }
+                    val selectedPlayer=reading().player
+                    waitDelay(8000)
+                    check(reading().player===selectedPlayer&&reading().playing) { "Old recovery replaced the target player" }
+                    test.sendKeyDownUpSync(KeyEvent.KEYCODE_MEDIA_PAUSE)
+                    test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_UP)
+                    click("选集")
+                    check(await(8000) { nodes().any { it.text?.toString()?.let { label -> label.contains(targetEpisode.title)&&label.contains("当前") }==true } })
+                    result="PASS";publish("passed")
+                    return "real_transport_target_change=PASS action=$interruption real_error_code=$errorCode cancelled_late_player=0 target_identity=PASS manual_target_progress=PASS target_advance_5s=PASS physical_outage=NOT_TESTED"
+                }
                 if(interruption=="back")test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                 else android.os.ParcelFileDescriptor.AutoCloseInputStream(
                     test.uiAutomation.executeShellCommand("input keyevent 3")
@@ -542,7 +622,7 @@ object RealTransportRecoveryRegression {
             result="FAIL"
             diagnose("failure_before_cleanup")
             failureScreenshot()
-            report("transport failure phase=$phase type=${error.javaClass.simpleName}")
+            report("transport failure phase=$phase type=${error.javaClass.simpleName} originLine=${error.stackTrace.firstOrNull()?.lineNumber}")
             publish("failed")
             throw IllegalStateException("Transport recovery failed at $phase type=${error.javaClass.simpleName}")
         } finally {

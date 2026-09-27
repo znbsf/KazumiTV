@@ -46,6 +46,10 @@ class TvNetworkInstrumentation : Instrumentation() {
                 output.putString("stream",MediaProbeFallbackRegression.run(targetContext)+"\n")
                 finish(Activity.RESULT_OK,output);return
             }
+            if(mode=="real-transport-process-completion") {
+                output.putString("stream",TransportProcessCompletion.run(this)+"\n")
+                finish(Activity.RESULT_OK,output);return
+            }
             if(mode=="real-transport-recovery") {
                 output.putString("stream",RealTransportRecoveryRegression.run(this,
                     delayedRetry=runnerArgs.getString("delayedRetry")=="true",
@@ -125,6 +129,9 @@ class TvNetworkInstrumentation : Instrumentation() {
             }
             if(mode in setOf("source-inventory","source-import","source-audit")) {
                 FullSourceAudit.run(this,mode,auditName,auditRun,runnerArgs.getString("candidateFile")); finish(Activity.RESULT_OK,output); return
+            }
+            if(mode=="recorded-episode-audit") {
+                RecordedEpisodeAudit.run(this,runnerArgs);finish(Activity.RESULT_OK,output);return
             }
             if(mode=="source-page") {
                 SourcePageDiagnostic.run(this,runnerArgs); finish(Activity.RESULT_OK,output); return

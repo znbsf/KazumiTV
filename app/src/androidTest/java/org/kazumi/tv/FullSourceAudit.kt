@@ -195,7 +195,7 @@ object FullSourceAudit {
         report("", "audit_summary", "finished_see_each_result_not_all_pass", JSONObject().put("selectedCount", canonical.size))
     }
 
-    private suspend fun play(test: Instrumentation, request: PlaybackRequest, report: (String, String) -> Unit) {
+    internal suspend fun play(test: Instrumentation, request: PlaybackRequest, report: (String, String) -> Unit) {
         val power=test.targetContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
         fun requireInteractive() {
             if(!power.isInteractive) {

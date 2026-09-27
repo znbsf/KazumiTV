@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory=$true)][string]$Adb,
     [string]$Serial = 'emulator-5560',
-    [Parameter(Mandatory=$true)][string]$OutputDirectory
+    [Parameter(Mandatory=$true)][string]$OutputDirectory,
+    [switch]$ProcessDeath
 )
 $ErrorActionPreference = 'Stop'
 if ($Serial -notmatch '^emulator-[0-9]+$') { throw 'Transport controls are limited to an emulator.' }
@@ -88,6 +89,27 @@ try {
                 Set-TransportCommand "restored:$restoreConfirmedDeviceMs"
             }
             if ($state.phase -eq 'finished') { $finished = $true; break }
+            if ($state.phase -eq 'process_kill_requested' -and $ProcessDeath) {
+                $beforePid = (& $Adb -s $Serial shell pidof com.znbsf.kazumi.compose.tv) -join ''
+                if ($LASTEXITCODE -ne 0 -or $beforePid -notmatch '^[0-9]+$') { throw 'Pending recovery process PID missing.' }
+                & $Adb -s $Serial shell am force-stop com.znbsf.kazumi.compose.tv
+                if ($LASTEXITCODE -ne 0) { throw 'Could not force-stop pending recovery process.' }
+                $afterPid = (& $Adb -s $Serial shell pidof com.znbsf.kazumi.compose.tv) -join ''
+                if ($afterPid.Trim()) { throw 'Recovery app process survived force-stop.' }
+                Set-Network 'speed' 'full'
+                Set-Network 'delay' 'none'
+                Assert-NetworkRestored
+                $receiptPath=Join-Path $OutputDirectory 'process-kill-receipt.json'
+                $receipt=@{checkpoint=$activeCheckpoint; oldPid=[int]$beforePid;
+                    confirmedDeviceMs=Get-DeviceUptimeMilliseconds} | ConvertTo-Json -Compress
+                [IO.File]::WriteAllText($receiptPath,$receipt,[Text.UTF8Encoding]::new($false))
+                & $Adb -s $Serial push $receiptPath "$remoteRoot/transport-process-kill-receipt.json" | Out-Null
+                if ($LASTEXITCODE -ne 0) { throw 'Could not save process-kill receipt.' }
+                @{event='pending_recovery_process_killed'; oldPid=$beforePid; processAbsent=$true;
+                  evidence='forced_process_death_not_low_memory'; checkpoint=$activeCheckpoint} | ConvertTo-Json -Compress
+                $finished=$true
+                break
+            }
         }
         Start-Sleep -Seconds 2
     }
