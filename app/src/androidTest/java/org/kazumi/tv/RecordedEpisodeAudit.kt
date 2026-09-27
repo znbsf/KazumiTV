@@ -30,7 +30,12 @@ object RecordedEpisodeAudit {
         val rule=RuleStore(test.targetContext).all().single { it.name==source }
         val url=recorded.getString("url")
         val uri=URI(url);val origin=URI(rule.baseUrl)
-        require(uri.scheme==origin.scheme&&uri.host==origin.host&&uri.port==origin.port&&uri.userInfo==null)
+        fun effectivePort(value:URI)=if(value.port>=0)value.port else when(value.scheme?.lowercase()) {
+            "https" -> 443;"http" -> 80;else -> -1
+        }
+        fun sameOrigin(value:URI)=value.scheme.equals(origin.scheme,true)&&value.host.equals(origin.host,true)&&
+            effectivePort(value)==effectivePort(origin)&&value.userInfo==null
+        require(sameOrigin(uri))
         val folder=File(root,"recorded-episode-$source-${System.currentTimeMillis()}").apply { check(mkdirs()) }
         fun report(stage:String,status:String,details:JSONObject=JSONObject()) {
             val row=details.put("source",source).put("stage",stage).put("status",status)
@@ -42,7 +47,7 @@ object RecordedEpisodeAudit {
         try {
             val page=withTimeout(30_000) { HttpText.pageAsync(url,headers=mapOf("User-Agent" to rule.userAgent,"Referer" to rule.referer)) }
             File(folder,"page-private.html").writeText(page.body)
-            require(URI(page.url).host==origin.host) { "Recorded page redirected outside the source origin" }
+            require(sameOrigin(URI(page.url))) { "Recorded page redirected outside the source origin" }
             SourcePageChecks.check(rule,page.body,page.url)
             check(page.status in 200..299)
             report(stage,"received",JSONObject().put("httpStatus",page.status)
