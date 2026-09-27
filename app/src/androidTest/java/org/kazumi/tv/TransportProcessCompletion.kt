@@ -66,12 +66,14 @@ object TransportProcessCompletion {
             while(!node.isClickable)node=node.parent ?: error("Process recovery control not clickable")
             check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK))
         }
+        fun report(message:String) = test.sendStatus(0,Bundle().apply { putString("stream",message+"\n") })
         try {
             val quietUntil=android.os.SystemClock.elapsedRealtime()+10_000
             while(android.os.SystemClock.elapsedRealtime()<quietUntil) {
                 check(player()==null) { "Fresh launcher resumed playback without explicit action" }
                 Thread.sleep(200)
             }
+            report("process_completion new_pid=true normal_launcher_no_auto_play_10s=PASS history_position_ms=${saved.position}")
             click("${saved.subject.title} · $episode")
             click("继续 $episode")
             await(90_000) { player()?.let { engine ->
@@ -82,6 +84,9 @@ object TransportProcessCompletion {
             }==true }
             val before=LibraryStore(context).history().single { it.key==key }.position
             await(20_000) { LibraryStore(context).history().single { it.key==key }.position>=before+5000 }
+            report("process_completion explicit_history_resume=PASS before_ms=$before after_ms=${LibraryStore(context).history().single { it.key==key }.position}")
+            test.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_MEDIA_PAUSE)
+            test.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_DPAD_UP)
             click("选集")
             await(30_000) { nodes().any { it.text?.toString()?.let { label -> label.contains(episode)&&label.contains("当前") }==true } }
             check(LibraryStore(context).history().single { it.key==key }.origin==saved.origin)
