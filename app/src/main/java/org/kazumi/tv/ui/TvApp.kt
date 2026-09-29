@@ -4,12 +4,14 @@ package org.kazumi.tv.ui
 import android.view.KeyEvent as AndroidKey
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -51,8 +56,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.tv.material3.*
-import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
+import coil.request.SuccessResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -796,87 +802,62 @@ private fun HomeNavigationGlyph(glyph: HomeNavGlyph, color: Color) {
     }
 }
 
+private data class HomeBackdropFrame(val art: HomeDisplayedArtwork, val bitmap: ImageBitmap)
+
 @Composable
 private fun HomeBackdrop(subject: Subject?, oled: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val revision by NetworkSettings.catalogRevision.collectAsState()
     val source = subject?.takeIf { !oled && it.cover.isNotBlank() }?.let {
-        HomeArtworkSource(it.id, it.cover)
+        HomeArtworkSource(it.id, it.cover, revision)
     }
     var backdrop by remember { mutableStateOf(HomeBackdropState()) }
-    val latestSource = rememberUpdatedState(source)
+    var frame by remember { mutableStateOf<HomeBackdropFrame?>(null) }
     LaunchedEffect(source) {
         backdrop = backdrop.select(source)
-        val candidate = backdrop.desired ?: return@LaunchedEffect
+        val candidate = backdrop.desired ?: run { frame = null; return@LaunchedEffect }
         if (candidate.source != source || backdrop.displayed?.identity == candidate) return@LaunchedEffect
+        // Rapid remote navigation only loads the settled selection. Keep the current
+        // pixels until the new image AND its portrait blur are ready for the fade.
         delay(260)
-        if (latestSource.value == candidate.source && backdrop.desired == candidate) {
-            backdrop = backdrop.begin(candidate)
+        backdrop = backdrop.begin(candidate)
+        val mirror = NetworkSettings.catalogMirror
+        val decoded = context.imageLoader.execute(
+            ImageRequest.Builder(context).data(candidate.source.url).size(1280, 720)
+                .memoryCacheKey("$mirror:${candidate.source.url}:0")
+                .diskCacheKey("$mirror:${candidate.source.url}").build()
+        ) as? SuccessResult
+        val drawable = decoded?.drawable
+        val landscape = drawable != null && drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0 &&
+            drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight.toFloat() >= 1.35f
+        val prepared = if (drawable == null || landscape) drawable else {
+            (context.imageLoader.execute(
+                ImageRequest.Builder(context).data(drawable).size(480, 720)
+                    .memoryCacheKey("$mirror:${candidate.source.url}:ambient-blur-v1")
+                    .transformations(HomeBackdropBlurTransformation()).build()
+            ) as? SuccessResult)?.drawable
         }
-    }
-    val displayed = backdrop.displayed
-    val activeRequest = remember(displayed?.identity, displayed?.landscape) {
-        displayed?.takeIf { it.landscape }?.let { ImageRequest.Builder(context).data(it.identity.source.url).build() }
-    }
-    val ambientRequest = remember(displayed?.identity, displayed?.landscape) {
-        displayed?.takeIf { !it.landscape }?.let {
-            ImageRequest.Builder(context)
-                .data(it.identity.source.url)
-                .size(480, 720)
-                .transformations(HomeBackdropBlurTransformation())
-                .build()
+        if (backdrop.desired == candidate) {
+            if (prepared != null) {
+                backdrop = backdrop.succeed(candidate, landscape)
+                frame = HomeBackdropFrame(checkNotNull(backdrop.displayed), prepared.toBitmap().asImageBitmap())
+            } else {
+                backdrop = backdrop.fail(candidate)
+                frame = null
+            }
         }
-    }
-    val pending = backdrop.pending
-    val pendingRequest = remember(pending) {
-        pending?.let { ImageRequest.Builder(context).data(it.source.url).build() }
     }
     Box(modifier.fillMaxSize().background(if (oled) Color.Black else Color(0xFF0B100C))) {
-        if (!oled && ambientRequest != null) {
-            AsyncImage(
-                model = ambientRequest,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().alpha(.84f),
-                contentScale = ContentScale.Crop,
-                onSuccess = {
-                    if (org.kazumi.tv.BuildConfig.DEBUG) {
-                        android.util.Log.d("HomeBackdrop", "ambient ready subject=${displayed?.identity?.source?.subjectId}")
-                    }
-                },
-                onError = { android.util.Log.w("HomeBackdrop", "cached low-resolution ambient image unavailable") }
-            )
-        }
-        if (!oled && activeRequest != null && displayed?.landscape == true) {
-            AsyncImage(
-                model = activeRequest,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
-        if (!oled && pendingRequest != null && pending != null && backdrop.desired == pending) {
-            AsyncImage(
-                model = pendingRequest,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().alpha(0f),
-                contentScale = ContentScale.Crop,
-                onSuccess = { result ->
-                    if (latestSource.value == pending.source) {
-                        val drawable = result.result.drawable
-                        val landscape = drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0 &&
-                            drawable.intrinsicWidth.toFloat() / drawable.intrinsicHeight.toFloat() >= 1.35f
-                        if (org.kazumi.tv.BuildConfig.DEBUG) {
-                            android.util.Log.d(
-                                "HomeBackdrop",
-                                "cover ready subject=${pending.source.subjectId} size=${drawable.intrinsicWidth}x${drawable.intrinsicHeight} layout=${if (landscape) "full" else "portrait-blurred-fullscreen"}"
-                            )
-                        }
-                        backdrop = backdrop.succeed(pending, landscape)
-                    }
-                },
-                onError = {
-                    if (latestSource.value == pending.source) backdrop = backdrop.fail(pending)
+        // OLED is immediate; ordinary artwork and missing-art transitions fade.
+        if (!oled) {
+            Crossfade(targetState = frame, modifier = Modifier.fillMaxSize(),
+                animationSpec = tween(600), label = "home-artwork") { ready ->
+                if (ready != null) {
+                    Image(ready.bitmap, contentDescription = null,
+                        modifier = Modifier.fillMaxSize().alpha(if (ready.art.landscape) 1f else .84f),
+                        contentScale = ContentScale.Crop)
                 }
-            )
+            }
         }
         if (!oled) {
             Box(
@@ -920,7 +901,7 @@ private fun SpotlightHeader(subject: Subject?, repository: TvCatalog) {
         }
     }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp).heightIn(max = 70.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(subject?.title ?: "探索番组", maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -928,6 +909,7 @@ private fun SpotlightHeader(subject: Subject?, repository: TvCatalog) {
         Text(
             summary.replace(Regex("\\s+"), " ").ifBlank { "选择节目查看详情" },
             maxLines = 2,
+            minLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = KazumiType.caption,
             color = Color.White.copy(alpha = .90f)

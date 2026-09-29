@@ -113,7 +113,8 @@ private fun DetailContent(subject:Subject,loadDetail:suspend(Int)->Subject,loadR
     }
     LaunchedEffect(choosingCollection) { if(restore=="collection") { withFrameNanos { }; collectionFocus.requestFocus(); restore=null } }
     Row(Modifier.fillMaxSize(),horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        CoverImage(detail.cover,detail.title,modifier = Modifier.width(158.dp).height(237.dp),contentScale = ContentScale.Crop,allowRetry=true)
+        CoverImage(detail.cover.ifBlank { subject.cover },detail.title,modifier = Modifier.width(158.dp).height(237.dp),
+            contentScale = ContentScale.Crop,allowRetry=true,placeholderModel=subject.cover)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(detail.title,style = KazumiType.heading,maxLines = 2,overflow = TextOverflow.Ellipsis)
             val info = detail.metadata

@@ -1,7 +1,7 @@
 package org.kazumi.tv.ui
 
 /** Request identity for a home backdrop. The revision prevents A -> B -> A stale completions. */
-internal data class HomeArtworkSource(val subjectId: Int, val url: String)
+internal data class HomeArtworkSource(val subjectId: Int, val url: String, val catalogRevision: Long = 0)
 
 internal data class HomeArtworkIdentity(val source: HomeArtworkSource, val revision: Int)
 
