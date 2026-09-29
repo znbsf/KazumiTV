@@ -21,6 +21,73 @@ import kotlin.concurrent.thread
 
 /** Pixel/geometry regression against production composables, using only local artwork. */
 object ArtworkContinuityRegression {
+    /** Real catalogue / remote path. Screens stay local; no player is opened. */
+    fun runLive(test: Instrumentation): String {
+        val checkpoint = "p3four-artwork-live-${System.currentTimeMillis()}"
+        UserDataCheckpoint.run(test, "user-data-backup", checkpoint)
+        TvPreferences(test.targetContext).apply { setupComplete = true; oled = false }
+        val evidence = File(test.targetContext.getExternalFilesDir(null), "artwork-live-${System.currentTimeMillis()}").apply { mkdirs() }
+        var activity: MainActivity? = null
+        fun capture(name: String) {
+            val bitmap = checkNotNull(test.uiAutomation.takeScreenshot())
+            File(evidence, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }
+            bitmap.recycle()
+        }
+        fun visible(text: String): Boolean {
+            if(android.os.Build.VERSION.SDK_INT >= 33) test.uiAutomation.clearCache()
+            fun visit(node: AccessibilityNodeInfo?): Boolean {
+                if(node == null) return false
+                if(node.text?.toString()?.contains(text) == true) return true
+                return (0 until node.childCount).any { visit(node.getChild(it)) }
+            }
+            return visit(test.uiAutomation.rootInActiveWindow)
+        }
+        fun posterFocused(): Boolean {
+            if(android.os.Build.VERSION.SDK_INT >= 33) test.uiAutomation.clearCache()
+            fun visit(node: AccessibilityNodeInfo?): Boolean {
+                if(node == null) return false
+                val rect = Rect().also { node.getBoundsInScreen(it) }
+                if(!node.contentDescription.isNullOrBlank() && rect.height() > 250 && rect.width() > 100) {
+                    var parent: AccessibilityNodeInfo? = node
+                    repeat(4) { if(parent?.isFocused == true) return true; parent = parent?.parent }
+                }
+                return (0 until node.childCount).any { visit(node.getChild(it)) }
+            }
+            return visit(test.uiAutomation.rootInActiveWindow)
+        }
+        try {
+            activity = test.startActivitySync(Intent(test.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+            Thread.sleep(10000)
+            capture("01-home")
+            check(visible("热门")) { "Real home did not load" }
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN)
+            Thread.sleep(1000)
+            // Recent-watch links can occupy the row between navigation and posters.
+            if(!posterFocused()) { test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_DOWN); Thread.sleep(500) }
+            check(posterFocused()) { "Remote did not reach a real poster" }
+            capture("02-card")
+            repeat(3) { index ->
+                test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_RIGHT)
+                repeat(5) { frame -> Thread.sleep(90); capture("03-move-$index-$frame") }
+                Thread.sleep(700)
+            }
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_DPAD_CENTER)
+            repeat(8) { frame -> Thread.sleep(90); capture("04-detail-$frame") }
+            Thread.sleep(1500)
+            check(visible("搜索播放来源") || visible("更换播放来源")) { "Real detail not reached" }
+            capture("05-detail-ready")
+            test.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            Thread.sleep(600)
+            check(visible("热门")) { "Real detail did not return home" }
+            capture("06-return")
+            return "real_catalogue_detail_return=PASS screenshots_for_visual_review=${evidence.name}"
+        } finally {
+            activity?.let { test.runOnMainSync { it.finish() } }
+            UserDataCheckpoint.run(test, "user-data-restore", checkpoint)
+            UserDataCheckpoint.run(test, "user-data-verify", checkpoint)
+        }
+    }
+
     fun run(test: Instrumentation): String {
         val context = test.targetContext
         val checkpoint = "p3four-artwork-${System.currentTimeMillis()}"
@@ -114,7 +181,10 @@ object ArtworkContinuityRegression {
             val colors = mutableListOf<Int>()
             repeat(16) { colors.add(background()); Thread.sleep(45) }
             await("blue backdrop ready") { isBlue(background()) }
-            check(bounds(checkNotNull(cover(4))) == firstBounds) { "Poster row moved between short and long summaries" }
+            val nextBounds = bounds(checkNotNull(cover(4)))
+            shot("02-long-summary").recycle()
+            File(evidence, "geometry.txt").writeText("before=$firstBounds\nafter=$nextBounds\n")
+            check(nextBounds == firstBounds) { "Poster row moved between short and long summaries: $firstBounds -> $nextBounds" }
             val after = background()
             check(colors.any { Color.red(it) < Color.red(before)-3 && Color.red(it) > Color.red(after)+3 && Color.blue(it) > Color.blue(before)+3 }) {
                 "No intermediate crossfade pixels observed"
@@ -147,6 +217,9 @@ object ArtworkContinuityRegression {
             check(bounds(checkNotNull(cover(4))) == firstBounds) { "Returning from detail moved poster row" }
             shot("05-return").recycle()
             return "summary_row_stable=PASS backdrop_intermediate_pixels=PASS cached_detail_pending=PASS detail_upgrade=PASS return_layout=PASS evidence=${evidence.name}"
+        } catch (failure: Exception) {
+            File(evidence, "failure.txt").writeText(failure.stackTraceToString())
+            throw failure
         } finally {
             release.countDown(); server.close(); worker.join(1000)
             activity?.let { test.runOnMainSync { it.finish() } }

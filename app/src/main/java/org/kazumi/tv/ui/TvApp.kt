@@ -50,6 +50,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -901,7 +902,10 @@ private fun SpotlightHeader(subject: Subject?, repository: TvCatalog) {
         }
     }
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+        // minLines alone still differs by a few pixels with CJK fallback fonts.
+        // Reserve the whole header, including font padding, at the user's font scale.
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)
+            .height(with(LocalDensity.current) { 74.sp.toDp() }),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Text(subject?.title ?: "探索番组", maxLines = 1, overflow = TextOverflow.Ellipsis,

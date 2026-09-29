@@ -101,8 +101,9 @@ class TvNetworkInstrumentation : Instrumentation() {
                 output.putString("stream", NavigationParcelRegression.run(this) + "\n")
                 finish(Activity.RESULT_OK, output); return
             }
-            if(mode == "artwork-continuity") {
-                output.putString("stream", ArtworkContinuityRegression.run(this) + "\n")
+            if(mode in setOf("artwork-continuity", "artwork-live")) {
+                output.putString("stream", (if(mode == "artwork-live") ArtworkContinuityRegression.runLive(this)
+                    else ArtworkContinuityRegression.run(this)) + "\n")
                 finish(Activity.RESULT_OK, output); return
             }
             if(mode in setOf("home-ui-acceptance", "home-navigation-edges")) {
