@@ -20,6 +20,7 @@ class WebDavRemoteFileCommitter {
     required WebDavUploadRemoteFile uploadFromFile,
     required WebDavRenameRemoteFile rename,
     required WebDavRemoteEntryExists exists,
+    bool removeDestinationBeforeRename = true,
   }) async {
     await _removeIfExists(
       temporaryPath,
@@ -28,11 +29,13 @@ class WebDavRemoteFileCommitter {
     );
     try {
       await uploadFromFile(sourceFilePath, temporaryPath);
-      await _removeIfExists(
-        destinationPath,
-        remove: remove,
-        exists: exists,
-      );
+      if (removeDestinationBeforeRename) {
+        await _removeIfExists(
+          destinationPath,
+          remove: remove,
+          exists: exists,
+        );
+      }
       await rename(temporaryPath, destinationPath);
     } catch (_) {
       await _removeIfExists(

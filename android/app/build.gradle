@@ -1,6 +1,7 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
+    id "org.jetbrains.kotlin.plugin.compose"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -53,7 +54,10 @@ android {
         versionName flutterVersionName
     }
 
-    buildFeatures { buildConfig true }
+    buildFeatures {
+        buildConfig true
+        compose true
+    }
     defaultConfig { buildConfigField "boolean", "IS_TV_BUILD", "false" }
 
     buildTypes {
@@ -69,7 +73,14 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    // Reuse the isolated native TV experiment's already-cached Compose stack.
+    implementation platform("androidx.compose:compose-bom:2025.05.01")
+    implementation "androidx.activity:activity-compose:1.10.1"
+    implementation "androidx.compose.foundation:foundation"
+    implementation "androidx.tv:tv-material:1.0.0"
+    testImplementation "junit:junit:4.13.2"
+}
 
 // F-droid splits APKs by ABI, and requires different versionCode for each ABI.
 // For flutter version X.Y.Z, version code is X0Y0ZA, where A is the ABI code.

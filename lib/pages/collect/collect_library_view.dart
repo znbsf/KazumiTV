@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
@@ -6,6 +9,8 @@ import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
 import 'package:kazumi/pages/collect/collect_library_query.dart';
+import 'package:kazumi/pages/menu/route_visibility.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 part 'collect_library_card.dart';
 
@@ -21,7 +26,7 @@ class CollectLibraryView extends StatefulWidget {
 
   final List<CollectedBangumi> entries;
   final bool showRating;
-  final ValueChanged<BangumiItem> onOpen;
+  final FutureOr<void> Function(BangumiItem) onOpen;
   final void Function(BangumiItem, CollectType) onChangeType;
   final bool Function(BangumiItem) canEdit;
 
@@ -43,6 +48,162 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
   CollectType? _selectedType = CollectType.watching;
   CollectSort _sort = CollectSort.recentlyChanged;
   String _query = '';
+  final _itemFocus = <int, FocusNode>{};
+  final _rowKeys = <int, GlobalKey>{};
+  List<CollectedBangumi> _tvEntries = [];
+  int _tvColumns = 1;
+  int _returnEpoch = 0;
+  bool _opening = false;
+  double _rowExtent = 154;
+  final _headerKey = GlobalKey();
+
+  FocusNode _focusFor(int id) => _itemFocus.putIfAbsent(
+      id, () => FocusNode(debugLabel: 'TV collection $id'));
+
+  double? _rowTop(int index) {
+    final first = index ~/ _tvColumns * _tvColumns;
+    if (first >= _tvEntries.length) return null;
+    final object = _rowKeys[_tvEntries[first].bangumiItem.id]
+        ?.currentContext
+        ?.findRenderObject();
+    if (object is! RenderBox || !object.attached || !object.hasSize) {
+      return null;
+    }
+    return RenderAbstractViewport.of(object)
+        .getOffsetToReveal(object, 0)
+        .offset;
+  }
+
+  double? _rowHeight(int index) {
+    final first = index ~/ _tvColumns * _tvColumns;
+    if (first >= _tvEntries.length) return null;
+    final object = _rowKeys[_tvEntries[first].bangumiItem.id]
+        ?.currentContext
+        ?.findRenderObject();
+    return object is RenderBox && object.attached && object.hasSize
+        ? object.size.height
+        : null;
+  }
+
+  bool _canRestore(
+          int epoch, CollectType? type, String query, CollectSort sort) =>
+      mounted &&
+      epoch == _returnEpoch &&
+      type == _selectedType &&
+      query == _query &&
+      sort == _sort &&
+      ModalRoute.of(context)?.isCurrent == true &&
+      !RouteVisibility.isCoveredOf(context);
+
+  bool _attached(FocusNode node) =>
+      node.context?.mounted == true && node.parent != null;
+
+  Future<void> _open(BangumiItem item) async {
+    if (!TvMode.enabled) {
+      await widget.onOpen(item);
+      return;
+    }
+    if (_opening) return;
+    final type = _selectedType;
+    final query = _query;
+    final sort = _sort;
+    final scroll = _scrollControllers[type]!;
+    if (!scroll.hasClients || _tvEntries.isEmpty) return;
+    var anchorIndex = 0;
+    for (var i = 0; i < _tvEntries.length; i += _tvColumns) {
+      final top = _rowTop(i);
+      final height = _rowHeight(i);
+      if (top != null && height != null && top + height > scroll.offset) {
+        anchorIndex = i;
+        _rowExtent = height;
+        break;
+      }
+    }
+    final anchorId = _tvEntries[anchorIndex].bangumiItem.id;
+    final offset = scroll.offset - (_rowTop(anchorIndex) ?? scroll.offset);
+    final epoch = ++_returnEpoch;
+    _opening = true;
+    try {
+      await widget.onOpen(item);
+    } finally {
+      _opening = false;
+    }
+    await WidgetsBinding.instance.endOfFrame;
+    bool valid() => _canRestore(epoch, type, query, sort);
+    if (!valid()) return;
+    if (_tvEntries.isEmpty) {
+      _focusSearch();
+      return;
+    }
+    final anchor =
+        _tvEntries.indexWhere((entry) => entry.bangumiItem.id == anchorId);
+    final fallback =
+        anchor >= 0 ? anchor : anchorIndex.clamp(0, _tvEntries.length - 1);
+    await _realizeRow(fallback, anchor >= 0 ? offset : 0, scroll, valid);
+    // Resolve again after each realization frame: the projection may change
+    // while covered, and no old FocusNode is retained across that boundary.
+    for (var attempt = 0; attempt < 3 && valid(); attempt++) {
+      if (_tvEntries.isEmpty) {
+        _focusSearch();
+        return;
+      }
+      final selected =
+          _tvEntries.indexWhere((entry) => entry.bangumiItem.id == item.id);
+      final currentAnchor =
+          _tvEntries.indexWhere((entry) => entry.bangumiItem.id == anchorId);
+      final index = selected >= 0
+          ? selected
+          : currentAnchor >= 0
+              ? currentAnchor
+              : anchorIndex.clamp(0, _tvEntries.length - 1);
+      final node = _focusFor(_tvEntries[index].bangumiItem.id);
+      final top = _rowTop(index);
+      final height = _rowHeight(index) ?? _rowExtent;
+      if (!_attached(node) ||
+          top == null ||
+          top + height <= scroll.offset ||
+          top >= scroll.offset + scroll.position.viewportDimension) {
+        await _realizeRow(index, 0, scroll, valid);
+        continue;
+      }
+      node.requestFocus();
+      return;
+    }
+  }
+
+  Future<void> _realizeRow(int index, double offset, ScrollController scroll,
+      bool Function() valid) async {
+    // Existing rows have variable height. Estimate from a mounted neighbor,
+    // then correct using its render viewport; cap work and check ownership
+    // before every jump instead of starting an uncancellable scrolling task.
+    for (var attempt = 0;
+        attempt < 3 && valid() && scroll.hasClients;
+        attempt++) {
+      if (_tvEntries.isEmpty) return;
+      index = index.clamp(0, _tvEntries.length - 1);
+      var top = _rowTop(index);
+      if (top == null) {
+        var distance = _tvEntries.length;
+        for (var i = 0; i < _tvEntries.length; i += _tvColumns) {
+          final known = _rowTop(i);
+          if (known == null || (i - index).abs() >= distance) continue;
+          distance = (i - index).abs();
+          final extent = _rowHeight(i) ?? _rowExtent;
+          top = known + (index ~/ _tvColumns - i ~/ _tvColumns) * extent;
+        }
+        final header = _headerKey.currentContext?.findRenderObject();
+        top ??=
+            (header is RenderBox && header.hasSize ? header.size.height : 0) +
+                index ~/ _tvColumns * _rowExtent;
+      }
+      final target = (top + offset).clamp(0.0, scroll.position.maxScrollExtent);
+      if (_rowTop(index) != null && (scroll.offset - target).abs() < 0.5) {
+        return;
+      }
+      scroll.jumpTo(target);
+      await WidgetsBinding.instance.endOfFrame;
+    }
+  }
 
   static const _categories = <CollectType?>[
     null,
@@ -55,6 +216,10 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
 
   @override
   void dispose() {
+    _returnEpoch++;
+    for (final node in _itemFocus.values) {
+      node.dispose();
+    }
     _searchController.dispose();
     _searchFocus.dispose();
     _categoryScrollController.dispose();
@@ -65,6 +230,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
   }
 
   void _resetResults() {
+    _returnEpoch++;
     // Reset stored offsets for unmounted categories too.
     _resultsStorage = PageStorageBucket();
     for (final controller in _scrollControllers.values) {
@@ -80,6 +246,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
 
   void _selectType(CollectType? type) {
     if (type == _selectedType) return;
+    _returnEpoch++;
     setState(() => _selectedType = type);
   }
 
@@ -116,10 +283,15 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
       },
       child: Focus(
         autofocus: true,
+        onKeyEvent: (_, event) {
+          if (event is KeyDownEvent || event is KeyRepeatEvent) _returnEpoch++;
+          return KeyEventResult.ignored;
+        },
         child: PageStorage(
           bucket: _resultsStorage,
           child: LayoutBuilder(builder: (context, constraints) {
-            final paged = mobile &&
+            final paged = !TvMode.enabled &&
+                mobile &&
                 MediaQuery.orientationOf(context) == Orientation.portrait;
             final contentWidth = constraints.maxWidth.clamp(0.0, 1560.0);
             final inset = (constraints.maxWidth - contentWidth) / 2 +
@@ -256,6 +428,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
   }
 
   Widget _header(CollectLibraryQuery query, {required bool expanded}) => Column(
+        key: _headerKey,
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -312,6 +485,10 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
     return LayoutBuilder(builder: (context, constraints) {
       final contentWidth = constraints.maxWidth - rightInset;
       final columns = contentWidth >= 840 && textScale <= 1.3 ? 2 : 1;
+      if (TvMode.enabled && type == _selectedType) {
+        _tvEntries = entries;
+        _tvColumns = columns;
+      }
       return CustomScrollView(
         key: PageStorageKey('collect-results-${type?.value ?? 'all'}'),
         controller: scrollController,
@@ -332,6 +509,10 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
                 itemBuilder: (context, index) {
                   final first = index * columns;
                   return Padding(
+                    key: TvMode.enabled
+                        ? _rowKeys.putIfAbsent(
+                            entries[first].bangumiItem.id, () => GlobalKey())
+                        : null,
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,7 +546,8 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
         key: ValueKey('collect-${entry.bangumiItem.id}'),
         entry: entry,
         showRating: widget.showRating,
-        onOpen: () => widget.onOpen(entry.bangumiItem),
+        focusNode: TvMode.enabled ? _focusFor(entry.bangumiItem.id) : null,
+        onOpen: () => unawaited(_open(entry.bangumiItem)),
         onChangeType: widget.canEdit(entry.bangumiItem)
             ? (type) => widget.onChangeType(entry.bangumiItem, type)
             : null,

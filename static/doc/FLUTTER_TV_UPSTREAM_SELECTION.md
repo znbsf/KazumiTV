@@ -15,3 +15,5 @@
 三项修改的旧上下文在固定基线唯一匹配；实际`git apply --check`及`git diff --check`均通过。完整官方SHA/父提交/文件patch、45条清单及应用哈希保存在任务`evidence/upstream-candidates.json`、`upstream-application.json`及`upstream-patches/`。
 
 **本地自动回归已通过：336 PASS / 0 FAIL / 0 SKIP。** 满额历史丢失有旧代码 RED / 修复 GREEN 对照，XPath patch 的上游 4 项测试通过，CLI 分析及基线/实验 ARMv7 构建通过。初始沙箱与 --no-pub 插件注册问题的失败证据已保留；正常批准流程以普通用户运行工具，未提权或改系统设置。启动时真实 WebDAV 和真实验证码操作尚未验证。详细结果见[首轮验收](FLUTTER_TV_LAB_ACCEPTANCE.md)。
+
+本文件保留首轮3项选择的历史回执；第三轮增加屏蔽规则同步和简繁转换，完整45提交冻结取舍及最终集中复验见 [上游逐项取舍](FLUTTER_TV_UPSTREAM_DISPOSITION.md)。

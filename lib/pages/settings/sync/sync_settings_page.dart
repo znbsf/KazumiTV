@@ -54,7 +54,8 @@ class _SyncSettingsPageState extends State<SyncSettingsPage> {
                 GStorage.getSetting(SettingsKeys.webDavEnable);
             final hasSyncContent =
                 GStorage.getSetting(SettingsKeys.webDavEnableHistory) ||
-                    GStorage.getSetting(SettingsKeys.webDavEnableCollect);
+                    GStorage.getSetting(SettingsKeys.webDavEnableCollect) ||
+                    GStorage.getSetting(SettingsKeys.webDavEnableDanmakuShield);
             final colors = Theme.of(context).colorScheme;
             final cards = [
               _SyncServiceCard(
@@ -81,7 +82,7 @@ class _SyncSettingsPageState extends State<SyncSettingsPage> {
                 title: '多设备同步',
                 service: 'WebDAV',
                 description: '通过自己的云盘，在其他设备接着看。',
-                content: '观看记录 · 收藏',
+                content: '观看记录 · 收藏 · 弹幕屏蔽词',
                 icon: Icons.devices_rounded,
                 color: colors.tertiaryContainer,
                 onColor: colors.onTertiaryContainer,
@@ -120,6 +121,13 @@ class _SyncSettingsPageState extends State<SyncSettingsPage> {
                     return Column(spacing: 16, children: cards);
                   },
                 ),
+                StateActionButton.tonal(
+                  onPressed: () => _open('/settings/local-library-backup/'),
+                  text: '收藏与历史备份',
+                  icon: Icons.save_alt_rounded,
+                ),
+                Text('文件备份、预览恢复与撤销',
+                    style: Theme.of(context).textTheme.bodyMedium),
               ],
             );
           },

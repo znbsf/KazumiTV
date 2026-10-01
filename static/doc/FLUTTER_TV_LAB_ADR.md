@@ -52,7 +52,7 @@
 
 首轮若Flutter修复已解决具体UX且未发现足以抵偿跨框架成本的缺口，暂缓Compose原型；不能把“引入Compose”列为必须完成的产品功能。
 
-具体只读候选是原生`EpisodeBrowser.kt`/`EpisodeWindow.kt`的长篇50项分段、倒序与序号定位。Flutter现有`episode_selection_panel.dart`已有四列TV网格、当前集定位、屏外焦点及线路菜单恢复，尚无证据说明实现这些新增控件需要Compose。首轮暂缓接入；如果用户需要长篇导航，先比较Dart补小控件与原生桥成本。
+首轮的只读候选是原生`EpisodeBrowser.kt`/`EpisodeWindow.kt`的长篇50项分段、倒序与序号定位。第三轮按已批准的架构目标接入独立 Compose Activity 做局部验证，运行时开关默认关闭，缺组件时回退到 Flutter 序号定位。Dart 只发送当前/已看等显示快照和不透明标识，并在接收时验证 session、revision、成员与单次动作；业务和播放器仍归现有 Dart/media-kit。组件的生命周期协议和 Kotlin 编译可自动验证，但相对等价 Flutter 控件的性能收益需要同设备对照，尚未证明全面采用的必要性。
 
 将来纯展示组件只接收`sessionId/revision/items{opaqueId,label,current,seen}`快照，返回`sessionId/revision/commandId/action/opaqueId`。Dart核验版本、成员与重复命令后执行原有业务；纯选集组件不接收媒体URL、Cookie或凭据。若接入需要两套可写状态或第二个播放器，停止该候选。
 

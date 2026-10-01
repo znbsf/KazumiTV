@@ -28,6 +28,7 @@ import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 import 'package:kazumi/services/player/pip_utils.dart';
 import 'package:kazumi/services/player/online_history_resume.dart';
+import 'package:kazumi/services/player/episode_identity.dart';
 import 'package:kazumi/services/player/timed_shutdown_service.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
@@ -204,10 +205,13 @@ class _VideoPageState extends State<VideoPage>
 
   void _initOnlineMode() {
     videoPageController.historyOffset = 0;
+    final args = widget.args;
 
     final resume = resolveOnlineHistoryResume(
-      history: historyController.getHistory(videoPageController.bangumiItem,
-          videoPageController.currentPlugin.name),
+      history: args is OnlineVideoPlaybackArgs && !args.allowHistoryResume
+          ? null
+          : historyController.getHistory(videoPageController.bangumiItem,
+              videoPageController.currentPlugin.name),
       roads: videoPageController.roadList,
       baseUrl: videoPageController.currentPlugin.baseUrl,
       currentSrc: videoPageController.src,
@@ -217,6 +221,20 @@ class _VideoPageState extends State<VideoPage>
       videoPageController.resetEpisodeState(
           episode: resume.episode, road: resume.road);
       videoPageController.historyOffset = resume.offset;
+    }
+    if (args is OnlineVideoPlaybackArgs) {
+      final transfer = args.transfer;
+      if (transfer != null &&
+          transfer.matches(
+              currentBangumiId: videoPageController.bangumiItem.id,
+              currentPlugin: videoPageController.currentPlugin.name,
+              currentSrc: videoPageController.src,
+              roads: videoPageController.roadList,
+              baseUrl: videoPageController.currentPlugin.baseUrl)) {
+        videoPageController.resetEpisodeState(
+            episode: transfer.episode, road: transfer.road);
+        videoPageController.historyOffset = transfer.offset;
+      }
     }
     _showTabBodyImmediately();
 
@@ -309,6 +327,37 @@ class _VideoPageState extends State<VideoPage>
         currentRoad: currentRoad,
         offset: offset,
         playerController: playerController);
+  }
+
+  void _resumeOnRoad(int road) {
+    final playing = videoPageController.playingEpisode;
+    final roads = videoPageController.roadList;
+    if (videoPageController.isOfflineMode ||
+        videoPageController.loading ||
+        playerController.playback.loading ||
+        playing == null ||
+        road < 0 ||
+        road >= roads.length ||
+        playing.road < 0 ||
+        playing.road >= roads.length) {
+      return;
+    }
+    final baseUrl = videoPageController.currentPlugin.baseUrl;
+    final current = episodeIdentityForRoad(roads[playing.road], playing.episode,
+        baseUrl: baseUrl);
+    final match = current == null
+        ? null
+        : matchingEpisodeIdentity(
+            current, episodeIdentitiesForRoad(roads[road], baseUrl: baseUrl));
+    if (match == null) {
+      KazumiDialog.showToast(message: '无法确定同一集，请手动选集（从头播放）');
+      return;
+    }
+    final offset = episodeTransferOffset(
+        position: playerController.playback.playerPosition,
+        duration: playerController.playback.playerDuration);
+    _closeTabBodyAnimated();
+    changeEpisode(match + 1, currentRoad: road, offset: offset);
   }
 
   void _showEpisodeGuide() {
@@ -783,6 +832,20 @@ class _VideoPageState extends State<VideoPage>
               !playerController.playback.loading &&
               !videoPageController.loading,
           disableAnimations: disableAnimations,
+          seenEpisodes: historyController
+                  .getHistory(videoPageController.bangumiItem,
+                      videoPageController.currentPlugin.name)
+                  ?.progresses
+                  .entries
+                  .where((entry) => entry.value.progress > Duration.zero)
+                  .map((entry) => entry.key)
+                  .toSet() ??
+              const {},
+          onNativeBrowserOpening: () async {
+            await playerController.pause();
+          },
+          onResumeRoad:
+              videoPageController.isOfflineMode ? null : _resumeOnRoad,
           onEpisodeSelected: (episode, road) {
             if (episode == videoPageController.selectedEpisode.episode &&
                 road == videoPageController.selectedEpisode.road) {

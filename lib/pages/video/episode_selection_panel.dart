@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/episode_tile.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/platform/native_episode_browser.dart';
+import 'package:kazumi/pages/video/episode_jump_dialog.dart';
 import 'package:flutter/physics.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';
 
@@ -25,6 +29,9 @@ class EpisodeSelectionPanel extends StatefulWidget {
     this.isOffline = false,
     this.isPlaying = false,
     this.disableAnimations = false,
+    this.seenEpisodes = const {},
+    this.onNativeBrowserOpening,
+    this.onResumeRoad,
   });
 
   final String title;
@@ -37,6 +44,9 @@ class EpisodeSelectionPanel extends StatefulWidget {
   final bool isOffline;
   final bool isPlaying;
   final bool disableAnimations;
+  final Set<int> seenEpisodes;
+  final Future<void> Function()? onNativeBrowserOpening;
+  final ValueChanged<int>? onResumeRoad;
 
   @override
   EpisodeSelectionPanelState createState() => EpisodeSelectionPanelState();
@@ -50,6 +60,100 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
   late int _visibleRoad = widget.selectedRoad;
   final _episodeFocus = <String, FocusNode>{};
   int _focusRequest = 0;
+  final _nativeBrowser = NativeEpisodeBrowser();
+  final _browserFocus = FocusNode(debugLabel: 'TV episode browser');
+  bool _nativeEnabled = const bool.fromEnvironment('KAZUMI_COMPOSE_EPISODES');
+  bool _browserOpening = false;
+  int _browserRevision = 0;
+  String? _pendingFingerprint;
+
+  @override
+  void didUpdateWidget(covariant EpisodeSelectionPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_browserOpening &&
+        (oldWidget.selectedRoad != widget.selectedRoad ||
+            oldWidget.selectedEpisode != widget.selectedEpisode ||
+            _pendingFingerprint != _roadFingerprint(_visibleRoad))) {
+      _browserRevision++;
+      unawaited(_nativeBrowser.cancel());
+    }
+  }
+
+  String _roadFingerprint(int road) => road >= 0 && road < widget.roads.length
+      ? jsonEncode([widget.roads[road].data, widget.roads[road].identifier])
+      : '';
+
+  Future<void> _openBrowser() async {
+    final road = _visibleRoad;
+    if (_browserOpening || road < 0 || road >= widget.roads.length) return;
+    final data = widget.roads[road];
+    if (data.data.isEmpty) return;
+    final fingerprint = _roadFingerprint(road);
+    _pendingFingerprint = fingerprint;
+    final revision = ++_browserRevision;
+    bool current() =>
+        mounted &&
+        revision == _browserRevision &&
+        _visibleRoad == road &&
+        _roadFingerprint(road) == fingerprint;
+    setState(() => _browserOpening = true);
+    try {
+      if (_nativeEnabled && data.data.length <= 5000) {
+        await widget.onNativeBrowserOpening?.call();
+        if (!current()) return;
+        final snapshot = EpisodeBrowserSnapshot(
+          sessionId: 'episode-${identityHashCode(this)}-$revision',
+          revision: revision,
+          initialOpaqueId: road == widget.selectedRoad && _canLocate
+              ? 'episode-${widget.selectedEpisode - 1}'
+              : 'episode-0',
+          items: List.generate(data.data.length, (index) {
+            final label = index < data.identifier.length &&
+                    data.identifier[index].trim().isNotEmpty
+                ? data.identifier[index]
+                : '第${index + 1}集';
+            return EpisodeBrowserItem(
+              opaqueId: 'episode-$index',
+              label: label.length > 256 ? label.substring(0, 256) : label,
+              current: road == widget.selectedRoad &&
+                  index + 1 == widget.selectedEpisode,
+              seen: road == widget.selectedRoad &&
+                  widget.seenEpisodes.contains(index + 1),
+            );
+          }),
+        );
+        try {
+          final selected =
+              await _nativeBrowser.show(snapshot, isCurrent: current);
+          if (!current()) return;
+          if (selected != null) {
+            final index =
+                snapshot.items.indexWhere((item) => item.opaqueId == selected);
+            if (index >= 0) widget.onEpisodeSelected(index + 1, road);
+            return;
+          }
+          if (_browserFocus.context != null) _browserFocus.requestFocus();
+          return;
+        } on EpisodeBrowserUnavailable {
+          if (!mounted || !current()) return;
+          setState(() => _nativeEnabled = false);
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+              const SnackBar(content: Text('原生选集暂不可用，已切回 Flutter')));
+        }
+      }
+      if (!mounted || !current()) return;
+      final index =
+          await showEpisodeJumpDialog(context, count: data.data.length);
+      if (!current()) return;
+      if (index != null) {
+        await _focusTvEpisode(index);
+      } else if (_browserFocus.context != null) {
+        _browserFocus.requestFocus();
+      }
+    } finally {
+      if (mounted) setState(() => _browserOpening = false);
+    }
+  }
 
   FocusNode _focusFor(int index) => _episodeFocus.putIfAbsent(
       '$_visibleRoad:$index',
@@ -94,6 +198,8 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
   void _selectRoad(int road) {
     if (_visibleRoad == road) return;
     _focusRequest++;
+    _browserRevision++;
+    unawaited(_nativeBrowser.cancel());
     setState(() => _visibleRoad = road);
     if (_scrollController.hasClients) _scrollController.jumpTo(0);
   }
@@ -135,6 +241,9 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
   @override
   void dispose() {
     _focusRequest++;
+    _browserRevision++;
+    unawaited(_nativeBrowser.dispose());
+    _browserFocus.dispose();
     for (final node in _episodeFocus.values) {
       node.dispose();
     }
@@ -300,6 +409,32 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
                       disableAnimations: widget.disableAnimations),
                   Row(children: [
                     Expanded(child: Text('$count 集')),
+                    IconButton(
+                        key: const ValueKey('episode-browser-toggle'),
+                        tooltip: _nativeEnabled
+                            ? '原生选集实验：开启（点击关闭）'
+                            : '原生选集实验：关闭（点击开启）',
+                        onPressed: _browserOpening
+                            ? null
+                            : () => setState(
+                                () => _nativeEnabled = !_nativeEnabled),
+                        icon: Icon(_nativeEnabled
+                            ? Icons.view_module_rounded
+                            : Icons.view_module_outlined)),
+                    IconButton(
+                        key: const ValueKey('episode-quick-browser'),
+                        focusNode: _browserFocus,
+                        tooltip: _nativeEnabled ? '原生快速选集' : '按序号定位剧集',
+                        onPressed:
+                            count > 0 && !_browserOpening ? _openBrowser : null,
+                        icon: const Icon(Icons.numbers_rounded)),
+                    if (_visibleRoad != widget.selectedRoad &&
+                        widget.onResumeRoad != null &&
+                        count > 0)
+                      IconButton(
+                          tooltip: '同集换线',
+                          onPressed: () => widget.onResumeRoad!(_visibleRoad),
+                          icon: const Icon(Icons.sync_alt_rounded)),
                     IconButton(
                         tooltip: '定位当前集',
                         onPressed: _canLocate ? revealCurrentEpisode : null,

@@ -2,6 +2,7 @@ import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/plugins/plugins.dart';
+import 'package:kazumi/services/player/cross_source_resume.dart';
 
 /// Route arguments for '/video/'. Entry points hand playback context over
 /// through the route instead of pre-filling a shared controller, which lets
@@ -19,12 +20,16 @@ class OnlineVideoPlaybackArgs extends VideoPlaybackArgs {
     required this.title,
     required this.src,
     required this.roads,
+    this.transfer,
+    this.allowHistoryResume = true,
   });
 
   final Plugin plugin;
   final String title;
   final String src;
   final List<Road> roads;
+  final CrossSourceResume? transfer;
+  final bool allowHistoryResume;
 }
 
 class OfflineVideoPlaybackArgs extends VideoPlaybackArgs {

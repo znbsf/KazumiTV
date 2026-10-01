@@ -21,6 +21,7 @@ import 'package:kazumi/services/platform/tv_channel_input.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/platform/tv_navigation.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
+import 'package:kazumi/pages/menu/route_visibility.dart';
 
 class PopularPage extends StatefulWidget {
   const PopularPage({
@@ -59,6 +60,10 @@ class _PopularPageState extends State<PopularPage> {
   bool _channelLookupLimited = false;
   int _gridFocusRequest = 0;
   int? _pendingGridChannel;
+  // Channel numbers are presentation; focus identity follows the subject.
+  int _homeReturnEpoch = 0;
+  int? _restoringHomeEpoch;
+  bool _openingHome = false;
 
   @override
   void initState() {
@@ -76,6 +81,7 @@ class _PopularPageState extends State<PopularPage> {
 
   @override
   void dispose() {
+    _homeReturnEpoch++;
     _gridFocusRequest++;
     scrollController.removeListener(scrollListener);
     tvChannelInputController.removeListener(_handleChannelDigit);
@@ -109,13 +115,15 @@ class _PopularPageState extends State<PopularPage> {
 
   void _focusHome() {
     if (!mounted || !TvMode.enabled) return;
+    _homeReturnEpoch++;
     _cancelGridFocusRequest();
     _tagSelectionTimer?.cancel();
     if (scrollController.hasClients) scrollController.jumpTo(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final first = _channelFocusNodes[1];
-      if (first?.context != null) first!.requestFocus();
+      if (_visibleBangumiList.isEmpty) return;
+      final first = _focusNodeForChannel(1);
+      if (_attached(first)) first.requestFocus();
     });
   }
 
@@ -125,6 +133,7 @@ class _PopularPageState extends State<PopularPage> {
         (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
       return KeyEventResult.ignored;
     }
+    _homeReturnEpoch++;
     // Repeats and quick reversals advance from the last requested cell, even
     // while its row is still scrolling into view. New input owns the request.
     final currentIndex = (_pendingGridChannel ?? (index + 1)) - 1;
@@ -175,16 +184,24 @@ class _PopularPageState extends State<PopularPage> {
         originScope?.hasFocus != true) {
       return;
     }
+    if (channelNumber < 1 || channelNumber > _visibleBangumiList.length) return;
     final node = _focusNodeForChannel(channelNumber);
     if (node.context != null) node.requestFocus();
   }
 
   void _onChannelFocusChanged(int channelNumber, bool focused) {
-    if (!focused || _pendingGridChannel != null) return;
+    if (!focused ||
+        _pendingGridChannel != null ||
+        _restoringHomeEpoch != null) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted ||
           _pendingGridChannel != null ||
-          _channelFocusNodes[channelNumber]?.hasPrimaryFocus != true) {
+          _restoringHomeEpoch != null ||
+          channelNumber < 1 ||
+          channelNumber > _visibleBangumiList.length ||
+          !_focusNodeForChannel(channelNumber).hasPrimaryFocus) {
         return;
       }
       // Also cover focus restored by the rail or a popped detail route. During
@@ -199,11 +216,15 @@ class _PopularPageState extends State<PopularPage> {
           ? popularController.trendList
           : popularController.bangumiList;
 
-  FocusNode _focusNodeForChannel(int channelNumber) =>
-      _channelFocusNodes.putIfAbsent(
-        channelNumber,
-        () => FocusNode(debugLabel: 'TV channel $channelNumber'),
-      );
+  FocusNode _focusNodeForChannel(int channelNumber) {
+    final id = _visibleBangumiList[channelNumber - 1].id;
+    final node = _channelFocusNodes.putIfAbsent(id, () => FocusNode());
+    node.debugLabel = 'TV channel $channelNumber';
+    return node;
+  }
+
+  bool _attached(FocusNode node) =>
+      node.context?.mounted == true && node.parent != null;
 
   FocusNode _focusNodeForTag(String tag) => _tagFocusNodes.putIfAbsent(
         tag,
@@ -214,6 +235,7 @@ class _PopularPageState extends State<PopularPage> {
   void _handleChannelDigit() {
     final event = tvChannelInputController.value;
     if (!mounted || !TvMode.enabled) return;
+    if (event != null) _homeReturnEpoch++;
     _cancelGridFocusRequest();
     if (event == null) {
       if (_channelInput.isNotEmpty || _channelSearching) {
@@ -254,7 +276,9 @@ class _PopularPageState extends State<PopularPage> {
 
     await _scrollToChannel(channelNumber);
     if (!mounted || _channelInput != expectedInput) return;
-    _focusNodeForChannel(channelNumber).requestFocus();
+    if (channelNumber <= _visibleBangumiList.length) {
+      _focusNodeForChannel(channelNumber).requestFocus();
+    }
   }
 
   Future<void> _ensureChannelAvailable(
@@ -319,7 +343,7 @@ class _PopularPageState extends State<PopularPage> {
     final items = _visibleBangumiList;
     if (channelNumber >= 1 && channelNumber <= items.length) {
       _clearChannelInput();
-      context.pushNamed('/info/', arguments: items[channelNumber - 1]);
+      unawaited(_openChannel(items[channelNumber - 1]));
       return;
     }
 
@@ -372,10 +396,107 @@ class _PopularPageState extends State<PopularPage> {
     }
   }
 
-  void _openChannel(BangumiItem item) {
+  Future<void> _openChannel(BangumiItem item) async {
+    if (_openingHome) return;
     _cancelGridFocusRequest();
     _clearChannelInput();
-    context.pushNamed('/info/', arguments: item);
+    if (!TvMode.enabled ||
+        !scrollController.hasClients ||
+        _visibleBangumiList.isEmpty) {
+      await context.pushNamed('/info/', arguments: item);
+      return;
+    }
+    final columns = _gridCrossCount();
+    final stride = _gridItemExtent(columns) + StyleString.cardSpace - 2;
+    final pixels = scrollController.offset;
+    final row = ((pixels +
+                    StyleString.cardSpace -
+                    2 -
+                    _loadingIndicatorHeight -
+                    _gridPadding)
+                .clamp(0.0, double.infinity) /
+            stride)
+        .floor();
+    final anchorIndex =
+        (row * columns).clamp(0, _visibleBangumiList.length - 1);
+    final anchorId = _visibleBangumiList[anchorIndex].id;
+    final savedOffset = pixels - row * stride;
+    final tag = popularController.currentTag;
+    final epoch = ++_homeReturnEpoch;
+    _restoringHomeEpoch = epoch;
+    _openingHome = true;
+    bool current() =>
+        mounted &&
+        TvMode.enabled &&
+        epoch == _homeReturnEpoch &&
+        tag == popularController.currentTag &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        !RouteVisibility.isCoveredOf(context);
+    try {
+      try {
+        await context.pushNamed('/info/', arguments: item);
+      } finally {
+        _openingHome = false;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+      if (!current()) return;
+      if (_visibleBangumiList.isEmpty) {
+        final category = _focusNodeForTag(tag);
+        if (_attached(category)) category.requestFocus();
+        return;
+      }
+      final anchor =
+          _visibleBangumiList.indexWhere((value) => value.id == anchorId);
+      final fallback = anchor >= 0
+          ? anchor
+          : anchorIndex.clamp(0, _visibleBangumiList.length - 1);
+      final newColumns = _gridCrossCount();
+      final newStride = _gridItemExtent(newColumns) + StyleString.cardSpace - 2;
+      if (scrollController.hasClients) {
+        scrollController.jumpTo((fallback ~/ newColumns * newStride +
+                (anchor >= 0 ? savedOffset : 0))
+            .clamp(0.0, scrollController.position.maxScrollExtent));
+        await WidgetsBinding.instance.endOfFrame;
+      }
+      for (var attempt = 0; attempt < 3 && current(); attempt++) {
+        final items = _visibleBangumiList;
+        if (items.isEmpty) {
+          final category = _focusNodeForTag(tag);
+          if (_attached(category)) category.requestFocus();
+          return;
+        }
+        final selected = items.indexWhere((value) => value.id == item.id);
+        final currentAnchor = items.indexWhere((value) => value.id == anchorId);
+        final index = selected >= 0
+            ? selected
+            : currentAnchor >= 0
+                ? currentAnchor
+                : anchorIndex.clamp(0, items.length - 1);
+        final node = _focusNodeForChannel(index + 1);
+        final count = _gridCrossCount();
+        final extent = _gridItemExtent(count);
+        final rowOffset = index ~/ count * (extent + StyleString.cardSpace - 2);
+        if (scrollController.hasClients) {
+          if (!mounted) return;
+          final header = _tvToolbarHeight + MediaQuery.paddingOf(context).top;
+          final top =
+              header + _loadingIndicatorHeight + _gridPadding + rowOffset;
+          final position = scrollController.position;
+          if (!_attached(node) ||
+              top + extent <= position.pixels + header ||
+              top >= position.pixels + position.viewportDimension) {
+            scrollController
+                .jumpTo(rowOffset.clamp(0.0, position.maxScrollExtent));
+            await WidgetsBinding.instance.endOfFrame;
+            continue;
+          }
+        }
+        if (_attached(node)) node.requestFocus();
+        return;
+      }
+    } finally {
+      if (_restoringHomeEpoch == epoch) _restoringHomeEpoch = null;
+    }
   }
 
   int _gridCrossCount() {
@@ -456,6 +577,7 @@ class _PopularPageState extends State<PopularPage> {
   }
 
   Future<void> _selectTag(String tag) async {
+    _homeReturnEpoch++;
     _cancelGridFocusRequest();
     _tagSelectionTimer?.cancel();
     if (tag == popularController.currentTag) return;
@@ -566,6 +688,7 @@ class _PopularPageState extends State<PopularPage> {
             final channelNumber = index + 1;
             return bangumiList.isNotEmpty
                 ? BangumiCardV(
+                    key: ValueKey(bangumiList[index].id),
                     bangumiItem: bangumiList[index],
                     channelNumber: TvMode.enabled ? channelNumber : null,
                     highlighted: _channelCandidate == channelNumber,
@@ -586,6 +709,12 @@ class _PopularPageState extends State<PopularPage> {
                 : null;
           },
           childCount: bangumiList.isNotEmpty ? bangumiList.length : 10,
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<int>) return null;
+            final index =
+                bangumiList.indexWhere((item) => item.id == key.value);
+            return index < 0 ? null : index;
+          },
         ),
       ),
     );
@@ -749,6 +878,7 @@ class _PopularPageState extends State<PopularPage> {
           if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
             return KeyEventResult.ignored;
           }
+          _homeReturnEpoch++;
           final tags = ['', ...defaultAnimeTags];
           if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
             _focusNodeForTag(tags[tvWrappedIndex(index, -1, tags.length)])
@@ -767,7 +897,7 @@ class _PopularPageState extends State<PopularPage> {
                 return;
               }
               await _scrollToChannel(1);
-              if (mounted && node.hasFocus) {
+              if (mounted && node.hasFocus && _visibleBangumiList.isNotEmpty) {
                 _focusNodeForChannel(1).requestFocus();
               }
             }));

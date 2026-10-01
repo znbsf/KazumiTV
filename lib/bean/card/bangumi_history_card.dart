@@ -92,6 +92,7 @@ class BangumiHistoryCardV extends StatefulWidget {
     this.focusNode,
     this.onKeyEvent,
     this.onNavigationInput,
+    this.onOpeningRoute,
   });
 
   final History historyItem;
@@ -102,6 +103,9 @@ class BangumiHistoryCardV extends StatefulWidget {
 
   /// Invalidates pending page navigation before local controls consume input.
   final VoidCallback? onNavigationInput;
+
+  /// Capture the return anchor only when an action opens another route.
+  final VoidCallback? onOpeningRoute;
 
   @override
   State<BangumiHistoryCardV> createState() => _BangumiHistoryCardVState();
@@ -136,6 +140,7 @@ class _BangumiHistoryCardVState extends State<BangumiHistoryCardV>
 
   Future<void> _onTap({bool resumeFromMenu = false}) async {
     widget.onNavigationInput?.call();
+    widget.onOpeningRoute?.call();
     if (widget.showDelete && !resumeFromMenu) {
       if (TvMode.enabled) {
         await _confirmDelete(_resumeFocus);
@@ -199,6 +204,7 @@ class _BangumiHistoryCardVState extends State<BangumiHistoryCardV>
 
   Future<void> _showMore() async {
     widget.onNavigationInput?.call();
+    widget.onOpeningRoute?.call();
     if (_menuOpen) return;
     _menuOpen = true;
     final action = await showDialog<String>(

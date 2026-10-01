@@ -40,6 +40,19 @@ class GStorage {
   /// Flag to indicate if the next ID has initialized
   static bool _collectChangeIdInitialized = false;
 
+  /// Coordinate a previewed library restore with both existing write queues.
+  /// The action writes boxes directly; re-entering either queue would deadlock.
+  static Future<T> runLibraryWriteExclusive<T>(Future<T> Function() action) {
+    return _runCollectChangesWriteExclusive(
+        () => HistoryStorageCoordinator().run(() async {
+              try {
+                return await action();
+              } finally {
+                _collectChangeIdInitialized = false;
+              }
+            }));
+  }
+
   /// Ensure collect-related write sequentially
   static Future<T> _runCollectChangesWriteExclusive<T>(
     Future<T> Function() action,
@@ -344,7 +357,10 @@ class GStorage {
 
   static Stream<void> watchSettings(Iterable<SettingKey<Object?>> keys) {
     final names = keys.map((key) => key.name).toSet();
-    return _setting.watch().where((event) => names.contains(event.key)).map((_) {});
+    return _setting
+        .watch()
+        .where((event) => names.contains(event.key))
+        .map((_) {});
   }
 
   static List<String> getStringListSettingByName(

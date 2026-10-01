@@ -21,4 +21,10 @@
 
         <item name="android:defaultFocusHighlightEnabled">false</item>
     </style>
+    <style name="EpisodeBrowserTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#11151C</item>
+        <item name="android:statusBarColor">#11151C</item>
+        <item name="android:navigationBarColor">#11151C</item>
+        <item name="android:defaultFocusHighlightEnabled">false</item>
+    </style>
 </resources>

@@ -47,6 +47,7 @@ class MainActivity: AudioServiceActivity() {
     private var tvNavigationChannel: MethodChannel? = null
     private var tvNavigationActive = false
     private var tvBackDownAt: Long? = null
+    private var episodeBrowserBridge: EpisodeBrowserBridge? = null
 
     private var pipIsPlaying = false
     private var pipDanmakuEnabled = false
@@ -88,6 +89,8 @@ class MainActivity: AudioServiceActivity() {
     }
 
     override fun onDestroy() {
+        episodeBrowserBridge?.detach()
+        episodeBrowserBridge = null
         unregisterPipActionReceiverIfNeeded()
         // audio_service stays bound for the whole activity lifetime, so its
         // own stopSelf() never destroys a service started for playback.
@@ -157,6 +160,8 @@ class MainActivity: AudioServiceActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        episodeBrowserBridge?.detach()
+        episodeBrowserBridge = EpisodeBrowserBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         intentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         intentChannel?.setMethodCallHandler { call, result ->
             if (call.method == "openWithMime") {
@@ -259,6 +264,12 @@ class MainActivity: AudioServiceActivity() {
                 result.notImplemented()
             }
         }
+    }
+
+    override fun cleanUpFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
+        episodeBrowserBridge?.detach()
+        episodeBrowserBridge = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     private fun tvRemoteAction(keyCode: Int): String? {

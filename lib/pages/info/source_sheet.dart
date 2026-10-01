@@ -20,6 +20,8 @@ import 'package:kazumi/plugins/anti_crawler_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/player/cross_source_resume.dart';
+import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/plugin/captcha_verification_service.dart';
 import 'package:kazumi/services/plugin/plugin_search_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
@@ -130,6 +132,43 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
             plugin.queryChapterRoads(searchItem.src, cancelToken: cancelToken),
       );
       if (roads.isEmpty) throw ChapterErrorException(plugin.name);
+      final choices = crossSourceResumeChoices(
+        histories: GStorage.histories.values,
+        bangumiId: widget.infoController.bangumiItem.id,
+        pluginName: plugin.name,
+        src: searchItem.src,
+        roads: roads,
+        baseUrl: plugin.baseUrl,
+      );
+      CrossSourceResume? transfer;
+      var allowHistoryResume = true;
+      if (choices.isNotEmpty) {
+        final choice = await task.show<int>(
+            builder: (context) => AlertDialog(
+                  title: const Text('同集换源'),
+                  content: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('确认新结果是同一作品和季度后，可继续同集；无法确认时请手动选集，从头播放。'),
+                    SizedBox(
+                        height: 220,
+                        width: 360,
+                        child: ListView.builder(
+                          itemCount: choices.length,
+                          itemBuilder: (context, i) => TextButton(
+                              onPressed: () => Navigator.pop(context, i),
+                              child: Text('${roads[choices[i].road].name} · '
+                                  '${roads[choices[i].road].identifier[choices[i].episode - 1]} · '
+                                  '继续 ${choices[i].offset} 秒')),
+                        )),
+                  ]),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, -1),
+                        child: const Text('手动选集'))
+                  ],
+                ));
+        if (choice >= 0 && choice < choices.length) transfer = choices[choice];
+        allowHistoryResume = choice >= 0;
+      }
       task.withContext((context) => context.pushNamed(
             '/video/',
             arguments: OnlineVideoPlaybackArgs(
@@ -138,6 +177,8 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
               title: searchItem.name,
               src: searchItem.src,
               roads: roads,
+              transfer: transfer,
+              allowHistoryResume: allowHistoryResume,
             ),
           ));
     }, onError: (error, stackTrace) {

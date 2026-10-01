@@ -7,12 +7,14 @@ class _CollectLibraryCard extends StatelessWidget {
     required this.showRating,
     required this.onOpen,
     required this.onChangeType,
+    this.focusNode,
   });
 
   final CollectedBangumi entry;
   final bool showRating;
   final VoidCallback onOpen;
   final ValueChanged<CollectType>? onChangeType;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,7 @@ class _CollectLibraryCard extends StatelessWidget {
             child: Semantics(
               button: true,
               label: [title, ...metadata].join('，'),
-              child: InkWell(onTap: onOpen),
+              child: InkWell(focusNode: focusNode, onTap: onOpen),
             ),
           ),
           Padding(

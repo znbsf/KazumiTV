@@ -4,6 +4,7 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
+import 'package:kazumi/pages/settings/danmaku/danmaku_ch_convert_tile.dart';
 import 'package:kazumi/utils/device.dart';
 
 class DanmakuSettingsPage extends StatefulWidget {
@@ -208,6 +209,7 @@ class _DanmakuSettingsPageState extends State<DanmakuSettingsPage> {
           SettingsSection(
             title: Text('弹幕显示'),
             tiles: [
+              const DanmakuChConvertTile(),
               SettingsSliderTile(
                 leading: Icons.crop_free_rounded,
                 title: Text('弹幕区域'),
