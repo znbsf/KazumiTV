@@ -4,6 +4,9 @@ import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/platform/tv_navigation.dart';
+import 'package:kazumi/bean/widget/tv_artwork.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
+import 'package:kazumi/services/storage/storage.dart';
 
 /// Applies TV-only focus behavior while preserving the normal mobile theme.
 class TvAppShell extends StatefulWidget {
@@ -48,16 +51,18 @@ class _TvAppShellState extends State<TvAppShell> {
     }
 
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final oled = GStorage.getSetting(SettingsKeys.oledEnhance);
     return Theme(
-      data: theme.copyWith(
-        focusColor: colorScheme.primary.withValues(alpha: 0.24),
-        hoverColor: colorScheme.primary.withValues(alpha: 0.12),
-        visualDensity: VisualDensity.comfortable,
-      ),
+      data: TvVisuals.theme(theme, oled: oled),
       child: FocusTraversalGroup(
         policy: TvLoopTraversalPolicy(),
-        child: widget.child,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            TvAmbientBackdrop(oled: oled),
+            widget.child,
+          ],
+        ),
       ),
     );
   }

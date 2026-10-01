@@ -4,6 +4,7 @@ import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -20,6 +21,7 @@ class BangumiInfoCardV extends StatefulWidget {
     required this.isLoading,
     required this.showRating,
     this.tvActions,
+    this.tvInitialCoverUrl,
   });
 
   final BangumiItem bangumiItem;
@@ -28,6 +30,7 @@ class BangumiInfoCardV extends StatefulWidget {
 
   /// Supplied only by the TV detail page; mobile keeps its original layout.
   final Widget? tvActions;
+  final String? tvInitialCoverUrl;
 
   @override
   State<BangumiInfoCardV> createState() => _BangumiInfoCardVState();
@@ -125,106 +128,81 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
 
   Widget _buildTvHeader(BuildContext context) {
     final theme = Theme.of(context);
-    Widget stat(String label, String value) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14)),
-              Text(value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  )),
-            ],
-          ),
-        );
+    final item = widget.bangumiItem;
+    final facts = <String>[
+      if (item.airDate.isNotEmpty) item.airDate,
+      if (widget.showRating && item.ratingScore > 0)
+        '评分 ${item.ratingScore.toStringAsFixed(1)}',
+      if (widget.showRating && item.votes > 0) '${item.votes} 人评价',
+      if (widget.showRating && item.rank > 0) '排名 #${item.rank}',
+    ];
     return SizedBox(
       height: BangumiInfoCardV.tvHeaderHeight(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 180,
-            height: 277,
+            width: 158,
+            height: 237,
             child: Hero(
               transitionOnUserGestures: true,
               flightShuttleBuilder: NetworkImgLayer.heroFlightShuttleBuilder,
-              tag: widget.bangumiItem.id,
+              tag: item.id,
               child: NetworkImgLayer(
-                src: widget.bangumiItem.images['large'] ?? '',
-                width: 180,
-                height: 277,
-                fadeInDuration: Duration.zero,
-                fadeOutDuration: Duration.zero,
+                src: NetworkImgLayer.tvDetailCoverUrl(item.images),
+                width: 158,
+                height: 237,
+                placeholderSrc: widget.tvInitialCoverUrl,
+                fadeInDuration: const Duration(milliseconds: 180),
+                fadeOutDuration: const Duration(milliseconds: 180),
               ),
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 24),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.bangumiItem.nameCn.isEmpty
-                      ? widget.bangumiItem.name
-                      : widget.bangumiItem.nameCn,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                // Keep actions outside Skeletonizer so loading never removes
-                // the primary focus target or disables starting a source search.
-                widget.tvActions!,
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 190,
-                        child: Skeletonizer(
-                          enabled: widget.isLoading,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              stat(
-                                  '放送开始:',
-                                  widget.bangumiItem.airDate.isEmpty
-                                      ? '待定'
-                                      : widget.bangumiItem.airDate),
-                              stat(
-                                  widget.showRating
-                                      ? '${widget.bangumiItem.votes} 人评分:'
-                                      : '*** 人评分:',
-                                  widget.showRating
-                                      ? '${widget.bangumiItem.ratingScore}'
-                                      : '***'),
-                              stat(
-                                  'Bangumi Ranked:',
-                                  widget.showRating
-                                      ? '#${widget.bangumiItem.rank}'
-                                      : '***'),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      if (widget.showRating &&
-                          !widget.isLoading &&
-                          widget.bangumiItem.votesCount.length >= 10)
-                        voteBarChart,
-                    ],
+            child: SingleChildScrollView(
+              primary: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.nameCn.isEmpty ? item.name : item.nameCn,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.headlineSmall,
                   ),
-                ),
-              ],
+                  if (facts.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(facts.join(' · '),
+                        style: TvVisuals.caption.copyWith(color: TvVisuals.muted)),
+                  ],
+                  const SizedBox(height: 12),
+                  // The same Dart playback/collection actions remain available
+                  // while metadata loads. Native main uses compact facts, not
+                  // the legacy full-size voting chart, beside its 158x237 cover.
+                  widget.tvActions!,
+                  if (widget.isLoading) ...[
+                    const SizedBox(height: 8),
+                    const Text('正在加载完整资料…', style: TvVisuals.caption),
+                  ],
+                  if (item.nameCn.isNotEmpty && item.name != item.nameCn) ...[
+                    const SizedBox(height: 8),
+                    Text(item.name,
+                        style: TvVisuals.caption.copyWith(color: TvVisuals.muted)),
+                  ],
+                  const SizedBox(height: 12),
+                  const Text('简介', style: TvVisuals.title),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.summary.isEmpty
+                        ? (widget.isLoading ? '正在加载…' : '暂无简介')
+                        : item.summary,
+                    maxLines: 5,
+                    overflow: TextOverflow.ellipsis,
+                    style: TvVisuals.body,
+                  ),
+                ],
+              ),
             ),
           ),
         ],

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,12 +8,17 @@ import 'package:hive_ce/hive.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:kazumi/bean/card/bangumi_card.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/tv_app_shell.dart';
+import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/services/player/low_memory_mode.dart';
 import 'package:kazumi/pages/popular/popular_page.dart';
+import 'package:kazumi/pages/popular/tv_popular_controller.dart';
+import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/services/platform/tv_channel_input.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/utils/constants.dart';
 import 'support/tv_focus_fixtures.dart';
 
 class _TempPaths extends PathProviderPlatform {
@@ -23,6 +30,16 @@ class _TempPaths extends PathProviderPlatform {
 
 Finder _poster(int number) => find
     .byWidgetPredicate((w) => w is BangumiCardV && w.channelNumber == number);
+
+List<Map<String, Object>> _subjects(int first, int count) => List.generate(
+    count,
+    (index) => {
+          'id': first + index,
+          'name': 'offline subject ${first + index}',
+          'summary': 'offline pagination fixture',
+          'rating': {'rank': 1, 'score': 7.0, 'total': 1},
+          'images': <String, String>{},
+        });
 
 void _expectVisibleFocus(WidgetTester tester, int number) {
   final finder = _poster(number);
@@ -67,6 +84,7 @@ void main() {
             (_) async => null);
   });
   tearDown(() {
+    DioFactory.reset();
     tvChannelInputController.cancel();
     TvMode.setEnabledForTesting(false);
   });
@@ -109,32 +127,99 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('TV categories stay fully visible in both directions and wrap',
+  testWidgets('cold data selects spotlight without moving navigation focus',
       (tester) async {
-    await mount(tester, size: const Size(854, 480));
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tvArtworkController.select(null);
+    final app = FocusFixtureApp(count: 0);
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    final navigation = tester
+        .widget<TvFocusableSurface>(find.byWidgetPredicate((widget) =>
+            widget is TvFocusableSurface &&
+            widget.focusNode?.debugLabel == 'TV function 3'))
+        .focusNode!;
+    navigation.requestFocus();
+    await tester.pumpAndSettle();
+    app.popular.trendList.addAll(List.generate(24, (i) => focusItem(101 + i)));
+    await tester.pumpAndSettle();
+    expect(navigation.hasPrimaryFocus, isTrue);
+    expect(tvArtworkController.value?.id, 101);
+    expect(find.text('仅供焦点验证'), findsOneWidget);
+
+    tester.widget<BangumiCardV>(_poster(2)).focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    expect(tvArtworkController.value?.id, 102);
+    navigation.requestFocus();
+    await tester.pumpAndSettle();
+    app.popular.trendList.add(focusItem(199));
+    await tester.pumpAndSettle();
+    expect(tvArtworkController.value?.id, 102,
+        reason: 'Appending items keeps the current valid spotlight');
+    app.popular.trendList
+        .replaceRange(0, 25, List.generate(24, (i) => focusItem(301 + i)));
+    await tester.pumpAndSettle();
+    expect(navigation.hasPrimaryFocus, isTrue);
+    expect(tvArtworkController.value?.id, 301,
+        reason: 'A removed spotlight falls back to the new first item');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('TV category strip reveals both directions without wrapping',
+      (tester) async {
+    final app = await mount(tester, size: const Size(854, 480));
     final tabs = find.byWidgetPredicate((w) =>
         w is TvFocusableSurface &&
         (w.focusNode?.debugLabel?.startsWith('TV category ') ?? false));
-    final first = tester.widget<TvFocusableSurface>(tabs.first).focusNode!;
+    final surfaces = tester.widgetList<TvFocusableSurface>(tabs).toList();
+    final first = surfaces.first.focusNode!;
     first.requestFocus();
     await tester.pumpAndSettle();
-    final viewport = tester.getRect(find.byType(SingleChildScrollView).first);
-    for (final key in [
-      LogicalKeyboardKey.arrowRight,
-      LogicalKeyboardKey.arrowLeft
-    ]) {
-      for (var i = 0; i < tabs.evaluate().length + 1; i++) {
-        await _press(tester, key);
-        final focused = find.byWidgetPredicate((w) =>
-            w is TvFocusableSurface &&
-            (w.focusNode?.debugLabel?.startsWith('TV category ') ?? false) &&
-            w.focusNode!.hasPrimaryFocus);
-        expect(focused, findsOneWidget);
-        final rect = tester.getRect(focused);
-        expect(rect.left, greaterThanOrEqualTo(viewport.left + 3));
-        expect(rect.right, lessThanOrEqualTo(viewport.right - 3));
-      }
+    final viewport = tester.getRect(find.ancestor(
+        of: tabs.first, matching: find.byType(SingleChildScrollView)));
+    void expectCategory(int index) {
+      expect(surfaces[index].focusNode!.hasPrimaryFocus, isTrue);
+      final rect = tester.getRect(tabs.at(index));
+      expect(rect.left, greaterThanOrEqualTo(viewport.left + 3));
+      expect(rect.right, lessThanOrEqualTo(viewport.right - 3));
     }
+
+    final queries = app.popular.queries;
+    expectCategory(0);
+    for (var i = 1; i < surfaces.length; i++) {
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expectCategory(i);
+    }
+    await _press(tester, LogicalKeyboardKey.arrowRight);
+    expectCategory(surfaces.length - 1);
+    for (var i = surfaces.length - 2; i >= 0; i--) {
+      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      expectCategory(i);
+    }
+    expect(app.popular.currentTag, isEmpty);
+    expect(app.popular.queries, queries,
+        reason: 'Moving focus must not select or request a category');
+    await _press(tester, LogicalKeyboardKey.arrowLeft);
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV function 3');
+    expect(
+        tester
+            .getRect(find.byWidgetPredicate((w) =>
+                w is TvFocusableSurface &&
+                w.focusNode?.debugLabel == 'TV function 3'))
+            .center
+            .dy,
+        closeTo(tester.getRect(tabs.first).center.dy, 1));
+    await _press(tester, LogicalKeyboardKey.arrowRight);
+    expectCategory(0);
+    await _press(tester, LogicalKeyboardKey.arrowRight);
+    expectCategory(1);
+    expect(app.popular.currentTag, isEmpty);
+    await _press(tester, LogicalKeyboardKey.select);
+    expect(app.popular.currentTag, defaultAnimeTags.first);
+    expect(app.popular.queries, queries + 1);
   });
 
   test('TV memory defaults on and preserves all explicit modes like mobile',
@@ -232,6 +317,10 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(app.popular.scrollOffset, closeTo(offset, 0.5));
     await _press(tester, LogicalKeyboardKey.arrowRight);
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV category 热门番组');
+    expect(app.popular.scrollOffset, closeTo(offset, 0.5));
+    await _press(tester, LogicalKeyboardKey.arrowLeft);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
     _expectVisibleFocus(tester, 7);
   });
 
@@ -267,17 +356,30 @@ void main() {
     _expectVisibleFocus(tester, 2);
   });
 
-  testWidgets('ragged final row wraps visibly and retains category/rail exits',
+  testWidgets('ragged final row stops and retains category/function exits',
       (tester) async {
     final app = await mount(tester, count: 25);
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 3; i++) {
       await _press(tester, LogicalKeyboardKey.arrowDown);
     }
+    _expectVisibleFocus(tester, 19);
+    for (var i = 0; i < 5; i++) {
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+    }
+    _expectVisibleFocus(tester, 24);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
     _expectVisibleFocus(tester, 25);
     await _press(tester, LogicalKeyboardKey.arrowRight);
     _expectVisibleFocus(tester, 25);
+    final queries = app.popular.queries;
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 1);
+    _expectVisibleFocus(tester, 25);
+    expect(app.popular.queries, queries + 1,
+        reason: 'DOWN at the loaded boundary requests the next batch once');
+    for (final number in [19, 13, 7, 1]) {
+      await _press(tester, LogicalKeyboardKey.arrowUp);
+      _expectVisibleFocus(tester, number);
+    }
     await _press(tester, LogicalKeyboardKey.arrowUp);
     expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV category 热门番组');
     await _press(tester, LogicalKeyboardKey.arrowDown);
@@ -289,18 +391,183 @@ void main() {
     expect(app.popular.isTimeOut, isFalse);
   });
 
-  testWidgets('long end-to-start wrap survives recycling the original card',
+  testWidgets('long directory stops at end and returns through recycled rows',
       (tester) async {
-    await mount(tester);
+    final app = await mount(tester);
     for (var row = 1; row <= 19; row++) {
       await _press(tester, LogicalKeyboardKey.arrowDown);
     }
     _expectVisibleFocus(tester, 115);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 1);
+    _expectVisibleFocus(tester, 115);
     await _press(tester, LogicalKeyboardKey.arrowRight);
-    _expectVisibleFocus(tester, 2);
+    _expectVisibleFocus(tester, 116);
     await tester.pump(const Duration(seconds: 1));
-    _expectVisibleFocus(tester, 2);
+    _expectVisibleFocus(tester, 116);
+    for (var row = 18; row >= 0; row--) {
+      await _press(tester, LogicalKeyboardKey.arrowUp);
+      _expectVisibleFocus(tester, row * 6 + 2);
+    }
+    expect(app.popular.scrollOffset, lessThan(10));
   });
+
+  testWidgets('TV directory appends a batch without taking newer focus',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    // Hive writes use real filesystem completion, outside the widget clock.
+    await tester.runAsync(
+        () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
+    final controller = TvPopularController();
+    final offsets = <int>[];
+    final appendStarted = Completer<void>();
+    VoidCallback? finishAppend;
+    DioFactory.apiDio.interceptors.insert(0, InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final offset = int.parse(options.uri.queryParameters['offset']!);
+        offsets.add(offset);
+        void respond(int first, int count) => handler.resolve(Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {'data': _subjects(first, count)}));
+        if (offset == 0) {
+          respond(1, 24);
+        } else {
+          expect(offset, 24);
+          expect(finishAppend, isNull,
+              reason: 'A pending append must not request another batch');
+          finishAppend = () => respond(25, 6);
+          appendStarted.complete();
+        }
+      },
+    ));
+    await tester.runAsync(() =>
+        controller.queryBangumiByTrend().timeout(const Duration(seconds: 5)));
+    await tester.pumpWidget(MaterialApp(
+        home: TvAppShell(child: PopularPage(controller: controller))));
+    await tester.pumpAndSettle();
+    tester.widget<BangumiCardV>(_poster(1)).focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 7);
+
+    // Scrolling near the boundary starts one append. Its progress indicator is
+    // intentionally still active while directional input continues.
+    Future<void> moveWhileLoading(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      // Build the first animation frame before advancing its elapsed time.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+    }
+
+    await moveWhileLoading(LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 13);
+    await moveWhileLoading(LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 19);
+    expect(appendStarted.isCompleted, isTrue);
+    expect(controller.isLoadingMore, isTrue);
+    await moveWhileLoading(LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 19);
+    await moveWhileLoading(LogicalKeyboardKey.arrowRight);
+    _expectVisibleFocus(tester, 20);
+    expect(controller.trendList.length, 24);
+    expect(offsets, [0, 24]);
+    finishAppend!();
+    await tester.pumpAndSettle();
+    _expectVisibleFocus(tester, 20);
+    expect(controller.trendList.length, 30);
+    expect(controller.canLoadMore, isFalse);
+    expect(controller.canRetryLoad, isFalse,
+        reason: 'A successful nonempty short tail is a completed directory');
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 26);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 26);
+    expect(offsets, [0, 24],
+        reason: 'The short tail stops automatic and boundary requests');
+    expect(controller.isTimeOut, isFalse);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('empty append is reachable by DOWN and retries the same cursor',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(
+        () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
+    final controller = TvPopularController();
+    final offsets = <int>[];
+    var appendAttempts = 0;
+    FocusNode? focusAtRetry;
+    DioFactory.apiDio.interceptors.insert(0, InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final offset = int.parse(options.uri.queryParameters['offset']!);
+        offsets.add(offset);
+        final subjects = offset == 0
+            ? _subjects(1, 24)
+            : ++appendAttempts == 1
+                ? <Map<String, Object>>[]
+                : _subjects(25, 6);
+        if (appendAttempts == 2) {
+          focusAtRetry = FocusManager.instance.primaryFocus;
+        }
+        handler.resolve(Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {'data': subjects}));
+      },
+    ));
+    await tester.runAsync(() =>
+        controller.queryBangumiByTrend().timeout(const Duration(seconds: 5)));
+    await tester.pumpWidget(MaterialApp(
+        home: TvAppShell(child: PopularPage(controller: controller))));
+    await tester.pumpAndSettle();
+    tester.widget<BangumiCardV>(_poster(1)).focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    for (final number in [7, 13, 19]) {
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+      _expectVisibleFocus(tester, number);
+    }
+    expect(offsets, [0, 24]);
+    expect(controller.trendList.length, 24);
+    expect(controller.canLoadMore, isFalse);
+    expect(controller.canRetryLoad, isTrue);
+    final card = tester.widget<BangumiCardV>(_poster(19)).focusNode!;
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(
+        FocusManager.instance.primaryFocus!.debugLabel, 'TV directory retry');
+    final retry = find.byWidgetPredicate((widget) =>
+        widget is TvFocusableSurface &&
+        widget.focusNode?.debugLabel == 'TV directory retry');
+    final footer = tester.getRect(retry);
+    final viewport = tester.getRect(find.byType(CustomScrollView));
+    expect(footer.top, greaterThanOrEqualTo(viewport.top));
+    expect(footer.bottom, lessThanOrEqualTo(viewport.bottom + .5));
+    await _press(tester, LogicalKeyboardKey.arrowUp);
+    _expectVisibleFocus(tester, 19);
+    expect(offsets, [0, 24]);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    expect(
+        FocusManager.instance.primaryFocus!.debugLabel, 'TV directory retry');
+    await _press(tester, LogicalKeyboardKey.select);
+    expect(focusAtRetry, same(card),
+        reason: 'Retry focuses the existing card before removing its button');
+    _expectVisibleFocus(tester, 19);
+    expect(offsets, [0, 24, 24]);
+    expect(controller.trendList.take(24).map((item) => item.id),
+        List.generate(24, (index) => index + 1));
+    expect(controller.trendList.length, 30);
+    expect(controller.canRetryLoad, isFalse);
+    expect(controller.isTimeOut, isFalse);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 25);
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 25);
+    expect(offsets, [0, 24, 24]);
+    expect(tester.takeException(), isNull);
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

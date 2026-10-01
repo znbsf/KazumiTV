@@ -149,7 +149,8 @@ FocusNode _collectionSubjectFocus(WidgetTester tester, int id) => tester
     .focusNode!;
 
 Future<void> _pumpUntil(
-    WidgetTester tester, bool Function() ready, String reason) async {
+    WidgetTester tester, bool Function() ready, String reason,
+    {String Function()? diagnostics}) async {
   for (var attempt = 0; attempt < 100 && !ready(); attempt++) {
     // Hive and a real loopback socket need an actual event-loop turn, while
     // widget transitions still advance through the controlled test clock.
@@ -157,7 +158,8 @@ Future<void> _pumpUntil(
         .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
     await tester.pump(const Duration(milliseconds: 50));
   }
-  expect(ready(), isTrue, reason: reason);
+  expect(ready(), isTrue,
+      reason: diagnostics == null ? reason : '$reason\n${diagnostics()}');
   await tester.pumpAndSettle();
 }
 
@@ -183,6 +185,7 @@ void main() {
   late _ChapterServer sourceServer;
   late Zone persistenceZone;
   final searchOffsets = <int>[];
+  final rejectedApiRequests = <String>[];
 
   setUpAll(() async {
     persistenceZone = Zone.current;
@@ -205,6 +208,7 @@ void main() {
     await GStorage.collectChanges.clear();
     await GStorage.searchHistory.clear();
     searchOffsets.clear();
+    rejectedApiRequests.clear();
     sourceServer.paths.clear();
     sourceServer.reorderPrimary = false;
     sourceServer.delayedReceived = Completer<void>();
@@ -214,6 +218,7 @@ void main() {
         InterceptorsWrapper(onRequest: (options, handler) {
       final offset = int.tryParse(options.uri.queryParameters['offset'] ?? '');
       if (options.method != 'POST' || offset == null) {
+        rejectedApiRequests.add('${options.method} ${options.uri}');
         handler.reject(DioException(
             requestOptions: options,
             error: StateError('Unexpected live API request: ${options.uri}')));
@@ -281,13 +286,34 @@ void main() {
         sourcePlugins: [primary], persistenceZone: persistenceZone);
     await tester.pumpWidget(app);
     await tester.pumpAndSettle();
+    // This business fixture enters the real SearchPage directly; homepage
+    // function-bar navigation has its own UI acceptance. Activate the actual
+    // remote input target explicitly, without invoking its submit callback.
+    expect(find.byType(SearchPage), findsOneWidget);
+    final entry = tester.widget<TvFocusableSurface>(
+        find.byKey(const Key('tv-search-entry')));
+    entry.focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    expect(entry.focusNode!.hasPrimaryFocus, isTrue);
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tv-search-editor')), findsOneWidget);
     await tester.enterText(
         find.byKey(const Key('tv-search-editor')), 'loopback');
     await tester.testTextInput.receiveAction(TextInputAction.search);
+    String searchState() =>
+        'loading=${app.search.isLoading}; timeout=${app.search.isTimeOut}; '
+        'results=${app.search.bangumiList.length}; offsets=$searchOffsets; '
+        'savedKeywords=${GStorage.searchHistory.values.map((history) => history.keyword).toList()}; '
+        'rejectedRequests=$rejectedApiRequests';
+    await _pumpUntil(tester, () => searchOffsets.isNotEmpty,
+        'Remote editor submission must reach the real search API transport',
+        diagnostics: searchState);
+    expect(find.byKey(const Key('tv-search-editor')), findsNothing);
+    expect(rejectedApiRequests, isEmpty);
     await _pumpUntil(tester, () => app.search.bangumiList.length == 20,
-        'SearchPage must submit through the real controller/API parser');
+        'SearchPage must submit through the real controller/API parser',
+        diagnostics: searchState);
     expect(searchOffsets, [0]);
     await tester.drag(
         find.byType(CustomScrollView).first, const Offset(0, -2400));

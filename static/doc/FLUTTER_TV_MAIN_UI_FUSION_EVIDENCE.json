@@ -1,0 +1,325 @@
+{
+  "utc": "2026-10-01T20:48:17.131422+00:00",
+  "worktree": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\Kazumi",
+  "branch": "codex/flutter-tv-main-ui-fusion-20261002",
+  "base": "a5f7bab4afce717af186c04f3fab8fe06681847b",
+  "native_main": "24bc50ef47af5e32907ed54413e1eb33c1fb601e",
+  "version": "2.3.1-tv-ui-fusion.1+20308",
+  "package": "com.predidit.kazumi.tv",
+  "abi": "x86_64",
+  "model_creation_parameters": "Parent explicitly provided GPT-6.1 Sol / Standard; no tool verification claim",
+  "scope": "C46G computer and owned emulator-5600 only; no physical-device actions",
+  "source_sha256": "e6c580cafecf5129b9f9ad5ea1b58632c182e22c728b6134c2ef567eab3b665d",
+  "source_files": 472,
+  "checks": [
+    {
+      "operation": "test",
+      "started_utc": "2026-10-01T20:31:54.220412+00:00",
+      "finished_utc": "2026-10-01T20:32:39.018881+00:00",
+      "worktree": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\Kazumi",
+      "command": [
+        "cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\toolchain\\flutter\\bin\\flutter.bat",
+        "--suppress-analytics",
+        "--no-version-check",
+        "test",
+        "--no-pub",
+        "--concurrency=2",
+        "--reporter=json"
+      ],
+      "exit_code": 0,
+      "timeout_seconds": 600,
+      "error": null,
+      "log": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\evidence\\fusion-checks\\test-20261001T203154220412Z.log",
+      "visible_tests": 580,
+      "passed": 580,
+      "failed": 0,
+      "skipped": 0,
+      "final_test_event": {
+        "success": true,
+        "type": "done",
+        "time": 43030
+      },
+      "windows_platform_moved": false,
+      "windows_platform_restored": false,
+      "device_actions": "NOT_RUN",
+      "gradle_workers_max": 2
+    },
+    {
+      "operation": "analyze",
+      "started_utc": "2026-10-01T20:32:39.093753+00:00",
+      "finished_utc": "2026-10-01T20:32:50.182631+00:00",
+      "worktree": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\Kazumi",
+      "command": [
+        "cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\toolchain\\flutter\\bin\\flutter.bat",
+        "--suppress-analytics",
+        "--no-version-check",
+        "analyze",
+        "--no-pub",
+        "--no-fatal-infos",
+        "--fatal-warnings"
+      ],
+      "exit_code": 0,
+      "timeout_seconds": 600,
+      "error": null,
+      "log": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\evidence\\fusion-checks\\analyze-20261001T203239093753Z.log",
+      "visible_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "final_test_event": null,
+      "windows_platform_moved": false,
+      "windows_platform_restored": false,
+      "device_actions": "NOT_RUN",
+      "gradle_workers_max": 2
+    },
+    {
+      "operation": "product-build",
+      "started_utc": "2026-10-01T20:32:50.252226+00:00",
+      "finished_utc": "2026-10-01T20:33:41.475994+00:00",
+      "worktree": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\Kazumi",
+      "command": [
+        "cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\toolchain\\flutter\\bin\\flutter.bat",
+        "--suppress-analytics",
+        "--no-version-check",
+        "build",
+        "apk",
+        "--release",
+        "--flavor",
+        "tv",
+        "--pub",
+        "--android-project-arg=kazumiTv=true",
+        "--target-platform",
+        "android-x64",
+        "--split-per-abi"
+      ],
+      "exit_code": 0,
+      "timeout_seconds": 1200,
+      "error": null,
+      "log": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\evidence\\fusion-checks\\product-build-20261001T203250252226Z.log",
+      "visible_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "final_test_event": null,
+      "windows_platform_moved": true,
+      "windows_platform_restored": true,
+      "device_actions": "NOT_RUN",
+      "gradle_workers_max": 2
+    },
+    {
+      "operation": "fixture-build",
+      "started_utc": "2026-10-01T20:34:53.576896+00:00",
+      "finished_utc": "2026-10-01T20:35:45.007220+00:00",
+      "worktree": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\Kazumi",
+      "command": [
+        "cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\toolchain\\flutter\\bin\\flutter.bat",
+        "--suppress-analytics",
+        "--no-version-check",
+        "build",
+        "apk",
+        "--release",
+        "--flavor",
+        "tv",
+        "--pub",
+        "--android-project-arg=kazumiTv=true",
+        "--target-platform",
+        "android-x64",
+        "--split-per-abi",
+        "--target",
+        "test_support/emulator_main.dart"
+      ],
+      "exit_code": 0,
+      "timeout_seconds": 1200,
+      "error": null,
+      "log": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\evidence\\fusion-checks\\fixture-build-20261001T203453576896Z.log",
+      "visible_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "final_test_event": null,
+      "windows_platform_moved": true,
+      "windows_platform_restored": true,
+      "device_actions": "NOT_RUN",
+      "gradle_workers_max": 2
+    }
+  ],
+  "analyzer": {
+    "errors": 0,
+    "warnings": 0,
+    "infos": 32
+  },
+  "artifacts": [
+    {
+      "kind": "product",
+      "local_path": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\artifacts\\Kazumi-FlutterTV-UI-Fusion-product-x86_64.apk",
+      "bytes": 33706155,
+      "sha256": "9f219c621fc3f4df52ee6228135b4bbd4b63eed54c7d9505ccea501bbace552c"
+    },
+    {
+      "kind": "fixture",
+      "local_path": "C:\\Users\\hentai\\Documents\\Codex\\2026-10-02\\task\\artifacts\\Kazumi-FlutterTV-UI-Fusion-fixture-x86_64.apk",
+      "bytes": 33707383,
+      "sha256": "854ebfc3a3d2b14170f627299d8a873d3b128f834fb4ed09eeee11ffe305de53"
+    }
+  ],
+  "images": [
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/product-home.png",
+      "original": "20261001T203819283702Z-final-product-release-home.png",
+      "bytes": 2588349,
+      "sha256": "81d3d5ae9dbb0fa099d759eee2f6df2d0e40c813ef45801b60eac285283fff3f",
+      "stage": "final-product"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/category-horizontal.png",
+      "original": "20261001T202500914977Z-final-product-category-horizontal.png",
+      "bytes": 2585067,
+      "sha256": "ffefa16423514a8b841c55b9f7982a124b7c8a90f1ef7dba97b162e1e0577f97",
+      "stage": "before-header-readability; top layout unchanged"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/detail-short.png",
+      "original": "20261001T204010005400Z-detail-open-1500ms.png",
+      "bytes": 1093305,
+      "sha256": "558c803c9ef39ffde8cd85d4fb4eb30732ba95d280094ee1e11b500e8a193f8c",
+      "stage": "final-fixture; pointer opens subject 2"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/detail-long.png",
+      "original": "20261001T200826014229Z-accepted-detail-long-summary.png",
+      "bytes": 1271160,
+      "sha256": "f2fcc98cf0b79f61035dc178181b1ba7490fc1774800fc92a22962da3f0f0abc",
+      "stage": "before-header-readability; detail code unchanged"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/detail-reading.png",
+      "original": "20261001T200901053621Z-accepted-detail-full-summary.png",
+      "bytes": 461411,
+      "sha256": "a2446e073051326e4e9f94224dac612adb9073bd9d86e4da51ce49c199abcbd5",
+      "stage": "before-header-readability; detail code unchanged"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/player-icons.png",
+      "original": "20261001T203810424657Z-final-player-icons-clear.png",
+      "bytes": 400949,
+      "sha256": "b8e4fe4dddd5263928bbebb5e39f211ec64fd9f66ae6e084504542000fa1d81c",
+      "stage": "fixture-pre-header; player code unchanged"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/player-settings.png",
+      "original": "20261001T203545575200Z-final-player-settings.png",
+      "bytes": 229804,
+      "sha256": "aa223611361fb4d9f9376904896d290447b714021707014b6785031ac9fb1d6a",
+      "stage": "fixture-pre-header; player code unchanged"
+    },
+    {
+      "file": "screenshots/flutter-tv-ui-fusion-20261002/directory-deep.png",
+      "original": "20261001T204325576675Z-final-home-readable-header-settled.png",
+      "bytes": 883652,
+      "sha256": "43a1580038f7174a41fe8a80a35382fae3ca31feeec5c34d3e5ceea890397b48",
+      "stage": "final-fixture; subject 80 stable return"
+    }
+  ],
+  "changed_since_player_acceptance": [
+    "lib/pages/popular/popular_page.dart"
+  ],
+  "runtime_observations": [
+    "20261001T202545204224Z-home-acceptance.json",
+    "20261001T202709622798Z-home-acceptance.json",
+    "20261001T202900294108Z-home-acceptance.json"
+  ],
+  "ordinary_data_boundary": "Real metadata/posters; same owned AVD retains controlled fixture rules/history from earlier UI validation. No public-provider film playback claim.",
+  "fixture": {
+    "catalog": 96,
+    "episodes": 201,
+    "sources": 2,
+    "media": "16-second synthetic color bars and silent AAC",
+    "media_sha256": "03783a50fa160a6dd47f5af0d40ce2a3a679796ad56c90cb9a9be3e568365b90"
+  },
+  "original_repository_protection": [
+    {
+      "index": 1,
+      "head": "a5f7bab4afce717af186c04f3fab8fe06681847b",
+      "branch": "codex/flutter-tv-reuse-lab-20261001",
+      "nul_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dirty_files": 0,
+      "unchanged": true
+    },
+    {
+      "index": 2,
+      "head": "c54b2fd492a4baa4f5e8d604a2b2c83593ce0cda",
+      "branch": "",
+      "nul_status_sha256": "e729ea916398516eedfb4e41f5af4419fcb75f5583e46508ec532350dd5cadf4",
+      "dirty_files": 3,
+      "unchanged": true
+    },
+    {
+      "index": 3,
+      "head": "a5f7bab4afce717af186c04f3fab8fe06681847b",
+      "branch": "local/xiaomi-isolated-lab5-20261001",
+      "nul_status_sha256": "b9fc71ea7a92e3cc1c419b62eab6a66c240b03ce26e05b10751244ba0f989888",
+      "dirty_files": 5,
+      "unchanged": true
+    },
+    {
+      "index": 4,
+      "head": "c8f1ab3fda324574c9b5a48fb3c7a53550da975c",
+      "branch": "main",
+      "nul_status_sha256": "5390c16278016ec128a1e24944f1fa7cfef64421af4fc6ea61a3b4533add8579",
+      "dirty_files": 14,
+      "unchanged": true
+    },
+    {
+      "index": 5,
+      "head": "24bc50ef47af5e32907ed54413e1eb33c1fb601e",
+      "branch": "codex/repository-hygiene-20261001",
+      "nul_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dirty_files": 0,
+      "unchanged": true
+    },
+    {
+      "index": 6,
+      "head": "c54b2fd492a4baa4f5e8d604a2b2c83593ce0cda",
+      "branch": "codex/upstream-tv-complete",
+      "nul_status_sha256": "fd7dbb87602e6fc23093aabac97e7240e99be57c3f4d03ffafb78891fc586a27",
+      "dirty_files": 122,
+      "unchanged": true
+    },
+    {
+      "index": 7,
+      "head": "ba52a11c53a009a8f63d1a639f338955456add2c",
+      "branch": "codex/quicksr-integration-explore",
+      "nul_status_sha256": "dd7f3a20de54cf12817c512f5469fd6ced89d3bfdf366be81651a2123ca65a70",
+      "dirty_files": 69,
+      "unchanged": true
+    },
+    {
+      "index": 8,
+      "head": "994465d9bfca3f39d0b41199d16e7fd93fe97881",
+      "branch": "",
+      "nul_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "dirty_files": 0,
+      "unchanged": true
+    }
+  ],
+  "compose": "Inherited optional component remains off by default; 131 selection observed earlier; cancellation/fallback covered by final regression. No comparative performance claim.",
+  "excluded_as_acceptance": [
+    "Wrong raw Android numeric key sequence",
+    "Pointer transition 20261001T203226910053Z started on detail 1, not home",
+    "final-episode-panel capture 20261001T203634928923Z still showed player HUD"
+  ],
+  "remaining_scope_blockers": [],
+  "deferred": "Flutter versus Compose same-condition pressure comparison plan in fusion report"
+}

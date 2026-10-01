@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +11,8 @@ import 'package:kazumi/pages/router.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/platform/tv_channel_input.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
+import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
 
 class ScaffoldMenu extends StatefulWidget {
   const ScaffoldMenu({super.key, required this.location});
@@ -25,13 +29,50 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   final _searchFocusNode = FocusNode(debugLabel: 'TV search entry');
   final _railFocusScope = FocusScopeNode(debugLabel: 'TV navigation rail');
   final _contentFocusScope = FocusScopeNode(debugLabel: 'TV content');
+  final _functionFocusNodes = <int, FocusNode>{};
+  FocusNode? _lastTvContentFocus;
+  int? _lastTvContentDestination;
   bool _restoreContentAfterRoute = false;
   DateTime? _lastExitPromptAt;
   bool _didScheduleInitialTvFocus = false;
+  int _tvInputEpoch = 0;
+  bool _pendingInitialHomeFocus = false;
+  bool _watchingInitialHomeInput = false;
+  FocusNode? _homeEntryFocus;
+  bool _homeReadyQueued = false;
 
   /// The shell sits at the bottom of the root stack and stays mounted while
   /// other pages cover it, so it publishes that state for its subtree.
   bool _isCovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_rememberTvContentFocus);
+    _pendingInitialHomeFocus = TvMode.enabled && _selectedIndex == 0;
+    if (_pendingInitialHomeFocus) {
+      FocusManager.instance.addEarlyKeyEventHandler(_recordInitialHomeInput);
+      _watchingInitialHomeInput = true;
+    }
+    TvDesktopNavigation.traceStartupFocus('menu-init',
+        focus: FocusManager.instance.primaryFocus,
+        pending: _pendingInitialHomeFocus,
+        epoch: _tvInputEpoch);
+  }
+
+  void _rememberTvContentFocus() {
+    if (!mounted || !TvMode.enabled || _isCovered) return;
+    final node = FocusManager.instance.primaryFocus;
+    _traceInitialHomeFocus('focus-change');
+    if (node == null ||
+        node is FocusScopeNode ||
+        !node.ancestors.contains(_contentFocusScope) ||
+        node.ancestors.contains(_railFocusScope) ||
+        TvDesktopNavigation.homeFocusOf(node)?.kind == TvHomeFocusKind.category)
+      return;
+    _lastTvContentFocus = node;
+    _lastTvContentDestination = _selectedIndex;
+  }
 
   @override
   void didUpdateWidget(covariant ScaffoldMenu oldWidget) {
@@ -56,10 +97,15 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
   @override
   void dispose() {
+    _finishInitialHomeFocus();
+    FocusManager.instance.removeListener(_rememberTvContentFocus);
     rootRouteObserver.unsubscribe(this);
     _searchFocusNode.dispose();
     _railFocusScope.dispose();
     _contentFocusScope.dispose();
+    for (final node in _functionFocusNodes.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -71,6 +117,11 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     _setCovered(false);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _isCovered || !TvMode.enabled) return;
+      final current = FocusManager.instance.primaryFocus;
+      if (current is! FocusScopeNode &&
+          current?.context?.mounted == true &&
+          (current!.ancestors.contains(_contentFocusScope) ||
+              current.ancestors.contains(_railFocusScope))) return;
       if (_restoreContentAfterRoute) {
         _contentFocusScope.requestFocus();
       } else {
@@ -81,22 +132,103 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
   void _requestTvEntryFocus() {
     if (!TvMode.enabled) return;
+    final inputEpoch = _tvInputEpoch;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _isCovered) return;
-      _searchFocusNode.requestFocus();
-      // The nested outlet installs its initial route after this frame and may
-      // focus that route's empty scope. Repair only this startup handoff;
-      // never take focus back from a control the user has already reached.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _isCovered || !TvMode.enabled) return;
-        final current = FocusManager.instance.primaryFocus;
-        if (current is FocusScopeNode &&
-            current.ancestors.contains(_contentFocusScope)) {
-          _searchFocusNode.requestFocus();
-        }
-      });
-      WidgetsBinding.instance.scheduleFrame();
+      if (!mounted || _isCovered || inputEpoch != _tvInputEpoch) return;
+      _requestDesktopEntry();
     });
+  }
+
+  KeyEventResult _recordInitialHomeInput(KeyEvent event) {
+    _traceInitialHomeFocus(
+        'input-${event.runtimeType}-synthesized=${event.synthesized}');
+    if (mounted &&
+        TvMode.enabled &&
+        !_isCovered &&
+        _selectedIndex == 0 &&
+        !event.synthesized &&
+        (event is KeyDownEvent || event is KeyRepeatEvent)) {
+      ++_tvInputEpoch;
+      _finishInitialHomeFocus();
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _finishInitialHomeFocus() {
+    _pendingInitialHomeFocus = false;
+    if (_watchingInitialHomeInput) {
+      FocusManager.instance.removeEarlyKeyEventHandler(_recordInitialHomeInput);
+      _watchingInitialHomeInput = false;
+    }
+  }
+
+  void _traceInitialHomeFocus(String event) {
+    if (!TvDesktopNavigation.startupTraceEnabled || !mounted) return;
+    TvDesktopNavigation.traceStartupFocus(event,
+        focus: FocusManager.instance.primaryFocus,
+        pending: _pendingInitialHomeFocus,
+        epoch: _tvInputEpoch,
+        current: ModalRoute.of(context)?.isCurrent,
+        covered: _isCovered);
+  }
+
+  void _onHomeReady(FocusNode hot) {
+    _homeEntryFocus = hot;
+    _traceInitialHomeFocus('menu-home-ready');
+    if (_homeReadyQueued) return;
+    _homeReadyQueued = true;
+    final inputEpoch = _tvInputEpoch;
+    // The shell's Search fallback requests focus earlier in this same frame.
+    // Apply its queued FocusManager update before checking ownership; the
+    // incoming primary focus may still be the outer route's empty scope here.
+    scheduleMicrotask(() {
+      _homeReadyQueued = false;
+      if (inputEpoch == _tvInputEpoch) _completeInitialHomeFocus();
+    });
+  }
+
+  void _completeInitialHomeFocus() {
+    if (!mounted ||
+        !_pendingInitialHomeFocus ||
+        _tvInputEpoch != 0 ||
+        !TvMode.enabled ||
+        _isCovered ||
+        _selectedIndex != 0 ||
+        ModalRoute.of(context)?.isCurrent != true) return;
+    final current = FocusManager.instance.primaryFocus;
+    if (current == _homeEntryFocus) {
+      _finishInitialHomeFocus();
+      return;
+    }
+    // An asynchronously installed outlet may have focused its empty scope, or
+    // the shell's initial Search fallback. A real user-selected control owns
+    // focus and must not be replaced by this one-time startup handoff.
+    if (current == _searchFocusNode ||
+        (current is FocusScopeNode &&
+            (current == _contentFocusScope ||
+                current.ancestors.contains(_contentFocusScope)))) {
+      _requestDesktopEntry();
+    }
+  }
+
+  void _requestDesktopEntry() {
+    final categories = _contentFocusScope.traversalDescendants.where(
+      (node) =>
+          TvDesktopNavigation.homeFocusOf(node)?.kind ==
+              TvHomeFocusKind.category &&
+          TvDesktopNavigation.homeFocusOf(node)?.category == '' &&
+          node.context?.mounted == true &&
+          node.parent != null &&
+          node.canRequestFocus,
+    );
+    if (_selectedIndex == 0 && categories.isNotEmpty) {
+      _traceInitialHomeFocus('entry-hot-request');
+      categories.first.requestFocus();
+      _finishInitialHomeFocus();
+    } else {
+      _traceInitialHomeFocus('entry-search-fallback');
+      _searchFocusNode.requestFocus();
+    }
   }
 
   void _setCovered(bool value) {
@@ -181,7 +313,8 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
           },
           child: OrientationBuilder(
             builder: (context, orientation) {
-              return orientation == Orientation.portrait && !TvMode.enabled
+              if (TvMode.enabled) return _tvMenu(context);
+              return orientation == Orientation.portrait
                   ? _bottomMenu(context, _selectedIndex)
                   : _sideMenu(context, _selectedIndex);
             },
@@ -202,7 +335,11 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
         actions: {
           TvFocusRailIntent: CallbackAction<TvFocusRailIntent>(
             onInvoke: (_) {
-              _railFocusScope.requestFocus();
+              final favorite = _functionFocusNodes[3];
+              if (favorite?.context != null)
+                favorite!.requestFocus();
+              else
+                _railFocusScope.requestFocus();
               return null;
             },
           ),
@@ -217,8 +354,10 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                 return KeyEventResult.ignored;
               }
               if (current != null &&
-                  !ReadingOrderTraversalPolicy()
-                      .inDirection(current, TraversalDirection.left)) {
+                  !ReadingOrderTraversalPolicy().inDirection(
+                    current,
+                    TraversalDirection.left,
+                  )) {
                 _railFocusScope.requestFocus();
               }
               return KeyEventResult.handled;
@@ -234,10 +373,154 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
     }
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
+        color: TvMode.enabled
+            ? Colors.transparent
+            : Theme.of(context).colorScheme.primaryContainer,
         borderRadius: borderRadius,
       ),
       child: child,
+    );
+  }
+
+  Widget _tvMenu(BuildContext context) => TvDesktopNavigation(
+        functionBar: _buildTvFunctionBar,
+        onHomeReady: _onHomeReady,
+        child: Scaffold(
+          body: _selectedIndex == 0
+              ? _outlet(context)
+              : Column(
+                  children: [
+                    SafeArea(
+                      bottom: false,
+                      child: SizedBox(
+                        height: 64,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              width: 390,
+                              child: _buildTvFunctionBar(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(child: _outlet(context)),
+                  ],
+                ),
+        ),
+      );
+
+  Widget _buildTvFunctionBar(BuildContext context) {
+    const entries = <(int, String, IconData)>[
+      (4, '设置', Icons.settings_outlined),
+      (-1, '搜索', Icons.search),
+      (2, '排期', Icons.calendar_view_week_outlined),
+      (1, '历史', Icons.history),
+      (3, '收藏', Icons.favorite_border),
+    ];
+    final nodes = [
+      for (final (index, _, _) in entries)
+        index == -1
+            ? _searchFocusNode
+            : _functionFocusNodes.putIfAbsent(
+                index,
+                () => FocusNode(debugLabel: 'TV function $index'),
+              ),
+    ];
+    void enterContent() {
+      final controls = _contentFocusScope.traversalDescendants.where(
+        (n) =>
+            n is! FocusScopeNode &&
+            n.canRequestFocus &&
+            n.context != null &&
+            !n.ancestors.contains(_railFocusScope),
+      );
+      final posters = controls.where((n) =>
+          TvDesktopNavigation.homeFocusOf(n)?.kind == TvHomeFocusKind.poster &&
+          TvDesktopNavigation.homeFocusOf(n)?.channelNumber == 1);
+      final recent = controls.where((n) =>
+          TvDesktopNavigation.homeFocusOf(n)?.kind == TvHomeFocusKind.recent);
+      if (recent.isNotEmpty) {
+        recent.first.requestFocus();
+      } else if (_lastTvContentDestination == _selectedIndex &&
+          _lastTvContentFocus?.context != null &&
+          _lastTvContentFocus!.canRequestFocus &&
+          _lastTvContentFocus!.ancestors.contains(_contentFocusScope)) {
+        _lastTvContentFocus!.requestFocus();
+      } else if (posters.isNotEmpty) {
+        posters.first.requestFocus();
+      } else if (controls.isNotEmpty) {
+        controls.first.requestFocus();
+      }
+    }
+
+    return FocusScope(
+      node: _railFocusScope,
+      child: Row(
+        children: [
+          for (var i = 0; i < entries.length; i++)
+            Expanded(
+              child: TvFocusableSurface(
+                focusNode: nodes[i],
+                focusScale: 1,
+                borderRadius: 12,
+                ensureVisibleOnFocus: false,
+                onKeyEvent: (_, event) {
+                  if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+                    return KeyEventResult.ignored;
+                  if (!event.synthesized) _tvInputEpoch++;
+                  if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                    enterContent();
+                    return KeyEventResult.handled;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    if (i > 0) nodes[i - 1].requestFocus();
+                    return KeyEventResult.handled;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                    if (i + 1 < nodes.length) {
+                      nodes[i + 1].requestFocus();
+                    } else {
+                      final categories =
+                          _contentFocusScope.traversalDescendants.where(
+                        (n) =>
+                            TvDesktopNavigation.homeFocusOf(n)?.kind ==
+                                TvHomeFocusKind.category &&
+                            TvDesktopNavigation.homeFocusOf(n)?.category ==
+                                '' &&
+                            n.context != null,
+                      );
+                      if (categories.isNotEmpty)
+                        categories.first.requestFocus();
+                    }
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                onPressed: () => entries[i].$1 == -1
+                    ? context.pushNamed('/search/')
+                    : _selectDestination(entries[i].$1),
+                child: SizedBox(
+                  height: 40,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(entries[i].$3, size: 16),
+                        const SizedBox(width: 4),
+                        Text(entries[i].$2,
+                            style: const TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -294,17 +577,17 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                 if (current == null) return KeyEventResult.ignored;
                 final nodes = _railFocusScope.traversalDescendants.toList()
                   ..sort(
-                      (a, b) => a.rect.center.dy.compareTo(b.rect.center.dy));
+                    (a, b) => a.rect.center.dy.compareTo(b.rect.center.dy),
+                  );
                 final index = nodes.indexOf(current);
                 if (index >= 0 &&
                     (event.logicalKey == LogicalKeyboardKey.arrowUp ||
                         event.logicalKey == LogicalKeyboardKey.arrowDown)) {
                   nodes[tvWrappedIndex(
-                          index,
-                          event.logicalKey == LogicalKeyboardKey.arrowUp
-                              ? -1
-                              : 1,
-                          nodes.length)]
+                    index,
+                    event.logicalKey == LogicalKeyboardKey.arrowUp ? -1 : 1,
+                    nodes.length,
+                  )]
                       .requestFocus();
                   return KeyEventResult.handled;
                 }
@@ -320,39 +603,46 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                       }
                       // A newly mounted outlet can remember only an empty
                       // route scope. Explicit RIGHT must enter a real control.
-                      final controls = _contentFocusScope.traversalDescendants
-                          .where((node) =>
-                              node is! FocusScopeNode &&
-                              node.canRequestFocus &&
-                              node.context != null);
+                      final controls =
+                          _contentFocusScope.traversalDescendants.where(
+                        (node) =>
+                            node is! FocusScopeNode &&
+                            node.canRequestFocus &&
+                            node.context != null,
+                      );
                       if (controls.isNotEmpty) controls.first.requestFocus();
                     });
                     return KeyEventResult.handled;
                   }
                   _railFocusScope.directionalTraversalEdgeBehavior =
                       TraversalEdgeBehavior.parentScope;
-                  ReadingOrderTraversalPolicy()
-                      .inDirection(current, TraversalDirection.right);
+                  ReadingOrderTraversalPolicy().inDirection(
+                    current,
+                    TraversalDirection.right,
+                  );
                   return KeyEventResult.handled;
                 }
                 if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                  final candidates = _railFocusScope
-                          .enclosingScope?.traversalDescendants
-                          .where((node) =>
-                              node.context != null &&
-                              !node.ancestors.contains(_railFocusScope))
-                          .toList() ??
-                      <FocusNode>[];
+                  final candidates =
+                      _railFocusScope.enclosingScope?.traversalDescendants
+                              .where(
+                                (node) =>
+                                    node.context != null &&
+                                    !node.ancestors.contains(_railFocusScope),
+                              )
+                              .toList() ??
+                          <FocusNode>[];
                   candidates.sort((a, b) {
-                    final horizontal =
-                        b.rect.center.dx.compareTo(a.rect.center.dx);
+                    final horizontal = b.rect.center.dx.compareTo(
+                      a.rect.center.dx,
+                    );
                     return horizontal != 0
                         ? horizontal
                         : (a.rect.center.dy - current.rect.center.dy)
                             .abs()
                             .compareTo(
-                                (b.rect.center.dy - current.rect.center.dy)
-                                    .abs());
+                              (b.rect.center.dy - current.rect.center.dy).abs(),
+                            );
                   });
                   if (candidates.isNotEmpty) candidates.first.requestFocus();
                   return KeyEventResult.handled;

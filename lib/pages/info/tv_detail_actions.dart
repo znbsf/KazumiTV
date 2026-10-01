@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 
 /// One visible TV action row. Menus keep their own focus and key handling.
 class TvDetailActions extends StatefulWidget {
@@ -48,8 +49,11 @@ class _TvDetailActionsState extends State<TvDetailActions> {
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight) {
-      _nodes[tvWrappedIndex(index, key == LogicalKeyboardKey.arrowLeft ? -1 : 1,
-              _nodes.length)]
+      _nodes[tvWrappedIndex(
+        index,
+        key == LogicalKeyboardKey.arrowLeft ? -1 : 1,
+        _nodes.length,
+      )]
           .requestFocus();
       return KeyEventResult.handled;
     }
@@ -71,7 +75,7 @@ class _TvDetailActionsState extends State<TvDetailActions> {
         duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             width: 2,
             color: node.hasPrimaryFocus
@@ -86,47 +90,73 @@ class _TvDetailActionsState extends State<TvDetailActions> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      skipTraversal: true,
-      canRequestFocus: false,
-      onKeyEvent: _onKey,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          _highlight(
-            widget.playFocus,
-            SizedBox(
-              height: 44,
-              child: FilledButton.icon(
-                autofocus: true,
-                focusNode: widget.playFocus,
-                onPressed: widget.onPlay,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('开始观看'),
+    final actionStyle = ButtonStyle(
+      textStyle: const WidgetStatePropertyAll(TvVisuals.control),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      side: const WidgetStatePropertyAll(BorderSide.none),
+      backgroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused)
+            ? Colors.white.withValues(alpha: .12)
+            : Colors.transparent,
+      ),
+      foregroundColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused)
+            ? TvVisuals.accent
+            : TvVisuals.text,
+      ),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      ),
+    );
+    return Theme(
+      data: Theme.of(context).copyWith(
+        filledButtonTheme: FilledButtonThemeData(style: actionStyle),
+        outlinedButtonTheme: OutlinedButtonThemeData(style: actionStyle),
+      ),
+      child: Focus(
+        skipTraversal: true,
+        canRequestFocus: false,
+        onKeyEvent: _onKey,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            _highlight(
+              widget.playFocus,
+              SizedBox(
+                height: 44,
+                child: FilledButton.icon(
+                  autofocus: true,
+                  focusNode: widget.playFocus,
+                  onPressed: widget.onPlay,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('开始观看'),
+                ),
               ),
             ),
-          ),
-          _highlight(
-            _collectFocus,
-            SizedBox(
-              height: 44,
-              child: widget.collectionBuilder(_collectFocus),
-            ),
-          ),
-          _highlight(
-            _reviewFocus,
-            SizedBox(
-              height: 44,
-              child: OutlinedButton.icon(
-                focusNode: _reviewFocus,
-                onPressed: widget.onReview,
-                icon: const Icon(Icons.rate_review_rounded),
-                label: const Text('发表吐槽'),
+            _highlight(
+              _collectFocus,
+              SizedBox(
+                height: 44,
+                child: widget.collectionBuilder(_collectFocus),
               ),
             ),
-          ),
-        ],
+            _highlight(
+              _reviewFocus,
+              SizedBox(
+                height: 44,
+                child: OutlinedButton.icon(
+                  focusNode: _reviewFocus,
+                  onPressed: widget.onReview,
+                  icon: const Icon(Icons.rate_review_rounded),
+                  label: const Text('发表吐槽'),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

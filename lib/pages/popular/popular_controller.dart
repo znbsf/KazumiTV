@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -32,6 +33,11 @@ abstract class _PopularController with Store {
 
   bool get _bangumiMirrorEnabled =>
       GStorage.getSetting(SettingsKeys.enableBangumiProxy);
+
+  // The TV controller supplies bounded directory pagination. Other platforms
+  // retain their existing request behavior.
+  bool get canLoadMore => true;
+  bool get canRetryLoad => true;
 
   void setCurrentTag(String s) {
     currentTag = s;

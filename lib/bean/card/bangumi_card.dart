@@ -21,6 +21,7 @@ class BangumiCardV extends StatelessWidget {
     this.onKeyEvent,
     this.onFocusChange,
     this.ensureVisibleOnFocus = true,
+    this.posterOverlay = false,
   });
 
   final BangumiItem bangumiItem;
@@ -33,14 +34,13 @@ class BangumiCardV extends StatelessWidget {
   final FocusOnKeyEventCallback? onKeyEvent;
   final ValueChanged<bool>? onFocusChange;
   final bool ensureVisibleOnFocus;
+  final bool posterOverlay;
 
   @override
   Widget build(BuildContext context) {
     void openBangumi() {
       if (!canTap) {
-        KazumiDialog.showToast(
-          message: '编辑模式',
-        );
+        KazumiDialog.showToast(message: '编辑模式');
         return;
       }
       if (onPressed != null) {
@@ -48,6 +48,91 @@ class BangumiCardV extends StatelessWidget {
       } else {
         context.pushNamed('/info/', arguments: bangumiItem);
       }
+    }
+
+    if (TvMode.enabled && posterOverlay) {
+      return TvFocusableSurface(
+        focusNode: focusNode,
+        onPressed: openBangumi,
+        onKeyEvent: onKeyEvent,
+        onFocusChange: onFocusChange,
+        highlighted: highlighted,
+        ensureVisibleOnFocus: ensureVisibleOnFocus,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            canRequestFocus: false,
+            onTap: openBangumi,
+            child: AspectRatio(
+              aspectRatio: .65,
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  final image = NetworkImgLayer(
+                    src: NetworkImgLayer.tvListCoverUrl(bangumiItem.images),
+                    width: box.maxWidth,
+                    height: box.maxHeight,
+                  );
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      enableHero
+                          ? Hero(
+                              tag: bangumiItem.id,
+                              transitionOnUserGestures: true,
+                              flightShuttleBuilder:
+                                  NetworkImgLayer.heroFlightShuttleBuilder,
+                              child: image,
+                            )
+                          : image,
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 84,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: .94),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        bottom: 10,
+                        child: Text(
+                          bangumiItem.nameCn.isEmpty
+                              ? bangumiItem.name
+                              : bangumiItem.nameCn,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            height: 1.375,
+                          ),
+                        ),
+                      ),
+                      if (channelNumber != null)
+                        Positioned(
+                          left: 8,
+                          top: 8,
+                          child: _ChannelNumberBadge(number: channelNumber!),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     final card = Card(
@@ -63,38 +148,42 @@ class BangumiCardV extends StatelessWidget {
             children: [
               AspectRatio(
                 aspectRatio: 0.65,
-                child: LayoutBuilder(builder: (context, boxConstraints) {
-                  final double maxWidth = boxConstraints.maxWidth;
-                  final double maxHeight = boxConstraints.maxHeight;
-                  final image = NetworkImgLayer(
-                    src: bangumiItem.images['large'] ?? '',
-                    width: maxWidth,
-                    height: maxHeight,
-                  );
-                  final poster = enableHero
-                      ? Hero(
-                          transitionOnUserGestures: true,
-                          flightShuttleBuilder:
-                              NetworkImgLayer.heroFlightShuttleBuilder,
-                          tag: bangumiItem.id,
-                          child: image,
-                        )
-                      : image;
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      poster,
-                      if (channelNumber != null)
-                        Positioned(
-                          left: 8,
-                          top: 8,
-                          child: _ChannelNumberBadge(number: channelNumber!),
-                        ),
-                    ],
-                  );
-                }),
+                child: LayoutBuilder(
+                  builder: (context, boxConstraints) {
+                    final double maxWidth = boxConstraints.maxWidth;
+                    final double maxHeight = boxConstraints.maxHeight;
+                    final image = NetworkImgLayer(
+                      src: TvMode.enabled
+                          ? NetworkImgLayer.tvListCoverUrl(bangumiItem.images)
+                          : bangumiItem.images['large'] ?? '',
+                      width: maxWidth,
+                      height: maxHeight,
+                    );
+                    final poster = enableHero
+                        ? Hero(
+                            transitionOnUserGestures: true,
+                            flightShuttleBuilder:
+                                NetworkImgLayer.heroFlightShuttleBuilder,
+                            tag: bangumiItem.id,
+                            child: image,
+                          )
+                        : image;
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        poster,
+                        if (channelNumber != null)
+                          Positioned(
+                            left: 8,
+                            top: 8,
+                            child: _ChannelNumberBadge(number: channelNumber!),
+                          ),
+                      ],
+                    );
+                  },
+                ),
               ),
-              BangumiContent(bangumiItem: bangumiItem)
+              BangumiContent(bangumiItem: bangumiItem),
             ],
           ),
         ),
@@ -111,16 +200,21 @@ class BangumiCardV extends StatelessWidget {
       child: card,
     );
     if (TvMode.enabled && channelNumber != null) {
-      return LayoutBuilder(builder: (context, constraints) {
-        final posterHeight =
-            constraints.maxHeight - BangumiContent.tvTitleHeight(context);
-        final width = (posterHeight * 0.65).clamp(1.0, constraints.maxWidth);
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-              width: width, height: constraints.maxHeight, child: surface),
-        );
-      });
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final posterHeight =
+              constraints.maxHeight - BangumiContent.tvTitleHeight(context);
+          final width = (posterHeight * 0.65).clamp(1.0, constraints.maxWidth);
+          return Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: width,
+              height: constraints.maxHeight,
+              child: surface,
+            ),
+          );
+        },
+      );
     }
     return surface;
   }
@@ -139,21 +233,14 @@ class _ChannelNumberBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.45),
           borderRadius: BorderRadius.circular(7),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.25),
-          ),
-          boxShadow: const [
-            BoxShadow(color: Colors.black38, blurRadius: 4),
-          ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+          boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 4)],
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Text(
             number.toString(),
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
           ),
         ),
       ),

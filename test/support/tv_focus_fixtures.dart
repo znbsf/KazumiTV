@@ -155,31 +155,41 @@ class FocusFixtureApp extends StatelessWidget {
       this.initialRoute = '/tab/popular/',
       int count = 31,
       int historyCount = 5,
+      Widget Function(FocusPopularController)? popularBuilder,
+      bool startupRedirect = false,
+      PageTransition? shellTransition,
       this.textScale = 1,
       this.brightness = Brightness.dark}) {
     popular = FocusPopularController(count: count);
     historyRepository = FocusHistoryRepository(count: historyCount);
     history = HistoryController(historyRepository);
     module = createModule(register: (c) {
+      if (startupRedirect) {
+        c.route('/',
+            transition: TransitionType.none,
+            child: (_, __) => const _FixtureStartupRedirect());
+      }
       c.addInstance<CollectController>(collection);
       c.addInstance<HistoryPlaybackService>(playback);
       c.route('/tab/',
           child: (_, state) => ScaffoldMenu(location: state.uri.path),
+          transition: shellTransition,
           children: (sub) {
             sub.route('/popular/',
-                child: (_, __) => PopularPage(controller: popular));
+                child: (_, __) =>
+                    popularBuilder?.call(popular) ??
+                    PopularPage(controller: popular));
             sub.route('/history/',
                 child: (_, __) => HistoryPage(controller: history));
             sub.route('/timeline/',
                 child: (_, __) => const FocusEpisodeFixture());
           });
       c.route('/search/', child: (_, __) => SearchPage(controller: search));
-      c.route('/info/',
-          child: (_, state) {
-            final item = state.arguments;
-            if (item is BangumiItem) openedInfoIds.add(item.id);
-            return const _FixtureDestination(label: '详情路由：本地测试');
-          });
+      c.route('/info/', child: (_, state) {
+        final item = state.arguments;
+        if (item is BangumiItem) openedInfoIds.add(item.id);
+        return const _FixtureDestination(label: '详情路由：本地测试');
+      });
       c.route('/video/',
           child: (_, __) =>
               const _FixtureDestination(label: '续播路由：仅验证参数，不是真实视频'));
@@ -216,6 +226,29 @@ class FocusFixtureApp extends StatelessWidget {
                   ),
                 )),
       );
+}
+
+/// Matches the ordinary entry's InitPage -> navigate(default home) handoff,
+/// without running storage/network/plugin initialization in focus tests.
+class _FixtureStartupRedirect extends StatefulWidget {
+  const _FixtureStartupRedirect();
+  @override
+  State<_FixtureStartupRedirect> createState() =>
+      _FixtureStartupRedirectState();
+}
+
+class _FixtureStartupRedirectState extends State<_FixtureStartupRedirect> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.navigate('/tab/popular/');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: Text('Init route')));
 }
 
 class _FixtureDestination extends StatelessWidget {

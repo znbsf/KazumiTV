@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -7,8 +8,10 @@ import 'package:kazumi/bean/widget/bangumi_mirror_error_widget.dart';
 import 'package:kazumi/bean/widget/custom_dropdown_menu.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
+import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/pages/popular/popular_controller.dart';
 import 'package:kazumi/bean/card/bangumi_card.dart';
+import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:window_manager/window_manager.dart';
@@ -22,12 +25,14 @@ import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/platform/tv_navigation.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
 import 'package:kazumi/pages/menu/route_visibility.dart';
+import 'package:kazumi/bean/widget/tv_artwork.dart';
+import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
+import 'package:kazumi/pages/popular/tv_recent_watch.dart';
+import 'package:kazumi/request/apis/bangumi_api.dart';
 
 class PopularPage extends StatefulWidget {
-  const PopularPage({
-    super.key,
-    required this.controller,
-  });
+  const PopularPage({super.key, required this.controller});
 
   final PopularController controller;
 
@@ -39,7 +44,7 @@ class _PopularPageState extends State<PopularPage> {
   static const _channelInputDelay = Duration(milliseconds: 1800);
   static const _channelLookupTimeout = Duration(seconds: 10);
   static const _channelLookupPageLimit = 5;
-  static const _tvToolbarHeight = 88.0;
+  static const _tvToolbarHeight = 64.0;
   static const _gridPadding = 8.0;
   static const _loadingIndicatorHeight = 4.0;
 
@@ -50,6 +55,8 @@ class _PopularPageState extends State<PopularPage> {
   final GlobalKey selectorKey = GlobalKey();
   final Map<int, FocusNode> _channelFocusNodes = {};
   final Map<String, FocusNode> _tagFocusNodes = {};
+  final _retryFocusNode = FocusNode(debugLabel: 'TV directory retry');
+  int? _retryReturnId;
   Timer? _tagSelectionTimer;
   Timer? _channelCommitTimer;
   Future<void>? _channelLookupFuture;
@@ -64,6 +71,19 @@ class _PopularPageState extends State<PopularPage> {
   int _homeReturnEpoch = 0;
   int? _restoringHomeEpoch;
   bool _openingHome = false;
+  bool _homeReadyReported = false;
+  bool _homeReadyFrameScheduled = false;
+  final _spotlight = ValueNotifier<BangumiItem?>(null);
+  Timer? _summaryTimer;
+  int _summaryRevision = 0;
+  final _summaryCache = <int, String>{};
+  StreamSubscription<dynamic>? _historySubscription;
+  double get _recentExtent => TvRecentWatch.items().isEmpty ? 0 : 44;
+  double get _pinnedExtent => _tvToolbarHeight + _recentExtent;
+  double get _rowSpacing => TvMode.enabled ? 16 : StyleString.cardSpace - 2;
+  double get _introExtent => TvMode.enabled
+      ? MediaQuery.textScalerOf(context).scale(74) + _recentExtent
+      : 0;
 
   @override
   void initState() {
@@ -74,8 +94,16 @@ class _PopularPageState extends State<PopularPage> {
     scrollController.addListener(scrollListener);
     tvChannelInputController.addListener(_handleChannelDigit);
     TvNavigation.homeRequests.addListener(_focusHome);
+    if (TvMode.enabled) {
+      _historySubscription = GStorage.histories.watch().listen((_) {
+        if (mounted) setState(() {});
+      });
+    }
     if (popularController.trendList.isEmpty) {
       popularController.queryBangumiByTrend();
+    }
+    if (TvMode.enabled && popularController.trendList.isNotEmpty) {
+      _setSpotlight(popularController.trendList.first);
     }
   }
 
@@ -88,12 +116,17 @@ class _PopularPageState extends State<PopularPage> {
     TvNavigation.homeRequests.removeListener(_focusHome);
     _tagSelectionTimer?.cancel();
     _channelCommitTimer?.cancel();
+    ++_summaryRevision;
+    _summaryTimer?.cancel();
+    _spotlight.dispose();
+    _historySubscription?.cancel();
     for (final node in _channelFocusNodes.values) {
       node.dispose();
     }
     for (final node in _tagFocusNodes.values) {
       node.dispose();
     }
+    _retryFocusNode.dispose();
     scrollController.dispose();
     super.dispose();
   }
@@ -102,15 +135,72 @@ class _PopularPageState extends State<PopularPage> {
     popularController.scrollOffset = scrollController.offset;
     if (scrollController.position.pixels >=
             scrollController.position.maxScrollExtent - 200 &&
-        !popularController.isLoadingMore) {
-      KazumiLogger()
-          .i('PopularPageController: Fetching next recommendation batch');
+        !popularController.isLoadingMore &&
+        popularController.canLoadMore) {
+      KazumiLogger().i(
+        'PopularPageController: Fetching next recommendation batch',
+      );
       if (popularController.currentTag != '') {
         popularController.queryBangumiByTag();
       } else {
         popularController.queryBangumiByTrend();
       }
     }
+  }
+
+  void _setSpotlight(BangumiItem item) {
+    _spotlight.value = item;
+    tvArtworkController.select(item,
+        imageUrl: NetworkImgLayer.tvListCoverUrl(item.images));
+    final revision = ++_summaryRevision;
+    _summaryTimer?.cancel();
+    if (item.summary.isNotEmpty || _summaryCache.containsKey(item.id)) return;
+    _summaryTimer = Timer(const Duration(milliseconds: 450), () async {
+      if (!mounted ||
+          revision != _summaryRevision ||
+          RouteVisibility.isCoveredOf(context)) return;
+      final details = await BangumiApi.getBangumiInfoByID(item.id);
+      if (!mounted ||
+          revision != _summaryRevision ||
+          _spotlight.value?.id != item.id ||
+          RouteVisibility.isCoveredOf(context)) return;
+      if (details != null) {
+        _summaryCache[item.id] = details.summary;
+        if (_summaryCache.length > 64)
+          _summaryCache.remove(_summaryCache.keys.first);
+        setState(() {});
+      }
+    });
+  }
+
+  bool _hasCurrentSpotlight(List<BangumiItem> items) {
+    final id = _spotlight.value?.id;
+    return id != null &&
+        (items.any((item) => item.id == id) ||
+            TvRecentWatch.items().any((entry) => entry.bangumiItem.id == id));
+  }
+
+  void _scheduleDefaultSpotlight(List<BangumiItem> items) {
+    if (!TvMode.enabled || items.isEmpty || _hasCurrentSpotlight(items)) return;
+    final tag = popularController.currentTag;
+    final firstId = items.first.id;
+    final epoch = _homeReturnEpoch;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !TvMode.enabled ||
+          epoch != _homeReturnEpoch ||
+          tag != popularController.currentTag ||
+          _openingHome ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          RouteVisibility.isCoveredOf(context)) return;
+      final current = _visibleBangumiList;
+      if (current.isEmpty ||
+          current.first.id != firstId ||
+          _hasCurrentSpotlight(current)) return;
+      // A cold request arrives after initState. Match native's first-item
+      // spotlight without changing the user's current navigation focus.
+      _setSpotlight(current.first);
+    });
   }
 
   void _focusHome() {
@@ -128,7 +218,11 @@ class _PopularPageState extends State<PopularPage> {
   }
 
   KeyEventResult _handleGridKey(
-      int index, int count, int columns, KeyEvent event) {
+    int index,
+    int count,
+    int columns,
+    KeyEvent event,
+  ) {
     if (!TvMode.enabled ||
         (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
       return KeyEventResult.ignored;
@@ -154,9 +248,119 @@ class _PopularPageState extends State<PopularPage> {
       _focusNodeForTag(popularController.currentTag).requestFocus();
       return KeyEventResult.handled;
     }
+    if (direction == TraversalDirection.down) {
+      final nextRow = (currentIndex ~/ columns + 1) * columns;
+      if (nextRow >= count) {
+        unawaited(_loadNextGridRow(currentIndex + columns + 1,
+            originChannel: currentIndex + 1));
+      } else {
+        // A shorter final row still has a real target, even when this column
+        // has no cell there. Stop/loading applies only after the final row.
+        unawaited(_focusGridChannel(
+            (currentIndex + columns).clamp(0, count - 1) + 1));
+      }
+      return KeyEventResult.handled;
+    }
     final target = tvGridTarget(currentIndex, count, columns, direction) + 1;
     unawaited(_focusGridChannel(target));
     return KeyEventResult.handled;
+  }
+
+  Future<void> _loadNextGridRow(int target,
+      {required int originChannel}) async {
+    final epoch = _homeReturnEpoch;
+    final origin = FocusManager.instance.primaryFocus;
+    if (!popularController.canLoadMore || popularController.isLoadingMore) {
+      if (!popularController.isLoadingMore && popularController.canRetryLoad) {
+        await _focusRetryFooter(originChannel);
+      }
+      return;
+    }
+    if (popularController.currentTag.isEmpty) {
+      await popularController.queryBangumiByTrend();
+    } else {
+      await popularController.queryBangumiByTag();
+    }
+    if (!mounted ||
+        epoch != _homeReturnEpoch ||
+        FocusManager.instance.primaryFocus != origin ||
+        RouteVisibility.isCoveredOf(context) ||
+        target > _visibleBangumiList.length) return;
+    await _focusGridChannel(target);
+  }
+
+  Future<void> _focusRetryFooter(int channel) async {
+    if (!scrollController.hasClients ||
+        channel < 1 ||
+        channel > _visibleBangumiList.length) return;
+    final epoch = _homeReturnEpoch;
+    final request = _gridFocusRequest;
+    final origin = FocusManager.instance.primaryFocus;
+    final id = _visibleBangumiList[channel - 1].id;
+    _pendingGridChannel = channel;
+    await _scrollToListEnd();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || request != _gridFocusRequest) return;
+    _pendingGridChannel = null;
+    if (epoch != _homeReturnEpoch ||
+        FocusManager.instance.primaryFocus != origin ||
+        RouteVisibility.isCoveredOf(context) ||
+        !popularController.canRetryLoad ||
+        !_attached(_retryFocusNode)) return;
+    _retryReturnId = id;
+    _retryFocusNode.requestFocus();
+  }
+
+  Future<void> _returnFromRetry({bool retry = false}) async {
+    final epoch = ++_homeReturnEpoch;
+    final tag = popularController.currentTag;
+    final origin = FocusManager.instance.primaryFocus;
+    _cancelGridFocusRequest();
+    final items = _visibleBangumiList;
+    if (items.isEmpty || (retry && !popularController.canRetryLoad)) return;
+    final previous = items.indexWhere((item) => item.id == _retryReturnId);
+    final index = previous >= 0 ? previous : items.length - 1;
+    await _scrollToChannel(index + 1, revealOnly: true);
+    if (!mounted ||
+        epoch != _homeReturnEpoch ||
+        tag != popularController.currentTag ||
+        FocusManager.instance.primaryFocus != origin ||
+        RouteVisibility.isCoveredOf(context)) return;
+    final card = _focusNodeForChannel(index + 1);
+    if (!_attached(card)) return;
+    card.requestFocus();
+    await WidgetsBinding.instance.endOfFrame;
+    if (!retry ||
+        !mounted ||
+        epoch != _homeReturnEpoch ||
+        tag != popularController.currentTag ||
+        !card.hasPrimaryFocus ||
+        !popularController.canRetryLoad) return;
+    if (tag.isEmpty) {
+      await popularController.queryBangumiByTrend(type: 'retry');
+    } else {
+      await popularController.queryBangumiByTag(type: 'retry');
+    }
+  }
+
+  KeyEventResult _handleRetryKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      unawaited(_returnFromRetry());
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      _homeReturnEpoch++;
+      _cancelGridFocusRequest();
+      Actions.maybeInvoke(context, const TvFocusRailIntent());
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _cancelGridFocusRequest() {
@@ -190,6 +394,9 @@ class _PopularPageState extends State<PopularPage> {
   }
 
   void _onChannelFocusChanged(int channelNumber, bool focused) {
+    if (focused && channelNumber <= _visibleBangumiList.length) {
+      _setSpotlight(_visibleBangumiList[channelNumber - 1]);
+    }
     if (!focused ||
         _pendingGridChannel != null ||
         _restoringHomeEpoch != null) {
@@ -220,16 +427,23 @@ class _PopularPageState extends State<PopularPage> {
     final id = _visibleBangumiList[channelNumber - 1].id;
     final node = _channelFocusNodes.putIfAbsent(id, () => FocusNode());
     node.debugLabel = 'TV channel $channelNumber';
-    return node;
+    return TvDesktopNavigation.registerHomeFocus(
+      node,
+      TvHomeFocusIdentity.poster(subjectId: id, channelNumber: channelNumber),
+    );
   }
 
   bool _attached(FocusNode node) =>
       node.context?.mounted == true && node.parent != null;
 
-  FocusNode _focusNodeForTag(String tag) => _tagFocusNodes.putIfAbsent(
-        tag,
-        () =>
-            FocusNode(debugLabel: 'TV category ${tag.isEmpty ? '热门番组' : tag}'),
+  FocusNode _focusNodeForTag(String tag) =>
+      TvDesktopNavigation.registerHomeFocus(
+        _tagFocusNodes.putIfAbsent(
+          tag,
+          () => FocusNode(
+              debugLabel: 'TV category ${tag.isEmpty ? '热门番组' : tag}'),
+        ),
+        TvHomeFocusIdentity.category(tag),
       );
 
   void _handleChannelDigit() {
@@ -396,20 +610,33 @@ class _PopularPageState extends State<PopularPage> {
     }
   }
 
-  Future<void> _openChannel(BangumiItem item) async {
+  void _onRecentNavigation() {
+    _homeReturnEpoch++;
+    _cancelGridFocusRequest();
+    _tagSelectionTimer?.cancel();
+  }
+
+  Future<void> _openRecent(History entry, FocusNode origin) =>
+      _openHomeDetail(entry.bangumiItem, recentOrigin: origin);
+
+  Future<void> _openChannel(BangumiItem item) => _openHomeDetail(item);
+
+  Future<void> _openHomeDetail(BangumiItem item,
+      {FocusNode? recentOrigin}) async {
     if (_openingHome) return;
     _cancelGridFocusRequest();
     _clearChannelInput();
     if (!TvMode.enabled ||
         !scrollController.hasClients ||
-        _visibleBangumiList.isEmpty) {
+        (_visibleBangumiList.isEmpty && recentOrigin == null)) {
       await context.pushNamed('/info/', arguments: item);
       return;
     }
     final columns = _gridCrossCount();
-    final stride = _gridItemExtent(columns) + StyleString.cardSpace - 2;
+    final stride = _gridItemExtent(columns) + _rowSpacing;
     final pixels = scrollController.offset;
-    final row = ((pixels +
+    final row = ((pixels -
+                    _introExtent +
                     StyleString.cardSpace -
                     2 -
                     _loadingIndicatorHeight -
@@ -417,14 +644,22 @@ class _PopularPageState extends State<PopularPage> {
                 .clamp(0.0, double.infinity) /
             stride)
         .floor();
-    final anchorIndex =
-        (row * columns).clamp(0, _visibleBangumiList.length - 1);
-    final anchorId = _visibleBangumiList[anchorIndex].id;
-    final savedOffset = pixels - row * stride;
+    final anchorIndex = _visibleBangumiList.isEmpty
+        ? 0
+        : (row * columns).clamp(0, _visibleBangumiList.length - 1);
+    final anchorId = _visibleBangumiList.isEmpty
+        ? null
+        : _visibleBangumiList[anchorIndex].id;
+    final savedOffset = pixels - _introExtent - row * stride;
+    final recentScope = recentOrigin?.enclosingScope;
+    final recentIndex = TvRecentWatch.items()
+        .indexWhere((entry) => entry.bangumiItem.id == item.id);
     final tag = popularController.currentTag;
     final epoch = ++_homeReturnEpoch;
     _restoringHomeEpoch = epoch;
     _openingHome = true;
+    ++_summaryRevision;
+    _summaryTimer?.cancel();
     bool current() =>
         mounted &&
         TvMode.enabled &&
@@ -440,23 +675,54 @@ class _PopularPageState extends State<PopularPage> {
       }
       await WidgetsBinding.instance.endOfFrame;
       if (!current()) return;
-      if (_visibleBangumiList.isEmpty) {
+      if (_visibleBangumiList.isNotEmpty) {
+        final anchor = _visibleBangumiList.indexWhere(
+          (value) => value.id == anchorId,
+        );
+        final fallback = anchor >= 0
+            ? anchor
+            : anchorIndex.clamp(0, _visibleBangumiList.length - 1);
+        final newColumns = _gridCrossCount();
+        final newStride = _gridItemExtent(newColumns) + _rowSpacing;
+        if (scrollController.hasClients) {
+          scrollController.jumpTo(
+            (_introExtent +
+                    fallback ~/ newColumns * newStride +
+                    (anchor >= 0 ? savedOffset : 0))
+                .clamp(0.0, scrollController.position.maxScrollExtent),
+          );
+          await WidgetsBinding.instance.endOfFrame;
+        }
+      }
+      if (!current()) return;
+      if (recentOrigin != null) {
+        final recent = TvRecentWatch.items();
+        if (recent.isNotEmpty) {
+          final selected =
+              recent.indexWhere((entry) => entry.bangumiItem.id == item.id);
+          final index = selected >= 0
+              ? selected
+              : recentIndex.clamp(0, recent.length - 1);
+          final id = recent[index].bangumiItem.id;
+          for (final node
+              in recentScope?.traversalDescendants ?? const <FocusNode>[]) {
+            final identity = TvDesktopNavigation.homeFocusOf(node);
+            if (identity?.kind == TvHomeFocusKind.recent &&
+                identity?.subjectId == id &&
+                _attached(node)) {
+              node.requestFocus();
+              return;
+            }
+          }
+        }
         final category = _focusNodeForTag(tag);
         if (_attached(category)) category.requestFocus();
         return;
       }
-      final anchor =
-          _visibleBangumiList.indexWhere((value) => value.id == anchorId);
-      final fallback = anchor >= 0
-          ? anchor
-          : anchorIndex.clamp(0, _visibleBangumiList.length - 1);
-      final newColumns = _gridCrossCount();
-      final newStride = _gridItemExtent(newColumns) + StyleString.cardSpace - 2;
-      if (scrollController.hasClients) {
-        scrollController.jumpTo((fallback ~/ newColumns * newStride +
-                (anchor >= 0 ? savedOffset : 0))
-            .clamp(0.0, scrollController.position.maxScrollExtent));
-        await WidgetsBinding.instance.endOfFrame;
+      if (_visibleBangumiList.isEmpty) {
+        final category = _focusNodeForTag(tag);
+        if (_attached(category)) category.requestFocus();
+        return;
       }
       for (var attempt = 0; attempt < 3 && current(); attempt++) {
         final items = _visibleBangumiList;
@@ -475,18 +741,22 @@ class _PopularPageState extends State<PopularPage> {
         final node = _focusNodeForChannel(index + 1);
         final count = _gridCrossCount();
         final extent = _gridItemExtent(count);
-        final rowOffset = index ~/ count * (extent + StyleString.cardSpace - 2);
+        final rowOffset = index ~/ count * (extent + _rowSpacing);
         if (scrollController.hasClients) {
           if (!mounted) return;
-          final header = _tvToolbarHeight + MediaQuery.paddingOf(context).top;
-          final top =
-              header + _loadingIndicatorHeight + _gridPadding + rowOffset;
+          final header = _pinnedExtent + MediaQuery.paddingOf(context).top;
+          final top = header +
+              (_introExtent - _recentExtent) +
+              _loadingIndicatorHeight +
+              _gridPadding +
+              rowOffset;
           final position = scrollController.position;
           if (!_attached(node) ||
               top + extent <= position.pixels + header ||
               top >= position.pixels + position.viewportDimension) {
-            scrollController
-                .jumpTo(rowOffset.clamp(0.0, position.maxScrollExtent));
+            scrollController.jumpTo(
+              (_introExtent + rowOffset).clamp(0.0, position.maxScrollExtent),
+            );
             await WidgetsBinding.instance.endOfFrame;
             continue;
           }
@@ -516,27 +786,36 @@ class _PopularPageState extends State<PopularPage> {
       final available = MediaQuery.sizeOf(context).height -
           MediaQuery.paddingOf(context).vertical -
           _tvToolbarHeight -
+          _introExtent -
           _loadingIndicatorHeight -
           2 * _gridPadding -
-          (StyleString.cardSpace - 2);
+          (_rowSpacing);
       return available / 2;
     }
     return MediaQuery.sizeOf(context).width / crossCount / 0.65 +
         MediaQuery.textScalerOf(context).scale(32.0);
   }
 
-  Future<void> _scrollToChannel(int channelNumber,
-      {bool revealOnly = false}) async {
+  Future<void> _scrollToChannel(
+    int channelNumber, {
+    bool revealOnly = false,
+  }) async {
     if (!scrollController.hasClients) return;
     final crossCount = _gridCrossCount();
     final row = (channelNumber - 1) ~/ crossCount;
     final extent = _gridItemExtent(crossCount);
-    final rowOffset = row * (extent + StyleString.cardSpace - 2);
+    final rowOffset = row * (extent + _rowSpacing);
     final position = scrollController.position;
-    var target = rowOffset;
-    if (revealOnly && TvMode.enabled) {
-      final header = _tvToolbarHeight + MediaQuery.paddingOf(context).top;
-      final top = header + _loadingIndicatorHeight + _gridPadding + rowOffset;
+    var target = row == 0 ? 0.0 : _introExtent + rowOffset;
+    // Native home expands the spotlight while its first row is visible. Return
+    // all the way to that row instead of leaving its introduction scrolled off.
+    if (revealOnly && TvMode.enabled && row > 0) {
+      final header = _pinnedExtent + MediaQuery.paddingOf(context).top;
+      final top = header +
+          (_introExtent - _recentExtent) +
+          _loadingIndicatorHeight +
+          _gridPadding +
+          rowOffset;
       final start = top - header - _gridPadding;
       final end = top + extent + _gridPadding - position.viewportDimension;
       // Keep an already visible row stationary. For oversized cards prefer
@@ -569,25 +848,22 @@ class _PopularPageState extends State<PopularPage> {
     return GStorage.getSetting(SettingsKeys.showWindowButton);
   }
 
-  void _scheduleTvTagSelection(String tag) {
-    _tagSelectionTimer?.cancel();
-    _tagSelectionTimer = Timer(const Duration(milliseconds: 280), () {
-      unawaited(_selectTag(tag));
-    });
-  }
-
   Future<void> _selectTag(String tag) async {
     _homeReturnEpoch++;
     _cancelGridFocusRequest();
     _tagSelectionTimer?.cancel();
+    ++_summaryRevision;
+    _summaryTimer?.cancel();
     if (tag == popularController.currentTag) return;
     tvChannelInputController.cancel();
     if (scrollController.hasClients) {
-      unawaited(scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      ));
+      unawaited(
+        scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        ),
+      );
     }
     popularController.setCurrentTag(tag);
     if (tag.isEmpty) {
@@ -609,6 +885,21 @@ class _PopularPageState extends State<PopularPage> {
             controller: scrollController,
             slivers: [
               buildSliverAppBar(),
+              if (TvMode.enabled)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: _buildTvSpotlight(),
+                  ),
+                ),
+              if (TvMode.enabled && _recentExtent > 0)
+                SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _RecentWatchHeader(
+                      _recentExtent,
+                      onOpen: _openRecent,
+                      onNavigation: _onRecentNavigation,
+                    )),
               SliverToBoxAdapter(
                 child: Observer(
                   builder: (_) => AnimatedOpacity(
@@ -616,25 +907,33 @@ class _PopularPageState extends State<PopularPage> {
                     duration: const Duration(milliseconds: 300),
                     child: popularController.isLoadingMore
                         ? const LinearProgressIndicator(
-                            minHeight: _loadingIndicatorHeight)
+                            minHeight: _loadingIndicatorHeight,
+                          )
                         : const SizedBox(height: _loadingIndicatorHeight),
                   ),
                 ),
               ),
               SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(
-                      StyleString.cardSpace, 0, StyleString.cardSpace, 0),
-                  sliver: Observer(builder: (_) {
+                padding: EdgeInsets.fromLTRB(
+                  TvMode.enabled ? 24 : StyleString.cardSpace,
+                  0,
+                  TvMode.enabled ? 24 : StyleString.cardSpace,
+                  0,
+                ),
+                sliver: Observer(
+                  builder: (_) {
                     if (popularController.isTimeOut) {
                       return SliverToBoxAdapter(
                         child: SizedBox(
                           height: 400,
                           child: BangumiMirrorErrorWidget(
                             onRetry: () {
-                              if (popularController.trendList.isEmpty) {
-                                popularController.queryBangumiByTrend();
+                              if (popularController.currentTag.isEmpty) {
+                                popularController.queryBangumiByTrend(
+                                    type: 'retry');
                               } else {
-                                popularController.queryBangumiByTag();
+                                popularController.queryBangumiByTag(
+                                    type: 'retry');
                               }
                             },
                             onSettingsReturned: () {
@@ -651,7 +950,36 @@ class _PopularPageState extends State<PopularPage> {
                           ? popularController.trendList
                           : popularController.bangumiList,
                     );
-                  })),
+                  },
+                ),
+              ),
+              if (TvMode.enabled)
+                SliverToBoxAdapter(child: Observer(builder: (_) {
+                  if (popularController.isLoadingMore ||
+                      popularController.canLoadMore ||
+                      _visibleBangumiList.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Center(
+                      child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: popularController.canRetryLoad
+                              ? TvFocusableSurface(
+                                  focusNode: _retryFocusNode,
+                                  ensureVisibleOnFocus: false,
+                                  onKeyEvent: _handleRetryKey,
+                                  onPressed: () =>
+                                      unawaited(_returnFromRetry(retry: true)),
+                                  child: TextButton.icon(
+                                    onPressed: () => unawaited(
+                                        _returnFromRetry(retry: true)),
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('重试加载更多'),
+                                  ),
+                                )
+                              : const Text('已到列表末尾',
+                                  style: TvVisuals.caption)));
+                })),
             ],
           ),
           if (TvMode.enabled && _channelInput.isNotEmpty)
@@ -661,24 +989,71 @@ class _PopularPageState extends State<PopularPage> {
       floatingActionButton: TvMode.enabled
           ? null
           : FloatingActionButton(
-              onPressed: () => scrollController.animateTo(0,
-                  duration: const Duration(milliseconds: 350),
-                  curve: Curves.easeOut),
+              onPressed: () => scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOut,
+              ),
               child: const Icon(Icons.arrow_upward),
             ),
     );
   }
 
+  Widget _buildTvSpotlight() => SizedBox(
+        key: const Key('tv-home-spotlight'),
+        height: MediaQuery.textScalerOf(context).scale(74),
+        child: Observer(
+          builder: (_) {
+            final items = _visibleBangumiList;
+            return ValueListenableBuilder<BangumiItem?>(
+              valueListenable: _spotlight,
+              builder: (context, selected, _) {
+                final item =
+                    selected != null && items.any((v) => v.id == selected.id)
+                        ? selected
+                        : (items.isEmpty ? null : items.first);
+                final summary = (item?.summary.isNotEmpty == true
+                        ? item!.summary
+                        : _summaryCache[item?.id] ?? '')
+                    .replaceAll(RegExp(r'<[^>]*>'), '')
+                    .replaceAll(RegExp(r'\s+'), ' ');
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item == null
+                          ? ''
+                          : (item.nameCn.isEmpty ? item.name : item.nameCn),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TvVisuals.heading,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      summary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TvVisuals.body.copyWith(color: TvVisuals.muted),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      );
+
   Widget contentGrid(List<BangumiItem> bangumiList) {
+    _scheduleDefaultSpotlight(bangumiList);
     final crossCount = _gridCrossCount();
     return SliverPadding(
       padding: const EdgeInsets.all(_gridPadding),
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           // 行间距
-          mainAxisSpacing: StyleString.cardSpace - 2,
+          mainAxisSpacing: _rowSpacing,
           // 列间距
-          crossAxisSpacing: StyleString.cardSpace,
+          crossAxisSpacing: TvMode.enabled ? 12 : StyleString.cardSpace,
           // 列数
           crossAxisCount: crossCount,
           mainAxisExtent: _gridItemExtent(crossCount),
@@ -686,33 +1061,44 @@ class _PopularPageState extends State<PopularPage> {
         delegate: SliverChildBuilderDelegate(
           (BuildContext context, int index) {
             final channelNumber = index + 1;
-            return bangumiList.isNotEmpty
-                ? BangumiCardV(
+            if (bangumiList.isEmpty) return null;
+            final focusNode =
+                TvMode.enabled ? _focusNodeForChannel(channelNumber) : null;
+            final card = BangumiCardV(
+              key: ValueKey(bangumiList[index].id),
+              bangumiItem: bangumiList[index],
+              channelNumber: TvMode.enabled ? channelNumber : null,
+              posterOverlay: TvMode.enabled,
+              highlighted: _channelCandidate == channelNumber,
+              focusNode: focusNode,
+              onKeyEvent: (_, event) => _handleGridKey(
+                index,
+                bangumiList.length,
+                crossCount,
+                event,
+              ),
+              ensureVisibleOnFocus: !TvMode.enabled,
+              onFocusChange: TvMode.enabled
+                  ? (focused) => _onChannelFocusChanged(channelNumber, focused)
+                  : null,
+              onPressed: TvMode.enabled
+                  ? () => _openChannel(bangumiList[index])
+                  : null,
+            );
+            return focusNode == null
+                ? card
+                : _GridFocusKeeper(
                     key: ValueKey(bangumiList[index].id),
-                    bangumiItem: bangumiList[index],
-                    channelNumber: TvMode.enabled ? channelNumber : null,
-                    highlighted: _channelCandidate == channelNumber,
-                    focusNode: TvMode.enabled
-                        ? _focusNodeForChannel(channelNumber)
-                        : null,
-                    onKeyEvent: (_, event) => _handleGridKey(
-                        index, bangumiList.length, crossCount, event),
-                    ensureVisibleOnFocus: !TvMode.enabled,
-                    onFocusChange: TvMode.enabled
-                        ? (focused) =>
-                            _onChannelFocusChanged(channelNumber, focused)
-                        : null,
-                    onPressed: TvMode.enabled
-                        ? () => _openChannel(bangumiList[index])
-                        : null,
-                  )
-                : null;
+                    focusNode: focusNode,
+                    child: card,
+                  );
           },
           childCount: bangumiList.isNotEmpty ? bangumiList.length : 10,
           findChildIndexCallback: (key) {
             if (key is! ValueKey<int>) return null;
-            final index =
-                bangumiList.indexWhere((item) => item.id == key.value);
+            final index = bangumiList.indexWhere(
+              (item) => item.id == key.value,
+            );
             return index < 0 ? null : index;
           },
         ),
@@ -772,31 +1158,80 @@ class _PopularPageState extends State<PopularPage> {
     );
   }
 
+  void _scheduleHomeReady(TvDesktopNavigation? navigation) {
+    final onReady = navigation?.onHomeReady;
+    if (onReady == null || _homeReadyReported || _homeReadyFrameScheduled)
+      return;
+    _homeReadyFrameScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _homeReadyFrameScheduled = false;
+      if (mounted) {
+        TvDesktopNavigation.traceStartupFocus(
+          'popular-ready',
+          focus: FocusManager.instance.primaryFocus,
+          current: ModalRoute.of(context)?.isCurrent,
+          covered: RouteVisibility.isCoveredOf(context),
+          attached: _attached(_focusNodeForTag('')),
+          canFocus: _focusNodeForTag('').canRequestFocus,
+          epoch: _homeReturnEpoch,
+        );
+      }
+      if (!mounted ||
+          !TvMode.enabled ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          RouteVisibility.isCoveredOf(context) ||
+          !_attached(_focusNodeForTag(''))) return;
+      _homeReadyReported = true;
+      onReady(_focusNodeForTag(''));
+    });
+  }
+
   Widget buildSliverAppBar() {
     final theme = Theme.of(context);
     if (TvMode.enabled) {
+      final navigation = TvDesktopNavigation.maybeOf(context);
+      final categories = Observer(
+        builder: (_) {
+          _scheduleHomeReady(navigation);
+          return SizedBox(
+            height: 48,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+              child: Row(
+                children: [
+                  _buildTvCategoryTab('', 0),
+                  for (var i = 0; i < defaultAnimeTags.length; i++)
+                    _buildTvCategoryTab(defaultAnimeTags[i], i + 1),
+                ],
+              ),
+            ),
+          );
+        },
+      );
       return SliverAppBar(
         pinned: true,
         toolbarHeight: _tvToolbarHeight,
         elevation: 0,
-        titleSpacing: 20,
-        backgroundColor: theme.colorScheme.surfaceContainerHigh,
+        titleSpacing: 32,
+        backgroundColor: WidgetStateColor.resolveWith((states) =>
+            states.contains(WidgetState.scrolledUnder)
+                ? TvVisuals.background
+                : Colors.transparent),
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         actions: buildActions(),
-        title: Observer(
-          builder: (_) => SizedBox(
-            height: 70,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              child: Row(children: [
-                _buildTvCategoryTab('', 0),
-                for (var index = 0; index < defaultAnimeTags.length; index++)
-                  _buildTvCategoryTab(defaultAnimeTags[index], index + 1),
-              ]),
-            ),
-          ),
-        ),
+        title: navigation == null
+            ? categories
+            : Row(
+                children: [
+                  Expanded(flex: 40, child: navigation.functionBar(context)),
+                  const SizedBox(width: 8),
+                  const SizedBox(height: 28, child: VerticalDivider(width: 1)),
+                  const SizedBox(width: 8),
+                  Expanded(flex: 62, child: categories),
+                ],
+              ),
       );
     }
     return SliverAppBar(
@@ -825,7 +1260,11 @@ class _PopularPageState extends State<PopularPage> {
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: const EdgeInsets.only(
-                      left: 16, top: 8, bottom: 8, right: 60),
+                    left: 16,
+                    top: 8,
+                    bottom: 8,
+                    right: 60,
+                  ),
                   child: SizedBox(
                     height: 44,
                     child: Observer(
@@ -846,8 +1285,11 @@ class _PopularPageState extends State<PopularPage> {
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.keyboard_arrow_down,
-                                  size: fontSize, color: theme.iconTheme.color),
+                              Icon(
+                                Icons.keyboard_arrow_down,
+                                size: fontSize,
+                                color: theme.iconTheme.color,
+                              ),
                             ],
                           ),
                         );
@@ -867,13 +1309,14 @@ class _PopularPageState extends State<PopularPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final selected = popularController.currentTag == tag;
-    final label = tag.isEmpty ? '热门番组' : tag;
+    final label = tag.isEmpty ? '热门' : tag;
     return Padding(
-      padding: const EdgeInsets.only(right: 10),
+      padding: const EdgeInsets.only(right: 6),
       child: TvFocusableSurface(
         focusNode: _focusNodeForTag(tag),
         ensureVisibleOnFocus: false,
-        borderRadius: 22,
+        borderRadius: 12,
+        focusScale: 1,
         onKeyEvent: (node, event) {
           if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
             return KeyEventResult.ignored;
@@ -881,18 +1324,30 @@ class _PopularPageState extends State<PopularPage> {
           _homeReturnEpoch++;
           final tags = ['', ...defaultAnimeTags];
           if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-            _focusNodeForTag(tags[tvWrappedIndex(index, -1, tags.length)])
-                .requestFocus();
+            if (index == 0) {
+              Actions.maybeInvoke(context, const TvFocusRailIntent());
+            } else {
+              _focusNodeForTag(tags[index - 1]).requestFocus();
+            }
             return KeyEventResult.handled;
           }
           if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            _focusNodeForTag(tags[tvWrappedIndex(index, 1, tags.length)])
-                .requestFocus();
+            if (index + 1 < tags.length)
+              _focusNodeForTag(tags[index + 1]).requestFocus();
             return KeyEventResult.handled;
           }
           if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
             _tagSelectionTimer?.cancel();
-            unawaited(_selectTag(tag).then((_) async {
+            final recent = node.enclosingScope?.traversalDescendants.where(
+                (n) =>
+                    n.context != null &&
+                    TvDesktopNavigation.homeFocusOf(n)?.kind ==
+                        TvHomeFocusKind.recent);
+            if (recent?.isNotEmpty == true) {
+              recent!.first.requestFocus();
+              return KeyEventResult.handled;
+            }
+            unawaited(() async {
               if (!mounted || !node.hasFocus || _visibleBangumiList.isEmpty) {
                 return;
               }
@@ -900,7 +1355,7 @@ class _PopularPageState extends State<PopularPage> {
               if (mounted && node.hasFocus && _visibleBangumiList.isNotEmpty) {
                 _focusNodeForChannel(1).requestFocus();
               }
-            }));
+            }());
             return KeyEventResult.handled;
           }
           if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
@@ -912,12 +1367,16 @@ class _PopularPageState extends State<PopularPage> {
         },
         onFocusChange: (focused) {
           if (!focused) return;
-          _scheduleTvTagSelection(tag);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final node = _focusNodeForTag(tag);
             if (!mounted || !node.hasFocus || node.context == null) return;
-            Scrollable.ensureVisible(
-              node.context!,
+            final scrollable = Scrollable.maybeOf(node.context!);
+            final target = node.context!.findRenderObject();
+            if (scrollable == null || target == null) return;
+            // Only reveal the horizontal strip. Walking every ancestor also
+            // moves the catalog viewport when focus arrives from a lower row.
+            scrollable.position.ensureVisible(
+              target,
               alignment: 0.5,
               duration: const Duration(milliseconds: 160),
               curve: Curves.easeOut,
@@ -929,15 +1388,15 @@ class _PopularPageState extends State<PopularPage> {
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOut,
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
-            color:
-                selected ? colorScheme.primaryContainer : colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
+            color: selected ? colorScheme.primaryContainer : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
             label,
             style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 15,
               color: selected
                   ? colorScheme.onPrimaryContainer
                   : colorScheme.onSurfaceVariant,
@@ -1002,10 +1461,7 @@ class _PopularPageState extends State<PopularPage> {
             buttonSize: size,
             animation: animation,
             maxWidth: 80,
-            items: [
-              '',
-              ...defaultAnimeTags,
-            ],
+            items: ['', ...defaultAnimeTags],
             itemBuilder: (item) => item.isEmpty ? '热门番组' : item,
           );
         },
@@ -1017,4 +1473,80 @@ class _PopularPageState extends State<PopularPage> {
     if (selected == null) return;
     await _selectTag(selected);
   }
+}
+
+/// Keep the one focused card attached until a scrolling request transfers
+/// focus. Otherwise long-held keys stop reaching the card when its old row is
+/// recycled before the new row has finished scrolling into view.
+class _GridFocusKeeper extends StatefulWidget {
+  const _GridFocusKeeper({
+    super.key,
+    required this.focusNode,
+    required this.child,
+  });
+  final FocusNode focusNode;
+  final Widget child;
+
+  @override
+  State<_GridFocusKeeper> createState() => _GridFocusKeeperState();
+}
+
+class _GridFocusKeeperState extends State<_GridFocusKeeper>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => widget.focusNode.hasFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.focusNode.addListener(updateKeepAlive);
+  }
+
+  @override
+  void didUpdateWidget(covariant _GridFocusKeeper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode != widget.focusNode) {
+      oldWidget.focusNode.removeListener(updateKeepAlive);
+      widget.focusNode.addListener(updateKeepAlive);
+      updateKeepAlive();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(updateKeepAlive);
+    super.dispose();
+  }
+}
+
+class _RecentWatchHeader extends SliverPersistentHeaderDelegate {
+  _RecentWatchHeader(this.height,
+      {required this.onOpen, required this.onNavigation});
+  final double height;
+  final Future<void> Function(History, FocusNode) onOpen;
+  final VoidCallback onNavigation;
+  @override
+  double get minExtent => height;
+  @override
+  double get maxExtent => height;
+  @override
+  Widget build(
+          BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      ColoredBox(
+          color: TvVisuals.background.withValues(alpha: .9),
+          child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child:
+                  TvRecentWatch(onOpen: onOpen, onNavigation: onNavigation)));
+  @override
+  bool shouldRebuild(_RecentWatchHeader oldDelegate) =>
+      oldDelegate.height != height ||
+      oldDelegate.onOpen != onOpen ||
+      oldDelegate.onNavigation != onNavigation;
 }

@@ -16,6 +16,8 @@ import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
+import 'package:kazumi/bean/widget/tv_artwork.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
 import 'package:kazumi/pages/info/info_tabview.dart';
@@ -60,6 +62,7 @@ class _InfoPageState extends State<InfoPage>
   InfoController get infoController => widget.infoController;
   late final TabController infoTabController;
   late final bool showRating;
+  late final String _initialCoverUrl;
 
   bool commentsIsLoading = false;
   bool charactersIsLoading = false;
@@ -297,6 +300,17 @@ class _InfoPageState extends State<InfoPage>
   @override
   void initState() {
     super.initState();
+    _initialCoverUrl =
+        NetworkImgLayer.tvListCoverUrl(widget.inputBangumiItem.images);
+    if (TvMode.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          tvArtworkController.select(widget.inputBangumiItem,
+              imageUrl:
+                  NetworkImgLayer.tvDetailCoverUrl(widget.inputBangumiItem.images));
+        }
+      });
+    }
     infoController.bangumiItem = widget.inputBangumiItem;
     infoController.characterList.clear();
     infoController.clearComments();
@@ -426,6 +440,9 @@ class _InfoPageState extends State<InfoPage>
                         infoController.bangumiItem.nameCn == ''
                             ? infoController.bangumiItem.name
                             : infoController.bangumiItem.nameCn,
+                        style: TvMode.enabled ? TvVisuals.title : null,
+                        maxLines: TvMode.enabled ? 1 : null,
+                        overflow: TvMode.enabled ? TextOverflow.ellipsis : null,
                       ),
                     ),
                   ),
@@ -492,7 +509,7 @@ class _InfoPageState extends State<InfoPage>
                         _isShowingBangumiInfoSkeleton;
                     return Stack(
                       children: [
-                        if (!showBangumiInfoSkeleton)
+                        if (!TvMode.enabled && !showBangumiInfoSkeleton)
                           Positioned.fill(
                             bottom: kTextTabBarHeight,
                             child: IgnorePointer(
@@ -515,6 +532,8 @@ class _InfoPageState extends State<InfoPage>
                                   bangumiItem: infoController.bangumiItem,
                                   isLoading: showBangumiInfoSkeleton,
                                   showRating: showRating,
+                                  tvInitialCoverUrl:
+                                      TvMode.enabled ? _initialCoverUrl : null,
                                   tvActions: TvMode.enabled
                                       ? TvDetailActions(
                                           playFocus: _tvPlayFocus,
@@ -552,6 +571,9 @@ class _InfoPageState extends State<InfoPage>
                           isScrollable: true,
                           tabAlignment: TabAlignment.center,
                           dividerHeight: 0,
+                          labelStyle: TvMode.enabled ? TvVisuals.control : null,
+                          unselectedLabelStyle:
+                              TvMode.enabled ? TvVisuals.control : null,
                           tabs:
                               _infoTabs.map((name) => Tab(text: name)).toList(),
                         ))),

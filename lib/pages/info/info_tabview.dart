@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
@@ -7,6 +8,9 @@ import 'package:kazumi/pages/info/info_comments_view.dart';
 import 'package:kazumi/bean/card/character_card.dart';
 import 'package:kazumi/bean/card/staff_card.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
+import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_relation.dart';
@@ -76,6 +80,7 @@ class _InfoTabViewState extends State<InfoTabView> {
   bool fullTag = false;
 
   Widget get infoBody {
+    if (TvMode.enabled) return _tvInfoBody;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -183,6 +188,65 @@ class _InfoTabViewState extends State<InfoTabView> {
     );
   }
 
+  Widget get _tvInfoBody => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // The native-style header already previews five synopsis lines
+                // beside the cover; this body retains full reading and tags.
+                if (widget.bangumiItem.summary.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => TvSynopsisReader(
+                        title: widget.bangumiItem.nameCn.isEmpty
+                            ? widget.bangumiItem.name
+                            : widget.bangumiItem.nameCn,
+                        summary: widget.bangumiItem.summary,
+                      ),
+                    ),
+                    child: const Text('阅读完整简介', style: TvVisuals.control),
+                  ),
+                ],
+                if (widget.bangumiItem.tags.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text('标签', style: TvVisuals.title),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final tag in widget.bangumiItem.tags.take(
+                        fullTag ? widget.bangumiItem.tags.length : 12,
+                      ))
+                        ActionChip(
+                          label: Text(
+                            '${tag.name} ${tag.count}',
+                            style: TvVisuals.control,
+                          ),
+                          onPressed: () => context.pushNamed(
+                            '/search/${Uri.encodeComponent(tag.name)}',
+                          ),
+                        ),
+                      if (!fullTag && widget.bangumiItem.tags.length > 12)
+                        ActionChip(
+                          label: const Text('更多 +', style: TvVisuals.control),
+                          onPressed: () => setState(() => fullTag = true),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+
   Widget get relationsListBody {
     return Builder(
       builder: (BuildContext context) {
@@ -289,11 +353,15 @@ class _InfoTabViewState extends State<InfoTabView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Skeletonizer.zone(child: Bone.text(fontSize: 18, width: 50)),
+              Skeletonizer.zone(
+                  child:
+                      Bone.text(fontSize: TvMode.enabled ? 16 : 18, width: 50)),
               const SizedBox(height: 8),
               Skeletonizer.zone(child: Bone.multiText(lines: 7)),
               const SizedBox(height: 16),
-              Skeletonizer.zone(child: Bone.text(fontSize: 18, width: 50)),
+              Skeletonizer.zone(
+                  child:
+                      Bone.text(fontSize: TvMode.enabled ? 16 : 18, width: 50)),
               const SizedBox(height: 8),
               if (widget.isLoading)
                 Skeletonizer.zone(
@@ -514,6 +582,91 @@ class _InfoTabViewState extends State<InfoTabView> {
   }
 }
 
+/// Native main's full synopsis interaction, using the same Dart subject data.
+/// The text itself owns up/down so remote navigation does not enter selection.
+class TvSynopsisReader extends StatefulWidget {
+  const TvSynopsisReader({
+    super.key,
+    required this.title,
+    required this.summary,
+  });
+  final String title;
+  final String summary;
+
+  @override
+  State<TvSynopsisReader> createState() => _TvSynopsisReaderState();
+}
+
+class _TvSynopsisReaderState extends State<TvSynopsisReader> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final delta = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowDown => 220.0,
+      LogicalKeyboardKey.arrowUp => -220.0,
+      _ => 0.0,
+    };
+    if (delta == 0 || !_scroll.hasClients) return KeyEventResult.ignored;
+    final next = (_scroll.offset + delta)
+        .clamp(0.0, _scroll.position.maxScrollExtent)
+        .toDouble();
+    if (next == _scroll.offset) return KeyEventResult.ignored;
+    _scroll.jumpTo(next);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+        backgroundColor: TvVisuals.background,
+        child: SizedBox(
+          width: 950,
+          height: MediaQuery.sizeOf(context).height * .8,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TvVisuals.heading.copyWith(color: TvVisuals.text),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('返回详情', style: TvVisuals.control),
+                ),
+                const Text('方向键上下阅读，返回键回到详情。', style: TvVisuals.caption),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: Focus(
+                    autofocus: true,
+                    onKeyEvent: _onKey,
+                    child: SingleChildScrollView(
+                      controller: _scroll,
+                      child: Text(
+                        widget.summary,
+                        style: TvVisuals.body.copyWith(color: TvVisuals.text),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
 class _RelatedBangumiCardH extends StatelessWidget {
   const _RelatedBangumiCardH({required this.relation});
 
@@ -535,7 +688,9 @@ class _RelatedBangumiCardH extends StatelessWidget {
         ? bangumiItem.name.trim()
         : bangumiItem.nameCn.trim();
 
-    return Card(
+    void openDetails() => context.pushNamed('/info/', arguments: bangumiItem);
+    final visibleImageHeight = TvMode.enabled ? imageHeight - 4 : imageHeight;
+    final card = Card(
       elevation: 0,
       margin: EdgeInsets.zero,
       color: colorScheme.surfaceContainerLow,
@@ -544,9 +699,7 @@ class _RelatedBangumiCardH extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(
-        onTap: () {
-          context.pushNamed('/info/', arguments: bangumiItem);
-        },
+        onTap: openDetails,
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: LayoutBuilder(
@@ -561,9 +714,11 @@ class _RelatedBangumiCardH extends StatelessWidget {
               return Row(
                 children: [
                   NetworkImgLayer(
-                    src: bangumiItem.images['large'] ?? '',
+                    src: TvMode.enabled
+                        ? NetworkImgLayer.tvListCoverUrl(bangumiItem.images)
+                        : bangumiItem.images['large'] ?? '',
                     width: imageWidth,
-                    height: imageHeight,
+                    height: visibleImageHeight,
                     origAspectRatio: posterAspectRatio,
                   ),
                   SizedBox(width: gap),
@@ -607,5 +762,13 @@ class _RelatedBangumiCardH extends StatelessWidget {
         ),
       ),
     );
+    return TvMode.enabled
+        ? TvFocusableSurface(
+            onPressed: openDetails,
+            borderRadius: 14,
+            focusScale: 1,
+            child: card,
+          )
+        : card;
   }
 }

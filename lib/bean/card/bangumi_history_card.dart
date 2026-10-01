@@ -299,8 +299,11 @@ class _BangumiHistoryCardVState extends State<BangumiHistoryCardV>
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: NetworkImgLayer(
-                        src: widget.historyItem.bangumiItem.images['large'] ??
-                            '',
+                        src: TvMode.enabled
+                            ? NetworkImgLayer.tvListCoverUrl(
+                                widget.historyItem.bangumiItem.images)
+                            : widget.historyItem.bangumiItem.images['large'] ??
+                                '',
                         width: imageWidth,
                         height: imageHeight,
                       ),

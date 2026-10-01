@@ -95,11 +95,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('cold TV shell gives OK an actionable search focus',
+  testWidgets('cold TV shell starts on Hot and exposes an actionable search',
       (tester) async {
     await mount(tester, FocusFixtureApp());
-    final search = tester.widget<FloatingActionButton>(
-        find.widgetWithIcon(FloatingActionButton, Icons.search));
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'TV category 热门番组');
+    for (var i = 0; i < 4; i++) {
+      await press(tester, LogicalKeyboardKey.arrowLeft);
+    }
+    final search = tester.widget<TvFocusableSurface>(find.byWidgetPredicate(
+        (widget) =>
+            widget is TvFocusableSurface &&
+            widget.focusNode?.debugLabel == 'TV search entry'));
     expect(search.focusNode!.hasPrimaryFocus, isTrue,
         reason: 'Actual focus: ${FocusManager.instance.primaryFocus}');
     await press(tester, LogicalKeyboardKey.select);
@@ -111,10 +117,10 @@ void main() {
   });
 
   testWidgets(
-      'cold history RIGHT enters an actionable control, never an empty route scope',
+      'cold history DOWN enters an actionable control, never an empty route scope',
       (tester) async {
     await mount(tester, FocusFixtureApp(initialRoute: '/tab/history/'));
-    await press(tester, LogicalKeyboardKey.arrowRight);
+    await press(tester, LogicalKeyboardKey.arrowDown);
     final focus = FocusManager.instance.primaryFocus;
     expect(focus, isNot(isA<FocusScopeNode>()));
     expect(focus?.ancestors.any((node) => node.debugLabel == 'TV content'),
@@ -123,7 +129,7 @@ void main() {
   });
 
   testWidgets(
-      'UI01 real shell: first column LEFT returns rail, RIGHT restores card and category',
+      'UI01 first column LEFT reaches functions, RIGHT reaches Hot, DOWN enters cards',
       (tester) async {
     final app = FocusFixtureApp();
     await mount(tester, app);
@@ -136,6 +142,8 @@ void main() {
         isTrue);
     expect(app.popular.currentTag, '');
     await press(tester, LogicalKeyboardKey.arrowRight);
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV category 热门番组');
+    await press(tester, LogicalKeyboardKey.arrowDown);
     expect(channel(tester, 1).hasPrimaryFocus, isTrue);
     expect(app.popular.currentTag, '');
     await press(tester, LogicalKeyboardKey.arrowUp);
@@ -310,7 +318,7 @@ void main() {
   });
 
   testWidgets(
-      'UI01 ragged last row wraps and rail round-trip preserves scrolled position',
+      'UI01 ragged last row reaches functions and Hot without changing the catalog',
       (tester) async {
     final app = FocusFixtureApp(count: 31);
     await mount(tester, app);
@@ -332,12 +340,15 @@ void main() {
     await press(tester, LogicalKeyboardKey.arrowLeft);
     await press(tester, LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
-    expect(channel(tester, number).hasPrimaryFocus, isTrue);
-    expect(app.popular.scrollOffset, closeTo(offset, 1));
-    await press(tester, LogicalKeyboardKey.arrowRight);
+    expect(FocusManager.instance.primaryFocus?.debugLabel, 'TV category 热门番组');
+    expect(app.popular.scrollOffset, closeTo(offset, 1),
+        reason: 'Horizontal category focus does not move the vertical catalog');
+    expect(app.popular.currentTag, '');
+    await press(tester, LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
-    expect(FocusManager.instance.primaryFocus!.debugLabel,
-        startsWith('TV channel'));
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV channel 1');
+    expect(app.popular.scrollOffset, closeTo(0, 1),
+        reason: 'Entering the first row restores the native spotlight');
     expect(tester.takeException(), isNull);
   });
 
@@ -346,7 +357,7 @@ void main() {
     final app = FocusFixtureApp(count: 0);
     await mount(tester, app);
     final tab = tester.widget<TvFocusableSurface>(find.ancestor(
-        of: find.text('热门番组'), matching: find.byType(TvFocusableSurface)));
+        of: find.text('热门'), matching: find.byType(TvFocusableSurface)));
     tab.focusNode!.requestFocus();
     await tester.pumpAndSettle();
     await press(tester, LogicalKeyboardKey.arrowDown);
@@ -416,27 +427,57 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  Future<FocusNode?> pendingHistoryScroll(WidgetTester tester,
-      {bool fromMore = false}) async {
-    await mount(tester,
-        FocusFixtureApp(initialRoute: '/tab/history/', historyCount: 25));
-    tester
-        .widget<BangumiHistoryCardV>(find.byType(BangumiHistoryCardV).first)
-        .focusNode!
-        .requestFocus();
+  Future<({FocusNode origin, FocusNode cardFocus, String targetKey})>
+      pendingHistoryScroll(WidgetTester tester, {bool fromMore = false}) async {
+    final app =
+        FocusFixtureApp(initialRoute: '/tab/history/', historyCount: 25);
+    await mount(tester, app);
+    final historyPage = find.byType(HistoryPage);
+    final grid = tester.widget<SliverGrid>(
+        find.descendant(of: historyPage, matching: find.byType(SliverGrid)));
+    final delegate =
+        grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+    final scroll = tester.widget<CustomScrollView>(find.descendant(
+        of: historyPage, matching: find.byType(CustomScrollView)));
+    final position = scroll.controller!.position;
+    final topPadding = (scroll.slivers.first as SliverPadding)
+        .padding
+        .resolve(TextDirection.ltr)
+        .top;
+    final rowHeight = delegate.mainAxisExtent!;
+    final rowStride = rowHeight + delegate.mainAxisSpacing;
+    // The desktop navigation changes the content viewport. Start from its last
+    // fully visible row so DOWN truly remains pending, regardless of density.
+    final row = ((position.viewportDimension - topPadding - rowHeight) /
+            rowStride)
+        .floor()
+        .clamp(
+            0, (app.history.histories.length - 1) ~/ delegate.crossAxisCount);
+    final index = row * delegate.crossAxisCount;
+    final history = app.history.histories[index];
+    final card = tester.widget<BangumiHistoryCardV>(find.byWidgetPredicate(
+        (widget) =>
+            widget is BangumiHistoryCardV &&
+            widget.historyItem.key == history.key));
+    card.focusNode!.requestFocus();
     await tester.pumpAndSettle();
-    for (var i = 0; i < 2; i++) {
-      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-      await tester.pumpAndSettle();
-    }
     if (fromMore) {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
     }
-    final origin = FocusManager.instance.primaryFocus;
+    final origin = FocusManager.instance.primaryFocus!;
+    final target = tvGridTarget(index, app.history.histories.length,
+        delegate.crossAxisCount, TraversalDirection.down);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump(const Duration(milliseconds: 10));
-    return origin;
+    expect(position.isScrollingNotifier.value, isTrue,
+        reason: 'This regression requires a pending viewport scroll.');
+    expect(FocusManager.instance.primaryFocus, same(origin));
+    return (
+      origin: origin,
+      cardFocus: card.focusNode!,
+      targetKey: app.history.histories[target].key,
+    );
   }
 
   testWidgets('UI04 pending DOWN cannot steal newer RIGHT More focus',
@@ -453,10 +494,10 @@ void main() {
 
   testWidgets('UI04 pending DOWN from More cannot steal newer local LEFT',
       (tester) async {
-    await pendingHistoryScroll(tester, fromMore: true);
+    final pending = await pendingHistoryScroll(tester, fromMore: true);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     final latest = FocusManager.instance.primaryFocus;
-    expect(latest?.debugLabel, 'TV history 本地测试源5::online');
+    expect(latest, same(pending.cardFocus));
     await tester.pumpAndSettle();
     expect(FocusManager.instance.primaryFocus, same(latest));
   });
@@ -498,14 +539,14 @@ void main() {
 
   testWidgets('UI04 repeated pending DOWN still realizes target',
       (tester) async {
-    await pendingHistoryScroll(tester);
+    final pending = await pendingHistoryScroll(tester);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump(const Duration(milliseconds: 10));
     await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowDown);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
     expect(FocusManager.instance.primaryFocus?.debugLabel,
-        'TV history 本地测试源7::online');
+        'TV history ${pending.targetKey}');
     expect(tester.takeException(), isNull);
   });
 

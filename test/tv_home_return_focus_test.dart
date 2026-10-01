@@ -96,8 +96,11 @@ void main() {
   testWidgets('home return retains viewport anchor and its pixel offset',
       (tester) async {
     final app = await _mount(tester);
-    final stride = tester.getSize(_card(1)).height + StyleString.cardSpace - 2;
-    _scroll(tester).jumpTo(stride * 3 + 30);
+    final firstTop = tester.getTopLeft(_card(1)).dy;
+    final stride = tester.getTopLeft(_card(7)).dy - firstTop;
+    final header = tester.getRect(find.descendant(
+        of: find.byType(PopularPage), matching: find.byType(AppBar)));
+    _scroll(tester).jumpTo(firstTop + stride * 3 - header.bottom + 30);
     await tester.pumpAndSettle();
     // Row four is fully visible; row three is partially hidden by the fixed
     // category toolbar. Focus and the first visible poster have distinct ids.
@@ -140,9 +143,12 @@ void main() {
     await tester.pumpAndSettle();
     await _back(tester);
     expect(_focus(tester, 3).hasPrimaryFocus, isTrue);
-    expect(
-        tester.getRect(_card(3)).overlaps(const Rect.fromLTWH(0, 88, 960, 452)),
-        isTrue);
+    final card = tester.getRect(_card(3));
+    final viewport = tester.getRect(_view);
+    final header = tester.getRect(find.descendant(
+        of: find.byType(PopularPage), matching: find.byType(AppBar)));
+    expect(card.top, greaterThanOrEqualTo(header.bottom - .5));
+    expect(card.bottom, lessThanOrEqualTo(viewport.bottom + .5));
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.pumpAndSettle();
     expect(app.openedInfoIds, [3, 3]);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:kazumi/bean/card/bangumi_info_card.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
@@ -23,7 +24,7 @@ BangumiItem _item() => BangumiItem(
       type: 2,
       name: 'A long anime title that remains readable beside the poster',
       nameCn: '',
-      summary: '',
+      summary: 'The TV synopsis stays readable beside the native-size cover.',
       airDate: '2026-09-05',
       airWeekday: 6,
       rank: 123,
@@ -164,6 +165,12 @@ void main() {
       expect(play.top, greaterThan(title.bottom));
       expect(play.bottom, lessThan(poster.bottom));
       expect(playFocus.hasPrimaryFocus, isTrue);
+      expect(find.byType(BarChart), findsNothing);
+      expect(find.textContaining('评分 8.1'), findsOneWidget);
+      expect(tester.getRect(find.text(_item().summary)).left,
+          greaterThan(poster.right));
+      expect(tester.getRect(find.text(_item().summary)).top,
+          greaterThan(play.bottom));
       expect(find.byType(FloatingActionButton), findsNothing);
       await tester.sendKeyEvent(LogicalKeyboardKey.select);
       await tester.pump();
