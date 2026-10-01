@@ -27,6 +27,7 @@ import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 import 'package:kazumi/services/player/pip_utils.dart';
+import 'package:kazumi/services/player/online_history_resume.dart';
 import 'package:kazumi/services/player/timed_shutdown_service.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
@@ -204,22 +205,18 @@ class _VideoPageState extends State<VideoPage>
   void _initOnlineMode() {
     videoPageController.historyOffset = 0;
 
-    var progress = historyController.lastWatching(
-        videoPageController.bangumiItem,
-        videoPageController.currentPlugin.name);
-    if (progress != null) {
-      if (videoPageController.roadList.length > progress.road) {
-        if (videoPageController.roadList[progress.road].data.length >=
-            progress.episode) {
-          videoPageController.resetEpisodeState(
-            episode: progress.episode,
-            road: progress.road,
-          );
-          if (playResume) {
-            videoPageController.historyOffset = progress.progress.inSeconds;
-          }
-        }
-      }
+    final resume = resolveOnlineHistoryResume(
+      history: historyController.getHistory(videoPageController.bangumiItem,
+          videoPageController.currentPlugin.name),
+      roads: videoPageController.roadList,
+      baseUrl: videoPageController.currentPlugin.baseUrl,
+      currentSrc: videoPageController.src,
+      playResume: playResume,
+    );
+    if (resume != null) {
+      videoPageController.resetEpisodeState(
+          episode: resume.episode, road: resume.road);
+      videoPageController.historyOffset = resume.offset;
     }
     _showTabBodyImmediately();
 

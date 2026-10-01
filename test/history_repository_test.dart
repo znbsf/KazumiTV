@@ -8,6 +8,8 @@ import 'package:kazumi/modules/bangumi/bangumi_tag.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/repositories/history_repository.dart';
 import 'package:kazumi/services/storage/history_storage_coordinator.dart';
+import 'package:kazumi/pages/history/history_controller.dart';
+import 'package:kazumi/services/player/playback_history_recorder.dart';
 
 void main() {
   late Directory tempDir;
@@ -34,6 +36,33 @@ void main() {
   });
 
   group('HistoryRepository source metadata', () {
+    test('failed local write stays retryable through the real repository contract',
+        () async {
+      final box = _FailOnceBox(historiesBox);
+      final repository = HistoryRepository(historiesBox: box,
+          privateModeReader: () => false, progressSyncAppender: _noopHistorySync);
+      final controller = HistoryController(repository);
+      final identity = PlaybackHistoryIdentity.online(bangumiItem: _item(19),
+          pluginName: 'plugin', episodeNumber: 2, episodeTitle: 'EP2', road: 0,
+          onlineBangumiSrc: '/subject', episodePageUrl: '/ep/2');
+      final recorder = PlaybackHistoryRecorder((position, duration) =>
+          controller.updateHistory(identity, position, duration: duration));
+      Future<void> sample() => recorder.record(
+          position: const Duration(seconds: 18),
+          duration: const Duration(minutes: 24), playing: true);
+      await expectLater(sample(), throwsStateError);
+      expect(historiesBox.values, isEmpty);
+      await sample();
+      expect(box.attempts, 2);
+      await historiesBox.flush();
+      await historiesBox.close();
+      historiesBox = await Hive.openBox<History>('histories');
+      final restored = HistoryRepository(historiesBox: historiesBox,
+          privateModeReader: () => false, progressSyncAppender: _noopHistorySync);
+      final saved = restored.getHistory('plugin', identity.bangumiItem)!;
+      expect(saved.episodePageUrl, '/ep/2');
+      expect(saved.progresses[2]!.progress, const Duration(seconds: 18));
+    });
     test('keeps online source isolated from offline history', () async {
       final repository = HistoryRepository(
         historiesBox: historiesBox,
@@ -273,6 +302,26 @@ void main() {
       expect(reconciliationStarted, isTrue);
     });
   });
+}
+
+class _FailOnceBox implements Box<History> {
+  _FailOnceBox(this.delegate);
+  final Box<History> delegate;
+  int attempts = 0;
+  @override
+  History? get(dynamic key, {History? defaultValue}) =>
+      delegate.get(key, defaultValue: defaultValue);
+  @override
+  Iterable<History> get values => delegate.values;
+  @override
+  Future<void> put(dynamic key, History value) async {
+    if (++attempts == 1) throw StateError('local storage unavailable');
+    await delegate.put(key, value);
+  }
+  @override
+  Future<void> delete(dynamic key) => delegate.delete(key);
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 Future<void> _noopHistorySync({

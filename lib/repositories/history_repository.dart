@@ -48,6 +48,7 @@ abstract class IHistoryRepository {
   /// [progress] 观看进度
   /// [duration] 视频总时长；距结尾 [nearEndWatchedThreshold] 以内的进度视为
   /// 已看完，归零保存。传 [Duration.zero] 表示时长未知，不做该判断
+  /// Throws on local write failure so the caller can retry the same snapshot.
   Future<void> updateHistory({
     required PlaybackHistoryIdentity identity,
     required Duration progress,
@@ -294,6 +295,7 @@ class HistoryRepository implements IHistoryRepository {
           error: e,
           stackTrace: stackTrace,
         );
+        rethrow;
       }
     });
   }

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/platform/owned_method_channel.dart';
 
 typedef PlayerShortcutAction = FutureOr<void> Function();
 typedef PlayerNavigationKeyHandler = bool Function(LogicalKeyboardKey key);
@@ -55,6 +56,10 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
   static const _tvRemoteChannel = MethodChannel(
     'com.predidit.kazumi/tv_remote',
   );
+  static final _tvRemoteOwners = OwnedMethodChannel(_tvRemoteChannel,
+      onActiveChanged: (active) => unawaited(_tvRemoteChannel.invokeMethod<void>(
+          'setPlayerActive', {'active': active})));
+  MethodChannelLease? _tvRemoteLease;
   late Map<String, List<String>> _shortcuts;
   final Map<LogicalKeyboardKey, PlayerLongPressShortcutActions>
       _activeLongPressKeys =
@@ -66,11 +71,7 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
     _shortcuts = widget.shortcuts ?? _loadShortcuts();
     FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
     if (TvMode.enabled) {
-      _tvRemoteChannel.setMethodCallHandler(_handleTvRemoteMethod);
-      unawaited(_tvRemoteChannel.invokeMethod<void>(
-        'setPlayerActive',
-        const {'active': true},
-      ));
+      _tvRemoteLease = _tvRemoteOwners.claim(_handleTvRemoteMethod);
     }
   }
 
@@ -85,13 +86,7 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
   @override
   void dispose() {
     FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
-    if (TvMode.enabled) {
-      _tvRemoteChannel.setMethodCallHandler(null);
-      unawaited(_tvRemoteChannel.invokeMethod<void>(
-        'setPlayerActive',
-        const {'active': false},
-      ));
-    }
+    _tvRemoteLease?.release();
     _releaseAllLongPressShortcuts();
     super.dispose();
   }

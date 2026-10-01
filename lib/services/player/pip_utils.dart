@@ -1,12 +1,19 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:kazumi/utils/device.dart';
+import 'package:kazumi/services/platform/owned_method_channel.dart';
 
 class PipUtils {
-  static bool androidPIPInited = false;
+  static final _pipOwners = OwnedMethodChannel(
+    const MethodChannel('com.predidit.kazumi/pip'),
+    onActiveChanged: (active) =>
+        unawaited(setAndroidPIPInPlayerPage(active)),
+  );
+  static bool get androidPIPInited => _pipOwners.hasOwners;
 
   // 比例约分
   static Size getPIPAspectSize({required int width, required int height}) {
@@ -132,15 +139,12 @@ class PipUtils {
     await windowManager.center();
   }
 
-  static void initPipHandler({
+  static MethodChannelLease initPipHandler({
     required Future<void> Function(String action) onAction,
     required void Function(bool inPipMode) onModeChanged,
+    void Function()? onActivated,
   }) {
-    const MethodChannel pipChannel = MethodChannel('com.predidit.kazumi/pip');
-    if (androidPIPInited) return;
-    androidPIPInited = true;
-
-    pipChannel.setMethodCallHandler((call) async {
+    return _pipOwners.claim((call) async {
       if (!Platform.isAndroid) {
         return;
       }
@@ -160,12 +164,10 @@ class PipUtils {
             await onAction(action);
           }
       }
-    });
+    }, onActivated: onActivated);
   }
 
-  static void disposePipHandler() {
-    const MethodChannel pipChannel = MethodChannel('com.predidit.kazumi/pip');
-    pipChannel.setMethodCallHandler(null);
-    androidPIPInited = false;
+  static void disposePipHandler(MethodChannelLease lease) {
+    lease.release();
   }
 }

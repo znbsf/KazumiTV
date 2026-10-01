@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:kazumi/pages/player/player_item_panel.dart';
 import 'package:kazumi/pages/player/player_keyboard_shortcuts.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/platform/owned_method_channel.dart';
 import 'package:kazumi/pages/player/controller/player_super_resolution.dart';
 import 'package:kazumi/pages/player/player_panel_hold.dart';
 import 'package:kazumi/pages/player/player_pointer_interaction.dart';
@@ -13,6 +14,7 @@ import 'package:kazumi/pages/player/syncplay_sheet.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/player/pip_utils.dart';
+import 'package:kazumi/services/player/pip_entry_request.dart';
 import 'package:kazumi/services/player/android_video_output.dart';
 import 'package:kazumi/services/sync/webdav.dart';
 import 'package:flutter/services.dart';
@@ -147,6 +149,8 @@ class _PlayerItemState extends State<PlayerItem>
   Rect? _lastPipSourceRect;
   bool _pipSourceRectSyncScheduled = false;
   bool _pipEnterRequested = false;
+  bool _pipEntryInFlight = false;
+  MethodChannelLease? _pipLease;
   late mobx.ReactionDisposer _playerSizeListener;
 
   late mobx.ReactionDisposer _fullscreenListener;
@@ -186,7 +190,7 @@ class _PlayerItemState extends State<PlayerItem>
   }
 
   Future<void> _syncAndroidAutoEnterPIPSetting() async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid || !(_pipLease?.isCurrent ?? false)) {
       return;
     }
     final bool autoEnterPIPEnabled =
@@ -201,22 +205,8 @@ class _PlayerItemState extends State<PlayerItem>
     }
   }
 
-  Future<void> _syncAndroidPIPPlayerPageState(bool inPlayerPage) async {
-    if (!Platform.isAndroid) {
-      return;
-    }
-    try {
-      await PipUtils.setAndroidPIPInPlayerPage(inPlayerPage);
-    } catch (e) {
-      KazumiLogger().w(
-        'PlayerItem: failed to sync android pip player page state',
-        error: e,
-      );
-    }
-  }
-
   Future<void> _updateAndroidPIPActions({bool force = false}) async {
-    if (!Platform.isAndroid) {
+    if (!Platform.isAndroid || !(_pipLease?.isCurrent ?? false)) {
       return;
     }
     final bool playing = playerController.playback.playing;
@@ -282,36 +272,35 @@ class _PlayerItemState extends State<PlayerItem>
 
   // Remove controls before PiP entry to avoid rebuilding during the resize animation.
   Future<void> enterAndroidPictureInPicture() async {
-    if (!Platform.isAndroid || !mounted) {
+    final lease = _pipLease;
+    if (!Platform.isAndroid || !mounted || lease == null ||
+        !lease.isCurrent || _pipEntryInFlight || _pipEnterRequested) {
       return;
     }
-    final bool supported = await PipUtils.isAndroidPIPSupported();
-    if (!mounted) {
-      return;
+    final ownsRequest = lease.captureOwnership();
+    _pipEntryInFlight = true;
+    try {
+      final result = await requestPictureInPicture(
+        isCurrent: () => mounted && ownsRequest(),
+        isSupported: PipUtils.isAndroidPIPSupported,
+        waitForFrame: () => WidgetsBinding.instance.endOfFrame,
+        updateActions: () => _updateAndroidPIPActions(force: true),
+        enter: () => PipUtils.enterAndroidPIPWindow(
+            width: playerController.debug.playerWidth,
+            height: playerController.debug.playerHeight),
+        onRequested: (requested) {
+          if (mounted) setState(() => _pipEnterRequested = requested);
+        },
+      );
+      if (!mounted || !ownsRequest()) return;
+      if (result == PipEntryResult.unsupported) {
+        KazumiDialog.showToast(message: '当前设备不支持画中画');
+      } else if (result == PipEntryResult.failed) {
+        KazumiDialog.showToast(message: '进入画中画失败');
+      }
+    } finally {
+      _pipEntryInFlight = false;
     }
-    if (!supported) {
-      KazumiDialog.showToast(message: '当前设备不支持画中画');
-      return;
-    }
-    setState(() {
-      _pipEnterRequested = true;
-    });
-    await WidgetsBinding.instance.endOfFrame;
-    if (!mounted) {
-      return;
-    }
-    await _updateAndroidPIPActions(force: true);
-    final bool entered = await PipUtils.enterAndroidPIPWindow(
-      width: playerController.debug.playerWidth,
-      height: playerController.debug.playerHeight,
-    );
-    if (entered || !mounted) {
-      return;
-    }
-    KazumiDialog.showToast(message: '进入画中画失败');
-    setState(() {
-      _pipEnterRequested = false;
-    });
   }
 
   void _handleAndroidPIPModeChanged(bool inPipMode) {
@@ -1246,11 +1235,14 @@ class _PlayerItemState extends State<PlayerItem>
             !videoPageController.loading &&
             historyIdentity != null &&
             historyIdentity.canRecord) {
-          historyController.updateHistory(
+          unawaited(historyController.updateHistory(
             historyIdentity,
             playerController.playback.playerPosition,
             duration: playerController.playback.playerDuration,
-          );
+          ).catchError((Object error, StackTrace stackTrace) {
+            KazumiLogger().w('PlayerItem: failed to save playback progress',
+                error: error, stackTrace: stackTrace);
+          }));
         }
       }
       final playingSelection = videoPageController.playbackEpisode;
@@ -1437,7 +1429,7 @@ class _PlayerItemState extends State<PlayerItem>
       },
     );
     if (Platform.isAndroid) {
-      PipUtils.initPipHandler(
+      _pipLease = PipUtils.initPipHandler(
         onAction: (action) async {
           if (!mounted) return;
 
@@ -1458,9 +1450,13 @@ class _PlayerItemState extends State<PlayerItem>
           await _updateAndroidPIPActions(force: true);
         },
         onModeChanged: _handleAndroidPIPModeChanged,
+        onActivated: () {
+          if (!mounted) return;
+          unawaited(_syncAndroidAutoEnterPIPSetting());
+          unawaited(_updateAndroidPIPActions(force: true));
+        },
       );
       unawaited(_syncAndroidAutoEnterPIPSetting());
-      unawaited(_syncAndroidPIPPlayerPageState(true));
       unawaited(_updateAndroidPIPActions(force: true));
       _scheduleAndroidPIPSourceRectSync();
     }
@@ -1533,10 +1529,7 @@ class _PlayerItemState extends State<PlayerItem>
     _panelVisibilityController.dispose();
     _screenshotFeedbackController.dispose();
     _disposePlayerMenu();
-    if (Platform.isAndroid) {
-      unawaited(_syncAndroidPIPPlayerPageState(false));
-      PipUtils.disposePipHandler();
-    }
+    _pipLease?.release();
     playerController.panel.reset();
     super.dispose();
   }

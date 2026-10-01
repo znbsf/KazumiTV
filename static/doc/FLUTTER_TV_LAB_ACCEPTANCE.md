@@ -22,3 +22,6 @@
 版本：2.3.1-tv-lab.1+20303；ARMv7 分包实际 versionCode 为 203031（既有 ABI 编码规则）。启动器标签：KazumiTV Flutter Lab。APK SHA-256：`7dfcf3f4fc2262a8e1c2922e73015acdc6ce18767eff0b449119ff7f42533e59`。
 
 中文实施记录、逐次日志、JSON、patch、APK 与重跑脚本已保存在本机任务目录 `kazumi-flutter-tv-lab-20261001`；最终证据入口为 `evidence/final-result.json`、`README-接手.md`。没有部署、设备安装或替换 Kotlin main。
+
+
+后续架构迭代见 [本轮完整验收](FLUTTER_TV_ARCHITECTURE_ACCEPTANCE.md)：366 项最终测试通过，本页首轮数据与 APK 保留为历史验收点。
