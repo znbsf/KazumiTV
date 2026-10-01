@@ -6,6 +6,8 @@
 
 [下载原生正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.3.3) · [旧Flutter TV版](https://github.com/znbsf/KazumiTV/releases/tag/v2.3.1-tv-legacy.1) · [功能与验证台账](docs/MIGRATION-STATUS.md) · [下一步](docs/ROADMAP.md) · [本版验收](docs/RELEASE-ACCEPTANCE-20260927.md)
 
+**开发main（2026-10-01）** 已合入搜索/收藏/历史返回、备份/诊断回执保护与可取消读取，最终247项单测、Lint及生产/测试构建通过；实际焦点、SAF和Activity重建仍待设备验证，尚无CI检查记录。正式下载包保持0.3.3，未随main更新发布。[当前状态与前三目标](docs/PROJECT-STATUS-20261001.md) · [文档目录](docs/README.md) · [清理记录](docs/REPOSITORY-HYGIENE-20261001.md)
+
 本版（**0.3.3，code53**）：整合同集换线/换源、选集、历史续播与最近观看路径，更新单行导航和六列电视首页。发布前发现并修复“热门”离屏后从收藏向右导致的崩溃；最终 APK 经独立模拟器复测、短时真实播放及数据恢复核对，229 项单测和 Lint 通过。Android 9 电视证据来自此前集成候选，最新焦点修复在 Android 16 模拟器验证。详见[发行说明](docs/RELEASE-0.3.3-STABLE.md)、[验收与版本边界](docs/RELEASE-ACCEPTANCE-20260927.md)、[逐源矩阵](docs/PLAYBACK-P1-MATRIX-20260924.md)和[声画录制方法](docs/AV-ACCEPTANCE-20260927.md)。
 
 ## 界面
