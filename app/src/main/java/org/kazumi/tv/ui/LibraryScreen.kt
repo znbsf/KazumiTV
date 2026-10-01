@@ -56,7 +56,11 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
     val cancelFocus=remember { FocusRequester() }
     val list=rememberLazyListState()
     var selectedKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingReturn by rememberSaveable { mutableStateOf(false) }
     var selectedAction by rememberSaveable { mutableStateOf("resume") }
+    var viewportKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var viewportIndex by rememberSaveable { mutableIntStateOf(0) }
+    var viewportOffset by rememberSaveable { mutableIntStateOf(0) }
     val requesters=remember { mutableMapOf<String,FocusRequester>() }
     val detailRequesters=remember { mutableMapOf<String,FocusRequester>() }
     val history=rememberWatchHistory()
@@ -71,16 +75,28 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
         else if(managing && marked.isNotEmpty()) { withFrameNanos { }; withFrameNanos { }; deleteFocus.requestFocus() }
     }
     LaunchedEffect(revision) { if(revision>0) { withFrameNanos { }; managementFocus.requestFocus() } }
-    LaunchedEffect(selectedKey,selectedAction) {
+    LaunchedEffect(pendingReturn,selectedKey,selectedAction,rowKeys,managing) {
+        if(!pendingReturn)return@LaunchedEffect
         selectedKey?.let { key ->
-            val index=rowKeys.indexOf(key)
-            if(index>=0) {
-                list.scrollToItem(index); withFrameNanos { }; withFrameNanos { }
-                (if(selectedAction=="detail" && !managing)detailRequesters[key] else requesters[key])?.requestFocus()
-            }
+            val target=ReturnViewport.resolve(rowKeys,key,viewportKey,viewportIndex,viewportOffset,visible.map { it.key }.toSet())
+            if(target!=null) {
+                list.scrollToItem(target.scrollIndex,target.scrollOffset); withFrameNanos { }; withFrameNanos { }
+                if(list.layoutInfo.visibleItemsInfo.none { it.index==target.focusIndex }) {
+                    list.scrollToItem(target.focusIndex); withFrameNanos { }; withFrameNanos { }
+                }
+                val restoredKey=rowKeys[target.focusIndex]
+                (if(selectedAction=="detail" && !managing)detailRequesters[restoredKey] else requesters[restoredKey])?.requestFocus()
+            } else { withFrameNanos { }; managementFocus.requestFocus() }
         }
+        pendingReturn=false
     }
-    fun clearSelection() { marked=arrayListOf(); selectedKey=null; selectedAction="resume" }
+    fun clearSelection() { pendingReturn=false; marked=arrayListOf(); selectedKey=null; selectedAction="resume" }
+    fun select(entry:HistoryEntry,action:String) {
+        selectedAction=action; selectedKey=entry.key
+        pendingReturn=true
+        viewportIndex=list.firstVisibleItemIndex; viewportOffset=list.firstVisibleItemScrollOffset
+        viewportKey=rowKeys.getOrNull(viewportIndex)
+    }
     Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("历史 · ${visible.size} / ${history.size}",style=KazumiType.heading)
         if(confirm) {
@@ -123,7 +139,7 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                         Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                             Text("${group.label} · ${group.entries.size}条",style=KazumiType.title,modifier=Modifier.padding(vertical=8.dp))
                             if(grouping==HistoryGrouping.SUBJECT && !managing)PlayerAction("继续最近观看") {
-                                val latest=group.entries.first(); selectedAction="resume"; selectedKey=latest.key; onResume(latest)
+                                val latest=group.entries.first(); select(latest,"resume"); onResume(latest)
                             }
                         }
                     }
@@ -135,7 +151,7 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                             colors=ButtonDefaults.colors(containerColor=Color.Transparent,focusedContainerColor=Color.White.copy(alpha=.12f),contentColor=KazumiColors.text,focusedContentColor=KazumiColors.accent),
                             onClick={
                                 if(managing) marked=ArrayList(if(entry.key in marked)marked-entry.key else marked+entry.key)
-                                else { selectedAction="resume"; selectedKey=entry.key; onResume(entry) }
+                                else { select(entry,"resume"); onResume(entry) }
                             }) {
                             Column(Modifier.fillMaxWidth()) {
                                 Text("${if(managing) if(entry.key in marked) "已选 · " else "未选 · " else ""}${entry.subject.title} · ${entry.episode}",style=KazumiType.body,maxLines=1,overflow=TextOverflow.Ellipsis)
@@ -143,7 +159,7 @@ fun LibraryScreen(mode: String, onResume: (HistoryEntry) -> Unit, onSelect: (Sub
                             }
                         }
                         if(!managing)PlayerAction("番剧详情",Modifier.focusRequester(detailRequesters.getOrPut(entry.key) { FocusRequester() })) {
-                            selectedAction="detail"; selectedKey=entry.key; onSelect(entry.subject)
+                            select(entry,"detail"); onSelect(entry.subject)
                         }
                         }
                     }

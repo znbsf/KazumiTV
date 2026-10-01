@@ -48,6 +48,10 @@ internal fun CollectionScreen(onSelect: (Subject) -> Unit) {
     var confirmRemove by rememberSaveable { mutableStateOf(false) }
     var notice by remember { mutableStateOf<String?>(null) }
     var lastId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var pendingReturn by rememberSaveable { mutableStateOf(false) }
+    var viewportId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var viewportIndex by rememberSaveable { mutableIntStateOf(0) }
+    var viewportOffset by rememberSaveable { mutableIntStateOf(0) }
     var restore by remember { mutableStateOf(false) }
     val grid=rememberLazyGridState()
     val actions=remember { FocusRequester() }
@@ -64,11 +68,20 @@ internal fun CollectionScreen(onSelect: (Subject) -> Unit) {
     LaunchedEffect(choosing,confirmRemove,restore) {
         if(!choosing && !confirmRemove && restore) { withFrameNanos { }; actions.requestFocus(); restore=false }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(pendingReturn,entries,managing,choosing,confirmRemove) {
+        if(!pendingReturn || managing || choosing || confirmRemove)return@LaunchedEffect
         lastId?.let { id ->
-            val index=entries.indexOfFirst { it.subject.id==id }
-            if(index>=0) { grid.scrollToItem(index); withFrameNanos { }; withFrameNanos { }; itemFocus[id]?.requestFocus() }
+            val target=ReturnViewport.resolve(entries.map { it.subject.id },id,viewportId,viewportIndex,viewportOffset)
+            if(target!=null) {
+                grid.scrollToItem(target.scrollIndex,target.scrollOffset); withFrameNanos { }; withFrameNanos { }
+                if(grid.layoutInfo.visibleItemsInfo.none { it.index==target.focusIndex }) {
+                    grid.scrollToItem(target.focusIndex); withFrameNanos { }; withFrameNanos { }
+                }
+                val restoredId=entries[target.focusIndex].subject.id
+                itemFocus[restoredId]?.requestFocus(); lastId=restoredId
+            } else { withFrameNanos { }; actions.requestFocus(); lastId=null }
         }
+        pendingReturn=false
     }
     fun apply(type: CollectionType?) {
         val count=store.changeCollections(selected.toSet(),type)
@@ -95,15 +108,15 @@ internal fun CollectionScreen(onSelect: (Subject) -> Unit) {
         notice?.let { Text(it,style=KazumiType.caption) }
         store.warning()?.let { Text(it,style=KazumiType.caption) }
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            PlayerAction("分类：${type?.label ?: "全部"}") { category=(category+1)%6; selected=arrayListOf() }
-            PlayerAction("排序：${sort.label}") { sortIndex=(sortIndex+1)%CollectionSort.entries.size }
-            PlayerAction(if(managing) "结束管理" else "管理收藏",Modifier.focusRequester(actions)) { managing=!managing; selected=arrayListOf() }
+            PlayerAction("分类：${type?.label ?: "全部"}") { pendingReturn=false; category=(category+1)%6; selected=arrayListOf() }
+            PlayerAction("排序：${sort.label}") { pendingReturn=false; sortIndex=(sortIndex+1)%CollectionSort.entries.size }
+            PlayerAction(if(managing) "结束管理" else "管理收藏",Modifier.focusRequester(actions)) { pendingReturn=false; managing=!managing; selected=arrayListOf() }
             if(managing) {
                 PlayerAction("选择当前结果") { selected=ArrayList(entries.map { it.subject.id }) }
                 if(selected.isNotEmpty())PlayerAction("修改所选（${selected.size}）") { choosing=true }
             }
         }
-        BasicTextField(value=query,onValueChange={ query=it.take(100); selected=arrayListOf() },singleLine=true,
+        BasicTextField(value=query,onValueChange={ pendingReturn=false; query=it.take(100); selected=arrayListOf() },singleLine=true,
             textStyle=KazumiType.body.copy(color=KazumiColors.text),cursorBrush=SolidColor(KazumiColors.accent),
             modifier=Modifier.fillMaxWidth().background(KazumiColors.surface).padding(10.dp),
             decorationBox={ inner -> if(query.isEmpty())Text("搜索收藏名称 / 原名",style=KazumiType.body,color=KazumiColors.muted); inner() })
@@ -113,7 +126,13 @@ internal fun CollectionScreen(onSelect: (Subject) -> Unit) {
             items(entries,key={it.subject.id}) { entry ->
                 Card(onClick={
                     if(managing) selected=ArrayList(if(entry.subject.id in selected)selected-entry.subject.id else selected+entry.subject.id)
-                    else { lastId=entry.subject.id; onSelect(entry.subject) }
+                    else {
+                        lastId=entry.subject.id
+                        pendingReturn=true
+                        viewportIndex=grid.firstVisibleItemIndex; viewportOffset=grid.firstVisibleItemScrollOffset
+                        viewportId=entries.getOrNull(viewportIndex)?.subject?.id
+                        onSelect(entry.subject)
+                    }
                 },modifier=Modifier.height(200.dp).focusRequester(itemFocus.getOrPut(entry.subject.id) { FocusRequester() }),
                     colors=CardDefaults.colors(containerColor=KazumiColors.surface,focusedContainerColor=KazumiColors.selected),
                     scale=CardDefaults.scale(focusedScale=1.035f)) {

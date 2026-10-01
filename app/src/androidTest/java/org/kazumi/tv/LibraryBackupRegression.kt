@@ -33,6 +33,17 @@ object LibraryBackupRegression {
         prefs.edit().putString("favorites",old).commit()
         store.restoreBackup(archive,store.backupFingerprint()); store.setCollection(b,CollectionType.PLANNED)
         check(runCatching { store.undoRestore() }.isFailure); check(store.collections().size==2)
+        // A damaged undo snapshot must never replace either current container or the journal.
+        store.restoreBackup(archive,store.backupFingerprint())
+        val undo=prefs.getString("restore_before",null)!!
+        for(broken in listOf("not json","{\"version\":99,\"records\":[]}","[{\"key\":\"broken\"}]")) {
+            prefs.edit().putString("restore_before",org.json.JSONObject(undo).put("history",broken).toString()).commit()
+            val unchanged=prefs.all.toMap()
+            check(runCatching { store.undoRestore() }.isFailure)
+            check(unchanged==prefs.all)
+        }
+        prefs.edit().putString("restore_before",undo).commit()
+        store.undoRestore(); check(store.collections().size==2)
         val activity=test.startActivitySync(Intent(test.targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
         try {
             fun nodes():List<AccessibilityNodeInfo> {

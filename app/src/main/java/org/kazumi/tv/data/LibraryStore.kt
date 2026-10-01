@@ -149,6 +149,8 @@ class LibraryStore(context: Context) {
         val before=JSONObject(preferences.getString("restore_before",null) ?: error("没有可撤销的恢复"))
         val target=LibraryCodec.read(before.getString("favorites"),CollectionCodec::read)
         require(!target.damagedContainer && target.rejected==0) { "撤销副本的收藏损坏，已停止撤销" }
+        val historyTarget=LibraryCodec.read(before.getString("history"),LibraryCodec::history)
+        require(!historyTarget.damagedContainer && historyTarget.rejected==0) { "撤销副本的历史损坏，已停止撤销" }
         val changes=changesFor(collections(),target.records)
         check(preferences.edit().putString("collection_changes",changes).putString("favorites",before.getString("favorites")).putString("history",before.getString("history"))
             .remove("restore_before").remove("restore_after").remove("history_trash").commit()) { "撤销保存失败" }
