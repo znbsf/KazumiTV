@@ -97,6 +97,7 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
         _visibleRoad == road &&
         _roadFingerprint(road) == fingerprint;
     setState(() => _browserOpening = true);
+    var restoreBrowserFocus = false;
     try {
       if (_nativeEnabled && data.data.length <= 5000) {
         await widget.onNativeBrowserOpening?.call();
@@ -132,7 +133,7 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
             if (index >= 0) widget.onEpisodeSelected(index + 1, road);
             return;
           }
-          if (_browserFocus.context != null) _browserFocus.requestFocus();
+          restoreBrowserFocus = true;
           return;
         } on EpisodeBrowserUnavailable {
           if (!mounted || !current()) return;
@@ -147,11 +148,28 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
       if (!current()) return;
       if (index != null) {
         await _focusTvEpisode(index);
-      } else if (_browserFocus.context != null) {
-        _browserFocus.requestFocus();
+      } else {
+        restoreBrowserFocus = true;
       }
     } finally {
-      if (mounted) setState(() => _browserOpening = false);
+      if (mounted) {
+        setState(() => _browserOpening = false);
+        if (restoreBrowserFocus && current()) {
+          final request = ++_focusRequest;
+          // The button remains disabled until this frame rebuilds. Requesting
+          // focus earlier loses the cancellation return to the route's scope.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted &&
+                current() &&
+                request == _focusRequest &&
+                ModalRoute.of(context)?.isCurrent == true &&
+                _browserFocus.context != null &&
+                _browserFocus.canRequestFocus) {
+              _browserFocus.requestFocus();
+            }
+          });
+        }
+      }
     }
   }
 

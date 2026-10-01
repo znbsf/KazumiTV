@@ -237,9 +237,34 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
-  void _goBack() {
-    if (_outletKey.currentState?.maybePop() ?? false) return;
-    _exitSettings();
+  bool _returning = false;
+
+  // RouterOutlet.maybePop removes its page directly. Use its real Navigator
+  // instead so a pane's PopScope can cancel a preview or block an active write.
+  NavigatorState? _outletNavigator() {
+    NavigatorState? navigator;
+    void visit(Element element) {
+      if (navigator != null) return;
+      if (element is StatefulElement && element.state is NavigatorState) {
+        navigator = element.state as NavigatorState;
+        return;
+      }
+      element.visitChildElements(visit);
+    }
+
+    _outletKey.currentContext?.visitChildElements(visit);
+    return navigator;
+  }
+
+  Future<void> _goBack() async {
+    if (_returning) return;
+    _returning = true;
+    try {
+      if (await _outletNavigator()?.maybePop() ?? false) return;
+      if (mounted) _exitSettings();
+    } finally {
+      _returning = false;
+    }
   }
 
   void _exitSettings() {
@@ -256,7 +281,7 @@ class _SettingsPageState extends State<SettingsPage> {
           appBar: wide
               ? SysAppBar(
                   title: const Text('设置'),
-                  leading: BackButton(onPressed: _exitSettings),
+                  leading: BackButton(onPressed: _goBack),
                 )
               : null,
           body: SafeArea(
