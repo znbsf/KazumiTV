@@ -175,7 +175,11 @@ class FocusFixtureApp extends StatelessWidget {
           });
       c.route('/search/', child: (_, __) => SearchPage(controller: search));
       c.route('/info/',
-          child: (_, __) => const _FixtureDestination(label: '详情路由：本地测试'));
+          child: (_, state) {
+            final item = state.arguments;
+            if (item is BangumiItem) openedInfoIds.add(item.id);
+            return const _FixtureDestination(label: '详情路由：本地测试');
+          });
       c.route('/video/',
           child: (_, __) =>
               const _FixtureDestination(label: '续播路由：仅验证参数，不是真实视频'));
@@ -189,6 +193,7 @@ class FocusFixtureApp extends StatelessWidget {
   late final FocusHistoryRepository historyRepository;
   late final HistoryController history;
   final search = FocusSearchController();
+  final List<int> openedInfoIds = [];
   final collection = FocusCollectController();
   final playback = FocusPlaybackService();
 

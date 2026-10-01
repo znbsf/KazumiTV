@@ -72,11 +72,17 @@ class _SearchResultGrid extends StatelessWidget {
     required this.items,
     required this.width,
     required this.showRating,
+    required this.focusFor,
+    required this.onOpen,
+    required this.onLayout,
   });
 
   final List<BangumiItem> items;
   final double width;
   final bool showRating;
+  final FocusNode Function(int) focusFor;
+  final Future<void> Function(BangumiItem, int) onOpen;
+  final void Function(int, double, double) onLayout;
 
   @override
   Widget build(BuildContext context) {
@@ -103,34 +109,53 @@ class _SearchResultGrid extends StatelessWidget {
     final columns = math.max(2, (width / 180).floor());
     final cardWidth = (width - (columns - 1) * 12) / columns;
 
-    return SliverGrid.builder(
+    final extent = cardWidth / _SearchResultCard.coverAspectRatio +
+        titleHeight +
+        metadataHeight +
+        _SearchResultCard.titleSpacing +
+        _SearchResultCard.metadataSpacing +
+        6 +
+        (TvMode.enabled ? 10 : 0);
+    final grid = SliverGrid.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           crossAxisSpacing: 12,
           mainAxisSpacing: 20,
-          mainAxisExtent: cardWidth / _SearchResultCard.coverAspectRatio +
-              titleHeight +
-              metadataHeight +
-              _SearchResultCard.titleSpacing +
-              _SearchResultCard.metadataSpacing +
-              6 +
-              (TvMode.enabled ? 10 : 0)),
+          mainAxisExtent: extent),
+      findChildIndexCallback: TvMode.enabled
+          ? (key) {
+              if (key is! ValueKey<int>) return null;
+              final index = items.indexWhere((item) => item.id == key.value);
+              return index >= 0 ? index : null;
+            }
+          : null,
       itemCount: items.length,
       itemBuilder: (_, index) => _SearchResultCard(
+          key: TvMode.enabled ? ValueKey(items[index].id) : null,
           item: items[index],
+          focusNode: TvMode.enabled ? focusFor(items[index].id) : null,
+          onPressed: () => onOpen(items[index], index),
           showRating: showRating,
           titleHeight: titleHeight,
           titleStyle: titleStyle),
     );
+    if (!TvMode.enabled) return grid;
+    return SliverLayoutBuilder(builder: (_, constraints) {
+      onLayout(columns, extent + 20, constraints.precedingScrollExtent);
+      return grid;
+    });
   }
 }
 
 class _SearchResultCard extends StatelessWidget {
   const _SearchResultCard({
+    super.key,
     required this.item,
     required this.showRating,
     required this.titleHeight,
     required this.titleStyle,
+    required this.onPressed,
+    this.focusNode,
   });
 
   static const coverAspectRatio = 0.7;
@@ -142,6 +167,8 @@ class _SearchResultCard extends StatelessWidget {
   final bool showRating;
   final double titleHeight;
   final TextStyle titleStyle;
+  final VoidCallback onPressed;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +180,7 @@ class _SearchResultCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
-          onTap: () => context.pushNamed('/info/', arguments: item),
+          onTap: onPressed,
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             ClipRRect(
@@ -199,8 +226,9 @@ class _SearchResultCard extends StatelessWidget {
     );
     if (!TvMode.enabled) return card;
     return TvFocusableSurface(
+      focusNode: focusNode,
       focusScale: 1,
-      onPressed: () => context.pushNamed('/info/', arguments: item),
+      onPressed: onPressed,
       child: card,
     );
   }

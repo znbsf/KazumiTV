@@ -11,7 +11,7 @@
         android:name="android.software.gamepad"
         android:required="false" />
 
-    <application android:label="KazumiTV Legacy" android:banner="@drawable/tv_banner"
+    <application android:label="KazumiTV Flutter Lab" android:banner="@drawable/tv_banner"
         android:icon="@mipmap/ic_launcher" tools:replace="android:icon,android:label">
         <!-- A TV remote needs DOWN/UP timing for short/long BACK. Android 16
              predictive back consumes KEYCODE_BACK before Activity dispatch.

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 
@@ -42,6 +43,15 @@ class _SearchPageState extends State<SearchPage> {
   final _searchHeaderKey = GlobalKey();
   String? _submittedQuery;
   bool _managingHistory = false;
+  final _resultFocusNodes = <int, FocusNode>{};
+  final _emptyResultFocus = FocusNode(debugLabel: 'TV empty search filters');
+  List<BangumiItem> _visibleResults = [];
+  int _resultReturnEpoch = 0;
+  bool _openingResult = false;
+  bool _pruningResultFocus = false;
+  int _resultColumns = 1;
+  double _resultRowExtent = 0;
+  double _resultGridStart = 0;
 
   SearchPageController get _controller => widget.controller;
   bool get _hasSearched => _submittedQuery != null;
@@ -62,6 +72,11 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _resultReturnEpoch++;
+    for (final node in _resultFocusNodes.values) {
+      node.dispose();
+    }
+    _emptyResultFocus.dispose();
     _input.dispose();
     _inputFocus.dispose();
     _scroll.dispose();
@@ -76,6 +91,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _submit(String value) async {
+    _resultReturnEpoch++;
     final filters = SearchParser(value).toFilterState();
     final query = SearchParser.fromFilterState(filters);
     _inputFocus.unfocus();
@@ -100,6 +116,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _showFilters() async {
+    _resultReturnEpoch++;
     _inputFocus.unfocus();
     final result = await showAdaptiveBottomSheet<_SearchFilterResult>(
       context: context,
@@ -118,6 +135,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _imageSearch() async {
+    _resultReturnEpoch++;
     _inputFocus.unfocus();
     final result = await context.pushNamed('/search/image');
     if (!mounted || result is! String || result.isEmpty) return;
@@ -125,6 +143,7 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void _clearSearch() {
+    _resultReturnEpoch++;
     _inputFocus.unfocus();
     _writeInput('');
     setState(() {
@@ -274,6 +293,18 @@ class _SearchPageState extends State<SearchPage> {
         .where((item) =>
             !watched.contains(item.id) && !abandoned.contains(item.id))
         .toList();
+    _visibleResults = items;
+    if (TvMode.enabled && !_pruningResultFocus) {
+      _pruningResultFocus = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _pruningResultFocus = false;
+        if (!mounted) return;
+        final ids = _visibleResults.map((item) => item.id).toSet();
+        for (final id in _resultFocusNodes.keys.toList()) {
+          if (!ids.contains(id)) _resultFocusNodes.remove(id)?.dispose();
+        }
+      });
+    }
     final busy = _controller.isLoading;
     final failed = _controller.isTimeOut;
     final submitted = SearchParser(_submittedQuery!).toFilterState();
@@ -346,7 +377,10 @@ class _SearchPageState extends State<SearchPage> {
                     ? Icons.refresh_rounded
                     : Icons.visibility_outlined,
                 text: allItems.isEmpty ? (failed ? '重试' : '重新搜索') : '显示全部'),
-            TextButton(onPressed: _showFilters, child: const Text('调整筛选')),
+            TextButton(
+                focusNode: TvMode.enabled ? _emptyResultFocus : null,
+                onPressed: _showFilters,
+                child: const Text('调整筛选')),
           ],
         ))
       else
@@ -354,6 +388,13 @@ class _SearchPageState extends State<SearchPage> {
           items: items,
           width: width,
           showRating: GStorage.getSetting(SettingsKeys.showRating),
+          focusFor: _resultFocusFor,
+          onOpen: _openResult,
+          onLayout: (columns, rowExtent, start) {
+            _resultColumns = columns;
+            _resultRowExtent = rowExtent;
+            _resultGridStart = start;
+          },
         ),
       if (allItems.isNotEmpty || !failed)
         SliverToBoxAdapter(
@@ -386,9 +427,84 @@ class _SearchPageState extends State<SearchPage> {
     ];
   }
 
+  FocusNode _resultFocusFor(int id) => _resultFocusNodes.putIfAbsent(
+      id, () => FocusNode(debugLabel: 'TV search subject $id'));
+
+  // Detaching a FocusNode retains its old context. A non-null context alone
+  // does not mean a lazy grid child is still mounted and in the focus tree.
+  bool _resultFocusAttached(FocusNode node) =>
+      node.context?.mounted == true && node.parent != null;
+
+  bool _canRestoreResult(int epoch, String? query) =>
+      mounted &&
+      epoch == _resultReturnEpoch &&
+      query == _submittedQuery &&
+      _hasSearched &&
+      ModalRoute.of(context)?.isCurrent == true;
+
+  Future<void> _openResult(BangumiItem item, int index) async {
+    if (!TvMode.enabled) {
+      await context.pushNamed('/info/', arguments: item);
+      return;
+    }
+    if (_openingResult) return;
+    _openingResult = true;
+    final epoch = ++_resultReturnEpoch;
+    final query = _submittedQuery;
+    try {
+      await context.pushNamed('/info/', arguments: item);
+    } finally {
+      _openingResult = false;
+    }
+    // The covered page may have rebuilt with reordered or filtered results.
+    if (!mounted || epoch != _resultReturnEpoch) return;
+    await WidgetsBinding.instance.endOfFrame;
+    if (!_canRestoreResult(epoch, query)) return;
+    if (_visibleResults.isEmpty) {
+      if (_resultFocusAttached(_emptyResultFocus)) {
+        _emptyResultFocus.requestFocus();
+      }
+      return;
+    }
+    final selected = _visibleResults.indexWhere((value) => value.id == item.id);
+    final target = selected >= 0
+        ? selected
+        : index.clamp(0, _visibleResults.length - 1);
+    final node = _resultFocusFor(_visibleResults[target].id);
+    if (_scroll.hasClients && _resultRowExtent > 0) {
+      final rowTop =
+          _resultGridStart + target ~/ _resultColumns * _resultRowExtent;
+      final rowBottom = rowTop + _resultRowExtent - 20;
+      final position = _scroll.position;
+      // A kept-alive child can be mounted outside the viewport. Preserve the
+      // viewport only when the target is both attached and actually visible.
+      if (!_resultFocusAttached(node) ||
+          rowBottom <= position.pixels ||
+          rowTop >= position.pixels + position.viewportDimension) {
+        _scroll.jumpTo(rowTop.clamp(0, position.maxScrollExtent));
+        await WidgetsBinding.instance.endOfFrame;
+      }
+    }
+    if (!_canRestoreResult(epoch, query)) return;
+    // Results may change during the realization frame. Resolve again instead
+    // of retaining a node that the result projection may have disposed.
+    if (_visibleResults.isEmpty) {
+      if (_resultFocusAttached(_emptyResultFocus)) {
+        _emptyResultFocus.requestFocus();
+      }
+      return;
+    }
+    final latest = _visibleResults.indexWhere((value) => value.id == item.id);
+    final latestIndex = latest >= 0
+        ? latest
+        : index.clamp(0, _visibleResults.length - 1);
+    final current = _resultFocusFor(_visibleResults[latestIndex].id);
+    if (_resultFocusAttached(current)) current.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    final page = Scaffold(
       appBar: const SysAppBar(
           backgroundColor: Colors.transparent, title: Text('番剧搜索')),
       body: SafeArea(
@@ -431,6 +547,17 @@ class _SearchPageState extends State<SearchPage> {
                         ])),
             ]);
           })),
+    );
+    if (!TvMode.enabled) return page;
+    return Focus(
+      canRequestFocus: false,
+      onKeyEvent: (_, event) {
+        if (event is KeyDownEvent || event is KeyRepeatEvent) {
+          _resultReturnEpoch++;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: page,
     );
   }
 }
