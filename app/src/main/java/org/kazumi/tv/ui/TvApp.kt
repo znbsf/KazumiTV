@@ -987,7 +987,7 @@ private fun SettingsScreen(oled: Boolean, onOled: (Boolean) -> Unit, onSetup: ()
     var rules by remember { mutableStateOf(false) }
     BackHandler(rules) { rules = false }
     if (rules) { RulesScreen(); return }
-    var panel by remember { mutableStateOf<String?>(null) }
+    var panel by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(panel != null) { panel = null }
     if (panel != null) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {

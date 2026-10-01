@@ -2,6 +2,7 @@
 package org.kazumi.tv.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.LocalActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,8 +13,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import androidx.webkit.WebViewCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.*
 import org.kazumi.tv.data.DiagnosticLog
+import org.kazumi.tv.data.DocumentText
 import java.io.File
 
 /** Explicit export only. No network upload, playback titles, URLs, account data or private sinks. */
@@ -24,7 +27,11 @@ fun DiagnosticsScreen(log:DiagnosticLog=DiagnosticLog.shared) {
     val scope=rememberCoroutineScope()
     var status by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
-    var exportRaw by remember { mutableStateOf<String?>(null) }
+    val transfer:DocumentTransferViewModel=viewModel(key="diagnostics-document-transfer")
+    val activity=LocalActivity.current
+    DisposableEffect(transfer,activity) {
+        onDispose { if(activity?.isChangingConfigurations!=true)transfer.finish() }
+    }
     fun report():String=log.report(
         runCatching { context.packageManager.getPackageInfo(context.packageName,0).versionName.orEmpty() }.getOrDefault(""),
         runCatching { WebViewCompat.getCurrentWebViewPackage(context)?.versionName.orEmpty() }.getOrDefault(""),
@@ -39,25 +46,25 @@ fun DiagnosticsScreen(log:DiagnosticLog=DiagnosticLog.shared) {
         it.isFile&&it.name.matches(Regex("report-[0-9]+\\.json"))
     }?.sortedByDescending { it.name } ?: emptyList()
     val exporter=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        val raw=exportRaw;exportRaw=null
-        if(uri!=null && raw!=null)work {
+        val raw=transfer.takeExport()
+        if(uri==null)status="已取消导出" else if(raw==null)status="导出内容已失效，请重新导出" else work {
             withContext(Dispatchers.IO) {
-                context.contentResolver.openOutputStream(uri,"wt")?.bufferedWriter()?.use { it.write(raw) }
-                    ?: error("write unavailable")
+                DocumentText.write(raw) { context.contentResolver.openOutputStream(uri,"wt") }
             }
             status="已导出脱敏播放诊断"
-        } else status="已取消导出"
+        }
     }
     LazyColumn(Modifier.fillMaxSize(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item { Text("播放诊断",style=KazumiType.heading) }
         item { Text("仅记录本次应用进程中的解析阶段和播放错误码，最多200条、64 KiB。重启应用后内存记录清空；不含片名、网址、请求头、账号或网页内容。",style=KazumiType.caption) }
         item { Text("当前 ${events.size} 条。这里只覆盖播放诊断，不包含全部应用日志。",style=KazumiType.caption) }
         if(status.isNotBlank())item { Text(status,style=KazumiType.body) }
-        if(!busy && exportRaw==null) {
+        if(!busy && transfer.operation==null) {
             item { PlayerAction("导出脱敏诊断") {
-                exportRaw=report()
+                if(busy || !transfer.beginExport(report()))return@PlayerAction
                 try { exporter.launch("KazumiTV-playback-${System.currentTimeMillis()}.json") }
-                catch(_:android.content.ActivityNotFoundException) { exportRaw=null;status="此电视没有文件保存器，可保存本机诊断" }
+                catch(_:android.content.ActivityNotFoundException) { transfer.finish();status="此电视没有文件保存器，可保存本机诊断" }
+                catch(_:Exception) { transfer.finish();status="无法打开文件保存器，请重试" }
             } }
             item { PlayerAction("保存本机诊断") { val raw=report();work {
                 withContext(Dispatchers.IO) {

@@ -50,11 +50,12 @@ fun SearchScreen(model: SearchViewModel = viewModel(), onSelect: (Subject) -> Un
         if(model.restoreFocus) {
             // Retain the original anchor until the failed window can be retried.
             if(state.failedOffset!=null)return@LaunchedEffect
-            val selected=results.indexOfFirst { it.id==model.focusId }
-            val restoredAnchor=results.indexOfFirst { it.id==model.scrollAnchorId }
             if(results.isNotEmpty() && !state.loading) {
-                grid.scrollToItem(if(restoredAnchor>=0)restoredAnchor else selected.coerceAtLeast(0),
-                    if(restoredAnchor>=0)model.scrollOffset else 0)
+                val target=ReturnViewport.resolve(results.map { it.id },model.focusId,model.scrollAnchorId,
+                    model.scrollIndex,model.scrollOffset)!!
+                val selected=target.focusIndex
+                val selectedId=results[selected].id
+                grid.scrollToItem(target.scrollIndex,target.scrollOffset)
                 withFrameNanos { }; withFrameNanos { }
                 // Preserve the saved viewport. Scroll to the focused item only if
                 // changed server results moved it outside that viewport.
@@ -63,9 +64,10 @@ fun SearchScreen(model: SearchViewModel = viewModel(), onSelect: (Subject) -> Un
                         grid.scrollToItem(selected)
                         withFrameNanos { }; withFrameNanos { }
                     }
-                    focus[model.focusId]?.requestFocus()
+                    focus[selectedId]?.requestFocus()
                 }
                 model.restoreFocus=false
+                model.focusId=selectedId
             } else if(!state.loading && results.isEmpty()) {
                 model.restoreFocus=false
                 model.focusId=null
