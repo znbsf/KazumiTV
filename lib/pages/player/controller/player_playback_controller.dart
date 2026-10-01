@@ -41,7 +41,8 @@ final class _OwnedPlayer {
             ? null
             : PlaybackHistoryRecorder(writeHistory) {
     if (history != null) {
-      _playingSubscription = player.stream.playing.listen(history!.observePlaying);
+      _playingSubscription =
+          player.stream.playing.listen(history!.observePlaying);
     }
   }
 
@@ -128,50 +129,16 @@ abstract class _PlayerPlaybackController with Store {
   bool androidEnableOpenSLES = true;
   bool autoPlay = true;
   bool playerDebugMode = false;
+  bool androidEmulator = false;
   int buttonSkipTime = 80;
   int arrowKeySkipTime = 10;
 
-  static const _diagnosticProperties = <String>[
-    'hwdec-current',
-    'hwdec-interop',
-    'current-vo',
-    'current-gpu-context',
-    'video-params/pixelformat',
-    'video-params/hw-pixelformat',
-    'estimated-vf-fps',
-    'current-ao',
-    'audio-params/samplerate',
-    'audio-out-params/samplerate',
-    'avsync',
-    'audio-delay',
-    'total-avsync-change',
-    'mistimed-frame-count',
-    'vo-delayed-frame-count',
-    'vsync-ratio',
-    'demuxer-cache-duration',
-    'frame-drop-count',
-    'decoder-frame-drop-count',
-    'track-list',
-  ];
-
   Future<PlayerDiagnosticsSnapshot> readDiagnostics() async {
-    final player = mediaPlayer;
-    final properties = <String, String>{};
-    final platform = player?.platform;
-    if (player != null && platform is NativePlayer) {
-      for (final property in _diagnosticProperties) {
-        try {
-          final value = await platform.getProperty(property);
-          if (mediaPlayer != player) break;
-          properties[property] = value;
-        } catch (_) {
-          // mpv properties are intentionally best-effort: some values are
-          // unavailable until the first decoded/rendered frame.
-        }
-      }
-    }
-    return PlayerDiagnosticsSnapshot.fromProperties(
-      properties,
+    // NativePlayer.getProperty is a synchronous FFI call despite returning a
+    // Future. A stalled codec can block the UI isolate before a timeout runs.
+    // Use typed event snapshots; unreported native counters remain unknown.
+    return PlayerDiagnosticsSnapshot.fromCachedState(
+      mediaPlayer?.state ?? const PlayerState(),
       hardwareAccelerationEnabled: hAenable,
       configuredHardwareDecoder: hardwareDecoder,
     );
@@ -473,6 +440,12 @@ abstract class _PlayerPlaybackController with Store {
         final String androidVideoRenderer =
             GStorage.getSetting(SettingsKeys.androidVideoRenderer);
 
+        final isEmulator = await PlatformEnvironmentService.isAndroidEmulator();
+        if (!isCurrentPlayer(player)) {
+          return await _discardIfNotCurrent(candidate);
+        }
+        androidEmulator = isEmulator;
+
         if (androidVideoRenderer == 'auto') {
           // Android 14 及以上使用基于 Vulkan 的 MPV GPU-NEXT 视频输出，着色器性能更好
           // GPU-NEXT 需要 Vulkan 1.2 支持
@@ -486,9 +459,18 @@ abstract class _PlayerPlaybackController with Store {
             configuredOutput: androidVideoRenderer,
             isTv: TvMode.enabled,
             androidSdkVersion: androidSdkVersion,
+            isEmulator: androidEmulator,
           );
         }
         videoRenderer ??= androidVideoRenderer;
+        if (usesAndroidAutoSoftwareOutput(
+          configuredOutput: androidVideoRenderer,
+          isTv: TvMode.enabled,
+          isEmulator: androidEmulator,
+        )) {
+          hAenable = false;
+          hardwareDecoder = 'no';
+        }
       }
 
       if (videoRenderer == 'mediacodec_embed') {

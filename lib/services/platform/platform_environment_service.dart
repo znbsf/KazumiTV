@@ -7,6 +7,23 @@ class PlatformEnvironmentService {
   PlatformEnvironmentService._();
 
   static const _intentChannel = MethodChannel('com.predidit.kazumi/intent');
+  static const _videoChannel =
+      MethodChannel('com.alexmercerind/media_kit_video');
+
+  /// Reuse the frozen video plugin's own goldfish/ranchu detection. An explicit
+  /// hwdec bypasses its default emulator protection, so auto TV output must
+  /// consult the same capability before selecting an embedded codec Surface.
+  static Future<bool> isAndroidEmulator() async {
+    try {
+      return await _videoChannel.invokeMethod<bool>('Utils.IsEmulator') ??
+          false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException catch (e) {
+      KazumiLogger().w('Failed to detect Android emulator', error: e);
+      return false;
+    }
+  }
 
   static Future<bool> isInMultiWindowMode() async {
     if (!Platform.isAndroid) {

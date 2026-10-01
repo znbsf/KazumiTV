@@ -1,7 +1,36 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/pages/player/controller/player_diagnostics.dart';
+import 'package:media_kit/media_kit.dart';
 
 void main() {
+  test(
+      'cached typed events report selected codecs without inventing native values',
+      () {
+    final snapshot = PlayerDiagnosticsSnapshot.fromCachedState(
+        const PlayerState(
+          videoParams: VideoParams(pixelformat: 'yuv420p'),
+          audioParams: AudioParams(sampleRate: 48000),
+          track: Track(
+              video: VideoTrack('1', null, null),
+              audio: AudioTrack('2', null, null)),
+          tracks: Tracks(video: [
+            VideoTrack('1', null, null, codec: 'h264', fps: 24)
+          ], audio: [
+            AudioTrack('1', null, null, codec: 'mp3'),
+            AudioTrack('2', null, null, codec: 'aac')
+          ]),
+        ),
+        hardwareAccelerationEnabled: true,
+        configuredHardwareDecoder: 'mediacodec');
+    expect(snapshot.videoCodec, 'h264');
+    expect(snapshot.audioCodec, 'aac');
+    expect(snapshot.audioInputSampleRate, '48000');
+    expect(snapshot.activeHardwareDecoder, isEmpty);
+    expect(snapshot.audioOutput, isEmpty);
+    expect(snapshot.decoderDroppedFrames, isEmpty);
+    expect(snapshot.decodeRouteSummary, '实际解码未知 · 配置 mediacodec');
+    expect(snapshot.decodeRouteSummary, isNot(contains('MediaCodec 通路')));
+  });
   test('reports the active MediaCodec path separately from configuration', () {
     final snapshot = PlayerDiagnosticsSnapshot.fromProperties(
       {

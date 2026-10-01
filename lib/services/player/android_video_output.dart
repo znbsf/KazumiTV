@@ -5,8 +5,16 @@ String selectAndroidVideoOutput({
   required String configuredOutput,
   required bool isTv,
   required int androidSdkVersion,
+  bool isEmulator = false,
 }) {
   if (configuredOutput != 'auto') return configuredOutput;
+  if (usesAndroidAutoSoftwareOutput(
+    configuredOutput: configuredOutput,
+    isTv: isTv,
+    isEmulator: isEmulator,
+  )) {
+    return 'gpu';
+  }
   if (isTv) return 'mediacodec_embed';
   return androidSdkVersion >= 34 ? 'gpu-next' : 'gpu';
 }
@@ -14,7 +22,15 @@ String selectAndroidVideoOutput({
 bool usesAndroidDirectMediaCodecOutput({
   required String configuredOutput,
   required bool isTv,
+  bool isEmulator = false,
 }) {
   return configuredOutput == 'mediacodec_embed' ||
-      (configuredOutput == 'auto' && isTv);
+      (configuredOutput == 'auto' && isTv && !isEmulator);
 }
+
+bool usesAndroidAutoSoftwareOutput({
+  required String configuredOutput,
+  required bool isTv,
+  required bool isEmulator,
+}) =>
+    configuredOutput == 'auto' && isTv && isEmulator;

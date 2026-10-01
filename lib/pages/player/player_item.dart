@@ -273,8 +273,12 @@ class _PlayerItemState extends State<PlayerItem>
   // Remove controls before PiP entry to avoid rebuilding during the resize animation.
   Future<void> enterAndroidPictureInPicture() async {
     final lease = _pipLease;
-    if (!Platform.isAndroid || !mounted || lease == null ||
-        !lease.isCurrent || _pipEntryInFlight || _pipEnterRequested) {
+    if (!Platform.isAndroid ||
+        !mounted ||
+        lease == null ||
+        !lease.isCurrent ||
+        _pipEntryInFlight ||
+        _pipEnterRequested) {
       return;
     }
     final ownsRequest = lease.captureOwnership();
@@ -885,6 +889,7 @@ class _PlayerItemState extends State<PlayerItem>
       if (usesAndroidDirectMediaCodecOutput(
         configuredOutput: androidVideoRenderer,
         isTv: TvMode.enabled,
+        isEmulator: playerController.playback.androidEmulator,
       )) {
         await KazumiDialog.show(builder: (context) {
           return AlertDialog(
@@ -1235,11 +1240,13 @@ class _PlayerItemState extends State<PlayerItem>
             !videoPageController.loading &&
             historyIdentity != null &&
             historyIdentity.canRecord) {
-          unawaited(historyController.updateHistory(
+          unawaited(historyController
+              .updateHistory(
             historyIdentity,
             playerController.playback.playerPosition,
             duration: playerController.playback.playerDuration,
-          ).catchError((Object error, StackTrace stackTrace) {
+          )
+              .catchError((Object error, StackTrace stackTrace) {
             KazumiLogger().w('PlayerItem: failed to save playback progress',
                 error: error, stackTrace: stackTrace);
           }));

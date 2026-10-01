@@ -103,7 +103,8 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
       vsync: this,
     );
     _tabController.addListener(_handleTabChanged);
-    if (TvMode.enabled) {
+    if (TvMode.enabled &&
+        _tabController.index == VideoDetailsTab.status.index) {
       unawaited(_refreshDiagnostics());
     }
   }
@@ -118,6 +119,12 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
   void _handleTabChanged() {
     if (mounted) {
       setState(() {});
+      if (TvMode.enabled &&
+          _tabController.index == VideoDetailsTab.status.index &&
+          _diagnostics == null &&
+          !_loadingDiagnostics) {
+        unawaited(_refreshDiagnostics());
+      }
     }
   }
 

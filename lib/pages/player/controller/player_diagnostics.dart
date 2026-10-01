@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:media_kit/media_kit.dart';
 
 final class PlayerDiagnosticsSnapshot {
   const PlayerDiagnosticsSnapshot({
@@ -62,6 +63,36 @@ final class PlayerDiagnosticsSnapshot {
     );
   }
 
+  factory PlayerDiagnosticsSnapshot.fromCachedState(
+    PlayerState state, {
+    required bool hardwareAccelerationEnabled,
+    required String configuredHardwareDecoder,
+  }) {
+    final video = state.tracks.video
+        .where((track) => track.id == state.track.video.id)
+        .firstOrNull;
+    final audio = state.tracks.audio
+        .where((track) => track.id == state.track.audio.id)
+        .firstOrNull;
+    return PlayerDiagnosticsSnapshot.fromProperties({
+      if (state.videoParams.pixelformat != null)
+        'video-params/pixelformat': state.videoParams.pixelformat!,
+      if (state.videoParams.hwPixelformat != null)
+        'video-params/hw-pixelformat': state.videoParams.hwPixelformat!,
+      if (video?.fps != null) 'estimated-vf-fps': '${video!.fps}',
+      if (state.audioParams.sampleRate != null)
+        'audio-params/samplerate': '${state.audioParams.sampleRate}',
+      'track-list': jsonEncode([
+        if (video != null)
+          {'type': 'video', 'selected': true, 'codec': video.codec ?? ''},
+        if (audio != null)
+          {'type': 'audio', 'selected': true, 'codec': audio.codec ?? ''},
+      ]),
+    },
+        hardwareAccelerationEnabled: hardwareAccelerationEnabled,
+        configuredHardwareDecoder: configuredHardwareDecoder);
+  }
+
   final bool hardwareAccelerationEnabled;
   final String configuredHardwareDecoder;
   final String activeHardwareDecoder;
@@ -92,7 +123,7 @@ final class PlayerDiagnosticsSnapshot {
       return '软件解码 · 硬解已关闭';
     }
     if (activeHardwareDecoder.isEmpty) {
-      return '正在检测 · 配置 $configuredHardwareDecoder';
+      return '实际解码未知 · 配置 $configuredHardwareDecoder';
     }
     if (activeHardwareDecoder == 'no') {
       return '软件解码 · 已从 $configuredHardwareDecoder 回退';

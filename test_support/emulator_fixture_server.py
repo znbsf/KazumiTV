@@ -3,7 +3,7 @@
 No user account, provider scraping, playback mock, system proxy or firewall rule.
 Run: python test_support/emulator_fixture_server.py <synthetic.mp4> <evidence-dir>
 """
-import hashlib, http.server, json, pathlib, struct, sys, time, urllib.parse, zlib
+import hashlib, http.server, json, pathlib, re, struct, sys, time, urllib.parse, zlib
 media=pathlib.Path(sys.argv[1]).resolve()
 out=pathlib.Path(sys.argv[2]).resolve();out.mkdir(parents=True,exist_ok=True)
 assert media.is_file()
@@ -27,13 +27,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif uri.path=='/tracks.mp4':
             size=media.stat().st_size;start=0;end=size-1
             if self.headers.get('Range'):
-                r=self.headers['Range'].removeprefix('bytes=').split('-');start=int(r[0] or 0);end=min(int(r[1]) if r[1] else end,end)
+                match=re.fullmatch(r'bytes=(\d*)-(\d*)',self.headers['Range'])
+                if not match or not any(match.groups()):self.send_error(400);return
+                left,right=match.groups()
+                if not left:start=max(0,size-int(right))
+                else:start=int(left);end=min(int(right),end) if right else end
+                if start>=size or start>end:
+                    self.send_response(416);self.send_header('Content-Range',f'bytes */{size}');self.send_header('Content-Length','0');self.end_headers();return
             self.send_response(206 if self.headers.get('Range') else 200)
             self.send_header('Content-Type','video/mp4');self.send_header('Accept-Ranges','bytes')
             self.send_header('Content-Length',str(end-start+1))
             if self.headers.get('Range'): self.send_header('Content-Range',f'bytes {start}-{end}/{size}')
             self.end_headers()
-            with media.open('rb') as f: f.seek(start);self.wfile.write(f.read(end-start+1))
+            try:
+                with media.open('rb') as f: f.seek(start);self.wfile.write(f.read(end-start+1))
+            except (BrokenPipeError,ConnectionResetError):pass
             return
         else: self.send_error(404);return
         self.send_response(200);self.send_header('Content-Type',content);self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
