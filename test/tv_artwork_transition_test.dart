@@ -300,7 +300,7 @@ void main() {
     tvArtworkController.select(_item(1, aUrl));
     await tester.pumpWidget(_app(tester));
     await tester.pump(const Duration(milliseconds: 259));
-    expect(find.byType(RawImage), findsNothing);
+    expect(_frame(aUrl), findsNothing);
     await tester.pump(const Duration(milliseconds: 1));
     await _finish(tester, aReady, a);
     expect(_frame(aUrl), findsOneWidget);
@@ -478,7 +478,7 @@ void main() {
     expect(_fade(tester, oldUrl), closeTo(0, .000001));
     await tester.pump(const Duration(milliseconds: 16));
     expect(_frame(oldUrl), findsNothing);
-    expect(find.byType(RawImage), findsNothing);
+    expect(_frame(failedUrl), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

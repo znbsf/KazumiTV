@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:kazumi/bean/widget/tv_artwork_preparation.dart';
+import 'package:kazumi/bean/widget/tv_backdrop_overlay.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -188,10 +189,11 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
         builder: (context, constraints) {
-          _observeGeometry(TvArtworkGeometry(
+          final geometry = TvArtworkGeometry(
             constraints.biggest,
             MediaQuery.devicePixelRatioOf(context),
-          ));
+          );
+          _observeGeometry(geometry);
           return IgnorePointer(
             child: ColoredBox(
               color: widget.oled ? Colors.black : TvVisuals.background,
@@ -223,35 +225,7 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
                               artwork: _displayed!,
                             ),
                     ),
-                  if (!widget.oled)
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Color(0xCC101611),
-                            Color(0x85101611),
-                            Color(0x45101611),
-                            Color(0xB8101611),
-                          ],
-                          stops: [0, .24, .62, 1],
-                        ),
-                      ),
-                    ),
-                  if (!widget.oled)
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Color(0x45101611),
-                            Colors.transparent,
-                            Color(0x45101611),
-                          ],
-                          stops: [0, .55, 1],
-                        ),
-                      ),
-                    ),
+                  if (!widget.oled) TvBackdropOverlay(geometry: geometry),
                 ],
               ),
             ),
