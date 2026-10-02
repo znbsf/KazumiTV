@@ -1,7 +1,7 @@
 name: kazumi
 description: "A new Flutter project."
 publish_to: "none"
-version: 2.3.1-tv-ui-fusion.1+20308
+version: 2.3.1-tv-ui-fusion.2+20314
 
 environment:
   sdk: ">=3.3.4 <4.0.0"

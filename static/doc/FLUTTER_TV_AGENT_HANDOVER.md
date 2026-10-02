@@ -12,7 +12,7 @@
 
 工作区根：`C:/Users/hentai/Documents/Codex/2026-10-02/task`；独立 Git worktree：`Kazumi`；分支：`codex/flutter-tv-main-ui-fusion-20261002`；origin：`https://github.com/znbsf/KazumiTV.git`。
 
-已推送阶段：产品 UI `d3033a972f696a891bb39d33a365d5981200c197`，电视有限验收文档 `3045e580971af5d2c9a77ccb694aa106937884a0`，连接中断说明 `67c08c980d5e884e34f3d272962df98c04b5772b`。当前 HEAD 是最后一项；后续修复尚在工作区，不能把旧 SHA 当作新包源码。推送和 CI 状态必须再读取实际回执。
+已推送阶段：产品 UI `d3033a972f696a891bb39d33a365d5981200c197`，电视有限验收文档 `3045e580971af5d2c9a77ccb694aa106937884a0`，连接中断说明 `67c08c980d5e884e34f3d272962df98c04b5772b`，公开搜索与旧WebView修复 `24e341bb503ec71522a82dc07cf1e8ffa292da7a`。当前 HEAD 是最后一项；性能探针尚在工作区，不能把旧 SHA 当作新包源码。root已读取远端SHA一致；GitHub Actions该分支返回空列表，现有workflow使用PR/manual/release触发，无CI通过声明。推送和CI动态状态必须再读取实际回执。
 
 | 路径 | 用途 |
 |---|---|
@@ -20,7 +20,7 @@
 | `lib/pages/info/`, `lib/pages/video/` | 原详情与播放器 UI；业务和解码不另建一套 |
 | `lib/request/clients/bangumi_client.dart`, `lib/request/core/dio_factory.dart` | 元数据公开搜索、镜像路由 |
 | `lib/services/video_source/`, `lib/webview/video/` | 解析任务串行、当前请求、旧 WebView fallback、URL 交接 |
-| `lib/services/performance/tv_performance_probe.dart` | 默认关闭的有界 release 帧/输入采样；F9/F10 仅诊断包 |
+| `lib/services/performance/tv_performance_probe.dart` | 默认关闭的有界 release 帧/输入采样；F10切换开始/结束，F9保留兼容，仅诊断包 |
 | `test/`, `test_support/` | 已复用回归、受控合法 fixture 和 Node JS 执行模型 |
 | 根 `toolchain/` | 冻结 Flutter/SDK/pub/Gradle 缓存；不升级或改全局工具链 |
 | 根 `runtime/xiaomi-build/Kazumi` | 构建副本，不能当作编辑源码或新 worktree |
@@ -64,9 +64,9 @@ python -X utf8 xiaomi-fusion-observe.py NEW-UNIQUE-LABEL --shot --logs
 冻结基线构建只取旧 UI 提交，覆盖已验证的 main/probe 两个文件；**不要用这个命令构建修复后的最终包**。阶段安装回执/测量文件禁止覆盖，不能盲目重复已完成安装。最终/优化阶段需要真实已提交 SHA 和递增版本号，构建脚本会校验旧签名、独立包、ARMv7、原 libmpv 字节及安装门禁。
 
 ```powershell
-python -X utf8 build-tv-optimization.py baseline --commit 67c08c980d5e884e34f3d272962df98c04b5772b --version 2.3.1-tv-ui-perf-baseline.1+20309 --probe-overlay
-python -X utf8 install-tv-optimization.py baseline
-python -X utf8 measure-tv-optimization.py baseline settled --label BASELINE-UNIQUE-LABEL
+python -X utf8 build-tv-optimization.py baseline-chunks --commit 67c08c980d5e884e34f3d272962df98c04b5772b --version 2.3.1-tv-ui-perf-baseline.4+20312 --probe-overlay
+python -X utf8 install-tv-optimization.py baseline-chunks
+python -X utf8 measure-tv-optimization.py baseline-chunks settled --label BASELINE-UNIQUE-LABEL
 ```
 
 性能复现从首页相同分类/作品位置开始，另测 rapid/vertical，先确认前后作品身份和缓存状态。完整步骤、指标边界在根 `evidence/tv-optimization-20261002/PROTOCOL.md`。程序内 Stopwatch 与 FrameTiming 是实际指标，ADB命令耗时不能用作 UI 响应时间。
@@ -76,14 +76,14 @@ python -X utf8 measure-tv-optimization.py baseline settled --label BASELINE-UNIQ
 - 已交付 UI：模拟器 580/580 回归、页面/播放器受控媒体验收；实电视首页/分类/最近观看/详情/向下50号作品/返回焦点通过。原始截图和逐操作回执在根 `evidence/xiaomi-ui-fusion-20261002`，摘要见 [实电视有限验收](FLUTTER_TV_XIAOMI_UI_ACCEPTANCE.md)。
 - 第一电视包 `2.3.1-tv-ui-fusion.1` code203081，ARMv7 APK SHA256 `23377cd84215bd8fa0ab527204ea9579d66ec77c4c82a6a7b0fca25678899d40`，实际安装字节匹配，独立包 UID10074及数据/首装时间保留，原三个应用均未改。
 - 旧三个真实源进入播放器路由后都在 URL 交接前失败，不能宣称首帧/音画/播放闭环通过。搜索镜像401是构建未含私有镜像凭据的公开请求路由问题；同一匿名请求在电脑官方API200。新代码仅对无凭据的公开搜索精确端点走官方，保留TLS/可选Bearer/所有其他路由，不搜索凭据。
-- 新 early-event 订阅、WebView幂等脚本/当前页面session、iframe显式媒体URL和签名字节修复有局部回归；整合首轮619/619通过。Node的小DOM模型不等于WebView66，电脑接口200不等于电视搜索或播放通过。
-- 电视连接曾消失；本轮用同一已记录连接恢复并再次核验身份/原包。现在正进行 release 性能基线与修复验收，尚无改善百分比或真实源PASS。
+- 新 early-event 订阅、WebView幂等脚本/当前页面session、iframe显式媒体URL和签名字节修复有局部回归；当前源加单变量背景缓存候选完整624/624通过，静态分析0错误/0警告。Node的小DOM模型不等于WebView66，电脑接口200不等于电视搜索或播放通过。
+- 电视连接曾消失；本轮用同一已记录连接恢复并再次核验身份/原包。初始化/监听正常、方向键及F10到达、F9未到Flutter；不推断具体系统拦截原因。诊断日志实测每条1023字节截断，已将完整分片限制900字节。前三基线失败样本保留。当前203121原UI基线首遍完整：162帧/10键，build p95 5.322ms、raster p95 74.735ms，152/162 raster超约16.667ms预算，focus p95 20.758ms；所有采样丢失边界为0，首卡片身份返回正确。主候选只加静态背景RepaintBoundary；真实收益对照和播放验收尚未完成，不能把候选测试通过称为性能优化成功。
 
 原始证据入口：`evidence/fusion-checks`、`evidence/home-perf-diagnosis`、`evidence/metadata-search-401`、`evidence/source-event-race`、`evidence/legacy-webview-playback`、`evidence/tv-optimization-20261002`。以真实存在的文件和时间戳为准；某些诊断路径在最终交付时更新。保护快照 `evidence/optimization-protection-before.json` 和 `capture_protection.py` 对八原树记录 HEAD、NUL状态及脏文件哈希。
 
 ## 已知教训、运行任务与恢复
 
-先读旧实验 `融合过程与教训复盘-20261001.md` 及本轮来源索引。同步FFI诊断曾阻塞导致ANR，禁止重introduce；没有数据不要误称卡顿主因。底层解码只在直接阻断当前验收时有界排查，不重开31例深挖。图片clone不是像素复制，Sliver已有虚拟化/边界；背景改动必须基线归因后同场景比较。
+先读旧实验 `融合过程与教训复盘-20261001.md` 及本轮来源索引。同步FFI诊断曾阻塞导致ANR，禁止重新引入；没有数据不要误称卡顿主因。底层解码只在直接阻断当前验收时有界排查，不重开31例深挖。图片clone不是像素复制，Sliver已有虚拟化/边界；背景改动必须基线归因后同场景比较。
 
 Git推送曾因GH007邮箱隐私拒绝，已用先前成功提交的公开noreply身份处理，未改用户隐私或全局Git配置。已发布提交不重写；接手不要重新运行带旧HEAD断言的amend/finalize脚本。设备序列/命令回执、签名密钥、URL可能含token的原始日志仅本机私有保留，不复制进Git/公开报告。
 
@@ -100,7 +100,7 @@ Git推送曾因GH007邮箱隐私拒绝，已用先前成功提交的公开norepl
 
 ## 技术/资产来源与许可
 
-项目仓库根 [LICENSE](../../LICENSE) 为GPLv3。继承 Kazumi/FlutterTV、media-kit/libmpv 和已列版本；第三方各自许可仍适用，以lockfile、平台二进制来源和既有文档为准，不从项目GPL推断所有依赖许可。UI来自只读原生main源码和已有截图，未新增外部图片素材；真实封面/元数据为既有远程业务内容，不宣称拥有再发布权。受控fixture的来源/许可需要沿用现有样本记录，不把真实源“可访问”当作合法性证明。
+项目仓库根 [LICENSE](../../LICENSE) 为GPLv3。继承 Kazumi/FlutterTV、media-kit/libmpv 和已列版本；第三方各自许可仍适用，以lockfile、平台二进制来源和既有文档为准，不从项目GPL推断所有依赖许可。UI来自只读原生main源码和已有截图，未新增外部图片素材；真实封面/元数据为既有远程业务内容，不宣称拥有再发布权。受控fixture是本机合成样本（根 `evidence/fusion-fixture-server/fixture-media.json`，SHA256 `03783a50fa160a6dd47f5af0d40ce2a3a679796ad56c90cb9a9be3e568365b90`）；不把真实源可访问当作合法性证明。
 
 ## 可直接发给下一 Agent / 本地 Codex 的提示
 

@@ -155,23 +155,25 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
                       : Opacity(
                           key: ValueKey(_displayed),
                           opacity: _landscape ? 1 : .84,
-                          child: _landscape
-                              ? Image(
-                                  image: _displayed!,
-                                  fit: BoxFit.cover,
-                                  gaplessPlayback: true,
-                                )
-                              : ImageFiltered(
-                                  imageFilter: ui.ImageFilter.blur(
-                                    sigmaX: 16,
-                                    sigmaY: 16,
-                                  ),
-                                  child: Image(
+                          child: RepaintBoundary(
+                            child: _landscape
+                                ? Image(
                                     image: _displayed!,
                                     fit: BoxFit.cover,
                                     gaplessPlayback: true,
+                                  )
+                                : ImageFiltered(
+                                    imageFilter: ui.ImageFilter.blur(
+                                      sigmaX: 16,
+                                      sigmaY: 16,
+                                    ),
+                                    child: Image(
+                                      image: _displayed!,
+                                      fit: BoxFit.cover,
+                                      gaplessPlayback: true,
+                                    ),
                                   ),
-                                ),
+                          ),
                         ),
                 ),
               if (!widget.oled)
