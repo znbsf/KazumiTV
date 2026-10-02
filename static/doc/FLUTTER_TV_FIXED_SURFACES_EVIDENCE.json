@@ -38,6 +38,13 @@
       "reason": "No trusted user-authored instruction in the visible transcript authorizes this external disclosure/destination.",
       "requested_clarification": true,
       "bypassed": false
+    },
+    {
+      "action": "Push current 13 source/test/documentation files on codex/flutter-tv-main-ui-fusion-20261002 to https://github.com/znbsf/KazumiTV.git",
+      "status": "AUTO_REVIEW_REJECTED_BEFORE_EXECUTION",
+      "reason": "GitHub origin is not verified as a trusted destination and visible user authorization does not clearly cover this exact payload/destination.",
+      "bypassed": false,
+      "explicit_authorization_required": true
     }
   ],
   "artifact": {
@@ -78,5 +85,6 @@
       "scope": "EMULATOR_CONTROLLED_SAMPLE",
       "library_uploaded": false
     }
-  ]
+  ],
+  "candidate_push": "BLOCKED_BEFORE_EXECUTION_NOT_PUSHED"
 }
