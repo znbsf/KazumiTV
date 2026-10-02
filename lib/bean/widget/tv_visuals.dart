@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 /// TV visual tokens ported from native main KazumiTheme.kt (24bc50ef).
 abstract final class TvVisuals {
+  // A reversible diagnostic control; ordinary TV builds use the user's new
+  // fixed-background, larger-card preference without preparing backdrop images.
+  static const fixedSurfaces =
+      bool.fromEnvironment('KAZUMI_TV_FIXED_SURFACES', defaultValue: true);
   static const accent = Color(0xFFB8E8A4);
   static const background = Color(0xFF101611);
   static const surface = Color(0xFF1C261F);
@@ -46,7 +50,9 @@ abstract final class TvVisuals {
     return inherited.copyWith(
       brightness: Brightness.dark,
       colorScheme: scheme,
-      scaffoldBackgroundColor: Colors.transparent,
+      scaffoldBackgroundColor: fixedSurfaces
+          ? (oled ? Colors.black : background)
+          : Colors.transparent,
       canvasColor: surface,
       focusColor: accent.withValues(alpha: .24),
       hoverColor: accent.withValues(alpha: .12),

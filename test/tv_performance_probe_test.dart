@@ -105,6 +105,9 @@ void main() {
     expect(boundaries['duplicateFramesExcluded'], 1);
     final frames = report['frames']! as List;
     expect((frames.first as Map)['reportObservedAtUs'], 4000);
+    expect((frames.first as Map)['vsyncStartUs'], 2020000);
+    expect((frames.first as Map)['rasterFinishWallUs'], 1700000002020000);
+    expect((frames.last as Map)['vsyncStartUs'], 2040000);
     expect((frames.last as Map)['reportObservedAtUs'], 999000,
         reason: 'Delivery time must remain separate from execution durations.');
   });

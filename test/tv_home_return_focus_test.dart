@@ -97,23 +97,23 @@ void main() {
       (tester) async {
     final app = await _mount(tester);
     final firstTop = tester.getTopLeft(_card(1)).dy;
-    final stride = tester.getTopLeft(_card(7)).dy - firstTop;
+    final stride = tester.getTopLeft(_card(6)).dy - firstTop;
     final header = tester.getRect(find.descendant(
         of: find.byType(PopularPage), matching: find.byType(AppBar)));
     _scroll(tester).jumpTo(firstTop + stride * 3 - header.bottom + 30);
     await tester.pumpAndSettle();
     // Row four is fully visible; row three is partially hidden by the fixed
     // category toolbar. Focus and the first visible poster have distinct ids.
-    _focus(tester, 25).requestFocus();
+    _focus(tester, 21).requestFocus();
     await tester.pumpAndSettle();
-    final anchorTop = tester.getTopLeft(_card(19)).dy;
-    await _open(tester, 25);
+    final anchorTop = tester.getTopLeft(_card(16)).dy;
+    await _open(tester, 21);
     app.popular.trendList
-        .insertAll(0, List.generate(6, (i) => focusItem(101 + i)));
+        .insertAll(0, List.generate(5, (i) => focusItem(101 + i)));
     await tester.pumpAndSettle();
     await _back(tester);
-    expect(_focus(tester, 25).hasPrimaryFocus, isTrue);
-    expect(tester.getTopLeft(_card(19)).dy, closeTo(anchorTop, 1));
+    expect(_focus(tester, 21).hasPrimaryFocus, isTrue);
+    expect(tester.getTopLeft(_card(16)).dy, closeTo(anchorTop, 1));
     expect(tester.takeException(), isNull);
   });
 

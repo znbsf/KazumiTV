@@ -3,12 +3,14 @@ import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/info/info_tabview.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/utils/constants.dart';
 
 ui.Image _poster(Color color, int width, int height) {
   final recorder = ui.PictureRecorder();
@@ -57,6 +59,58 @@ void main() {
     NetworkImgLayer.clearTvCoverMemory();
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
+  });
+
+  testWidgets('sliding TV page covers the previous page throughout transition',
+      (tester) async {
+    _useLogicalPixels(tester);
+    tester.view.physicalSize = const Size(800, 600);
+    addTearDown(tester.view.resetPhysicalSize);
+    final navigator = GlobalKey<NavigatorState>();
+    final boundary = GlobalKey();
+    const incoming = ValueKey('incoming-page');
+    await tester.pumpWidget(RepaintBoundary(
+      key: boundary,
+      child: MaterialApp(
+        navigatorKey: navigator,
+        theme: TvVisuals.theme(ThemeData(
+          platform: TargetPlatform.android,
+          pageTransitionsTheme: pageTransitionsTheme2024,
+        )),
+        home: const Scaffold(
+            body: ColoredBox(color: Colors.red, child: SizedBox.expand())),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    navigator.currentState!.push(MaterialPageRoute<void>(
+        builder: (_) =>
+            const Scaffold(key: incoming, body: SizedBox.expand())));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 180));
+
+    Future<void> expectCovered() async {
+      final rect = tester.getRect(find.byKey(incoming));
+      expect(rect.left, greaterThan(0), reason: 'sample during the slide');
+      expect(rect.left, lessThan(720));
+      final render =
+          boundary.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      final frame = render.toImageSync();
+      final bytes = await tester.runAsync(() => frame.toByteData());
+      // Well inside the moving page, away from its edge shadow. The old red
+      // page is still painted underneath; it must not bleed into this pixel.
+      expect(bytes!.getUint32((400 * frame.width + 760) * 4), 0x101611FF);
+      frame.dispose();
+    }
+
+    await expectCovered();
+    await tester.pumpAndSettle();
+    navigator.currentState!.pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 180));
+    await expectCovered();
+    await tester.pumpAndSettle();
+    expect(find.byKey(incoming), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

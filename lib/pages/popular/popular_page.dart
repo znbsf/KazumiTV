@@ -80,7 +80,9 @@ class _PopularPageState extends State<PopularPage> {
   StreamSubscription<dynamic>? _historySubscription;
   double get _recentExtent => TvRecentWatch.items().isEmpty ? 0 : 44;
   double get _pinnedExtent => _tvToolbarHeight + _recentExtent;
-  double get _rowSpacing => TvMode.enabled ? 16 : StyleString.cardSpace - 2;
+  double get _rowSpacing => TvMode.enabled
+      ? (TvVisuals.fixedSurfaces ? 12 : 16)
+      : StyleString.cardSpace - 2;
   double get _introExtent => TvMode.enabled
       ? MediaQuery.textScalerOf(context).scale(74) + _recentExtent
       : 0;
@@ -776,7 +778,7 @@ class _PopularPageState extends State<PopularPage> {
       crossCount = 5;
     }
     if (width > LayoutBreakpoint.medium['width']!) {
-      crossCount = 6;
+      crossCount = TvMode.enabled && TvVisuals.fixedSurfaces ? 5 : 6;
     }
     return crossCount;
   }
@@ -790,7 +792,9 @@ class _PopularPageState extends State<PopularPage> {
           _loadingIndicatorHeight -
           2 * _gridPadding -
           (_rowSpacing);
-      return available / 2;
+      // Larger covers keep the next row visible as a scrolling cue. Focus
+      // restoration uses this same extent rather than an assumed row height.
+      return available / (TvVisuals.fixedSurfaces ? 1.65 : 2);
     }
     return MediaQuery.sizeOf(context).width / crossCount / 0.65 +
         MediaQuery.textScalerOf(context).scale(32.0);
@@ -1053,7 +1057,9 @@ class _PopularPageState extends State<PopularPage> {
           // 行间距
           mainAxisSpacing: _rowSpacing,
           // 列间距
-          crossAxisSpacing: TvMode.enabled ? 12 : StyleString.cardSpace,
+          crossAxisSpacing: TvMode.enabled
+              ? (TvVisuals.fixedSurfaces ? 8 : 12)
+              : StyleString.cardSpace,
           // 列数
           crossAxisCount: crossCount,
           mainAxisExtent: _gridItemExtent(crossCount),

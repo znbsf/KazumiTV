@@ -157,7 +157,8 @@ void main() {
     TvMode.setEnabledForTesting(false);
   });
 
-  testWidgets('home starts on Hot with one navigation row and six posters', (
+  testWidgets(
+      'home starts on Hot with one navigation row and five larger posters', (
     tester,
   ) async {
     await _mount(tester);
@@ -177,12 +178,12 @@ void main() {
     }
 
     final first = tester.getRect(_poster(1));
-    for (var number = 2; number <= 6; number++) {
+    for (var number = 2; number <= 5; number++) {
       final rect = tester.getRect(_poster(number));
       expect(rect.top, closeTo(first.top, .1));
       expect(rect.left, greaterThan(first.left));
     }
-    expect(tester.getRect(_poster(7)).top, greaterThan(first.bottom));
+    expect(tester.getRect(_poster(6)).top, greaterThan(first.bottom));
     final title = find.descendant(
       of: _poster(1),
       matching: find.text('本地测试番剧 1'),

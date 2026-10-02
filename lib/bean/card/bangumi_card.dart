@@ -5,6 +5,7 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 
 // 视频卡片 - 垂直布局
@@ -84,6 +85,14 @@ class BangumiCardV extends StatelessWidget {
                               child: image,
                             )
                           : image,
+                      if (TvVisuals.fixedSurfaces)
+                        const IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Color(0x0CFFFFFF),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         left: 0,
                         right: 0,
@@ -96,7 +105,8 @@ class BangumiCardV extends StatelessWidget {
                               end: Alignment.bottomCenter,
                               colors: [
                                 Colors.transparent,
-                                Colors.black.withValues(alpha: .94),
+                                Colors.black.withValues(
+                                    alpha: TvVisuals.fixedSurfaces ? .84 : .94),
                               ],
                             ),
                           ),
@@ -124,6 +134,17 @@ class BangumiCardV extends StatelessWidget {
                           left: 8,
                           top: 8,
                           child: _ChannelNumberBadge(number: channelNumber!),
+                        ),
+                      if (TvVisuals.fixedSurfaces)
+                        IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: const Color(0x26E8EEE5),
+                              ),
+                            ),
+                          ),
                         ),
                     ],
                   );

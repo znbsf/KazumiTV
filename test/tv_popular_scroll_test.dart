@@ -105,17 +105,18 @@ void main() {
     return app;
   }
 
-  testWidgets('TV home fits two complete rows including titles',
+  testWidgets('TV home shows a complete larger row and a following-row cue',
       (tester) async {
     await mount(tester);
     final viewport = tester.getRect(find.byType(CustomScrollView).first);
-    final last = tester.getRect(_poster(12));
+    final last = tester.getRect(_poster(5));
+    expect(tester.getRect(_poster(6)).top, lessThan(viewport.bottom));
     expect(last.bottom, lessThanOrEqualTo(viewport.bottom - 3));
     final image =
-        find.descendant(of: _poster(12), matching: find.byType(AspectRatio));
+        find.descendant(of: _poster(5), matching: find.byType(AspectRatio));
     expect(tester.widget<AspectRatio>(image.first).aspectRatio, 0.65);
     final badge = find.descendant(
-      of: _poster(12),
+      of: _poster(5),
       matching: find.byWidgetPredicate((widget) =>
           widget is DecoratedBox &&
           widget.decoration is BoxDecoration &&
@@ -247,11 +248,11 @@ void main() {
         // Real homepage, pinned categories and virtualized grid; no network.
         for (var row = 1; row <= 9; row++) {
           await _press(tester, LogicalKeyboardKey.arrowDown);
-          _expectVisibleFocus(tester, row * 6 + 1);
+          _expectVisibleFocus(tester, row * 5 + 1);
         }
         for (var row = 8; row >= 0; row--) {
           await _press(tester, LogicalKeyboardKey.arrowUp);
-          _expectVisibleFocus(tester, row * 6 + 1);
+          _expectVisibleFocus(tester, row * 5 + 1);
         }
         expect(app.popular.scrollOffset, lessThan(10));
       });
@@ -267,10 +268,10 @@ void main() {
     await _press(tester, LogicalKeyboardKey.arrowUp);
     final offset = app.popular.scrollOffset;
     await _press(tester, LogicalKeyboardKey.arrowRight);
-    _expectVisibleFocus(tester, 14);
+    _expectVisibleFocus(tester, 12);
     expect(app.popular.scrollOffset, closeTo(offset, 0.5));
     await _press(tester, LogicalKeyboardKey.arrowLeft);
-    _expectVisibleFocus(tester, 13);
+    _expectVisibleFocus(tester, 11);
     expect(app.popular.scrollOffset, closeTo(offset, 0.5));
   });
 
@@ -297,9 +298,9 @@ void main() {
     }
     await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
     await _press(tester, LogicalKeyboardKey.arrowRight);
-    _expectVisibleFocus(tester, 56);
+    _expectVisibleFocus(tester, 47);
     await tester.pump(const Duration(seconds: 1));
-    _expectVisibleFocus(tester, 56);
+    _expectVisibleFocus(tester, 47);
   });
 
   testWidgets('leaving pending scroll for rail cancels it and restores content',
@@ -321,7 +322,7 @@ void main() {
     expect(app.popular.scrollOffset, closeTo(offset, 0.5));
     await _press(tester, LogicalKeyboardKey.arrowLeft);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 7);
+    _expectVisibleFocus(tester, 6);
   });
 
   testWidgets(
@@ -338,7 +339,7 @@ void main() {
     expect(FocusManager.instance.primaryFocus, same(detailFocus));
     await rootNavigatorKey.currentState!.maybePop();
     await tester.pumpAndSettle();
-    _expectVisibleFocus(tester, 7);
+    _expectVisibleFocus(tester, 6);
   });
 
   testWidgets('numeric preview supersedes pending directional scroll',
@@ -358,25 +359,25 @@ void main() {
 
   testWidgets('ragged final row stops and retains category/function exits',
       (tester) async {
-    final app = await mount(tester, count: 25);
-    for (var i = 0; i < 3; i++) {
+    final app = await mount(tester, count: 26);
+    for (var i = 0; i < 4; i++) {
       await _press(tester, LogicalKeyboardKey.arrowDown);
     }
-    _expectVisibleFocus(tester, 19);
-    for (var i = 0; i < 5; i++) {
+    _expectVisibleFocus(tester, 21);
+    for (var i = 0; i < 4; i++) {
       await _press(tester, LogicalKeyboardKey.arrowRight);
     }
-    _expectVisibleFocus(tester, 24);
+    _expectVisibleFocus(tester, 25);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 25);
+    _expectVisibleFocus(tester, 26);
     await _press(tester, LogicalKeyboardKey.arrowRight);
-    _expectVisibleFocus(tester, 25);
+    _expectVisibleFocus(tester, 26);
     final queries = app.popular.queries;
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 25);
+    _expectVisibleFocus(tester, 26);
     expect(app.popular.queries, queries + 1,
         reason: 'DOWN at the loaded boundary requests the next batch once');
-    for (final number in [19, 13, 7, 1]) {
+    for (final number in [21, 16, 11, 6, 1]) {
       await _press(tester, LogicalKeyboardKey.arrowUp);
       _expectVisibleFocus(tester, number);
     }
@@ -387,26 +388,26 @@ void main() {
     // This fixture returns no new items on pagination, just as the API's
     // current catch-and-return-empty path does on a failed request.
     expect(app.popular.queries, greaterThan(0));
-    expect(app.popular.trendList.length, 25);
+    expect(app.popular.trendList.length, 26);
     expect(app.popular.isTimeOut, isFalse);
   });
 
   testWidgets('long directory stops at end and returns through recycled rows',
       (tester) async {
     final app = await mount(tester);
-    for (var row = 1; row <= 19; row++) {
+    for (var row = 1; row <= 23; row++) {
       await _press(tester, LogicalKeyboardKey.arrowDown);
     }
-    _expectVisibleFocus(tester, 115);
+    _expectVisibleFocus(tester, 116);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 115);
+    _expectVisibleFocus(tester, 116);
     await _press(tester, LogicalKeyboardKey.arrowRight);
-    _expectVisibleFocus(tester, 116);
+    _expectVisibleFocus(tester, 117);
     await tester.pump(const Duration(seconds: 1));
-    _expectVisibleFocus(tester, 116);
-    for (var row = 18; row >= 0; row--) {
+    _expectVisibleFocus(tester, 117);
+    for (var row = 22; row >= 0; row--) {
       await _press(tester, LogicalKeyboardKey.arrowUp);
-      _expectVisibleFocus(tester, row * 6 + 2);
+      _expectVisibleFocus(tester, row * 5 + 2);
     }
     expect(app.popular.scrollOffset, lessThan(10));
   });
@@ -451,10 +452,11 @@ void main() {
     tester.widget<BangumiCardV>(_poster(1)).focusNode!.requestFocus();
     await tester.pumpAndSettle();
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 7);
+    _expectVisibleFocus(tester, 6);
 
-    // Scrolling near the boundary starts one append. Its progress indicator is
-    // intentionally still active while directional input continues.
+    // Reach the loaded boundary and request its next row. The larger cards
+    // need not cross the pixel prefetch threshold before this explicit DOWN.
+    // Keep the append pending while newer directional input owns the focus.
     Future<void> moveWhileLoading(LogicalKeyboardKey key) async {
       await tester.sendKeyEvent(key);
       // Build the first animation frame before advancing its elapsed time.
@@ -464,28 +466,32 @@ void main() {
     }
 
     await moveWhileLoading(LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 13);
+    _expectVisibleFocus(tester, 11);
     await moveWhileLoading(LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 19);
+    _expectVisibleFocus(tester, 16);
+    await moveWhileLoading(LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 21);
+    await moveWhileLoading(LogicalKeyboardKey.arrowDown);
+    _expectVisibleFocus(tester, 21);
     expect(appendStarted.isCompleted, isTrue);
     expect(controller.isLoadingMore, isTrue);
     await moveWhileLoading(LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 19);
+    _expectVisibleFocus(tester, 21);
     await moveWhileLoading(LogicalKeyboardKey.arrowRight);
-    _expectVisibleFocus(tester, 20);
+    _expectVisibleFocus(tester, 22);
     expect(controller.trendList.length, 24);
     expect(offsets, [0, 24]);
     finishAppend!();
     await tester.pumpAndSettle();
-    _expectVisibleFocus(tester, 20);
+    _expectVisibleFocus(tester, 22);
     expect(controller.trendList.length, 30);
     expect(controller.canLoadMore, isFalse);
     expect(controller.canRetryLoad, isFalse,
         reason: 'A successful nonempty short tail is a completed directory');
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 26);
+    _expectVisibleFocus(tester, 27);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 26);
+    _expectVisibleFocus(tester, 27);
     expect(offsets, [0, 24],
         reason: 'The short tail stops automatic and boundary requests');
     expect(controller.isTimeOut, isFalse);
@@ -528,7 +534,7 @@ void main() {
     await tester.pumpAndSettle();
     tester.widget<BangumiCardV>(_poster(1)).focusNode!.requestFocus();
     await tester.pumpAndSettle();
-    for (final number in [7, 13, 19]) {
+    for (final number in [6, 11, 16, 21]) {
       await _press(tester, LogicalKeyboardKey.arrowDown);
       _expectVisibleFocus(tester, number);
     }
@@ -536,7 +542,7 @@ void main() {
     expect(controller.trendList.length, 24);
     expect(controller.canLoadMore, isFalse);
     expect(controller.canRetryLoad, isTrue);
-    final card = tester.widget<BangumiCardV>(_poster(19)).focusNode!;
+    final card = tester.widget<BangumiCardV>(_poster(21)).focusNode!;
     await _press(tester, LogicalKeyboardKey.arrowDown);
     expect(
         FocusManager.instance.primaryFocus!.debugLabel, 'TV directory retry');
@@ -548,7 +554,7 @@ void main() {
     expect(footer.top, greaterThanOrEqualTo(viewport.top));
     expect(footer.bottom, lessThanOrEqualTo(viewport.bottom + .5));
     await _press(tester, LogicalKeyboardKey.arrowUp);
-    _expectVisibleFocus(tester, 19);
+    _expectVisibleFocus(tester, 21);
     expect(offsets, [0, 24]);
     await _press(tester, LogicalKeyboardKey.arrowDown);
     expect(
@@ -556,7 +562,7 @@ void main() {
     await _press(tester, LogicalKeyboardKey.select);
     expect(focusAtRetry, same(card),
         reason: 'Retry focuses the existing card before removing its button');
-    _expectVisibleFocus(tester, 19);
+    _expectVisibleFocus(tester, 21);
     expect(offsets, [0, 24, 24]);
     expect(controller.trendList.take(24).map((item) => item.id),
         List.generate(24, (index) => index + 1));
@@ -564,9 +570,9 @@ void main() {
     expect(controller.canRetryLoad, isFalse);
     expect(controller.isTimeOut, isFalse);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 25);
+    _expectVisibleFocus(tester, 26);
     await _press(tester, LogicalKeyboardKey.arrowDown);
-    _expectVisibleFocus(tester, 25);
+    _expectVisibleFocus(tester, 26);
     expect(offsets, [0, 24, 24]);
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(seconds: 30)));

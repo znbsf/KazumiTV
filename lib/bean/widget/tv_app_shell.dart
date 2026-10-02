@@ -59,7 +59,10 @@ class _TvAppShellState extends State<TvAppShell> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            TvAmbientBackdrop(oled: oled),
+            if (TvVisuals.fixedSurfaces)
+              ColoredBox(color: oled ? Colors.black : TvVisuals.background)
+            else
+              TvAmbientBackdrop(oled: oled),
             widget.child,
           ],
         ),

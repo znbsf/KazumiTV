@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show FramePhase;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
@@ -109,6 +110,18 @@ class TvPerformanceCollector {
       final budget = 1000000 / refreshRateHz;
       _frames.add({
         'frame': number,
+        // Engine timestamps, never delivery time. Wall raster finish allows
+        // coarse alignment to external system-clock resource samples without
+        // equating the Dart Stopwatch epoch with Android uptime.
+        'vsyncStartUs': timing.timestampInMicroseconds(FramePhase.vsyncStart),
+        'buildStartUs': timing.timestampInMicroseconds(FramePhase.buildStart),
+        'rasterStartUs': timing.timestampInMicroseconds(FramePhase.rasterStart),
+        'rasterFinishUs':
+            timing.timestampInMicroseconds(FramePhase.rasterFinish),
+        'rasterFinishWallUs':
+            timing.timestampInMicroseconds(FramePhase.rasterFinishWallTime),
+        'rasterCacheLayerBytes': timing.layerCacheBytes,
+        'rasterCachePictureBytes': timing.pictureCacheBytes,
         'buildUs': build,
         'rasterUs': raster,
         'totalSpanUs': total,
