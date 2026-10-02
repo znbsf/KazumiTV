@@ -201,16 +201,26 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
                   if (!widget.oled)
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 600),
+                      // Each transition paints one image. Apply its animated
+                      // alpha to that draw instead of a full-window opacity
+                      // layer; preserve AnimatedSwitcher's outgoing lifetime.
+                      transitionBuilder: (child, animation) =>
+                          child is _TvArtworkPixels
+                              ? _TvArtworkPixels(
+                                  key: child.key,
+                                  artwork: child.artwork,
+                                  opacity: animation,
+                                )
+                              : child,
                       layoutBuilder: (current, previous) => Stack(
                         fit: StackFit.expand,
                         children: [...previous, if (current != null) current],
                       ),
                       child: _displayed == null
                           ? const SizedBox.expand()
-                          : Opacity(
+                          : _TvArtworkPixels(
                               key: ValueKey(_displayed!.key),
-                              opacity: _displayed!.key.landscape ? 1 : .84,
-                              child: _TvArtworkPixels(artwork: _displayed!),
+                              artwork: _displayed!,
                             ),
                     ),
                   if (!widget.oled)
@@ -251,8 +261,13 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
 }
 
 class _TvArtworkPixels extends StatefulWidget {
-  const _TvArtworkPixels({required this.artwork});
+  const _TvArtworkPixels({
+    super.key,
+    required this.artwork,
+    this.opacity = const AlwaysStoppedAnimation(1),
+  });
   final TvPreparedArtwork artwork;
+  final Animation<double> opacity;
 
   @override
   State<_TvArtworkPixels> createState() => _TvArtworkPixelsState();
@@ -275,6 +290,9 @@ class _TvArtworkPixelsState extends State<_TvArtworkPixels> {
       scale: artwork.scale,
       fit: artwork.key.prefiltered ? BoxFit.fill : BoxFit.cover,
       filterQuality: FilterQuality.medium,
+      opacity: widget.opacity.drive(
+        Tween<double>(begin: 0, end: artwork.key.landscape ? 1 : .84),
+      ),
     );
     if (artwork.key.prefiltered || artwork.key.landscape) return pixels;
     // Bounded fallback for oversized geometry or failed preparation; never

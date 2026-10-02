@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/bean/widget/tv_artwork_preparation.dart';
@@ -45,7 +47,6 @@ BangumiItem _item(int id, String url) => focusItem(id)..images = {'large': url};
 
 Finder _frame(String url, {double? dpr}) => find.descendant(
       of: find.byWidgetPredicate((widget) =>
-          widget is Opacity &&
           widget.key is ValueKey<TvArtworkKey> &&
           (widget.key! as ValueKey<TvArtworkKey>).value.url == url &&
           (dpr == null ||
@@ -105,14 +106,104 @@ Future<void> _finish(
   await tester.pump(const Duration(milliseconds: 16));
 }
 
-double _fade(WidgetTester tester, String url) => tester
-    .widget<FadeTransition>(
-      find
-          .ancestor(of: _frame(url), matching: find.byType(FadeTransition))
-          .first,
-    )
-    .opacity
-    .value;
+double _fade(WidgetTester tester, String url) {
+  final image = tester.widget<RawImage>(_frame(url));
+  final frame = tester.widget(find.byWidgetPredicate((widget) =>
+      widget.key is ValueKey<TvArtworkKey> &&
+      (widget.key! as ValueKey<TvArtworkKey>).value.url == url));
+  final key = (frame.key! as ValueKey<TvArtworkKey>).value;
+  return image.opacity!.value / (key.landscape ? 1 : .84);
+}
+
+Future<ui.Image> _pattern(bool wide, bool alternate) async {
+  final width = wide ? 160 : 80;
+  final height = wide ? 90 : 120;
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  for (var y = 0; y < height; y += 10) {
+    for (var x = 0; x < width; x += 10) {
+      canvas.drawRect(
+        Rect.fromLTWH(x.toDouble(), y.toDouble(), 10, 10),
+        Paint()
+          ..color = [
+            Colors.red,
+            Colors.blue,
+            Colors.green,
+            Colors.white
+          ][(x ~/ 10 + y ~/ 10 + (alternate ? 2 : 0)) % 4],
+      );
+    }
+  }
+  final picture = recorder.endRecording();
+  try {
+    return await picture.toImage(width, height);
+  } finally {
+    picture.dispose();
+  }
+}
+
+// Frozen reference to the original full-window FadeTransition + Opacity
+// composition. The product's direct image alpha must preserve these pixels.
+Widget _referenceBackdrop(ui.Image a, ui.Image b, bool wide, double progress) {
+  Widget layer(ui.Image image, double opacity) => FadeTransition(
+        opacity: AlwaysStoppedAnimation(opacity),
+        child: Opacity(
+          opacity: wide ? 1 : .84,
+          child: wide
+              ? RawImage(image: image, fit: BoxFit.cover)
+              : ImageFiltered(
+                  imageFilter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: RawImage(image: image, fit: BoxFit.cover),
+                ),
+        ),
+      );
+  return ColoredBox(
+    color: TvVisuals.background,
+    child: Stack(fit: StackFit.expand, children: [
+      layer(a, 1 - progress),
+      layer(b, progress),
+      const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xCC101611),
+              Color(0x85101611),
+              Color(0x45101611),
+              Color(0xB8101611)
+            ],
+            stops: [0, .24, .62, 1],
+          ),
+        ),
+      ),
+      const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0x45101611), Colors.transparent, Color(0x45101611)],
+            stops: [0, .55, 1],
+          ),
+        ),
+      ),
+    ]),
+  );
+}
+
+Future<Uint8List> _capture(
+    WidgetTester tester, GlobalKey key, double dpr) async {
+  return (await tester.runAsync(() async {
+    final image =
+        await (key.currentContext!.findRenderObject() as RenderRepaintBoundary)
+            .toImage(pixelRatio: dpr);
+    try {
+      final bytes =
+          (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      return Uint8List.fromList(bytes.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  }))!;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -127,6 +218,75 @@ void main() {
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
   });
+
+  for (final dpr in [1.0, 2.0]) {
+    for (final wide in [false, true]) {
+      testWidgets(
+          'direct image fade matches original layered pixels DPR $dpr wide $wide',
+          (tester) async {
+        tester.view.devicePixelRatio = dpr;
+        tester.view.physicalSize = Size(192 * dpr, 64 * dpr);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
+        final aUrl = 'https://fixture.invalid/alpha-a-$dpr-$wide.png';
+        final bUrl = 'https://fixture.invalid/alpha-b-$dpr-$wide.png';
+        final aReady = await _pending(aUrl);
+        final bReady = await _pending(bUrl);
+        final a = (await tester.runAsync(() => _pattern(wide, false)))!;
+        final b = (await tester.runAsync(() => _pattern(wide, true)))!;
+        final aReference = a.clone();
+        final bReference = b.clone();
+        final actualKey = GlobalKey();
+        final referenceKey = GlobalKey();
+        final progress = ValueNotifier<double>(0);
+        tvArtworkController.select(_item(101, aUrl));
+        await tester.pumpWidget(MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: Row(children: [
+            Expanded(
+                child: RepaintBoundary(
+                    key: actualKey, child: const TvAmbientBackdrop())),
+            Expanded(
+                child: RepaintBoundary(
+                    key: referenceKey,
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: progress,
+                      builder: (context, value, child) => _referenceBackdrop(
+                          aReference, bReference, wide, value),
+                    ))),
+          ]),
+        ));
+        await tester.pump(const Duration(milliseconds: 260));
+        await _finish(tester, aReady, a);
+        tvArtworkController.select(_item(102, bUrl));
+        await tester.pump(const Duration(milliseconds: 260));
+        await _completeAndBuild(tester, bReady, b);
+        for (final fraction in [0.0, .25, .5, .75, 1.0]) {
+          progress.value = fraction;
+          await tester.pump(Duration(milliseconds: fraction == 0 ? 0 : 150));
+          expect(_fade(tester, bUrl), closeTo(fraction, .000001));
+          final expected = await _capture(tester, referenceKey, dpr);
+          final actual = await _capture(tester, actualKey, dpr);
+          expect(actual.length, expected.length);
+          var maximum = 0;
+          var sum = 0;
+          for (var i = 0; i < actual.length; ++i) {
+            final delta = (actual[i] - expected[i]).abs();
+            maximum = delta > maximum ? delta : maximum;
+            sum += delta;
+          }
+          expect(maximum, lessThanOrEqualTo(3), reason: 'fade=$fraction');
+          expect(sum / actual.length, lessThanOrEqualTo(.5),
+              reason: 'fade=$fraction');
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        aReference.dispose();
+        bReference.dispose();
+        progress.dispose();
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('260ms dwell and decode keep old pixels until a 600ms fade', (
     tester,
@@ -284,22 +444,14 @@ void main() {
     await _finish(tester, portraitReady, portrait);
     expect(find.byType(ImageFiltered), findsNothing,
         reason: 'portrait blur is prepared once, outside the fade paint path');
-    final portraitOpacity = tester.widget<Opacity>(
-      find
-          .ancestor(of: _frame(portraitUrl), matching: find.byType(Opacity))
-          .first,
-    );
-    expect(portraitOpacity.opacity, .84);
+    expect(tester.widget<RawImage>(_frame(portraitUrl)).opacity!.value, .84);
     final window = tester.getSize(find.byType(TvAmbientBackdrop));
     expect(tester.getSize(_frame(portraitUrl)), window);
     tvArtworkController.select(_item(2, wideUrl));
     await tester.pump(const Duration(milliseconds: 260));
     await _finish(tester, wideReady, wide);
     expect(find.byType(ImageFiltered), findsNothing);
-    final wideOpacity = tester.widget<Opacity>(
-      find.ancestor(of: _frame(wideUrl), matching: find.byType(Opacity)).first,
-    );
-    expect(wideOpacity.opacity, 1);
+    expect(tester.widget<RawImage>(_frame(wideUrl)).opacity!.value, 1);
     expect(tester.getSize(_frame(wideUrl)), window);
     expect(tester.takeException(), isNull);
   });
