@@ -18,6 +18,7 @@ import 'package:kazumi/services/platform/tv_channel_input.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'support/tv_focus_fixtures.dart';
 
@@ -104,6 +105,64 @@ void main() {
     await tester.pumpAndSettle();
     return app;
   }
+
+  testWidgets(
+      'paced held vertical keys settle at 21 then 1 without release drift',
+      (tester) async {
+    var elapsed = 0;
+    final life = TvInputLifecycle(() => elapsed)..install();
+    addTearDown(life.dispose);
+    await mount(tester, count: 40);
+    life.start(0);
+    Future<void> frames(int millis) async {
+      for (var t = 0; t < millis; t += 10) {
+        elapsed += 10000;
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+    }
+
+    Future<void> hold(LogicalKeyboardKey key, int target) async {
+      await tester.sendKeyDownEvent(key);
+      await frames(450);
+      for (var i = 0; i < 3; i++) {
+        await tester.sendKeyRepeatEvent(key);
+        await frames(180);
+      }
+      await tester.sendKeyUpEvent(key);
+      await frames(250);
+      _expectVisibleFocus(tester, target);
+      final state = tester.state<ScrollableState>(find
+          .descendant(
+              of: find.byType(CustomScrollView).first,
+              matching: find.byType(Scrollable))
+          .first);
+      final offset = state.position.pixels;
+      await frames(1250);
+      _expectVisibleFocus(tester, target);
+      expect(state.position.pixels, closeTo(offset, .01));
+    }
+
+    await hold(LogicalKeyboardKey.arrowDown, 21);
+    await hold(LogicalKeyboardKey.arrowUp, 1);
+    life.stop();
+    final report = life.report();
+    expect((report['appEvents'] as List).map((e) => e['type']), [
+      'down',
+      'repeat',
+      'repeat',
+      'repeat',
+      'up',
+      'down',
+      'repeat',
+      'repeat',
+      'repeat',
+      'up'
+    ]);
+    expect((report['catalogStart'] as Map)['columns'], 5);
+    expect((report['logging'] as Map)['scrollComplete'], isTrue);
+    expect((report['checkpoints'] as List).last['state']['pendingChannel'],
+        isNull);
+  });
 
   testWidgets('TV home shows a complete larger row and a following-row cue',
       (tester) async {

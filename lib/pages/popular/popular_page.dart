@@ -30,6 +30,7 @@ import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/popular/tv_recent_watch.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
+import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 
 class PopularPage extends StatefulWidget {
   const PopularPage({super.key, required this.controller});
@@ -78,6 +79,66 @@ class _PopularPageState extends State<PopularPage> {
   int _summaryRevision = 0;
   final _summaryCache = <int, String>{};
   StreamSubscription<dynamic>? _historySubscription;
+  VoidCallback? _releaseProbeState;
+  ModalRoute<dynamic>? _probeRoute;
+  bool _probeCovered = false;
+  int? _probeColumns;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!TvInputLifecycle.enabled) return;
+    _probeRoute = ModalRoute.of(context);
+    _probeCovered = RouteVisibility.isCoveredOf(context);
+    _releaseProbeState ??= TvInputLifecycle.registerPageState(
+      this,
+      isCurrent: () =>
+          mounted && _probeRoute?.isCurrent == true && !_probeCovered,
+      read: () => {
+        'route': '/tab/popular/',
+        'isCurrent': _probeRoute?.isCurrent,
+        'covered': _probeCovered,
+        'columns': _probeColumns,
+        'listLength': _visibleBangumiList.length,
+        'currentTag': popularController.currentTag,
+        'canLoadMore': popularController.canLoadMore,
+        'isLoadingMore': popularController.isLoadingMore,
+        'canRetryLoad': popularController.canRetryLoad,
+        'gridRequest': _gridFocusRequest,
+        'pendingChannel': _pendingGridChannel,
+        'pendingItemId': _pendingGridChannel != null &&
+                _pendingGridChannel! > 0 &&
+                _pendingGridChannel! <= _visibleBangumiList.length
+            ? _visibleBangumiList[_pendingGridChannel! - 1].id
+            : null,
+        'scrollOffset':
+            scrollController.hasClients ? scrollController.offset : null,
+        'maxScrollExtent': scrollController.hasClients
+            ? scrollController.position.maxScrollExtent
+            : null,
+        'scrollTraceEnabled': true,
+      },
+      readCatalogIds: () => _visibleBangumiList.map((item) => item.id).toList(),
+    );
+    TvInputLifecycle.checkpoint('home_visibility');
+  }
+
+  void _traceGrid(String kind, Map<String, Object?> fields, {KeyEvent? event}) {
+    if (!TvInputLifecycle.active) return;
+    TvInputLifecycle.trace(
+        kind,
+        {
+          'request': _gridFocusRequest,
+          'pendingChannel': _pendingGridChannel,
+          'count': _visibleBangumiList.length,
+          'columns': _probeColumns,
+          'canLoadMore': popularController.canLoadMore,
+          'isLoadingMore': popularController.isLoadingMore,
+          ...fields,
+        },
+        inputEvent: event);
+  }
+
   double get _recentExtent => TvRecentWatch.items().isEmpty ? 0 : 44;
   double get _pinnedExtent => _tvToolbarHeight + _recentExtent;
   double get _rowSpacing => TvMode.enabled
@@ -111,6 +172,7 @@ class _PopularPageState extends State<PopularPage> {
 
   @override
   void dispose() {
+    _releaseProbeState?.call();
     _homeReturnEpoch++;
     _gridFocusRequest++;
     scrollController.removeListener(scrollListener);
@@ -134,6 +196,9 @@ class _PopularPageState extends State<PopularPage> {
   }
 
   void scrollListener() {
+    if (TvInputLifecycle.active) {
+      TvInputLifecycle.scrollChanged('/tab/popular/', scrollController.offset);
+    }
     popularController.scrollOffset = scrollController.offset;
     if (scrollController.position.pixels >=
             scrollController.position.maxScrollExtent - 200 &&
@@ -233,6 +298,10 @@ class _PopularPageState extends State<PopularPage> {
     // Repeats and quick reversals advance from the last requested cell, even
     // while its row is still scrolling into view. New input owns the request.
     final currentIndex = (_pendingGridChannel ?? (index + 1)) - 1;
+    if (TvInputLifecycle.active) {
+      _traceGrid('key', {'index': index, 'currentIndex': currentIndex},
+          event: event);
+    }
     _cancelGridFocusRequest();
     final direction = switch (event.logicalKey) {
       LogicalKeyboardKey.arrowLeft => TraversalDirection.left,
@@ -241,12 +310,20 @@ class _PopularPageState extends State<PopularPage> {
       LogicalKeyboardKey.arrowUp => TraversalDirection.up,
       _ => null,
     };
-    if (direction == null) return KeyEventResult.ignored;
+    if (direction == null) {
+      if (TvInputLifecycle.active)
+        _traceGrid('disposition', {'reason': 'ignored'}, event: event);
+      return KeyEventResult.ignored;
+    }
     if (direction == TraversalDirection.left && currentIndex % columns == 0) {
+      if (TvInputLifecycle.active)
+        _traceGrid('disposition', {'reason': 'rail'}, event: event);
       Actions.maybeInvoke(context, const TvFocusRailIntent());
       return KeyEventResult.handled;
     }
     if (direction == TraversalDirection.up && currentIndex < columns) {
+      if (TvInputLifecycle.active)
+        _traceGrid('disposition', {'reason': 'category'}, event: event);
       _focusNodeForTag(popularController.currentTag).requestFocus();
       return KeyEventResult.handled;
     }
@@ -270,9 +347,15 @@ class _PopularPageState extends State<PopularPage> {
 
   Future<void> _loadNextGridRow(int target,
       {required int originChannel}) async {
+    if (TvInputLifecycle.active)
+      _traceGrid(
+          'load_begin', {'target': target, 'originChannel': originChannel});
     final epoch = _homeReturnEpoch;
     final origin = FocusManager.instance.primaryFocus;
     if (!popularController.canLoadMore || popularController.isLoadingMore) {
+      if (TvInputLifecycle.active)
+        _traceGrid('load_skip',
+            {'target': target, 'canRetryLoad': popularController.canRetryLoad});
       if (!popularController.isLoadingMore && popularController.canRetryLoad) {
         await _focusRetryFooter(originChannel);
       }
@@ -283,6 +366,12 @@ class _PopularPageState extends State<PopularPage> {
     } else {
       await popularController.queryBangumiByTag();
     }
+    if (TvInputLifecycle.active)
+      _traceGrid('load_end', {
+        'target': target,
+        'epochCurrent': epoch == _homeReturnEpoch,
+        'originUnchanged': FocusManager.instance.primaryFocus == origin
+      });
     if (!mounted ||
         epoch != _homeReturnEpoch ||
         FocusManager.instance.primaryFocus != origin ||
@@ -366,6 +455,7 @@ class _PopularPageState extends State<PopularPage> {
   }
 
   void _cancelGridFocusRequest() {
+    if (TvInputLifecycle.active) _traceGrid('cancel', {});
     _gridFocusRequest++;
     if (_pendingGridChannel != null && scrollController.hasClients) {
       scrollController.jumpTo(scrollController.offset);
@@ -378,24 +468,55 @@ class _PopularPageState extends State<PopularPage> {
     final origin = FocusManager.instance.primaryFocus;
     final originScope = origin?.enclosingScope;
     _pendingGridChannel = channelNumber;
+    if (TvInputLifecycle.active)
+      _traceGrid('focus_begin', {'target': channelNumber});
     // A cached/kept-alive FocusNode can have a context outside the viewport.
     // Reveal by grid geometry first, in either direction, then transfer focus.
     await _scrollToChannel(channelNumber, revealOnly: true);
-    if (!mounted || request != _gridFocusRequest) return;
+    if (!mounted || request != _gridFocusRequest) {
+      if (TvInputLifecycle.active)
+        _traceGrid('focus_abort', {
+          'target': channelNumber,
+          'originalRequest': request,
+          'reason': !mounted ? 'unmounted' : 'request_superseded'
+        });
+      return;
+    }
     _pendingGridChannel = null;
     // Large jumps can evict the old card and leave a fallback focus in this
     // scope. That is not a user's move to another control or covered route.
     if ((FocusManager.instance.primaryFocus != origin &&
             origin?.parent != null) ||
         originScope?.hasFocus != true) {
+      if (TvInputLifecycle.active)
+        _traceGrid('focus_abort', {
+          'target': channelNumber,
+          'reason': originScope?.hasFocus != true
+              ? 'origin_scope_lost'
+              : 'origin_changed_attached'
+        });
       return;
     }
-    if (channelNumber < 1 || channelNumber > _visibleBangumiList.length) return;
+    if (channelNumber < 1 || channelNumber > _visibleBangumiList.length) {
+      if (TvInputLifecycle.active)
+        _traceGrid(
+            'focus_abort', {'target': channelNumber, 'reason': 'out_of_range'});
+      return;
+    }
     final node = _focusNodeForChannel(channelNumber);
+    if (TvInputLifecycle.active)
+      _traceGrid(node.context != null ? 'focus_apply' : 'focus_abort', {
+        'target': channelNumber,
+        'targetItemId': _visibleBangumiList[channelNumber - 1].id,
+        if (node.context == null) 'reason': 'target_context_missing'
+      });
     if (node.context != null) node.requestFocus();
   }
 
   void _onChannelFocusChanged(int channelNumber, bool focused) {
+    if (TvInputLifecycle.active)
+      _traceGrid(
+          'card_focus', {'channelNumber': channelNumber, 'focused': focused});
     if (focused && channelNumber <= _visibleBangumiList.length) {
       _setSpotlight(_visibleBangumiList[channelNumber - 1]);
     }
@@ -625,6 +746,9 @@ class _PopularPageState extends State<PopularPage> {
 
   Future<void> _openHomeDetail(BangumiItem item,
       {FocusNode? recentOrigin}) async {
+    if (TvInputLifecycle.active)
+      _traceGrid('detail_activate',
+          {'itemId': item.id, 'alreadyOpening': _openingHome});
     if (_openingHome) return;
     _cancelGridFocusRequest();
     _clearChannelInput();
@@ -674,6 +798,8 @@ class _PopularPageState extends State<PopularPage> {
         await context.pushNamed('/info/', arguments: item);
       } finally {
         _openingHome = false;
+        if (TvInputLifecycle.active)
+          _traceGrid('detail_return', {'itemId': item.id});
       }
       await WidgetsBinding.instance.endOfFrame;
       if (!current()) return;
@@ -780,6 +906,7 @@ class _PopularPageState extends State<PopularPage> {
     if (width > LayoutBreakpoint.medium['width']!) {
       crossCount = TvMode.enabled && TvVisuals.fixedSurfaces ? 5 : 6;
     }
+    if (TvInputLifecycle.enabled) _probeColumns = crossCount;
     return crossCount;
   }
 
@@ -828,6 +955,15 @@ class _PopularPageState extends State<PopularPage> {
           end > start ? start : position.pixels.clamp(end, start).toDouble();
     }
     target = target.clamp(0.0, position.maxScrollExtent);
+    if (TvInputLifecycle.active)
+      _traceGrid('scroll_begin', {
+        'targetChannel': channelNumber,
+        'row': row,
+        'targetOffset': target,
+        'currentOffset': position.pixels,
+        'maxScrollExtent': position.maxScrollExtent,
+        'revealOnly': revealOnly
+      });
     if ((target - position.pixels).abs() > 0.5) {
       await scrollController.animateTo(
         target,
@@ -837,6 +973,11 @@ class _PopularPageState extends State<PopularPage> {
     }
     if (!mounted) return;
     await WidgetsBinding.instance.endOfFrame;
+    if (TvInputLifecycle.active)
+      _traceGrid('scroll_end', {
+        'targetChannel': channelNumber,
+        'offset': scrollController.hasClients ? scrollController.offset : null
+      });
   }
 
   Future<void> _scrollToListEnd() async {

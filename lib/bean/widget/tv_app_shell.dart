@@ -7,6 +7,7 @@ import 'package:kazumi/services/platform/tv_navigation.dart';
 import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 
 /// Applies TV-only focus behavior while preserving the normal mobile theme.
 class TvAppShell extends StatefulWidget {
@@ -26,9 +27,14 @@ class _TvAppShellState extends State<TvAppShell> {
     super.initState();
     if (TvMode.enabled) {
       _channel.setMethodCallHandler((call) async {
+        if (TvInputLifecycle.active)
+          TvInputLifecycle.platformAction(call.method, 'dart_received');
         if (call.method == 'home') TvNavigation.goHome();
         if (call.method == 'back') {
-          await rootNavigatorKey.currentState?.maybePop();
+          final didPop = await rootNavigatorKey.currentState?.maybePop();
+          if (TvInputLifecycle.active)
+            TvInputLifecycle.platformAction('back', 'maybe_pop_result',
+                didPop: didPop);
         }
       });
       _channel.invokeMethod<void>('setActive', true);

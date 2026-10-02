@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 
 /// Opt-in only. An ordinary build installs no probe listeners or timers.
 const bool kazumiTvPerformanceEnabled =
@@ -398,6 +399,7 @@ class TvPerformanceProbe {
   int _idleKeyMarkersReported = 0;
   int? _registeredKeyboardIdentity;
   TvPerformanceCollector? _collector;
+  TvInputLifecycle? _lifecycle;
   Timer? _deadline;
   Timer? _drain;
   bool _postFrameScheduled = false;
@@ -444,6 +446,7 @@ class TvPerformanceProbe {
   void install() {
     if (_installed || !enabled || !television) return;
     _installed = true;
+    _lifecycle = TvInputLifecycle(nowMicros)..install();
     SchedulerBinding.instance.addTimingsCallback(_timings);
     _registeredKeyboardIdentity = identityHashCode(HardwareKeyboard.instance);
     HardwareKeyboard.instance.addHandler(_key);
@@ -468,6 +471,8 @@ class TvPerformanceProbe {
     _deadline?.cancel();
     _drain?.cancel();
     _collector = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
     SchedulerBinding.instance.removeTimingsCallback(_timings);
     HardwareKeyboard.instance.removeHandler(_key);
     FocusManager.instance.removeListener(_focus);
@@ -575,6 +580,7 @@ class TvPerformanceProbe {
       startFocusIdentity: _focusIdentity,
       startImageCache: _imageCache(),
     );
+    _lifecycle?.start(_collector!.startedAtUs);
     _deadline = Timer(const Duration(seconds: 60), () => _stop('timeout'));
   }
 
@@ -622,6 +628,7 @@ class TvPerformanceProbe {
     final collector = _collector;
     if (collector == null || !collector.isOpen) return;
     _deadline?.cancel();
+    _lifecycle?.stop();
     collector.stop(
       reason: reason,
       endFrameNumber: _frameNumber,
@@ -632,6 +639,7 @@ class TvPerformanceProbe {
     _drain = Timer(drainDuration, () {
       if (!_installed || !identical(_collector, collector)) return;
       final report = collector.report();
+      report['lifecycle'] = _lifecycle?.report();
       // Use the actual adapter wait when tests shorten it.
       (report['measurementScope']!
               as Map<String, Object?>)['lateTimingDrainMs'] =
