@@ -415,7 +415,9 @@ class TvPerformanceProbe {
     _instance = TvPerformanceProbe._(
       enabled: true,
       television: true,
-      onLog: (line) => debugPrintSynchronously(line, wrapWidth: null),
+      // Output follows stop + timing drain; throttling avoids Android dropping
+      // the tail of a burst. Collection and timing never use this print queue.
+      onLog: (line) => debugPrintThrottled(line, wrapWidth: null),
       nowMicros: () => clock.elapsedMicroseconds,
     )..install();
   }
