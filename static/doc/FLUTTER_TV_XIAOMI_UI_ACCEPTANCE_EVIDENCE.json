@@ -175,5 +175,21 @@
     "read_interface_exposed": false,
     "reset_card_used": false
   },
-  "remaining_blocker": "A playable source path on the current WebView is required for physical AV acceptance; choosing a source or a scoped compatibility follow-up remains a parent/user decision"
+  "remaining_blocker": "A playable source path on current WebView and restored existing authorized TV connection are required for remaining physical AV acceptance",
+  "final_device_visibility": {
+    "status": "NO_LONGER_VISIBLE_IN_ADB_AT_FINAL_READ_ONLY_CHECK",
+    "last_confirmed_ui": {
+      "observation": "40-final-home-after-source-failures",
+      "utc": "2026-10-02T05:45:11.953133+00:00",
+      "package": "com.znbsf.kazumi.flutterlab.test",
+      "page": "home",
+      "focus": [
+        "飙马野郎 JOJO的奇妙冒险 第一赛段\n50 号节目\n50"
+      ]
+    },
+    "last_confirmed_package_utc": "2026-10-02T05:45:16.792045+00:00",
+    "no_connect_pair_input_or_restart_after_loss": true,
+    "current_tv_screen": "UNCONFIRMED_AFTER_CONNECTION_LOSS",
+    "raw_target_details": "PRIVATE_LOCAL_ONLY"
+  }
 }
