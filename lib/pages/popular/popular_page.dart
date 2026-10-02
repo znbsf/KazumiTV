@@ -302,6 +302,24 @@ class _PopularPageState extends State<PopularPage> {
       _traceGrid('key', {'index': index, 'currentIndex': currentIndex},
           event: event);
     }
+    // A boundary that cannot act must not discard the last loaded cell's
+    // in-flight reveal. This input still invalidates old async load epochs,
+    // but only a real replacement destination supersedes the focus request.
+    final pending = _pendingGridChannel;
+    final waitingAtLoadedEnd = event.logicalKey == LogicalKeyboardKey.arrowDown &&
+        pending != null &&
+        pending >= 1 &&
+        pending <= count &&
+        (currentIndex ~/ columns + 1) * columns >= count &&
+        (popularController.isLoadingMore ||
+            (!popularController.canLoadMore && !popularController.canRetryLoad));
+    if (waitingAtLoadedEnd) {
+      if (TvInputLifecycle.active) {
+        _traceGrid('disposition', {'reason': 'pending_loaded_boundary'},
+            event: event);
+      }
+      return KeyEventResult.handled;
+    }
     _cancelGridFocusRequest();
     final direction = switch (event.logicalKey) {
       LogicalKeyboardKey.arrowLeft => TraversalDirection.left,

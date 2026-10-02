@@ -471,6 +471,144 @@ void main() {
     expect(app.popular.scrollOffset, lessThan(10));
   });
 
+  testWidgets('held DOWN preserves pending last loaded row during append',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(
+        () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
+    final controller = TvPopularController();
+    final offsets = <int>[];
+    VoidCallback? finishAppend;
+    var appendCompleted = false;
+    var elapsed = 0;
+    final life = TvInputLifecycle(() => elapsed)..install();
+    addTearDown(life.dispose);
+    DioFactory.apiDio.interceptors.insert(0, InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final offset = int.parse(options.uri.queryParameters['offset']!);
+        offsets.add(offset);
+        void respond(int first, int count) => handler.resolve(Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {'data': _subjects(first, count)}));
+        if (offset == 0) {
+          respond(1, 24);
+        } else {
+          expect(offset, 24);
+          expect(finishAppend, isNull,
+              reason: 'A pending append must not request another batch');
+          finishAppend = () => respond(25, 24);
+        }
+      },
+    ));
+    addTearDown(() async {
+      if (HardwareKeyboard.instance.logicalKeysPressed
+          .contains(LogicalKeyboardKey.arrowDown)) {
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
+      }
+      if (finishAppend != null && !appendCompleted) {
+        appendCompleted = true;
+        finishAppend!();
+      }
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+    await tester.runAsync(() =>
+        controller.queryBangumiByTrend().timeout(const Duration(seconds: 5)));
+    await tester.pumpWidget(MaterialApp(
+        home: TvAppShell(child: PopularPage(controller: controller))));
+    await tester.pumpAndSettle();
+    tester.widget<BangumiCardV>(_poster(1)).focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    life.start(0);
+
+    Future<void> frames(int millis) async {
+      for (var t = 0; t < millis; t += 10) {
+        elapsed += 10000;
+        await tester.pump(const Duration(milliseconds: 10));
+      }
+    }
+
+    final observedInputs = <dynamic>[];
+    Map state(String name) {
+      TvInputLifecycle.checkpoint(name);
+      life.stop();
+      final report = life.report();
+      observedInputs.addAll(report['appEvents'] as List);
+      final snapshot = (report['checkpoints'] as List).last['state'] as Map;
+      life.start(elapsed);
+      return snapshot;
+    }
+
+    expect(state('initial')['columns'], 5);
+    expect(controller.trendList.length, 24);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
+    await frames(450);
+    _expectVisibleFocus(tester, 6);
+    for (var i = 0; i < 3; i++) {
+      await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowDown);
+      await frames(180);
+    }
+    // 6 -> pending 11 -> pending 16 -> pending 21. The reveal is 260 ms;
+    // repeats every 180 ms must leave 21 pending, not already focused.
+    final beforePrefetch = state('pending_last_loaded_row');
+    expect(beforePrefetch['pendingChannel'], 21,
+        reason: 'Fixture must actually reach the in-flight boundary state');
+    expect(beforePrefetch['channelNumber'], isNot(21));
+
+    // Make prefetch deterministic: use the same public controller request as
+    // scrollListener if the pixel threshold has not started it yet. This is
+    // fixture setup, not a claim that this timing happened in the TV window.
+    if (!controller.isLoadingMore) {
+      unawaited(controller.queryBangumiByTrend());
+    }
+    for (var i = 0; i < 5 && finishAppend == null; i++) {
+      await tester.pump(); // Flush microtasks without advancing reveal time.
+    }
+    expect(controller.isLoadingMore, isTrue);
+    expect(finishAppend, isNotNull);
+    expect(offsets, [0, 24]);
+    final beforeBoundary = state('append_pending_before_extra_repeat');
+    expect(beforeBoundary['pendingChannel'], 21);
+    final request = beforeBoundary['gridRequest'];
+
+    // The extra fourth repeat asks for unloaded channel 26 while channel 21
+    // is still valid and pending. A no-op load must not cancel that reveal.
+    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowDown);
+    final afterBoundary = state('after_extra_repeat');
+    expect(afterBoundary['pendingChannel'], 21,
+        reason: 'Loading boundary must preserve the last valid focus request');
+    expect(afterBoundary['gridRequest'], request);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
+    await frames(400);
+    _expectVisibleFocus(tester, 21);
+    await frames(500);
+    _expectVisibleFocus(tester, 21);
+    expect(state('released')['pendingChannel'], isNull);
+    expect(controller.trendList.length, 24);
+
+    // A different direction still supersedes the boundary, and the delayed
+    // append cannot steal its focus when it finally completes.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await frames(350);
+    _expectVisibleFocus(tester, 22);
+    appendCompleted = true;
+    finishAppend!();
+    await frames(600);
+    expect(controller.trendList.length, 48);
+    expect(offsets, [0, 24]);
+    _expectVisibleFocus(tester, 22);
+    life.stop();
+    observedInputs.addAll(life.report()['appEvents'] as List);
+    expect(observedInputs
+        .where((e) => e['key'] == 'down')
+        .map((e) => e['type']),
+        ['down', 'repeat', 'repeat', 'repeat', 'repeat', 'up']);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
   testWidgets('TV directory appends a batch without taking newer focus',
       (tester) async {
     tester.view.physicalSize = const Size(960, 540);
