@@ -59,7 +59,8 @@ class BangumiCardV extends StatelessWidget {
         onFocusChange: onFocusChange,
         highlighted: highlighted,
         ensureVisibleOnFocus: ensureVisibleOnFocus,
-        child: ClipRRect(
+        child: RepaintBoundary(
+            child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             canRequestFocus: false,
@@ -152,7 +153,7 @@ class BangumiCardV extends StatelessWidget {
               ),
             ),
           ),
-        ),
+        )),
       );
     }
 
