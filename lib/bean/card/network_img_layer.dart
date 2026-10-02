@@ -360,6 +360,9 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
           fit: StackFit.expand,
           children: [
             AnimatedSwitcher(
+              // Keep the displayed opaque cover underneath the incoming fade.
+              // Fading both layers out/in exposes the dark page at mid-handoff.
+              switchOutCurve: const Threshold(0.0),
               duration: layer.placeholderSrc != null
                   ? const Duration(milliseconds: 180)
                   : layer.fadeInDuration ?? const Duration(milliseconds: 120),

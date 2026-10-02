@@ -121,6 +121,7 @@ void main() {
       final small = _poster(Colors.red, 80, 120);
       (await _pending(url, 80)).complete(ImageInfo(image: small));
       final largeReady = await _pending(url, 158);
+      final detailBoundary = GlobalKey();
       await tester.pumpWidget(
         _app(
           const NetworkImgLayer(
@@ -136,12 +137,15 @@ void main() {
 
       await tester.pumpWidget(
         _app(
-          const NetworkImgLayer(
-            src: url,
-            placeholderSrc: url,
-            key: ValueKey('detail'),
-            width: 158,
-            height: 237,
+          RepaintBoundary(
+            key: detailBoundary,
+            child: const NetworkImgLayer(
+              src: url,
+              placeholderSrc: url,
+              key: ValueKey('detail'),
+              width: 158,
+              height: 237,
+            ),
           ),
         ),
       );
@@ -154,7 +158,7 @@ void main() {
       ));
       expect(switcher.duration, const Duration(milliseconds: 180));
 
-      final large = _poster(Colors.blue, 158, 237);
+      final large = _poster(Colors.red, 158, 237);
       largeReady.complete(ImageInfo(image: large));
       // Stream completion schedules setState after this first pump. Build the
       // switcher in a separate frame before advancing its animation clock.
@@ -170,13 +174,20 @@ void main() {
       );
       expect(incoming.opacity.value, greaterThan(0));
       expect(incoming.opacity.value, lessThan(1));
+      // Two identical opaque colors at different decode sizes must retain
+      // brightness during their handoff, regardless of the underlying page.
+      final surface = detailBoundary.currentContext!.findRenderObject()
+          as RenderRepaintBoundary;
+      final pixels = surface.toImageSync();
+      final rgba = await tester.runAsync(() => pixels.toByteData());
+      expect(rgba!.getUint32((118 * pixels.width + 79) * 4), 0xF44336FF);
+      pixels.dispose();
       final outgoing = tester.widget<FadeTransition>(
         find
             .ancestor(of: _frame(small), matching: find.byType(FadeTransition))
             .first,
       );
-      expect(outgoing.opacity.value, greaterThan(0));
-      expect(outgoing.opacity.value, lessThan(1));
+      expect(outgoing.opacity.value, 1);
       await tester.pump(const Duration(milliseconds: 90));
       await tester.pump(const Duration(milliseconds: 16));
       expect(_frame(small), findsNothing);

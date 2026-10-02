@@ -1,16 +1,16 @@
 # Kazumi FlutterTV 本机Agent / Codex接手手册
 
-2026-10-02 UTC：上一轮交付已完成，当前继续[固定背景与大卡片候选](FLUTTER_TV_FIXED_SURFACES_CANDIDATE.md)。候选已完成电脑回归，真机新安装被自动审批拒绝，须取得明确授权后继续；上一轮[最终报告](FLUTTER_TV_OPTIMIZATION_AND_PLAYBACK.md)仅是旧产品基线。动态实际HEAD/远端/运行状态看工作区根evidence/fusion-final-handover.json。本手册不依赖云端会话，不含秘密和私有聊天转录。
+当前交付为[固定主题背景与五列大卡片](FLUTTER_TV_FIXED_SURFACES_CANDIDATE.md)，产品源码e0697911、实际探针关闭隔离验收包203231、probe/Compose关闭、完整640项回归通过。电视与Library授权已直接确认并执行；旧审批阻塞已解除。当前帧/资源结果、播放与运行终态见[证据](FLUTTER_TV_FIXED_SURFACES_EVIDENCE.json)及工作区evidence/fusion-final-handover.json。下文旧203191、639项和32–45%改善均只属于前一阶段基线，不能归给固定背景版本。
 
 ## 目标、来源和权限
 
-成熟FlutterTV与已审查a5f7bab4为底座，吸收选择的上游增量，再融合实查的原生main新UI。首页同排双组导航、左右滑分类、向下虚拟滚动、原生柔化背景、深色绿焦点；详情/播放器保留Dart业务。规则、Hive、同步、历史、选集和原media-kit/libmpv是单一业务来源，不全面重写。Compose默认关闭，未恢复A/B或进一步页面改造。源版本、逐页/交互范围、旧实验复用见[融合矩阵](FLUTTER_TV_MAIN_UI_FUSION.md)，45项上游取舍见[索引](FLUTTER_TV_UPSTREAM_DISPOSITION.md)。
+成熟FlutterTV与已审查a5f7bab4为底座，吸收选择的上游增量，再融合实查的原生main新UI。首页同排双组导航、左右滑分类、向下虚拟滚动、原生主题配色、固定不透明页面背景和淡色大卡片焦点；详情/播放器保留Dart业务。规则、Hive、同步、历史、选集和原media-kit/libmpv是单一业务来源，不全面重写。Compose默认关闭，未恢复A/B或进一步页面改造。源版本、逐页/交互范围、旧实验复用见[融合矩阵](FLUTTER_TV_MAIN_UI_FUSION.md)，45项上游取舍见[索引](FLUTTER_TV_UPSTREAM_DISPOSITION.md)。
 
 最初仅电脑/模拟器，后来用户明确授权同一已核验Xiaomi电视和独立测试应用验收、卡顿基线、局部优化及播放修复。该历史授权不自动授权下一接手者操作设备或账号；先核实当前请求、精确目标和运行所有权，只读可先完成。不改系统网络/代理/功耗/安全/证书/全局WebView，不猜地址/配对，不操作其他真机或原三个应用。原暂停会话和定时项目检查保持暂停。
 
 父最初指定GPT-6.1 Sol / Standard，后因该模型容量失败明确把继续会话切换为Astra。没有内部模型/模式设置读回、剩余额度接口；未用重置卡。创建参数和父明确切换不冒称内部验证。
 
-## 实际目录与版本
+## 目录与前一阶段版本索引（203191基线）
 
 工作区C:/Users/hentai/Documents/Codex/2026-10-02/task；源码Kazumi；分支codex/flutter-tv-main-ui-fusion-20261002；origin https://github.com/znbsf/KazumiTV.git。原生main及旧8树只读保护，不reset/stash/清理/替换。
 
@@ -69,7 +69,7 @@ python -X utf8 xiaomi-fusion-observe.py NEW-UNIQUE-LABEL --shot --logs
 
 性能流程在根evidence/tv-optimization-20261002/PROTOCOL.md。measure-tv-optimization.py的settled/rapid/vertical脚本需核对相同目录、最近观看与起止卡片1，区分首遍/暖缓存；误起卡片2样本不合格。只在窗口外截图/读日志；F10结束后报告最多18次、间隔2秒累计读取，不调系统logbuffer。最终正式包不能用于开启探针；有新测量需求才创建诊断包。固定脚本记录真实输入间隔；ADB命令耗时不能当UI延迟。
 
-## 当前验证结论与剩余限制
+## 前一阶段验证与仍适用的限制（不能归给203231）
 
 完整639/639回归在渐变缓存源码e498a5b3通过；后续结束报告传输变更另13/13探针测试通过，analysis为0错误/0警告/32info；最终仅版本变更。旧580项为原UI历史阶段测试数。实际正式包关闭诊断，静态二进制和F10日志均验证。
 
@@ -95,4 +95,4 @@ python -X utf8 xiaomi-fusion-observe.py NEW-UNIQUE-LABEL --shot --logs
 
 ## 可直接发给下一Agent的提示
 
-> 在C46G接手Kazumi FlutterTV。先只读C:/Users/hentai/Documents/Codex/2026-10-02/task/START-HERE.md、本手册、FLUTTER_TV_OPTIMIZATION_AND_PLAYBACK.md和evidence/fusion-final-handover.json，再核实Git HEAD/status、锁与进程。当前已交付融合/播放修复/背景优化，产品源码83752494、独立包203191、probe/Compose默认关闭。不要重复已完成安装或覆盖旧证据。按实际新请求推进，保留原Dart业务/播放器、8旧树/3原TV应用；原会话/定时检查暂停。设备/账号写入授权不从手册继承，核实当前目标与权限，只读可先做。不读密钥、私有聊天或无关历史，不改系统设置。区分639全回归+13后续测试、技术画面闭环、人工声音/来源权利、电视元数据超时和未达60Hz的边界。新改动更新本机入口、真实SHA、制品、证据和退出状态。
+> 在C46G接手Kazumi FlutterTV。先只读工作区START-HERE.md、固定背景交付文档/证据和evidence/fusion-final-handover.json，核实当前HEAD、远端、锁、进程与用户请求。当前产品源码e0697911、实际探针关闭隔离验收包203231、probe/Compose关闭，640项完整回归。固定背景减少部分绘制工作；本轮PSS端点较低但有缓存和进程年龄混杂，但横向单帧p95未改善，不声称60fps。优先复用现有脚本和有效/失效窗口，不盲重测、不开同步FFI。保留Dart业务/原播放器、8旧树脏文件和3原TV应用；原会话/定时检查暂停。设备写入按当前已授权精确目标及唯一持有者执行，不猜地址，不改系统设置。人工声音/口型、GPU/温度、GC和元数据连接限制单列。新变更更新本机入口、真实源码/文档SHA、制品和运行终态；文档不代替设备/账号授权。

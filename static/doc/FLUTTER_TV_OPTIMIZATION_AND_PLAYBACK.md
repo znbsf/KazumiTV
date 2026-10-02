@@ -1,3 +1,5 @@
+> 历史阶段：本文203191与32–45%结果属于固定背景改版之前。当前产品为203231，参见[固定背景交付](FLUTTER_TV_FIXED_SURFACES_CANDIDATE.md)。
+
 # FlutterTV 性能与播放最终交付
 
 2026-10-02 UTC。本轮融合、修复、实测优化及正式独立包更新已完成；外部连接、人工声音与帧预算限制仍然存在。旧模拟器/初次电视验收报告保留为历史阶段，当前结论以本报告和[证据摘要](FLUTTER_TV_OPTIMIZATION_AND_PLAYBACK_EVIDENCE.json)为准。[完整接手手册](FLUTTER_TV_AGENT_HANDOVER.md)提供架构、命令和下一Agent提示。
