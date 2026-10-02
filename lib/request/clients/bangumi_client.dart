@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/request/core/network_error_mapper.dart';
 import 'package:kazumi/utils/constants.dart';
@@ -48,16 +49,24 @@ class BangumiClient {
     CancelToken? cancelToken,
   }) async {
     try {
+      final useOfficialSearch = _useOfficialSearchWithoutMirrorCredentials(
+        url,
+        requiresAuth: requiresAuth,
+      );
       final response = await DioFactory.apiDio.post(
         url,
         data: data,
         queryParameters: queryParameters,
         options: Options(
+          extra: useOfficialSearch
+              ? {DioFactory.bypassBangumiMirrorExtra: true}
+              : null,
           headers: _headers(
             requiresAuth: requiresAuth,
             url: url,
             method: 'POST',
             data: data,
+            signMirrorRequest: !useOfficialSearch,
           ),
         ),
         cancelToken: cancelToken,
@@ -68,12 +77,35 @@ class BangumiClient {
     }
   }
 
+  bool _useOfficialSearchWithoutMirrorCredentials(
+    String url, {
+    required bool requiresAuth,
+  }) {
+    // Self-built apps do not have the CI-only mirror signing credentials.
+    // Public subject search is also available on the official API without them.
+    // Keep every other endpoint and authenticated request on its chosen route.
+    if (requiresAuth ||
+        !GStorage.getSetting(SettingsKeys.enableBangumiProxy) ||
+        ((bangumiMirrorCredentials['id']?.trim().isNotEmpty ?? false) &&
+            (bangumiMirrorCredentials['value']?.trim().isNotEmpty ?? false))) {
+      return false;
+    }
+    final uri = Uri.parse(url);
+    final official = Uri.parse(ApiEndpoints.bangumiAPIDomain);
+    return uri.scheme == official.scheme &&
+        uri.host == official.host &&
+        uri.port == official.port &&
+        uri.userInfo.isEmpty &&
+        uri.path == '/v0/search/subjects';
+  }
+
   Map<String, dynamic> _headers({
     required bool requiresAuth,
     String? accessToken,
     required String url,
     required String method,
     Object? data,
+    bool signMirrorRequest = true,
   }) {
     final headers = <String, dynamic>{...bangumiHTTPHeader};
     final bangumiSyncEnable =
@@ -84,7 +116,7 @@ class BangumiClient {
     if ((requiresAuth || bangumiSyncEnable) && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
-    if (_shouldSignProtectedMirrorRequest(url, method)) {
+    if (signMirrorRequest && _shouldSignProtectedMirrorRequest(url, method)) {
       final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
       final body = data == null ? '' : jsonEncode(data);
       headers['X-AppId'] = bangumiMirrorCredentials['id'];

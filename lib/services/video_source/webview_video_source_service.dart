@@ -9,6 +9,12 @@ import 'package:kazumi/services/video_source/video_source_service.dart';
 /// WebView 实例在服务生命周期内复用，切换集数时调用 unloadPage 释放页面资源，
 /// 仅在 [dispose] 时才真正销毁 WebView。
 class WebViewVideoSourceService implements IVideoSourceService {
+  WebViewVideoSourceService({
+    VideoWebviewController Function()? controllerFactory,
+  }) : _controllerFactory =
+            controllerFactory ?? VideoWebviewControllerFactory.getController;
+
+  final VideoWebviewController Function() _controllerFactory;
   VideoWebviewController? _webview;
   StreamSubscription? _logSubscription;
 
@@ -60,40 +66,81 @@ class WebViewVideoSourceService implements IVideoSourceService {
   }) async {
     request.throwIfNotCurrent(_activeRequest);
 
-    if (_webview == null) {
-      _webview = VideoWebviewControllerFactory.getController();
-      await _webview!.init();
-
-      _logSubscription = _webview!.onLog.listen((log) {
-        if (!_logController.isClosed) {
-          _logController.add(log);
-        }
-      });
-    }
-
     var didStartLoad = false;
+    Future<void>? loadFuture;
+    StreamSubscription<VideoParserEvent>? parserSubscription;
+    Timer? parserTimer;
+    final parserResult = Completer<VideoParserEvent>();
     try {
-      request.throwIfNotCurrent(_activeRequest);
-      didStartLoad = true;
-      await _webview!.loadUrl(
-        episodeUrl,
-        useLegacyParser,
-        offset: offset,
-      );
+      if (_webview == null) {
+        final webview = _controllerFactory();
+        try {
+          await webview.init();
+        } catch (_) {
+          await webview.dispose();
+          rethrow;
+        }
+        _webview = webview;
+
+        _logSubscription = webview.onLog.listen((log) {
+          if (!_logController.isClosed) {
+            _logController.add(log);
+          }
+        });
+      }
 
       request.throwIfNotCurrent(_activeRequest);
 
-      final parserFuture = _webview!.onVideoURLParser.first.timeout(
-        timeout,
-        onTimeout: () {
-          request.throwIfNotCurrent(_activeRequest);
-          throw VideoSourceTimeoutException(timeout);
+      // 广播流不会重放事件：iframe/原生拦截可能在 loadUrl 返回前
+      // 已经给出 URL，因此必须先订阅，且订阅只属于当前解析请求。
+      parserSubscription = _webview!.onVideoURLParser.listen(
+        (event) {
+          if (request.isCurrent(_activeRequest) && !parserResult.isCompleted) {
+            parserResult.complete(event);
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (request.isCurrent(_activeRequest) && !parserResult.isCompleted) {
+            parserResult.completeError(error, stackTrace);
+          }
+        },
+        onDone: () {
+          if (request.isCurrent(_activeRequest) && !parserResult.isCompleted) {
+            parserResult.completeError(const VideoSourceNotFoundException());
+          }
         },
       );
+
+      didStartLoad = true;
+      loadFuture = Future<void>.sync(
+        () => _webview!.loadUrl(
+          episodeUrl,
+          useLegacyParser,
+          offset: offset,
+        ),
+      );
+
+      // 同时监听两个 Future 的错误，避免加载尚未返回时解析流错误
+      // 成为未处理异常。保持原有“loadUrl 完成后开始解析超时”的语义。
+      final loadedAndParsed = Future.wait<Object?>([
+        loadFuture.then<void>((_) {
+          request.throwIfNotCurrent(_activeRequest);
+          if (!parserResult.isCompleted) {
+            parserTimer = Timer(timeout, () {
+              if (!parserResult.isCompleted) {
+                parserResult
+                    .completeError(VideoSourceTimeoutException(timeout));
+              }
+            });
+          }
+        }),
+        parserResult.future,
+      ], eagerError: true)
+          .then((results) => results[1] as VideoParserEvent);
       final cancelFuture = request.cancelled.then<VideoParserEvent>((_) {
         throw const VideoSourceCancelledException();
       });
-      final event = await Future.any([parserFuture, cancelFuture]);
+      final event = await Future.any([loadedAndParsed, cancelFuture]);
 
       request.throwIfNotCurrent(_activeRequest);
 
@@ -110,7 +157,19 @@ class WebViewVideoSourceService implements IVideoSourceService {
       request.throwIfNotCurrent(_activeRequest);
       rethrow;
     } finally {
+      parserTimer?.cancel();
+      await parserSubscription?.cancel();
+      if (parserSubscription != null && !parserResult.isCompleted) {
+        parserResult.completeError(const VideoSourceCancelledException());
+      }
       if (didStartLoad) {
+        // 取消时也要等旧加载命令收尾再卸页，下一请求才可使用同一
+        // WebView；卸页期间的迟到事件已不再有本轮订阅。
+        try {
+          await loadFuture;
+        } catch (_) {
+          // 加载异常已由上面的等待路径处理；这里只等待命令收尾。
+        }
         await _webview?.unloadPage();
       }
       if (identical(_activeRequest, request)) {
@@ -153,8 +212,11 @@ class _ResolveRequest {
   }
 
   void throwIfNotCurrent(_ResolveRequest? current) {
-    if (_cancelled.isCompleted || !identical(current, this)) {
+    if (!isCurrent(current)) {
       throw const VideoSourceCancelledException();
     }
   }
+
+  bool isCurrent(_ResolveRequest? current) =>
+      !_cancelled.isCompleted && identical(current, this);
 }

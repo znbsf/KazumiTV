@@ -9,6 +9,8 @@ import 'package:kazumi/utils/http_headers.dart';
 class DioFactory {
   DioFactory._();
 
+  static const bypassBangumiMirrorExtra = 'kazumi.bangumi.bypassMirror';
+
   static Dio? _apiDio;
   static Dio? _rulesRepoDio;
   static Dio? _pluginDio;
@@ -95,6 +97,10 @@ class _BangumiMirrorInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (options.extra[DioFactory.bypassBangumiMirrorExtra] == true) {
+      handler.next(options);
+      return;
+    }
     final enableBangumiProxy =
         GStorage.getSetting(SettingsKeys.enableBangumiProxy);
     if (!enableBangumiProxy) {
