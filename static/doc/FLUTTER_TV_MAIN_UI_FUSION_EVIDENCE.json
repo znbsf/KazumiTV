@@ -321,5 +321,16 @@
     "final-episode-panel capture 20261001T203634928923Z still showed player HUD"
   ],
   "remaining_scope_blockers": [],
-  "deferred": "Flutter versus Compose same-condition pressure comparison plan in fusion report"
+  "deferred": "Flutter versus Compose same-condition pressure comparison plan in fusion report",
+  "post_delivery_television": {
+    "result": "PHYSICAL_UI_PASS_PLAYBACK_RESOLUTION_BLOCKED",
+    "authorization": "Later explicit user authorization: exact existing Xiaomi TV / isolated test package",
+    "installed_source_commit": "d3033a972f696a891bb39d33a365d5981200c197",
+    "apk_sha256": "23377cd84215bd8fa0ab527204ea9579d66ec77c4c82a6a7b0fca25678899d40",
+    "report": "FLUTTER_TV_XIAOMI_UI_ACCEPTANCE.md",
+    "evidence": "FLUTTER_TV_XIAOMI_UI_ACCEPTANCE_EVIDENCE.json",
+    "first_frame_and_av": "NOT_REACHED; URL resolution blocked",
+    "product_source_unchanged": true,
+    "compose_ab_resumed": false
+  }
 }
