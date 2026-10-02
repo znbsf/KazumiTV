@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:kazumi/pages/menu/route_visibility.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
@@ -14,18 +16,20 @@ class PlayerLongPressShortcutActions {
   const PlayerLongPressShortcutActions({
     required this.onRepeat,
     required this.onRelease,
+    required this.onCancel,
   });
 
   final PlayerShortcutAction onRepeat;
   final PlayerShortcutAction onRelease;
+  final PlayerShortcutAction onCancel;
 }
 
 /// Dispatches player shortcuts before focused controls handle the key event.
 ///
 /// [focusScopeNode] must be attached to a stable ancestor of the player area.
 /// Dialog routes and explicitly blocked overlay interactions keep their normal
-/// key handling. Active long-press shortcuts are always released, even after
-/// focus leaves the player or this widget is disposed.
+/// key handling. Only a genuine release inside the owning context commits a
+/// tap. Context loss, synthesized events and disposal cancel the hold.
 class PlayerKeyboardShortcuts extends StatefulWidget {
   const PlayerKeyboardShortcuts({
     super.key,
@@ -52,23 +56,31 @@ class PlayerKeyboardShortcuts extends StatefulWidget {
       _PlayerKeyboardShortcutsState();
 }
 
-class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
+class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
+    with WidgetsBindingObserver {
   static const _tvRemoteChannel = MethodChannel(
     'com.predidit.kazumi/tv_remote',
   );
   static final _tvRemoteOwners = OwnedMethodChannel(_tvRemoteChannel,
-      onActiveChanged: (active) => unawaited(_tvRemoteChannel.invokeMethod<void>(
-          'setPlayerActive', {'active': active})));
+      onActiveChanged: (active) => unawaited(_tvRemoteChannel
+          .invokeMethod<void>('setPlayerActive', {'active': active})));
   MethodChannelLease? _tvRemoteLease;
   late Map<String, List<String>> _shortcuts;
-  final Map<LogicalKeyboardKey, PlayerLongPressShortcutActions>
-      _activeLongPressKeys =
-      <LogicalKeyboardKey, PlayerLongPressShortcutActions>{};
+  final _activeLongPressKeys = <LogicalKeyboardKey,
+      ({String actionName, PlayerLongPressShortcutActions actions})>{};
+  ModalRoute<dynamic>? _route;
+  bool _routeCovered = false;
+  bool _applicationActive = true;
 
   @override
   void initState() {
     super.initState();
     _shortcuts = widget.shortcuts ?? _loadShortcuts();
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    _applicationActive =
+        lifecycle == null || lifecycle == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+    FocusManager.instance.addListener(_cancelInvalidLongPressShortcuts);
     FocusManager.instance.addEarlyKeyEventHandler(_handleKeyEvent);
     if (TvMode.enabled) {
       _tvRemoteLease = _tvRemoteOwners.claim(_handleTvRemoteMethod);
@@ -76,18 +88,37 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
+    _routeCovered = RouteVisibility.isCoveredOf(context);
+    _cancelInvalidLongPressShortcuts();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _applicationActive = state == AppLifecycleState.resumed;
+    if (!_applicationActive) _cancelAllLongPressShortcuts();
+  }
+
+  @override
   void didUpdateWidget(PlayerKeyboardShortcuts oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.shortcuts != oldWidget.shortcuts) {
+    if (widget.shortcuts != oldWidget.shortcuts ||
+        widget.focusScopeNode != oldWidget.focusScopeNode) {
+      _cancelAllLongPressShortcuts();
       _shortcuts = widget.shortcuts ?? _loadShortcuts();
     }
+    _cancelInvalidLongPressShortcuts();
   }
 
   @override
   void dispose() {
     FocusManager.instance.removeEarlyKeyEventHandler(_handleKeyEvent);
+    FocusManager.instance.removeListener(_cancelInvalidLongPressShortcuts);
+    WidgetsBinding.instance.removeObserver(this);
     _tvRemoteLease?.release();
-    _releaseAllLongPressShortcuts();
+    _cancelAllLongPressShortcuts();
     super.dispose();
   }
 
@@ -113,10 +144,18 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
   }
 
   KeyEventResult _handleKeyEvent(KeyEvent event) {
+    // A release can arrive before a focus/route notification. Check ownership
+    // first, so it cannot commit an armed short tap after the context changed.
+    _cancelInvalidLongPressShortcuts();
+    if (event.synthesized) {
+      final active = _activeLongPressKeys.remove(event.logicalKey);
+      if (active != null) _invokeCancellation(active.actions.onCancel);
+      return KeyEventResult.ignored;
+    }
     if (event is KeyUpEvent) {
       final longPressActions = _activeLongPressKeys.remove(event.logicalKey);
       if (longPressActions != null) {
-        _invokeAction(longPressActions.onRelease);
+        _invokeAction(longPressActions.actions.onRelease);
         return KeyEventResult.handled;
       }
     }
@@ -149,7 +188,11 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
       }
       final longPressActions = widget.longPressActions[actionName];
       if (longPressActions != null) {
-        _activeLongPressKeys[event.logicalKey] = longPressActions;
+        // Aliases of forward share one business hold and saved base speed.
+        // Finish the previous owner before arming another key.
+        _cancelAllLongPressShortcuts();
+        _activeLongPressKeys[event.logicalKey] =
+            (actionName: actionName, actions: longPressActions);
       }
       _invokeAction(action);
       return KeyEventResult.handled;
@@ -160,7 +203,7 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
       if (longPressActions == null) {
         return KeyEventResult.ignored;
       }
-      _invokeAction(longPressActions.onRepeat);
+      _invokeAction(longPressActions.actions.onRepeat);
       return KeyEventResult.handled;
     }
 
@@ -168,12 +211,12 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
   }
 
   bool _shouldHandleShortcut() {
+    if (!_applicationActive || _routeCovered) return false;
     if (widget.isBlocked?.call() ?? false) {
       return false;
     }
 
-    final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) {
+    if (_route != null && !_route!.isCurrent) {
       return false;
     }
 
@@ -201,11 +244,39 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts> {
     return null;
   }
 
-  void _releaseAllLongPressShortcuts() {
-    final actions = _activeLongPressKeys.values.toSet();
+  void _cancelInvalidLongPressShortcuts() {
+    if (_activeLongPressKeys.isEmpty) return;
+    if (!_shouldHandleShortcut()) {
+      _cancelAllLongPressShortcuts();
+      return;
+    }
+    for (final entry in _activeLongPressKeys.entries.toList()) {
+      if (!(widget.shouldHandleAction
+              ?.call(entry.value.actionName, entry.key) ??
+          true)) {
+        _activeLongPressKeys.remove(entry.key);
+        _invokeCancellation(entry.value.actions.onCancel);
+      }
+    }
+  }
+
+  void _cancelAllLongPressShortcuts() {
+    final actions = _activeLongPressKeys.values.map((v) => v.actions).toSet();
+    // Clear synchronously before callbacks; late repeat/UP cannot finish twice.
     _activeLongPressKeys.clear();
     for (final action in actions) {
-      _invokeAction(action.onRelease);
+      _invokeCancellation(action.onCancel);
+    }
+  }
+
+  void _invokeCancellation(PlayerShortcutAction action) {
+    // Route/widget updates can cancel while a descendant is building. The
+    // hold is already removed; let the callback update the HUD after build.
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      scheduleMicrotask(() => _invokeAction(action));
+    } else {
+      _invokeAction(action);
     }
   }
 

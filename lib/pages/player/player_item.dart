@@ -1,6 +1,7 @@
 import 'package:kazumi/pages/history/history_controller.dart';
 
 import 'dart:async';
+import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 import 'dart:io';
 
 import 'package:kazumi/pages/player/player_item_panel.dart';
@@ -145,6 +146,41 @@ class _PlayerItemState extends State<PlayerItem>
   late final Animation<double> _screenshotFeedbackAnimation;
 
   double lastPlayerSpeed = 1.0;
+  bool _keyboardForwardArmed = false;
+  bool _keyboardForwardRepeated = false;
+  bool _keyboardForwardBoosted = false;
+  double _keyboardForwardBaseSpeed = 1.0;
+  VoidCallback? _releaseProbeState;
+  ModalRoute<dynamic>? _probePlayerRoute;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!TvInputLifecycle.enabled) return;
+    _probePlayerRoute = ModalRoute.of(context);
+    _releaseProbeState ??= TvInputLifecycle.registerPageState(
+      this,
+      isCurrent: () => mounted && _probePlayerRoute?.isCurrent == true,
+      read: () => {
+        'route': 'player',
+        'role': 'player',
+        'subjectId': videoPageController.bangumiItem.id,
+        'requestedRate': playerController.playback.playerSpeed,
+        'playing': playerController.playback.playing,
+        'positionMs': playerController.playback.currentPosition.inMilliseconds,
+        'controlsVisible': playerController.panel.showVideoController,
+        'speedHudVisible': playerController.panel.showPlaySpeed,
+        'menuCount': _openPlayerMenuCount,
+        'tabVisible': videoPageController.showTabBody,
+        'forwardArmed': _keyboardForwardArmed,
+        'forwardRepeated': _keyboardForwardRepeated,
+        'scrollTraceEnabled': false,
+      },
+      readCatalogIds: () => [],
+    );
+    TvInputLifecycle.checkpoint('player_visibility');
+  }
+
   late double longPressPlaySpeed;
   bool? _lastPipPlaying;
   bool? _lastPipDanmakuEnabled;
@@ -389,11 +425,14 @@ class _PlayerItemState extends State<PlayerItem>
       'forward': PlayerLongPressShortcutActions(
         onRepeat: handleShortcutForwardRepeat,
         onRelease: handleShortcutForwardUp,
+        onCancel: handleShortcutForwardCancel,
       ),
     };
   }
 
   void _showTvControls() {
+    if (TvInputLifecycle.active)
+      TvInputLifecycle.trace('player_controls', {'action': 'show'});
     widget.keyboardFocus.requestFocus();
     showVideoController();
     final direction = _pendingTvControlDirection;
@@ -528,6 +567,9 @@ class _PlayerItemState extends State<PlayerItem>
   }
 
   Future<void> handleShortcutRewind() async {
+    if (TvInputLifecycle.active)
+      TvInputLifecycle.trace('rewind',
+          {'seekBySeconds': -playerController.playback.arrowKeySkipTime});
     try {
       await _seekWithPlayerTimer(
         () => playerController.seekBy(
@@ -540,25 +582,60 @@ class _PlayerItemState extends State<PlayerItem>
   }
 
   void handleShortcutForwardDown() {
-    lastPlayerSpeed = playerController.playback.playerSpeed;
+    if (TvInputLifecycle.active)
+      TvInputLifecycle.trace('forward_down',
+          {'requestedRate': playerController.playback.playerSpeed});
+    _keyboardForwardArmed = true;
+    _keyboardForwardRepeated = false;
+    _keyboardForwardBoosted = false;
+    _keyboardForwardBaseSpeed = playerController.playback.playerSpeed;
   }
 
   Future<void> handleShortcutForwardRepeat() async {
+    if (!_keyboardForwardArmed) return;
+    if (TvInputLifecycle.active)
+      TvInputLifecycle.trace('forward_repeat',
+          {'requestedRate': playerController.playback.playerSpeed});
+    // A repeat is a long hold even if the requested speed is already high.
+    _keyboardForwardRepeated = true;
     final double defaultShortcutForwardPlaySpeed = GStorage.getSetting(
       SettingsKeys.defaultShortcutForwardPlaySpeed,
     );
     if (playerController.playback.playerSpeed <
         defaultShortcutForwardPlaySpeed) {
+      _keyboardForwardBoosted = true;
       playerController.panel.showPlaySpeed = true;
       await setPlaybackSpeed(defaultShortcutForwardPlaySpeed);
     }
   }
 
-  Future<void> handleShortcutForwardUp() async {
-    if (playerController.panel.showPlaySpeed) {
+  Future<void> handleShortcutForwardUp() =>
+      _finishKeyboardForward(commitTap: true);
+
+  Future<void> handleShortcutForwardCancel() =>
+      _finishKeyboardForward(commitTap: false);
+
+  Future<void> _finishKeyboardForward({required bool commitTap}) async {
+    if (!_keyboardForwardArmed) return;
+    final restore = _keyboardForwardBoosted;
+    final originalSpeed = _keyboardForwardBaseSpeed;
+    final seek = commitTap && !_keyboardForwardRepeated;
+    if (TvInputLifecycle.active)
+      TvInputLifecycle.trace('forward_finish', {
+        'commitTap': commitTap,
+        'repeated': _keyboardForwardRepeated,
+        'restoreRate': restore,
+        'baseRate': originalSpeed,
+        'seek': seek,
+      });
+    _keyboardForwardArmed = false;
+    _keyboardForwardRepeated = false;
+    _keyboardForwardBoosted = false;
+    if (restore) {
       playerController.panel.showPlaySpeed = false;
-      await setPlaybackSpeed(lastPlayerSpeed);
-    } else {
+      await setPlaybackSpeed(originalSpeed);
+    }
+    if (seek) {
       try {
         await _seekWithPlayerTimer(
           () => playerController.seekBy(
@@ -1564,6 +1641,7 @@ class _PlayerItemState extends State<PlayerItem>
 
   @override
   void dispose() {
+    _releaseProbeState?.call();
     // The route-scoped PlayerController owns playback disposal.
     _fullscreenListener();
     _playerSizeListener();

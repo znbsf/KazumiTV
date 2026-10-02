@@ -233,6 +233,39 @@ void main() {
     expect(seekCount, 0);
   });
 
+  testWidgets('disposing an armed short press must not commit its tap action',
+      (tester) async {
+    final scope = FocusScopeNode();
+    addTearDown(scope.dispose);
+    var commits = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: FocusScope(
+            node: scope,
+            child: Column(children: [
+              PlayerKeyboardShortcuts(
+                focusScopeNode: scope,
+                shortcuts: {
+                  'forward': [_label(LogicalKeyboardKey.arrowRight)]
+                },
+                actions: {'forward': () {}},
+                longPressActions: {
+                  'forward': PlayerLongPressShortcutActions(
+                      onRepeat: () {},
+                      onRelease: () => commits++,
+                      onCancel: () {})
+                },
+              ),
+              const Focus(autofocus: true, child: SizedBox()),
+            ]))));
+    await tester.pump();
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpWidget(const SizedBox());
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowRight);
+    expect(commits, 0,
+        reason:
+            'Leaving a player before release is cancellation, not a seek tap.');
+  });
+
   testWidgets('an open TV overlay blocks player seek shortcuts', (
     tester,
   ) async {

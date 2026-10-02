@@ -29,6 +29,7 @@ import 'package:kazumi/utils/device.dart';
 import 'package:kazumi/utils/media.dart';
 import 'package:kazumi/services/platform/platform_environment_service.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 
 part 'player_playback_controller.g.dart';
 
@@ -44,11 +45,24 @@ final class _OwnedPlayer {
       _playingSubscription =
           player.stream.playing.listen(history!.observePlaying);
     }
+    if (TvInputLifecycle.enabled) {
+      // Typed media-kit events only, never a native property query. The
+      // optional diagnostic owner cancels this subscription with the player.
+      _rateProbeSubscription = player.stream.rate.listen((rate) {
+        if (TvInputLifecycle.active)
+          TvInputLifecycle.trace('player_rate', {
+            'rate': rate,
+            'source': 'media_kit_typed_rate_event',
+            'playerIdentity': identityHashCode(player),
+          });
+      });
+    }
   }
 
   final Player player;
   final PlaybackHistoryRecorder? history;
   StreamSubscription<bool>? _playingSubscription;
+  StreamSubscription<double>? _rateProbeSubscription;
   bool ready = false;
   Future<void>? _disposeFuture;
 
@@ -74,6 +88,7 @@ final class _OwnedPlayer {
     // Capture synchronously before the native player is detached/disposed.
     final finalHistory = recordHistory();
     ready = false;
+    await _rateProbeSubscription?.cancel();
     await _playingSubscription?.cancel();
     try {
       await player.dispose();
@@ -656,6 +671,16 @@ abstract class _PlayerPlaybackController with Store {
     } catch (_) {
       return;
     }
+    if (TvInputLifecycle.active)
+      TvInputLifecycle.trace('player_state', {
+        'source': 'existing_timer_cached_state',
+        'playerIdentity': identityHashCode(player),
+        'rate': state.rate,
+        'requestedRate': playerSpeed,
+        'playing': state.playing,
+        'positionMs': state.position.inMilliseconds,
+        'durationMs': state.duration.inMilliseconds,
+      });
     if (playing != state.playing) {
       playing = state.playing;
     }
