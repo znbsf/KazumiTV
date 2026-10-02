@@ -25,6 +25,7 @@ class _TvAppShellState extends State<TvAppShell> {
   @override
   void initState() {
     super.initState();
+    FocusManager.instance.addEarlyKeyEventHandler(_handleConfirmRepeat);
     if (TvMode.enabled) {
       _channel.setMethodCallHandler((call) async {
         if (TvInputLifecycle.active)
@@ -41,8 +42,24 @@ class _TvAppShellState extends State<TvAppShell> {
     }
   }
 
+  // Material Activate shortcuts accept repeats by default. The initial press
+  // may already have pushed a route, so guard at the TV shell above Navigator.
+  KeyEventResult _handleConfirmRepeat(KeyEvent event) {
+    if (!TvMode.enabled || event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    return key == LogicalKeyboardKey.select ||
+            key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter ||
+            key == LogicalKeyboardKey.gameButtonA
+        ? KeyEventResult.handled
+        : KeyEventResult.ignored;
+  }
+
   @override
   void dispose() {
+    FocusManager.instance.removeEarlyKeyEventHandler(_handleConfirmRepeat);
     if (TvMode.enabled) {
       _channel.setMethodCallHandler(null);
       _channel.invokeMethod<void>('setActive', false);
