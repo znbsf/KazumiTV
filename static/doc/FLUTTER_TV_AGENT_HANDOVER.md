@@ -12,7 +12,7 @@
 
 工作区根：`C:/Users/hentai/Documents/Codex/2026-10-02/task`；独立 Git worktree：`Kazumi`；分支：`codex/flutter-tv-main-ui-fusion-20261002`；origin：`https://github.com/znbsf/KazumiTV.git`。
 
-已推送阶段：产品 UI `d3033a972f696a891bb39d33a365d5981200c197`，电视有限验收文档 `3045e580971af5d2c9a77ccb694aa106937884a0`，连接中断说明 `67c08c980d5e884e34f3d272962df98c04b5772b`，公开搜索与旧WebView修复 `24e341bb503ec71522a82dc07cf1e8ffa292da7a`。当前 HEAD 是最后一项；性能探针尚在工作区，不能把旧 SHA 当作新包源码。root已读取远端SHA一致；GitHub Actions该分支返回空列表，现有workflow使用PR/manual/release触发，无CI通过声明。推送和CI动态状态必须再读取实际回执。
+已推送阶段：产品 UI `d3033a972f696a891bb39d33a365d5981200c197`，电视有限验收文档 `3045e580971af5d2c9a77ccb694aa106937884a0`，连接中断说明 `67c08c980d5e884e34f3d272962df98c04b5772b`，公开搜索与旧WebView修复 `24e341bb503ec71522a82dc07cf1e8ffa292da7a`，默认关闭的探针与失败背景边界候选 `0aa7075a4f7fd09e55ba12b114f54374dd3ab6d3`。本次记录时 HEAD/远端均为最后一项，已只读核验；新异步背景候选正在工作区实现，不能把旧 SHA 当作新包源码。GitHub Actions此前该分支返回空列表，现有workflow使用PR/manual/release触发，无CI通过声明。推送和CI动态状态必须再读取实际回执。
 
 | 路径 | 用途 |
 |---|---|
@@ -77,7 +77,9 @@ python -X utf8 measure-tv-optimization.py baseline-chunks settled --label BASELI
 - 第一电视包 `2.3.1-tv-ui-fusion.1` code203081，ARMv7 APK SHA256 `23377cd84215bd8fa0ab527204ea9579d66ec77c4c82a6a7b0fca25678899d40`，实际安装字节匹配，独立包 UID10074及数据/首装时间保留，原三个应用均未改。
 - 旧三个真实源进入播放器路由后都在 URL 交接前失败，不能宣称首帧/音画/播放闭环通过。搜索镜像401是构建未含私有镜像凭据的公开请求路由问题；同一匿名请求在电脑官方API200。新代码仅对无凭据的公开搜索精确端点走官方，保留TLS/可选Bearer/所有其他路由，不搜索凭据。
 - 新 early-event 订阅、WebView幂等脚本/当前页面session、iframe显式媒体URL和签名字节修复有局部回归；当前源加单变量背景缓存候选完整624/624通过，静态分析0错误/0警告。Node的小DOM模型不等于WebView66，电脑接口200不等于电视搜索或播放通过。
-- 电视连接曾消失；本轮用同一已记录连接恢复并再次核验身份/原包。初始化/监听正常、方向键及F10到达、F9未到Flutter；不推断具体系统拦截原因。诊断日志实测每条1023字节截断，已将完整分片限制900字节。前三基线失败样本保留。当前203121原UI基线首遍完整：162帧/10键，build p95 5.322ms、raster p95 74.735ms，152/162 raster超约16.667ms预算，focus p95 20.758ms；所有采样丢失边界为0，首卡片身份返回正确。主候选只加静态背景RepaintBoundary；真实收益对照和播放验收尚未完成，不能把候选测试通过称为性能优化成功。
+- 后续异步竖图预滤已本机冻结，完整632/632回归通过（`test-20261002T082411090649Z.json`）；非纯色像素与原ImageFiltered/cover在DPR1/2比较通过，保持260ms驻留、600ms交叉淡入、720px源解码、sigma16、.84透明度和原双渐变。只保留一个准备任务和最新待处理选择，缓存限2项/16MiB；该上限不包含仍由淡出/在途任务持有的资源，不能宣称总显存峰值16MiB。超尺寸或准备异常保留原渲染效果。新的电视对照还未执行。
+- 修复包203131已在电视将公开搜索精确路由改至官方HTTPS，但两次连接均12秒超时，结果验收未通过；不改网络/代理。原17规则检索返回10结果。baimao已实际交付第1/2集URL并渲染画面，暂停/恢复/时间推进及seek已观察；退出续播、最终包回归与人工听声仍待完成。这是实际技术观察，来源授权/再发布权不因此得到证明。
+- 电视连接曾消失；本轮用同一已记录连接恢复并再次核验身份/原包。初始化/监听正常、方向键及F10到达、F9未到Flutter；不推断具体系统拦截原因。诊断日志实测每条1023字节截断，已将完整分片限制900字节。前三基线失败样本保留。203121原UI基线五个窗口完整：首遍settled raster p95 74.735ms，warm 74.973ms，rapid 283.869ms，vertical首遍/暖89.684/89.855ms；build较快，背景合成需优先归因。203131边界候选首遍/暖仅73.811/73.616ms，暖改善1.81%，**未接受为有效优化**。SDK ImageFiltered自身已有重绘边界。相同203131包临时应用内OLED=true后，settled raster p95 36.495ms；10键、焦点1→1、采样边界全0。该开关同时移除图和双渐变，只能归因整个背景合成；已恢复原false（截图52），系统设置未改。异步竖图预滤候选与实际播放验收仍在实施。
 
 原始证据入口：`evidence/fusion-checks`、`evidence/home-perf-diagnosis`、`evidence/metadata-search-401`、`evidence/source-event-race`、`evidence/legacy-webview-playback`、`evidence/tv-optimization-20261002`。以真实存在的文件和时间戳为准；某些诊断路径在最终交付时更新。保护快照 `evidence/optimization-protection-before.json` 和 `capture_protection.py` 对八原树记录 HEAD、NUL状态及脏文件哈希。
 
