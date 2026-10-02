@@ -1,0 +1,82 @@
+{
+  "utc": "2026-10-02T11:58:33.395680+00:00",
+  "status": "LOCAL_CANDIDATE_READY_AWAITING_EXPLICIT_AUTHORIZATION",
+  "source_commit": "2d4126fa06c9cdddcede54acdd4be2b14c757028",
+  "branch": "codex/flutter-tv-main-ui-fusion-20261002",
+  "full_tests": 640,
+  "analyzer": {
+    "errors": 0,
+    "warnings": 0,
+    "infos": 32
+  },
+  "probe_marker_absent": true,
+  "original_libmpv_bytes_verified": true,
+  "physical_device_candidate_installed": false,
+  "physical_device_new_performance_acceptance": false,
+  "last_verified_physical_device_version": 203191,
+  "emulator_visual": {
+    "home_five_columns": true,
+    "detail_same_fixed_theme": true,
+    "detail_focus": "开始观看",
+    "return_focus": "受控样本 1 / 1 号节目",
+    "continuity_recording": "fixed-EMULATOR-detail-continuity.mp4",
+    "physical_tv_acceptance": false,
+    "performance_measurement": false
+  },
+  "eight_protected_worktrees_unchanged": true,
+  "unresolved_approval_blockers": [
+    {
+      "action": "Install resource-baseline APK on existing Xiaomi isolated app",
+      "status": "AUTO_REVIEW_REJECTED_BEFORE_EXECUTION",
+      "reason": "Original visible user request is emulator-only; later assistant summaries do not establish physical-device authorization.",
+      "requested_clarification": true,
+      "bypassed": false
+    },
+    {
+      "action": "Save the two emulator screenshots to ChatGPT Library",
+      "status": "AUTO_REVIEW_REJECTED_BEFORE_EXECUTION",
+      "reason": "No trusted user-authored instruction in the visible transcript authorizes this external disclosure/destination.",
+      "requested_clarification": true,
+      "bypassed": false
+    }
+  ],
+  "artifact": {
+    "result": "CANDIDATE_INSTALL_GATES_PASS",
+    "stage": "resource-final",
+    "frozen_commit": "2d4126fa06c9cdddcede54acdd4be2b14c757028",
+    "sha256": "f60a8b474a6dd9d14ac0da76b2c6c2d4fecdbc4301a8ffe17777a57ce4d528b1",
+    "bytes": 31642694,
+    "version_code": 203221,
+    "version_name": "2.3.1-tv-fixed-surfaces.2",
+    "package": "com.znbsf.kazumi.flutterlab.test",
+    "abi": "armeabi-v7a",
+    "certificate_sha256": [
+      "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4"
+    ],
+    "probe_enabled": false,
+    "compose_default": false,
+    "original_libmpv_bytes_unchanged": true,
+    "prepared_source_sha256": "35fc4d5c35624aa4497e550de3fc0c3984a6158d245aaa9aaefa4a99693371ac",
+    "device_action": false
+  },
+  "screenshots": [
+    {
+      "name": "01-fixed-theme-home-EMULATOR-CONTROLLED-SAMPLE.png",
+      "sha256": "042273aa2f4d2b3de3dbcf36d8cb82ffda4077b4f541df91ea0b084999e12707",
+      "scope": "EMULATOR_CONTROLLED_SAMPLE",
+      "library_uploaded": false
+    },
+    {
+      "name": "02-fixed-theme-detail-EMULATOR-CONTROLLED-SAMPLE.png",
+      "sha256": "4c46cce633ba3269bf1d5812256207650c3c4da32f488b915172153445080a50",
+      "scope": "EMULATOR_CONTROLLED_SAMPLE",
+      "library_uploaded": false
+    },
+    {
+      "name": "03-fixed-theme-return-EMULATOR-CONTROLLED-SAMPLE.png",
+      "sha256": "032b7478df8dec1fbfa882e838848d005c4bb20b336452c1a4e5084dc94f8c0e",
+      "scope": "EMULATOR_CONTROLLED_SAMPLE",
+      "library_uploaded": false
+    }
+  ]
+}

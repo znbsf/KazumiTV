@@ -1,6 +1,6 @@
 # Kazumi FlutterTV 本机Agent / Codex接手手册
 
-2026-10-02 UTC：本轮融合、优化、正式包更新和技术播放验收已完成，保留明确限制。先读[最终报告](FLUTTER_TV_OPTIMIZATION_AND_PLAYBACK.md)，动态实际HEAD/远端/运行状态看工作区根evidence/fusion-final-handover.json。本手册不依赖云端会话，不含秘密和私有聊天转录。
+2026-10-02 UTC：上一轮交付已完成，当前继续[固定背景与大卡片候选](FLUTTER_TV_FIXED_SURFACES_CANDIDATE.md)。候选已完成电脑回归，真机新安装被自动审批拒绝，须取得明确授权后继续；上一轮[最终报告](FLUTTER_TV_OPTIMIZATION_AND_PLAYBACK.md)仅是旧产品基线。动态实际HEAD/远端/运行状态看工作区根evidence/fusion-final-handover.json。本手册不依赖云端会话，不含秘密和私有聊天转录。
 
 ## 目标、来源和权限
 
