@@ -6,6 +6,8 @@
 
 固定 Flutter 3.47.3 / `e8113bf45620cbeb8aff64947ee4c93e16adb4cf`、JDK 21、Android SDK 36 / Build Tools 36.0.0、NDK 28.2.13676358；依赖锁文件不升级。先 `flutter pub get --enforce-lockfile`，构建使用 `--pub` 重新生成插件注册，构建后检查 pubspec.lock 未变。
 
+分析与全部测试使用 Windows runner，与现有四张非 TV 像素基线的生成/验收平台一致，保持原基线和严格逐像素比较。首轮 Linux 运行其余 659 项通过，四张截图有 0.39–0.47% 跨平台差异；不更新基线或跳过测试。三 ABI Android 构建仍使用 Ubuntu。
+
 唯一启用工作流为 `.github/workflows/tv-ci.yml`，响应 main 的 PR/push、指定融合/集成分支 push 及手动触发。它运行分析和测试，并分别构建 ARMv7、ARM64、x86_64；候选身份为 `com.znbsf.kazumi.fluttertv.candidate`，开发证书、probe 关闭，只上传 Actions artifact。权限限当次任务的 `contents:read`，checkout 不保留凭据；不使用 secret、发布环境、长期令牌或 Release 写权限。
 
 旧通用 pr.yaml/release.yaml 的原文保留于 native-history/upstream-flutter-workflows，集成时移除旧触发入口。未配置的签名工作流移至 [workflow-reference/tv-release.yml.reference](workflow-reference/tv-release.yml.reference)，不在 active workflows 中；它只是未来方案参考，不能当作可用 CI，也不需要为本次发行配置 GitHub secret/environment。

@@ -12,7 +12,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   checks:
-    runs-on: ubuntu-24.04
+    # Keep exact pixel comparisons on the Windows host used for the baselines.
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
