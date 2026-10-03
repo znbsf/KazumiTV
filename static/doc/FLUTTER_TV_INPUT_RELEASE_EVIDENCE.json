@@ -1,0 +1,561 @@
+{
+  "schema": "kazumi-flutter-tv-input-release-evidence/v1",
+  "prepared_date_utc": "2026-10-03",
+  "scope": "Saved evidence with source/version separation: 2026-10-02 diagnostic/baseline records and a separate 2026-10-03 bounded final probe-off smoke.",
+  "branch": "codex/flutter-tv-main-ui-fusion-20261002",
+  "product_source": "e767f4ac875d201e35e63730c7257a873b48fafb",
+  "delivery_commit": "Recorded separately by the integrating owner; documentation HEAD is not the APK source.",
+  "final_tv_package": {
+    "application_id": "com.znbsf.kazumi.flutterlab.test",
+    "version_code": 203291,
+    "version_name": "2.3.1-tv-input-final.2",
+    "abi": "armeabi-v7a",
+    "apk": "artifacts/Kazumi-FlutterTV-confirm-final-Xiaomi-isolated-armeabi-v7a.apk",
+    "sha256": "b5e40c8cd8696a35dbfe04899bcb079c46a29157a7954f6c3373278634f852e6",
+    "bytes": 31648090,
+    "development_certificate_sha256": "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4",
+    "probe_enabled": false,
+    "compose_default": false,
+    "original_libmpv_bytes_unchanged": true,
+    "libmpv_sha256": "6035ab32a2151c404af75417c97646046cbee3d6612365841378635051ba7825",
+    "installed_bytes_verified": true,
+    "test_uid_data_directory_first_install_preserved": true,
+    "original_three_packages_unchanged": true,
+    "no_uninstall_clear_or_downgrade": true,
+    "candidate_receipt": {
+      "workspace_path": "evidence/tv-optimization-20261002/confirm-final-candidate.json",
+      "sha256": "ffc069d513742d17b52302743fafb43571006a1ac178504e363011c82c569f58"
+    },
+    "install_receipt": {
+      "workspace_path": "evidence/tv-optimization-20261002/confirm-final-installation.json",
+      "sha256": "6f08ab5f3d749fb345103be35795c7dc851ffc8955fb03d68ad4e549aed4240a"
+    },
+    "probe_off_receipt": {
+      "workspace_path": "evidence/tv-optimization-20261002/confirm-final-probe-off-validation.json",
+      "sha256": "7dc56318ee7ba29c08097d30199460ed6d354cfefa364c7c3bff6dbbb5ea353a"
+    },
+    "saved_smoke": {
+      "result": "VISIBLE_PLAYBACK_AND_RETURN_HOME_SMOKE_WITH_LIMITS",
+      "visible_video_frame": true,
+      "player_exited_to_detail": true,
+      "returned_home": true,
+      "final_focus": "recently watched",
+      "playback_left_running": false,
+      "own_pid_log_marker_counts": {
+        "FATAL EXCEPTION": 0,
+        "Fatal signal": 0,
+        "Unhandled Exception": 0,
+        "KAZUMI_TV_PERF": 0
+      },
+      "clock_slope_verified": false,
+      "sound_or_lip_sync_verified": false,
+      "receipt": {
+        "workspace_path": "evidence/tv-optimization-20261002/confirm-final-smoke.json",
+        "sha256": "8d29c40ed455e9318432166f6be2969260c963c67f2a32fafd66e5f1903e861c"
+      }
+    }
+  },
+  "validation": {
+    "source_commit": "e767f4ac875d201e35e63730c7257a873b48fafb",
+    "tests": {
+      "passed": 663,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "receipt": {
+        "workspace_path": "evidence/fusion-checks/test-20261002T194400011797Z.json",
+        "sha256": "a6640d0ebf1fc567ca450e9e4ffb443ad5aea48a9b611886c5946392d81d846a"
+      }
+    },
+    "analyze": {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 58,
+      "exit_code": 0,
+      "receipt": {
+        "workspace_path": "evidence/fusion-checks/analyze-20261002T194633093358Z.json",
+        "sha256": "a619ffade067bbb154057d540a2dc0975d3c05ef4c18ec3caa1d4d5e0b0351bc"
+      },
+      "log": {
+        "workspace_path": "evidence/fusion-checks/analyze-20261002T194633093358Z.log",
+        "sha256": "c7a967a7973ce0754f1e93c4db0abc07954d55a593eec7b33fc934251f8dfeeb"
+      }
+    },
+    "repeated_for_documentation": false
+  },
+  "input_fixes": [
+    {
+      "id": "player_cancel",
+      "commit": "1c2d62c45ce9430bad3b59de46d7ccd9eb56c434",
+      "behavior": "Cancel keyboard holds without committing tap seek; separate keyboard/touch state and restore the hold owner base rate.",
+      "red_receipt": {
+        "workspace_path": "evidence/fusion-checks/test-20261002T185047673889Z.json",
+        "sha256": "50fa1c0731ee9414a70db82d2a4dfa640f17d8500d479cc5697c38d6154f5180"
+      },
+      "device_evidence_source": "ae90351a11a0ceba361f7d5642979aba4ac40273"
+    },
+    {
+      "id": "pagination_pending_focus",
+      "commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+      "behavior": "Keep a valid pending reveal when another DOWN repeat reaches a loading boundary with no actionable next item.",
+      "red_receipt": {
+        "workspace_path": "evidence/fusion-checks/test-20261002T191835291736Z.json",
+        "sha256": "b383945141d49f2121a64fc53589ce0946fa77e6d6912e063e449a5eb152fcb6"
+      },
+      "green_receipt": {
+        "workspace_path": "evidence/fusion-checks/test-20261002T191907357608Z.json",
+        "sha256": "10bb0c35ec162ef86ef41e8d6f642f446dd3c0b175c087df492cff35cd98da39"
+      },
+      "scope": "Delayed-append component regression; earlier device window did not reach this edge and is not a device reproduction."
+    },
+    {
+      "id": "held_confirm",
+      "commit": "e767f4ac875d201e35e63730c7257a873b48fafb",
+      "behavior": "Suppress TV select/enter/numpadEnter/gameButtonA repeat before ordinary Focus/Shortcuts activation; retain down/up/directions and non-TV defaults.",
+      "red_receipt": {
+        "workspace_path": "evidence/fusion-checks/test-20261002T194139711080Z.json",
+        "sha256": "d546ad7b5efb99abf34a645ab57465cf4e6de6327cee49c833442cefadb9eabd"
+      },
+      "green_receipt": {
+        "workspace_path": "evidence/fusion-checks/test-20261002T194230084822Z.json",
+        "sha256": "41171e37ac5989c004ca51f96f985791023bfab9e56274662ea0aa41497d357c"
+      },
+      "scope": "Other early handlers still run; does not intercept their own business actions."
+    }
+  ],
+  "held_confirm_saved_device_result": {
+    "source_commit": "e767f4ac875d201e35e63730c7257a873b48fafb",
+    "version_code": 203281,
+    "probe_enabled": true,
+    "native_attempts_accepted": true,
+    "app_select_types": [
+      "down",
+      "repeat",
+      "repeat",
+      "repeat",
+      "up"
+    ],
+    "single_back_returns_original_home_card": true,
+    "catalog_unchanged": true,
+    "window_sha256": "9111df485205f9ff3de8afa6faf85fa9166e5108d6191fde1d95857388610422",
+    "scope": "Controlled helper injection, final route/focus state and component regression; unregistered intermediate control identities remain unknown.",
+    "receipt": {
+      "workspace_path": "evidence/input-lifecycle-20261002/confirm-repeat-fixed-result.json",
+      "sha256": "7f5f251618421110cc7fa9b2e55c0832f5fab4630328193f436a9293dbf96390"
+    }
+  },
+  "player_saved_device_results": {
+    "source_commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+    "version_code": 203261,
+    "apk_sha256": "049c903f2fe46e7b6b45fdb8b64ab1ebda96b13433f43dfe499605cba4085677",
+    "probe_enabled": true,
+    "verdict": "SUPPORTED_WITHIN_SAVED_TRACE",
+    "player_code_unchanged_by_e767": true,
+    "not_relabelled_as_203291_measurement": true,
+    "windows": [
+      {
+        "name": "player-short-tap",
+        "raw": {
+          "workspace_path": "evidence/tv-resource-20261002/windows/player-short-tap.json",
+          "sha256": "691257033eaf508d2c3856078e4f368f7187fba9d6cdc4290cec6131f9f0d6aa"
+        },
+        "source_commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+        "version_code": 203261,
+        "helper_sha256": "a1196284391eb74818dd39ee9f7d04623c527fd5ed04230ec9f3a440e9a667b4",
+        "resource_sampler": false,
+        "screen_recording": false
+      },
+      {
+        "name": "player-held-release",
+        "raw": {
+          "workspace_path": "evidence/tv-resource-20261002/windows/player-held-release.json",
+          "sha256": "b2279e017d83bb90bb3171ca1ab78b694aeb6f7c731eff85dc0d172d03b05695"
+        },
+        "source_commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+        "version_code": 203261,
+        "helper_sha256": "a1196284391eb74818dd39ee9f7d04623c527fd5ed04230ec9f3a440e9a667b4",
+        "resource_sampler": false,
+        "screen_recording": false
+      },
+      {
+        "name": "player-overlay-cancel",
+        "raw": {
+          "workspace_path": "evidence/tv-resource-20261002/windows/player-overlay-cancel.json",
+          "sha256": "91b1b8d35ab8979c148a74681af51622ef495da979b390466a91e59f9761d209"
+        },
+        "source_commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+        "version_code": 203261,
+        "helper_sha256": "a1196284391eb74818dd39ee9f7d04623c527fd5ed04230ec9f3a440e9a667b4",
+        "resource_sampler": false,
+        "screen_recording": false
+      },
+      {
+        "name": "player-held-progress",
+        "raw": {
+          "workspace_path": "evidence/tv-resource-20261002/windows/player-held-progress.json",
+          "sha256": "afd3e3f785872ed4f05db23919a62942d1111f41f8bf47f1079ba6da297d1136"
+        },
+        "source_commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+        "version_code": 203261,
+        "helper_sha256": "9c82324d6d82fac34460a87c360f06b2579678327f9432cc4c77e748fa5b0c0c",
+        "resource_sampler": false,
+        "screen_recording": false
+      }
+    ],
+    "native_and_app_order_match": true,
+    "dropped": 0,
+    "state_read_errors": 0,
+    "short_tap_seek": true,
+    "recorded_held_or_cancel_forward_seek": false,
+    "one_forward_finish_per_window": true,
+    "overlay_cancel_ms_after_controls_show": 39.578,
+    "overlay_cancel_ms_before_right_up": 616.224,
+    "late_up_second_finish": false,
+    "long_window_cached_position_slope": {
+      "hold_interior": 2.0001,
+      "cross_release": 1.7599,
+      "post_finish": 1.0133
+    },
+    "rate_semantics": "Pinned media-kit setRate updates state and emits typed rate before _setProperty; cache/request-side report, not native acknowledgement.",
+    "position_semantics": "Existing approximately 1Hz cached state; atUs is read time, not native position update time.",
+    "unknown": [
+      "native rate confirmation",
+      "native restoration within 250ms",
+      "every-frame continuity and all uninstrumented seek paths"
+    ],
+    "scope_limits": [
+      "Controlled helper injection is not physical remote hardware acceptance.",
+      "Four windows do not cover every disposal, synthesized-key, background or initial-rate cancellation branch.",
+      "Forward business inputSeq is null; attribution uses an isolated unique owner and same-domain event order.",
+      "Player control identity and full scroll coverage are unknown."
+    ],
+    "review": {
+      "workspace_path": "evidence/input-lifecycle-20261002/player-actual-window-review.json",
+      "sha256": "09cfb38e751b1ccf6fef1a5fa08a0b651c5afd0182ac02b61260b38c3d440c3b"
+    }
+  },
+  "home_navigation_saved_results": [
+    {
+      "name": "input-h-verified-on",
+      "source_commit": "14f36aadef08b7771d83522def3ccad59e3202fa",
+      "version_code": 203241,
+      "verdict": "PASS_WITHIN_LOGGED_SCOPE",
+      "scope_accepted": true,
+      "catalog_count": 24,
+      "app_events": 10,
+      "focus_events": 9,
+      "scroll_events": 1,
+      "summary": {
+        "workspace_path": "evidence/input-lifecycle-20261002/input-h-verified-on-summary.json",
+        "sha256": "854f24d2d49f4f1155377a934bcc370d6b4490e0ee7b84099e3080f170b49a7c"
+      },
+      "raw": {
+        "workspace_path": "evidence/tv-resource-20261002/windows/input-h-verified-on.json",
+        "sha256": "bd1dc2242f02361ab060cb1e0dbc3db0639e846297f2edeb3e4c523fd9f2d28d"
+      }
+    },
+    {
+      "name": "input-v-verified-loaded48",
+      "source_commit": "14f36aadef08b7771d83522def3ccad59e3202fa",
+      "version_code": 203241,
+      "verdict": "PASS_WITHIN_LOGGED_SCOPE",
+      "scope_accepted": true,
+      "catalog_count": 48,
+      "app_events": 10,
+      "focus_events": 5,
+      "scroll_events": 34,
+      "summary": {
+        "workspace_path": "evidence/input-lifecycle-20261002/input-v-verified-loaded48-summary.json",
+        "sha256": "1faf37a1056445e0be098c7a40eece1f133bf8746f7cf8e7fad97d8d277f57c3"
+      },
+      "raw": {
+        "workspace_path": "evidence/tv-resource-20261002/windows/input-v-verified-loaded48.json",
+        "sha256": "d4e05ce5050c4ee7c3dbb4b6d2fd86f0ed21bd743080f7b3d7c52a863eb91b6b"
+      }
+    },
+    {
+      "name": "input-final-source-horizontal",
+      "source_commit": "ae90351a11a0ceba361f7d5642979aba4ac40273",
+      "version_code": 203261,
+      "verdict": "PASS_WITHIN_LOGGED_SCOPE",
+      "scope_accepted": true,
+      "catalog_count": 24,
+      "app_events": 10,
+      "focus_events": 9,
+      "scroll_events": 1,
+      "summary": {
+        "workspace_path": "evidence/input-lifecycle-20261002/input-final-source-horizontal-summary.json",
+        "sha256": "6772a03d07ed7f7ed8c82ff0b6ec53502275abb655606eaecece6c115d1c2c72"
+      },
+      "raw": {
+        "workspace_path": "evidence/tv-resource-20261002/windows/input-final-source-horizontal.json",
+        "sha256": "9ddb2b4941ae0fedf118f2a1830132d70dbe835d786fb3cf70e501ea139d3d22"
+      }
+    }
+  ],
+  "render_findings": {
+    "poster_boundary": {
+      "experiment_commit": "8337cdf2e24ffabf51418c125db81fe3a1db3be2",
+      "revert_commit": "4b6e979aaf37d45a707c34892e34f7cfc66d2199",
+      "verdict": "REVERTED_NO_PRIMARY_RASTER_BENEFIT",
+      "frames_per_variant": 51,
+      "raster_p95_ms": [
+        42.829,
+        43.042
+      ],
+      "over_budget_frames": [
+        47,
+        47
+      ],
+      "build_p95_ms": [
+        6.066,
+        4.282
+      ],
+      "receipt": {
+        "workspace_path": "evidence/render-cause-20261002/poster-boundary-disposition.json",
+        "sha256": "f29aa748f234d5ff56b58f7317ab09f01041f2a77662882c88ecc944c61b7d6d"
+      }
+    },
+    "native_trace": {
+      "version_code": 203231,
+      "separate_historical_window": true,
+      "own_queue_buffer_calls": 49,
+      "queue_buffer_p95_ms": 31.371,
+      "queue_buffer_sleep_percent": 98.25,
+      "mali_adjacent_wakeups": "43/44",
+      "inference": "Submission synchronization wait supported; concrete GPU work cause, fence ownership and individual visual-effect attribution unproven.",
+      "review": {
+        "workspace_path": "evidence/render-cause-20261002/native-release-203231-own-raster-review.md",
+        "sha256": "ce9798bb5e3d1b279a0ca7112bac8daa15938c03c1ef00b3970dd58589b8ee50"
+      }
+    },
+    "no_60fps_or_panel_fps_claim": true,
+    "no_statistical_gain_from_single_window": true,
+    "no_full_visual_continuity_claim": true
+  },
+  "three_abi_configuration_build": {
+    "source_commit": "e767f4ac875d201e35e63730c7257a873b48fafb",
+    "composite_source_preparation_sha256": "95ab028faeef897112d579c88937f1924c210218acd3d846502ab3bbd3388e3c",
+    "overlay_files": {
+      "android/app/tv.gradle": "7f55ffa7a2a463cf414f029c024e1edcbae15dcaaa62bf88bcbbcdf6f874df33",
+      "android/app/src/tv/AndroidManifest.xml": "c6d0d08cf941c2de4d61123a16721786d5a4f8cc7e12ba29376af51d7164d098",
+      "android/app/src/tv/res/drawable/tv_banner.xml": "dc7b4d172a25ddd85ad170b455ac27dca19496ecee2b99618c6759a5133f5cd8",
+      "android/app/src/tv/res/drawable/kazumitv_mark.xml": "e3a22a1a9b2393d3da2b96f73b2116bd5a1f01b711f7ba077ab0aa3ad4c0871e"
+    },
+    "application_id": "com.znbsf.kazumi.fluttertv.candidate",
+    "version_name": "0.4.0-ci",
+    "signing": "Existing development/debug certificate",
+    "certificate_sha256": "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4",
+    "formal_release": false,
+    "remote_ci_run": false,
+    "formal_signing_path_exercised": false,
+    "arm64_runtime_tested": false,
+    "artifacts": [
+      {
+        "apk": "KazumiTV-preview-config-confirm-CI-armeabi-v7a.apk",
+        "sha256": "0b1c5b0df0966dd9a716de7ebd42b2bc7176def6b2b307767d43d58989619997",
+        "bytes": 31648802,
+        "version_code": 203301,
+        "abi": "armeabi-v7a",
+        "libmpv_sha256": "6035ab32a2151c404af75417c97646046cbee3d6612365841378635051ba7825",
+        "probe_marker_absent": true
+      },
+      {
+        "apk": "KazumiTV-preview-config-confirm-CI-arm64-v8a.apk",
+        "sha256": "79750d8113dff0d2b3e98e97f7ff09c4140c4d09b3ba651f480bb59677fb1e42",
+        "bytes": 32655160,
+        "version_code": 203302,
+        "abi": "arm64-v8a",
+        "libmpv_sha256": "77319bc63a205123b403e35088401e7da61886b78bd0a678a282876cfb9c0f66",
+        "probe_marker_absent": true
+      },
+      {
+        "apk": "KazumiTV-preview-config-confirm-CI-x86_64.apk",
+        "sha256": "8fcf06c4cc8766c3ee9286467a37a0364519943694487058f8bbd439cf79addc",
+        "bytes": 33716903,
+        "version_code": 203304,
+        "abi": "x86_64",
+        "libmpv_sha256": "fed6d87e0eaa54b6be12578b31a20f1bd09f6aa9d52b0008e4dc88a5887c5926",
+        "probe_marker_absent": true
+      }
+    ],
+    "summary": {
+      "workspace_path": "evidence/release-readiness-20261002/config-build-confirm/summary.json",
+      "sha256": "4c2c6b83ce04870cbc429a3298e52f285386fc655a0fc93aa176ebdec613b8dd"
+    },
+    "x86_64_emulator": {
+      "api": 36,
+      "final_version_code": 203304,
+      "installed_bytes_verified": true,
+      "same_certificate_upgrade_from": 203284,
+      "first_install_was_earlier_source": true,
+      "home_visible": true,
+      "original_app_and_candidate_data_preserved": true,
+      "stopped_utc": "2026-10-02T19:57:29.649585+00:00",
+      "userdata_preserved": true,
+      "fixture_server_started": false,
+      "install_receipt": {
+        "workspace_path": "evidence/release-readiness-20261002/config-build-confirm/emulator-installation.json",
+        "sha256": "b6b85052568c360c12b3b9c804fcd063560a5232157a85a5bf97572133b913df"
+      },
+      "stop_receipt": {
+        "workspace_path": "evidence/release-readiness-20261002/config-build-confirm/emulator-final-smoke-and-stop.json",
+        "sha256": "e78f1cef6f1d0d1d641fb1727dcc703f085b1601b6a07880b5ef606cacca7e24"
+      }
+    },
+    "build_summary_installed_false_is_build_time_only": true
+  },
+  "protection_and_publication_at_cutoff": {
+    "old_worktrees": 8,
+    "heads_branches_status_dirty_sha_unchanged": true,
+    "protection_receipt": {
+      "workspace_path": "evidence/input-final-protection-comparison.json",
+      "sha256": "cb71a8a31247b09b3e78c829293a42c75fc1fcc3840be2d73a1278b909f0be2b"
+    },
+    "main_or_tags_or_public_release_mutated": false,
+    "native_main": "24bc50ef47af5e32907ed54413e1eb33c1fb601e",
+    "last_verified_published_fusion_head": "2123363121e5e97c8a788bc06199167bfef1774f",
+    "new_product_commits_pushed_at_cutoff": false,
+    "recommendation_not_approval": {
+      "application_id": "com.znbsf.kazumi.fluttertv",
+      "version_name": "0.4.0-preview.1",
+      "dedicated_long_term_signing": true,
+      "final_version_code_selected": false,
+      "old_native_data_migration_is_preview_gate": false
+    },
+    "formal_signing_confirmed_available": false,
+    "repository_secret_names": [],
+    "environment_names": [],
+    "registered_workflows": [],
+    "signing_metadata_receipt": {
+      "workspace_path": "evidence/release-readiness-20261002/signing-ci-metadata-final.json",
+      "sha256": "aa96435f9b355726e28ea49d86ca9af0d40cd136e6daf485174edb1ea08337fa"
+    },
+    "signing_scope": "Only configured identity/metadata checked; no secret values, private keys or unrelated local paths read.",
+    "main_plan": "Preserve native 24bc archive, review a two-parent integration merge, require concrete main/release approval; rollback on a new branch/PR with revert -m 1, never force push.",
+    "workflow_plan": "Local candidate only; signed artifact, main and tag sequencing must be reviewed before execution.",
+    "old_session_or_schedules_resumed": false,
+    "snapshot_date_utc": "2026-10-02"
+  },
+  "baseline_evidence_cutoff_utc": "2026-10-02T20:07:04.954194+00:00",
+  "latest_saved_evidence_utc": "2026-10-03T02:29:29.765955+00:00",
+  "resume_verification_20261003": {
+    "result": "FINAL_PROBE_OFF_BOUNDED_SMOKE_COMPLETE_WITH_LIMITS",
+    "utc": "2026-10-03T02:29:29.765955+00:00",
+    "source_commit": "e767f4ac875d201e35e63730c7257a873b48fafb",
+    "version_code": 203291,
+    "probe_enabled": false,
+    "compose_default": false,
+    "reinstalled": false,
+    "full_tests_repeated": false,
+    "summary": {
+      "workspace_path": "evidence/resume-verification-20261003/final-smoke-review.json",
+      "sha256": "432e80ca6750385f0607b38e1cc05725dd1946bfb24982184b32e2a859607afc"
+    },
+    "local_hash_and_signing_recheck": {
+      "receipt": {
+        "workspace_path": "evidence/resume-verification-20261003/local-and-signing-check.json",
+        "sha256": "48e986235164c3e99861755a6b3288466e43180d98c71fd38840f1ff7e8e48f0"
+      },
+      "final_apk_and_three_ci_apk_hashes_unchanged": true,
+      "player_source_unchanged_ae903_to_e767": true,
+      "repository_secret_names": [],
+      "environment_names": [],
+      "registered_workflows": [],
+      "dedicated_formal_signing_confirmed": false,
+      "secret_values_or_keystores_read": false,
+      "unreferenced_local_keys_not_searched": true
+    },
+    "confirm": {
+      "receipt": {
+        "workspace_path": "evidence/resume-verification-20261003/final203291-confirm-held.json",
+        "sha256": "85ef14119acc1f6b81a381e47539a1b4a92f6adfb3e26a29489bab7f798fd06a"
+      },
+      "native_select_events": [
+        "down",
+        "repeat",
+        "repeat",
+        "repeat",
+        "up"
+      ],
+      "same_down_time": true,
+      "all_attempts_accepted": true,
+      "single_back_restores_original_home_card": true,
+      "new_application_lifecycle_stream_captured": false
+    },
+    "transition_visual": {
+      "reviewer": "integrating device owner",
+      "actual_encoded_frames_reviewed": 19,
+      "result": "Reviewed all 19 encoded frames: opaque fixed detail backdrop, normal horizontal route/Hero motion; no cover-black flash observed in those frames.",
+      "limitations": [
+        "Sparse compositor capture does not prove every physical display frame, panel tearing, latency, or 60fps.",
+        "Screen recording adds load; no performance comparison."
+      ],
+      "frame_index": {
+        "workspace_path": "evidence/resume-verification-20261003/final203291-confirm-held-actual-frame-index.json",
+        "sha256": "65b9de93735cc18ceee4de56bd742cad13b7ceea8bd6622fec8c1d6441c9db6d"
+      },
+      "movie_sha256": "a5f952f59f0eec069946c93bb16172ef2caf95601b408be819be08452fb27462",
+      "failed_extraction": "Older fixed-time contact-sheet extractor requested PTS beyond last encoded frame and failed; all actual frames then decoded without interpolation.",
+      "screenshots_or_media_published": false
+    },
+    "player_hold": {
+      "receipt": {
+        "workspace_path": "evidence/resume-verification-20261003/final203291-player-hold-immersive.json",
+        "sha256": "de490d09e591c2fa5a7f732546a1d864702978e51b950089e0aadcbc6a1817b5"
+      },
+      "native_right_events": 19,
+      "same_down_time": true,
+      "all_attempts_accepted": true,
+      "video_observation": "Media renders/moves, 2.0x HUD visible during hold and absent in later saved frames.",
+      "native_rate_confirmation": false,
+      "restoration_latency_bound": false
+    },
+    "player_cancel": {
+      "receipt": {
+        "workspace_path": "evidence/resume-verification-20261003/final203291-player-cancel-paused.json",
+        "sha256": "e42a1b15267c5f40495078ae0cd6fbdc1fdab737484e601906093d4902234775"
+      },
+      "native_right_events": 3,
+      "controls_opened_while_right_held": true,
+      "paused_for_window": true,
+      "before_displayed_position": [
+        "23:44",
+        "24:12"
+      ],
+      "after_displayed_position": [
+        "23:44",
+        "24:12"
+      ],
+      "result": "Displayed paused position unchanged; no erroneous 10-second tap seek observed. HUD absent by final recorded frame.",
+      "limitation": "Paused visible-state check; not a new native-rate confirmation or 250ms cancellation timing claim."
+    },
+    "excluded_window": {
+      "receipt": {
+        "workspace_path": "evidence/resume-verification-20261003/final203291-player-hold.json",
+        "sha256": "f3aef5665b38ddd7fb48ef5ad6e87063e0cf1a2bda6247a28a8d3e5134bba51e"
+      },
+      "reason": "Episode panel was open: native arrows moved menu focus. This is not player hold/rate evidence.",
+      "correction": "Player-scene preflight now requires immersive empty UI labels; exactly one valid replacement window retained.",
+      "counted_as_player_hold_or_rate_evidence": false
+    },
+    "end_state": {
+      "return_to_detail": true,
+      "return_to_home": true,
+      "playback_left_running": false,
+      "final_focus": "recently watched",
+      "final_home_receipt_sha256": "61a3bdde2cb4eab19d098cde8701b1a33bdebbd716c284c2803a388b009609f3",
+      "own_pid_log_marker_counts": {
+        "FATAL EXCEPTION": 0,
+        "Fatal signal": 0,
+        "Unhandled Exception": 0,
+        "KAZUMI_TV_PERF": 0
+      },
+      "original_three_packages_unchanged": true,
+      "test_uid_data_directory_first_install_preserved": true,
+      "device_testing_finished": true
+    },
+    "prior_player_internal_evidence_remains_ae903_203261": true,
+    "screenshots_and_media_private_local_only": true
+  }
+}

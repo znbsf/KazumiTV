@@ -1,6 +1,6 @@
 # Kazumi FlutterTV 本机Agent / Codex接手手册
 
-当前交付为[固定主题背景与五列大卡片](FLUTTER_TV_FIXED_SURFACES_CANDIDATE.md)，产品源码e0697911、实际探针关闭隔离验收包203231、probe/Compose关闭、完整640项回归通过。电视与Library授权已直接确认并执行；旧审批阻塞已解除。当前帧/资源结果、播放与运行终态见[证据](FLUTTER_TV_FIXED_SURFACES_EVIDENCE.json)及工作区evidence/fusion-final-handover.json。下文旧203191、639项和32–45%改善均只属于前一阶段基线，不能归给固定背景版本。
+当前产品候选见[输入修复与发布候选报告](FLUTTER_TV_INPUT_RELEASE_CANDIDATE.md)及[证据摘要](FLUTTER_TV_INPUT_RELEASE_EVIDENCE.json)：源码e767f4ac、隔离包203291、probe/Compose关闭，663/663测试通过，分析0错误/0警告/58info。2026-10-03同一最终包有限复核已完成：长按确认后一次BACK回原卡，播放器持键HUD和暂停取消进度符合保存的可见状态，随后退出回首页；原应用和数据保留，不宣称原生速率或250ms恢复保证。三ABI配置候选以开发签名完成本地构建，最终x86_64候选完成模拟器覆盖更新并停机，ARM64未运行，正式签名与远端发布CI未验证。设备测试已收尾，分支交付及运行所有权以工作区最新evidence/fusion-final-handover.json为准。下文保留历史交接：203191/639、203231/640与32–45%改善属于各自旧阶段，不能当作当前包的完整结果；运行终态也须按该记录日期理解。main/tag/公开Release的切换仍待具体方案批准，旧会话与定时项目检查不自动恢复。
 
 ## 目标、来源和权限
 
