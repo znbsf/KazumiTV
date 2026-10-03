@@ -28,6 +28,8 @@ jobs:
           cache: true
       - name: Verify exact Flutter revision
         run: |
+          # First launch may print bootstrap output before the machine JSON.
+          flutter --version
           flutter --version --machine > "$RUNNER_TEMP/flutter-sdk.json"
           python -c "import json,os,pathlib; d=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'flutter-sdk.json').read_text()); assert d['frameworkRevision']=='e8113bf45620cbeb8aff64947ee4c93e16adb4cf' and d['frameworkVersion']=='3.47.3'"
       - run: flutter pub get --enforce-lockfile
@@ -57,6 +59,8 @@ jobs:
           cache: true
       - name: Verify exact Flutter revision
         run: |
+          # First launch may print bootstrap output before the machine JSON.
+          flutter --version
           flutter --version --machine > "$RUNNER_TEMP/flutter-sdk.json"
           python -c "import json,os,pathlib; d=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'flutter-sdk.json').read_text()); assert d['frameworkRevision']=='e8113bf45620cbeb8aff64947ee4c93e16adb4cf' and d['frameworkVersion']=='3.47.3'"
       - run: flutter pub get --enforce-lockfile
