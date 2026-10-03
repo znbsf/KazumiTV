@@ -1,6 +1,6 @@
 # TV 构建与发布维护
 
-0.4.0-preview.1 已获准采用新包 `com.znbsf.kazumi.fluttertv`、基础版本号 `20324`、本机专用长期签名，并保留原生历史后切换 main、发布 GitHub 预览 Release。发行由维护者在本机完成，CI 不接收签名秘密。
+0.4.0 正式版沿用包名 `com.znbsf.kazumi.fluttertv` 及 preview 的长期证书，基础版本号递增为 `20325`。main 已保留原生与 Flutter 两条历史，preview 和原生归档继续保留。发行由维护者在本机完成，CI 不接收签名秘密。
 
 ## 工具链与无秘密 CI
 
@@ -14,7 +14,7 @@
 
 ## 本机签名与三个 ABI
 
-使用审阅后的精确集成提交构建。维护者已获准建立本机长期发布证书；凭据由本机受控流程提供给签名进程，使用现有 `TV_KEYSTORE_PATH`、`TV_KEYSTORE_PASSWORD`、`TV_KEY_ALIAS`、`TV_KEY_PASSWORD` 环境接口，材料不进入仓库或制品。构建命令不包含密码值：
+使用审阅后的精确提交构建。0.4.0 复用 preview 已有的长期发布证书，不能重新生成或替换；凭据由本机受控流程提供给签名进程，使用现有 `TV_KEYSTORE_PATH`、`TV_KEYSTORE_PASSWORD`、`TV_KEY_ALIAS`、`TV_KEY_PASSWORD` 环境接口，材料不进入仓库或制品。构建命令不包含密码值：
 
 ```sh
 flutter pub get --enforce-lockfile
@@ -24,22 +24,22 @@ flutter build apk --release --pub --flavor tv --split-per-abi \
   --android-project-arg=kazumiTvSigned=true \
   --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv \
   --android-project-arg=kazumiTvLabel=KazumiTV \
-  --build-name=0.4.0-preview.1 --build-number=20324 \
+  --build-name=0.4.0 --build-number=20325 \
   --dart-define=KAZUMI_TV_PERF=false --dart-define=KAZUMI_TV_FIXED_SURFACES=true
 git diff --exit-code -- pubspec.lock
 ```
 
 输出为 `build/app/outputs/flutter-apk/app-<ABI>-tv-release.apk`。本次本机发行使用等价的分步流程：先省略 `kazumiTvSigned` 构建 release 模式中间包，再由维护者在本机窗口输入密码，用 Android Build Tools 36.0.0 的 `apksigner` 替换中间签名。签名前后逐项比较 ZIP 非签名内容，并复核对齐、发布证书及不可调试状态；中间包不安装、不发布。
 
-基础编号乘 10 后按 ABI 加 1/2/4：ARMv7 203241、ARM64 203242、x86_64 203244。新 appId 的版本序列独立于原生或实验包，后续同包升级须保持兼容证书并递增编号。
+基础编号乘 10 后按 ABI 加 1/2/4：ARMv7 203251、ARM64 203252、x86_64 203254。新 appId 的版本序列独立于原生或实验包，后续同包升级须保持兼容证书并递增编号。
 
-每份包用 `tools/verify_tv_artifact.py` 核验明确 appId、ABI、基础编号 20324、版本 0.4.0-preview.1、完整 source SHA 和实际公开证书 SHA256。核验器同时检查 TV 入口、不可调试、probe 关闭及 libmpv 哈希，并输出 JSON。三个 ABI 必须都纳入，不以两个 ARM 包替代完整发行清单。
+每份包用 `tools/verify_tv_artifact.py` 核验明确 appId、ABI、基础编号 20325、版本 0.4.0、完整 source SHA 和实际公开证书 SHA256。核验器同时检查 TV 入口、不可调试、probe 关闭及 libmpv 哈希，并输出 JSON。三个 ABI 必须都纳入，不以两个 ARM 包替代完整发行清单。
 
 ## 产物、发布与回退
 
-将三份 APK 命名为 `KazumiTV-0.4.0-preview.1-{armeabi-v7a,arm64-v8a,x86_64}.apk`，附上各 ABI 核验 JSON、SHA256SUMS、精确构建提交的对应源码 ZIP、GPL 与第三方 NOTICE。正式证书/源码/产物哈希从实际回执获取，不预填开发证书或用文档提交冒充来源。
+将三份 APK 命名为 `KazumiTV-0.4.0-{armeabi-v7a,arm64-v8a,x86_64}.apk`，附上各 ABI 核验 JSON、SHA256SUMS、精确构建提交的对应源码 ZIP、GPL 与第三方 NOTICE。正式证书/源码/产物哈希从实际回执获取，不预填开发证书或用文档提交冒充来源。
 
-签名 artifact 可先本地审阅，不要求 main 已切换或 tag 已存在。随后按获准方案保留原生 `24bc50ef47af5e32907ed54413e1eb33c1fb601e` 归档，通过双父合并保留历史并普通推送 main；核验精确 tag `tv-fusion-v0.4.0-preview.1` 指向已验产物源码，再发布标为 prerelease 的 GitHub Release。CI 不自动建 tag、不创建或发布 Release。
+签名 artifact 可先本地审阅，不要求 main 已切换或 tag 已存在。随后普通推送 main，保留现有双父历史、原生归档及 `tv-fusion-v0.4.0-preview.1`；核验正式 tag `v0.4.0` 指向已验产物源码，再发布非 prerelease 的 GitHub Release。CI 不自动建 tag、不创建或发布 Release。
 
 原生代码与历史 Release 保留。源码回退使用新分支上的 `git revert -m 1 <MERGE_SHA>` 后普通合入，不重写历史；应用采用并存包，用户可直接切回原生，不卸载或清数据。首版不迁移原生收藏/历史，不开发转换层。
 
