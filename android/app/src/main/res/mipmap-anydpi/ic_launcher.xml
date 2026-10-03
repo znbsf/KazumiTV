@@ -1,0 +1,7 @@
+<!-- Original KazumiTV geometric mark: screen brackets and a play chevron. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#101611" android:pathData="M24,0H84Q108,0 108,24V84Q108,108 84,108H24Q0,108 0,84V24Q0,0 24,0Z" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#B8E8A4" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M35,28H25V78H35M73,28H83V78H73" />
+    <path android:fillColor="#B8E8A4" android:pathData="M43,34L70,53L43,72L43,60L53,53L43,46Z" />
+    <path android:fillColor="#66885A" android:pathData="M43,84H65V88H43Z" />
+</vector>

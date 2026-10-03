@@ -1,0 +1,228 @@
+{
+  "schema": "kazumi-release-native-license-source-index/v1",
+  "checked_utc": "2026-10-03T03:00:09.050692+00:00",
+  "native_release": "v1.2.7",
+  "native_release_url": "https://github.com/Predidit/libmpv-android-video-build/releases/tag/v1.2.7",
+  "build_source_commit": "dd2bfba8209bcd22e2d4c79f125b40e619e637ed",
+  "build_recipe_archive": "libmpv-build-dd2bfba-source.zip",
+  "recipe_archive_contains_dependencies": false,
+  "dependencies_reproduced_by": "native-depinfo.sh + native-download-deps.sh; fixed upstream SHAs plus archive buildscripts/patches",
+  "default_flavor": {
+    "ffmpeg": [
+      "--disable-gpl",
+      "--disable-nonfree",
+      "--enable-version3"
+    ],
+    "mpv": [
+      "-Dgpl=false"
+    ],
+    "binary_object_level_license_audit": false
+  },
+  "dependency_version_assignments": [
+    "v_sdk=9123335_latest",
+    "v_ndk=27.2.12479018",
+    "v_sdk_build_tools=34.0.0",
+    "v_libass=0.17.1",
+    "v_harfbuzz=7.2.0",
+    "v_fribidi=1.0.12",
+    "v_freetype=2-13-0",
+    "v_mbedtls=3.4.0",
+    "v_dav1d=1.2.0",
+    "v_libxml2=2.10.3",
+    "v_ffmpeg=7.1.3",
+    "v_mpv=32a164cc017acab50389f2194f720ccfd0b01a28",
+    "v_libplacebo=d4624cbfb37fdef337a7da5794b66202671a89cd",
+    "v_lcms2=lcms2.17",
+    "v_libogg=1.3.5",
+    "v_libvorbis=1.3.7",
+    "v_libvpx=1.13.0",
+    "v_libx264=023112c6f2f575c72e9f26274d183b70996fb542",
+    "v_fftools_ffi=10070acb2c090edda86dba431f6c281145ceb221",
+    "v_media_kit_android_helper=b768ce102cfa9b5ddec618bb939d689d1b0899fa",
+    "v_gas_preprocessor=ac1836309c2e77023c228b7184485597286289d3",
+    "sha_mbedtls=1873d3bfc2da771672bd8e7e8f41f57e0af77f33",
+    "sha_dav1d=676a864a11af2c0522e1f992e770589543894686",
+    "sha_libxml2=f507d167f1755b7eaea09fb1a44d29aab828b6d1",
+    "sha_libvpx=d6eb9696aa72473c1a11d34d928d35a3acc0c9a9",
+    "sha_ffmpeg=f46e514491172d15bd74b4abb1814cd2f05a763e",
+    "sha_freetype=de8b92dd7ec634e9e2b25ef534c54a3537555c11",
+    "sha_fribidi=6428d8469e536bcbb6e12c7b79ba6659371c435a",
+    "sha_harfbuzz=a321c4fee56b15247c10f9aa3db7e7ccb3b8173b",
+    "sha_libass=e8ad72accd3a84268275a9385beb701c9284e5b3",
+    "sha_lcms2=5176347635785e53ee5cee92328f76fda766ecc6"
+  ],
+  "actual_local_jars": [
+    {
+      "abi": "armeabi-v7a",
+      "jar_sha256": "7f522ed762ea6dfeba93a02e3837c5538790030b9965a03ed3a00276adc7b32c",
+      "entries": [
+        "lib/armeabi-v7a/libmediakitandroidhelper.so",
+        "lib/armeabi-v7a/libmpv.so"
+      ],
+      "mpv_sha256": "6035ab32a2151c404af75417c97646046cbee3d6612365841378635051ba7825"
+    },
+    {
+      "abi": "arm64-v8a",
+      "jar_sha256": "13e882d96b8cd235425172b022e4a94dfcae5f07985dff85c8d648e7369fa2d1",
+      "entries": [
+        "lib/arm64-v8a/libmediakitandroidhelper.so",
+        "lib/arm64-v8a/libmpv.so"
+      ],
+      "mpv_sha256": "77319bc63a205123b403e35088401e7da61886b78bd0a678a282876cfb9c0f66"
+    },
+    {
+      "abi": "x86_64",
+      "jar_sha256": "aed0fffc99e5e554d48e1af90bc700133c25fbc02615bf1bf17db9299365c481",
+      "entries": [
+        "lib/x86_64/libmediakitandroidhelper.so",
+        "lib/x86_64/libmpv.so"
+      ],
+      "mpv_sha256": "fed6d87e0eaa54b6be12578b31a20f1bd09f6aa9d52b0008e4dc88a5887c5926"
+    }
+  ],
+  "shaderc": {
+    "supplied_by": "Android NDK 27.2.12479018 (r27c)",
+    "source_directory": "sources/third_party/shaderc",
+    "recipe": "buildscripts/scripts/shaderc.sh at dd2bfba",
+    "separate_latest_shaderc_substitution": false,
+    "nested_ndk_notice_files_collected_this_pass": false
+  },
+  "misans": {
+    "source": "https://hyperos.mi.com/font/en/download/",
+    "original_font_sha256": "9c120f0a849bc0aa5048daae2a3c0f6eecd828b5b33fce682a9622833f5feea6",
+    "font_modified": false,
+    "material": "MiSans-License.en.txt",
+    "required_attribution_in_software": true
+  },
+  "files": [
+    {
+      "path": "LICENSES/libmpv-build-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/Predidit/libmpv-android-video-build/dd2bfba8209bcd22e2d4c79f125b40e619e637ed/LICENSE",
+      "sha256": "8f25da1621b9e063833aaae0d4a28c6b83c3e70176aad0fae5e4893e219ae799",
+      "bytes": 1879
+    },
+    {
+      "path": "LICENSES/mpv-Copyright.txt",
+      "source_url": "https://raw.githubusercontent.com/mpv-player/mpv/32a164cc017acab50389f2194f720ccfd0b01a28/Copyright",
+      "sha256": "bfe9ee4cceabcb8ecbfadf208d04156f73d801e6a57369a5606bb8341e204a23",
+      "bytes": 4096
+    },
+    {
+      "path": "LICENSES/mpv-LICENSE.LGPL.txt",
+      "source_url": "https://raw.githubusercontent.com/mpv-player/mpv/32a164cc017acab50389f2194f720ccfd0b01a28/LICENSE.LGPL",
+      "sha256": "72b672113d642cbb8ef5dcc76938db801983c56e50b1400ab930f1a64d6dc8d9",
+      "bytes": 26410
+    },
+    {
+      "path": "LICENSES/FFmpeg-LICENSE.md",
+      "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/f46e514491172d15bd74b4abb1814cd2f05a763e/LICENSE.md",
+      "sha256": "cb48bf09a11f5fb576cddb0431c8f5ed0a60157a9ec942adffc13907cbe083f2",
+      "bytes": 4376
+    },
+    {
+      "path": "LICENSES/FFmpeg-COPYING.LGPLv3.txt",
+      "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/f46e514491172d15bd74b4abb1814cd2f05a763e/COPYING.LGPLv3",
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768",
+      "bytes": 7651
+    },
+    {
+      "path": "LICENSES/FFmpeg-COPYING.GPLv3.txt",
+      "source_url": "https://raw.githubusercontent.com/FFmpeg/FFmpeg/f46e514491172d15bd74b4abb1814cd2f05a763e/COPYING.GPLv3",
+      "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+      "bytes": 35147
+    },
+    {
+      "path": "LICENSES/media-kit-android-helper-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/Predidit/media-kit-android-helper/b768ce102cfa9b5ddec618bb939d689d1b0899fa/LICENSE",
+      "sha256": "2e3000f38718f050869d57540c288c661a446f64df1ba4ea4764df552b04a331",
+      "bytes": 1112
+    },
+    {
+      "path": "LICENSES/mbedtls-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/Mbed-TLS/mbedtls/1873d3bfc2da771672bd8e7e8f41f57e0af77f33/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "bytes": 11358
+    },
+    {
+      "path": "LICENSES/dav1d-COPYING.txt",
+      "source_url": "https://raw.githubusercontent.com/videolan/dav1d/676a864a11af2c0522e1f992e770589543894686/COPYING",
+      "sha256": "b327887de263238deaa80c34cdd2ff3e0ba1d35db585ce14a37ce3e74ee389e9",
+      "bytes": 1317
+    },
+    {
+      "path": "LICENSES/libxml2-Copyright.txt",
+      "source_url": "https://raw.githubusercontent.com/GNOME/libxml2/f507d167f1755b7eaea09fb1a44d29aab828b6d1/Copyright",
+      "sha256": "c5c63674f8a83c4d2e385d96d1c670a03cb871ba2927755467017317878574bd",
+      "bytes": 1289
+    },
+    {
+      "path": "LICENSES/freetype-FTL.txt",
+      "source_url": "https://raw.githubusercontent.com/freetype/freetype/de8b92dd7ec634e9e2b25ef534c54a3537555c11/docs/FTL.TXT",
+      "sha256": "08c135755dd589039470f1fdbb400daaabaaa50d0b366d19cebff4d22986baa1",
+      "bytes": 6743
+    },
+    {
+      "path": "LICENSES/fribidi-COPYING.txt",
+      "source_url": "https://raw.githubusercontent.com/fribidi/fribidi/6428d8469e536bcbb6e12c7b79ba6659371c435a/COPYING",
+      "sha256": "32434afcc8666ba060e111d715bfdb6c2d5dd8a35fa4d3ab8ad67d8f850d2f2b",
+      "bytes": 26440
+    },
+    {
+      "path": "LICENSES/harfbuzz-COPYING.txt",
+      "source_url": "https://raw.githubusercontent.com/harfbuzz/harfbuzz/a321c4fee56b15247c10f9aa3db7e7ccb3b8173b/COPYING",
+      "sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+      "bytes": 1971
+    },
+    {
+      "path": "LICENSES/libass-COPYING.txt",
+      "source_url": "https://raw.githubusercontent.com/libass/libass/e8ad72accd3a84268275a9385beb701c9284e5b3/COPYING",
+      "sha256": "f7e30699d02798351e7f839e3d3bfeb29ce65e44efa7735c225464c4fd7dfe9c",
+      "bytes": 755
+    },
+    {
+      "path": "LICENSES/lcms2-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/mm2/Little-CMS/5176347635785e53ee5cee92328f76fda766ecc6/LICENSE",
+      "sha256": "6dbd60437f8ef91d8de1f08ad75882547fd4931bfcc3566a0735f28db1484d31",
+      "bytes": 1080
+    },
+    {
+      "path": "LICENSES/libplacebo-LICENSE.txt",
+      "source_url": "https://raw.githubusercontent.com/haasn/libplacebo/d4624cbfb37fdef337a7da5794b66202671a89cd/LICENSE",
+      "sha256": "b3aa400aca6d2ba1f0bd03bd98d03d1fe7489a3bbb26969d72016360af8a5c9d",
+      "bytes": 24478
+    },
+    {
+      "path": "libmpv-build-dd2bfba-source.zip",
+      "source_url": "https://codeload.github.com/Predidit/libmpv-android-video-build/zip/dd2bfba8209bcd22e2d4c79f125b40e619e637ed",
+      "sha256": "2b398adb6639e1ed9db9e87e9c179d4fb2dcc928551a3f88631e1ee6fd406b5f",
+      "bytes": 112549
+    },
+    {
+      "path": "native-depinfo.sh",
+      "source_url": "https://raw.githubusercontent.com/Predidit/libmpv-android-video-build/dd2bfba8209bcd22e2d4c79f125b40e619e637ed/buildscripts/include/depinfo.sh",
+      "sha256": "187655c3db6fc415fabf3f70fa24b2723f5d2357ccc005f8d56837e433575ff4",
+      "bytes": 1754
+    },
+    {
+      "path": "native-download-deps.sh",
+      "source_url": "https://raw.githubusercontent.com/Predidit/libmpv-android-video-build/dd2bfba8209bcd22e2d4c79f125b40e619e637ed/buildscripts/include/download-deps.sh",
+      "sha256": "688615afd90f6967eb221d446cb6eaa1358068cd47d8b73429f52ff2d04f2741",
+      "bytes": 3697
+    },
+    {
+      "path": "MiSans-License.en.txt",
+      "source_url": "https://hyperos.mi.com/font/en/download/",
+      "sha256": "66a19f8feca5054b88066e83a670867fb57649620fe700558372b8a9d0ea9a45",
+      "bytes": 1466,
+      "method": "Official HTML agreement text only, tags removed and whitespace normalized; no substantive text changes",
+      "source_html_sha256": "f3b0c35221e4a580d6e4795803fd2583a12bfdac96bbef80d8b9a7d69830fb1d"
+    },
+    {
+      "path": "LICENSES/media-kit-LICENSE.txt",
+      "source_url": "https://github.com/Predidit/media-kit/blob/994465d9bfca3f39d0b41199d16e7fd93fe97881/media_kit/LICENSE",
+      "sha256": "a78baa721ad6f5c0b2d8fb0c6cfff835ad8ed90393cac0087a90e8813490f2bd",
+      "bytes": 1133,
+      "method": "Exact pinned local checkout bytes"
+    }
+  ]
+}

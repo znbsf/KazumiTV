@@ -1,0 +1,16 @@
+This MiSans Fonts Intellectual Property License Agreement
+(hereinafter the "Agreement") is a legal agreement between you and
+Xiaomi Inc. (hereinafter "Xiaomi" or the "Licensor") regarding the
+installation and use of MiSans fonts (hereinafter "MiSans" or
+"MiSans Fonts"). You must accept all terms and conditions set
+forth in this Agreement before using all or any part of MiSans.
+Installing and using MiSans will be deemed as your acceptance of
+this Agreement and your consent to be bound by the terms of this
+Agreement. If you have any objections, please do not install
+and/or use MiSans and delete all MiSans font packages
+immediately.
+
+Subject to the terms and conditions of this Agreement, the Licensor hereby grants you a non-transferable, non-exclusive, royalty-free, revocable, worldwide copyright license to use MiSans Fonts in accordance with this Agreement, provided that the following conditions are met:
+You should specifically note in the software that MiSans Fonts was used.
+You may not adapt or redevelop MiSans Fonts or any of its components.
+You may not separately lease, sublicense, give, loan or further distribute MiSans Fonts or its components; nor may you redistribute or sell the font software or any copies thereof. This restriction does not apply to any other work you create using MiSans Fonts. If you use MiSans Fonts to create promotional materials, logos, apps, etc., you have the right to distribute or sell such works.

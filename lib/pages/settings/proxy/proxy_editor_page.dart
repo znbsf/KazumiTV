@@ -1,0 +1,140 @@
+import 'package:flutter/material.dart';
+import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
+import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/network/proxy_utils.dart';
+import 'package:kazumi/services/network/proxy_manager.dart';
+import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/request/core/network_config.dart';
+
+class ProxyEditorPage extends StatefulWidget {
+  const ProxyEditorPage({super.key});
+
+  @override
+  State<ProxyEditorPage> createState() => _ProxyEditorPageState();
+}
+
+class _ProxyEditorPageState extends State<ProxyEditorPage> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController urlController = TextEditingController();
+  final TextEditingController testUrlController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    urlController.text = GStorage.getSetting(SettingsKeys.proxyUrl);
+    testUrlController.text = GStorage.getSetting(SettingsKeys.proxyTestUrl);
+  }
+
+  @override
+  void dispose() {
+    urlController.dispose();
+    testUrlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> saveAndTest() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final url = urlController.text.trim();
+    if (url.isEmpty) {
+      KazumiDialog.showToast(message: '请输入代理地址');
+      return;
+    }
+
+    final testUrl = testUrlController.text.trim().isEmpty
+        ? 'https://www.google.com'
+        : testUrlController.text.trim();
+
+    await GStorage.putSetting(SettingsKeys.proxyUrl, url);
+    await GStorage.putSetting(SettingsKeys.proxyTestUrl, testUrl);
+    await GStorage.putSetting(SettingsKeys.proxyConfigured, false);
+
+    await GStorage.putSetting(SettingsKeys.proxyEnable, true);
+    ProxyManager.applyProxy();
+
+    try {
+      final parsed = ProxyUtils.parseProxyUrl(url);
+      if (parsed == null) {
+        throw StateError('Invalid proxy URL');
+      }
+      final dio = DioFactory.createForConfig(
+        NetworkConfig(
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 10),
+          proxyHost: parsed.$1,
+          proxyPort: parsed.$2,
+          allowBadCertificates: true,
+          enableLog: false,
+        ),
+      );
+      await dio
+          .get(
+            testUrl,
+          )
+          .timeout(const Duration(seconds: 15));
+      await GStorage.putSetting(SettingsKeys.proxyConfigured, true);
+      KazumiDialog.showToast(message: '测试成功');
+    } catch (e) {
+      await GStorage.putSetting(SettingsKeys.proxyEnable, false);
+      ProxyManager.clearProxy();
+      KazumiDialog.showToast(message: '代理连接失败');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsDetailScaffold(
+      title: const Text('代理配置'),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: SizedBox(
+            width: (MediaQuery.of(context).size.width > 800) ? 800 : null,
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: urlController,
+                    decoration: const InputDecoration(
+                      labelText: '代理地址',
+                      hintText: 'http://127.0.0.1:7890',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return '请输入代理地址';
+                      }
+                      if (!ProxyUtils.isValidProxyUrl(value)) {
+                        return '格式错误，请使用 http://host:port 格式';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: testUrlController,
+                    decoration: const InputDecoration(
+                      labelText: '测试地址',
+                      hintText: 'https://www.google.com',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: saveAndTest,
+        icon: const Icon(Icons.save),
+        label: const Text('保存并测试'),
+      ),
+    );
+  }
+}

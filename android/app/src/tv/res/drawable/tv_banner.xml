@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="#101611" /><corners android:radius="12dp" /></shape></item>
+    <item android:width="112dp" android:height="112dp" android:gravity="center" android:drawable="@drawable/kazumitv_mark" />
+</layer-list>

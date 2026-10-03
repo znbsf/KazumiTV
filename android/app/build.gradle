@@ -1,0 +1,105 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "org.jetbrains.kotlin.plugin.compose"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+android {
+    namespace "com.example.kazumi"
+    compileSdk flutter.compileSdkVersion
+    // Use the highest NDK required by the native plugins. Newer NDKs remain
+    // backward compatible with plugins that declare an older version.
+    ndkVersion "28.2.13676358"
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId "com.predidit.kazumi"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+
+    buildFeatures {
+        buildConfig true
+        compose true
+    }
+    defaultConfig { buildConfigField "boolean", "IS_TV_BUILD", "false" }
+
+    buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig signingConfigs.debug
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    // Reuse the isolated native TV experiment's already-cached Compose stack.
+    implementation platform("androidx.compose:compose-bom:2025.05.01")
+    implementation "androidx.activity:activity-compose:1.10.1"
+    implementation "androidx.compose.foundation:foundation"
+    implementation "androidx.tv:tv-material:1.0.0"
+    testImplementation "junit:junit:4.13.2"
+}
+
+// F-droid splits APKs by ABI, and requires different versionCode for each ABI.
+// For flutter version X.Y.Z, version code is X0Y0ZA, where A is the ABI code.
+// See:
+// * https://developer.android.com/build/gradle-tips
+// * https://developer.android.com/studio/build/configure-apk-splits
+// * https://gitlab.com/fdroid/fdroiddata/-/blob/master/metadata/im.nfc.nfsee.yml
+ext.abiCodes = ["armeabi-v7a": 1, "arm64-v8a": 2, "x86_64": 4]
+import com.android.build.OutputFile
+android.applicationVariants.all { variant ->
+    variant.outputs.each { output ->
+        def abiVersionCode = project.ext.abiCodes.get(output.getFilter(OutputFile.ABI))
+        if (abiVersionCode != null) {
+            output.versionCodeOverride = variant.versionCode * 10 + abiVersionCode
+        }
+    }
+}
+
+// Explicit opt-in; normal upstream Android builds keep their original variants.
+if (project.findProperty("kazumiTv") == "true") {
+    apply from: "tv.gradle"
+}

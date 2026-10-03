@@ -1,8 +1,0 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="320dp" android:height="180dp" android:viewportWidth="320" android:viewportHeight="180">
-    <path android:fillColor="#101611" android:pathData="M0,0h320v180h-320z" />
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#B8E8A4" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M58,60H48V112H58M96,60H106V112H96" />
-    <path android:fillColor="#B8E8A4" android:pathData="M67,67L94,86L67,105V93L77,86L67,79Z" />
-    <!-- Hand-drawn monoline lettering: KazumiTV. No upstream artwork or font asset. -->
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#E8EEE5" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M132,74V100M147,74L132,88L148,100M164,84H155V100H166V84M173,84H185L173,100H185M193,84V100H204V84M212,100V84H222V100M222,84H232V100M241,84V100M241,77V78" />
-    <path android:fillColor="@android:color/transparent" android:strokeColor="#B8E8A4" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M250,74H266M258,74V100M272,74L282,100L292,74" />
-</vector>

@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "updated_utc": "2026-10-02T05:48:16.180860+00:00",
+  "result": "PHYSICAL_UI_PASS_PLAYBACK_RESOLUTION_BLOCKED",
+  "authorization": "User explicitly authorized this existing Xiaomi TV after the emulator-only delivery",
+  "installed_source_commit": "d3033a972f696a891bb39d33a365d5981200c197",
+  "branch": "codex/flutter-tv-main-ui-fusion-20261002",
+  "model_parameters": "Parent-created GPT-6.1 Sol / Standard; no internal tool verification claim",
+  "target": {
+    "alias": "existing-authorized-xiaomi-tv",
+    "identity_sha256": "ffd8da095c904cb6fc20344b674f006d9da0106a8e293f35b884985ce68f853e",
+    "model": "MiTV-ASTP0",
+    "android_sdk": 28,
+    "abi": "armeabi-v7a",
+    "resolution": "1920x1080",
+    "webview": "com.android.webview 66.0.3359.158"
+  },
+  "apk": {
+    "sha256": "23377cd84215bd8fa0ab527204ea9579d66ec77c4c82a6a7b0fca25678899d40",
+    "bytes": 31641254,
+    "package": "com.znbsf.kazumi.flutterlab.test",
+    "abi": "armeabi-v7a",
+    "version_code": 203081,
+    "version_name": "2.3.1-tv-ui-fusion.1",
+    "minimum_sdk": 24,
+    "certificate_sha256": [
+      "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4"
+    ],
+    "mpv_sha256": "6035ab32a2151c404af75417c97646046cbee3d6612365841378635051ba7825"
+  },
+  "installation": {
+    "status": "INSTALLED_BYTES_VERIFIED",
+    "actual_installed_bytes_match": true,
+    "install_count": 1,
+    "test_uid_directory_first_install_preserved": true,
+    "no_uninstall_clear_downgrade": true
+  },
+  "ui": {
+    "home_horizontal_navigation": "PASS",
+    "home_vertical_scroll_to_50": "PASS",
+    "detail_compact_layout": "PASS",
+    "deep_return_identity": "PASS",
+    "source_list_scroll_and_expand": "PASS",
+    "final_home_focus": "50 号节目",
+    "compose_default_off": true,
+    "source_focus_observation": "Excluded header semantics can leave a stale result focus in XML; visible screenshot and actual activation establish the focused header",
+    "human_physical_remote_long_press": "NOT_RUN"
+  },
+  "metadata_search": {
+    "status": "HTTP_401",
+    "explicit_retry_count": 1,
+    "error_ui_present": true,
+    "no_global_network_failure_inference": true
+  },
+  "source_search": {
+    "existing_rule_count": 17,
+    "result_count": 11,
+    "rule_edit_or_fixture_replacement": false
+  },
+  "real_source_attempts": [
+    {
+      "source": "7sefun",
+      "episodes": 2,
+      "entry": "25-real-7sefun-attempt",
+      "settled": "26-real-7sefun-settled",
+      "observations": [
+        "WebView SSL handshake failures",
+        "No Dart player video URL handoff"
+      ],
+      "result": "VIDEO_SOURCE_RESOLUTION_TIMEOUT",
+      "video_url_handoff": false,
+      "first_frame": "NOT_REACHED",
+      "actual_audio_video": "NOT_VERIFIED"
+    },
+    {
+      "source": "baimao",
+      "episodes": 2,
+      "entry": "32-real-baimao-attempt",
+      "settled": "33-real-baimao-settled",
+      "observations": [
+        "Website Artplayer script: Unexpected token .; Artplayer is not defined",
+        "about:blank: _r_text already declared; contribution to timeout not established",
+        "No Dart player video URL handoff"
+      ],
+      "result": "VIDEO_SOURCE_RESOLUTION_TIMEOUT",
+      "video_url_handoff": false,
+      "first_frame": "NOT_REACHED",
+      "actual_audio_video": "NOT_VERIFIED"
+    },
+    {
+      "source": "ezdmw",
+      "episodes": 1,
+      "entry": "36-real-ezdmw-attempt",
+      "settled": "37-real-ezdmw-settled",
+      "observations": [
+        "Chromium media activity does not establish Dart player playback",
+        "No Dart player video URL handoff; timeout root cause not established in bounded run"
+      ],
+      "result": "VIDEO_SOURCE_RESOLUTION_TIMEOUT",
+      "video_url_handoff": false,
+      "first_frame": "NOT_REACHED",
+      "actual_audio_video": "NOT_VERIFIED"
+    }
+  ],
+  "blocked_checks": [
+    "First frame and advancing Dart-player position",
+    "Pause/play and ten-second seek",
+    "Episode switch during successful playback",
+    "Resume at measured playback position",
+    "Human sound, full-screen image and physical-remote confirmation"
+  ],
+  "interpretation": "Resolver timeout is established; decoder failure and complete AV playback are not established",
+  "protections": {
+    "original_packages_unchanged": 3,
+    "original_repositories_unchanged": 8,
+    "frozen_product_source_files_unchanged": 472,
+    "libmpv_bytes_same_as_old_installed": true,
+    "no_system_network_proxy_power_security_or_webview_change": true,
+    "no_other_device_action": true,
+    "no_new_ffi_diagnostics": true,
+    "compose_ab_not_resumed": true,
+    "paused_thread_and_disabled_checks_unchanged": true
+  },
+  "scripts": [
+    "xiaomi-fusion-device.py",
+    "xiaomi-fusion-observe.py",
+    "package-xiaomi-fusion-evidence.py"
+  ],
+  "local_raw_evidence": "evidence/xiaomi-ui-fusion-20261002; private target and full logs remain uncommitted",
+  "screenshots": [
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/home.png",
+      "source_observation": "01-home-start.png",
+      "sha256": "3cdb28781a2b4268400f122d726fc714cd4692cab506b8937cf63a56e4ed931c",
+      "bytes": 2575118
+    },
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/detail.png",
+      "source_observation": "12-detail-deep-item.png",
+      "sha256": "81bea00004fcd8d1ccf4f7f4ca3f48e26cb0ce0fee89c36ec75f077df8eda482",
+      "bytes": 2024071
+    },
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/sources.png",
+      "source_observation": "21-source-dpad-entry.png",
+      "sha256": "069611a268f4dbef0cac1287f80776207007ac62d2488484b0f83cc4ffbf7764",
+      "bytes": 712232
+    },
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/source-visible-focus.png",
+      "source_observation": "23-source-expanded-observation.png",
+      "sha256": "2fbd51d66c2acc68ab899c54a0449b5b5c63a6633920a28d3e6da3e00a48ef5b",
+      "bytes": 713778
+    },
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/metadata-search-error.png",
+      "source_observation": "17-search-results.png",
+      "sha256": "7cb95403716d93465ba2a0dcbb4b987ae8d93d48388862f6afddfb594e210a71",
+      "bytes": 1301487
+    },
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/source-resolution-timeout.png",
+      "source_observation": "37-real-ezdmw-settled.png",
+      "sha256": "43e37b1528b9dbb54ea974b7360b7811ff6bc864e515be5934573d7078bc30d2",
+      "bytes": 83476
+    },
+    {
+      "path": "screenshots/flutter-tv-ui-fusion-xiaomi-20261002/home-return.png",
+      "source_observation": "40-final-home-after-source-failures.png",
+      "sha256": "14b0a7c9a756caa39859b970d2afae8c685fb0a9f42937a00796a39d7c1dfb20",
+      "bytes": 2904149
+    }
+  ],
+  "quota": {
+    "read_interface_exposed": false,
+    "reset_card_used": false
+  },
+  "remaining_blocker": "A playable source path on current WebView and restored existing authorized TV connection are required for remaining physical AV acceptance",
+  "final_device_visibility": {
+    "status": "NO_LONGER_VISIBLE_IN_ADB_AT_FINAL_READ_ONLY_CHECK",
+    "last_confirmed_ui": {
+      "observation": "40-final-home-after-source-failures",
+      "utc": "2026-10-02T05:45:11.953133+00:00",
+      "package": "com.znbsf.kazumi.flutterlab.test",
+      "page": "home",
+      "focus": [
+        "飙马野郎 JOJO的奇妙冒险 第一赛段\n50 号节目\n50"
+      ]
+    },
+    "last_confirmed_package_utc": "2026-10-02T05:45:16.792045+00:00",
+    "no_connect_pair_input_or_restart_after_loss": true,
+    "current_tv_screen": "UNCONFIRMED_AFTER_CONNECTION_LOSS",
+    "raw_target_details": "PRIVATE_LOCAL_ONLY"
+  }
+}

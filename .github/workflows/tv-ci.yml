@@ -1,0 +1,86 @@
+name: TV checks and candidate APKs
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, codex/flutter-tv-main-ui-fusion-20261002, integration/flutter-tv-main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tv-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: subosito/flutter-action@44ac965b96f18d999802d4b807e3256d5a3f9fa1 # v2.16.0
+        with:
+          channel: stable
+          flutter-version: '3.47.3'
+          cache: true
+      - name: Verify exact Flutter revision
+        run: |
+          flutter --version --machine > "$RUNNER_TEMP/flutter-sdk.json"
+          python -c "import json,os,pathlib; d=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'flutter-sdk.json').read_text()); assert d['frameworkRevision']=='e8113bf45620cbeb8aff64947ee4c93e16adb4cf' and d['frameworkVersion']=='3.47.3'"
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-fatal-infos --fatal-warnings
+      - run: flutter test --concurrency=2
+  apk:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {target: android-arm, abi: armeabi-v7a}
+          - {target: android-arm64, abi: arm64-v8a}
+          - {target: android-x64, abi: x86_64}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with: {distribution: temurin, java-version: '21'}
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+      - uses: subosito/flutter-action@44ac965b96f18d999802d4b807e3256d5a3f9fa1 # v2.16.0
+        with:
+          channel: stable
+          flutter-version: '3.47.3'
+          cache: true
+      - name: Verify exact Flutter revision
+        run: |
+          flutter --version --machine > "$RUNNER_TEMP/flutter-sdk.json"
+          python -c "import json,os,pathlib; d=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'flutter-sdk.json').read_text()); assert d['frameworkRevision']=='e8113bf45620cbeb8aff64947ee4c93e16adb4cf' and d['frameworkVersion']=='3.47.3'"
+      - run: flutter pub get --enforce-lockfile
+      - name: Build isolated TV candidate (debug certificate; never a public release)
+        run: >-
+          flutter build apk --release --pub --flavor tv
+          --android-project-arg=kazumiTv=true
+          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.candidate
+          --android-project-arg=kazumiTvLabel=KazumiTV-CI
+          --target-platform ${{ matrix.target }} --split-per-abi
+          --build-name=0.4.0-ci --build-number=20324
+          --dart-define=KAZUMI_TV_PERF=false --dart-define=KAZUMI_TV_FIXED_SURFACES=true
+      - name: Lockfile must remain unchanged after plugin regeneration
+        run: git diff --exit-code -- pubspec.lock
+      - name: Validate package, ABI, TV launcher, signature and probe absence
+        env: {ABI: '${{ matrix.abi }}'}
+        run: |
+          python tools/verify_tv_artifact.py "build/app/outputs/flutter-apk/app-$ABI-tv-release.apk" \
+            --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --application-id com.znbsf.kazumi.fluttertv.candidate --abi "$ABI" \
+            --build-number 20324 --version-name 0.4.0-ci --source-sha "$GITHUB_SHA" \
+            --output "build/tv-receipts/$ABI.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tv-candidate-${{ matrix.abi }}-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build/app/outputs/flutter-apk/app-${{ matrix.abi }}-tv-release.apk
+            build/tv-receipts/${{ matrix.abi }}.json

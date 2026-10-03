@@ -1,0 +1,9 @@
+case,count,ordinal,label,descending,page,action
+single,1,1,EP1,false,0,selected
+segment50,201,50,SP1,false,0,selected
+segment51reverse,201,51,EP1,true,3,selected
+long151,201,151,第151集,false,3,selected
+long151reverse,201,151,第151集,true,1,selected
+lastreverse,201,201,OVA1,true,0,selected
+max5000,5000,5000,PV,true,0,selected
+back,201,151,第151集,true,1,cancelled

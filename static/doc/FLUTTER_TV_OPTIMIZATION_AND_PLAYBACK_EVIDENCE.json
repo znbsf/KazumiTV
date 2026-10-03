@@ -1,0 +1,958 @@
+{
+  "utc": "2026-10-02T10:07:50.086795+00:00",
+  "status": "COMPLETE_WITH_EXPLICIT_LIMITS",
+  "product_source_commit": "83752494b2888c3e0338584ef02a3d55b9b00e00",
+  "measured_source_commit": "0fa262183a8da71ed247e22818778759f9f8a231",
+  "artifact": {
+    "sha256": "1f49893b42b7efb51fa04e06fd9fed5759c41da91086bea9d51baeba6f0fef4a",
+    "bytes": 31658234,
+    "version_code": 203191,
+    "version_name": "2.3.1-tv-ui-fusion.3",
+    "package": "com.znbsf.kazumi.flutterlab.test",
+    "abi": "armeabi-v7a",
+    "certificate_sha256": [
+      "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4"
+    ],
+    "probe_enabled": false,
+    "compose_default": false,
+    "original_libmpv_bytes_unchanged": true
+  },
+  "artifact_relative_to_workspace": "artifacts/Kazumi-FlutterTV-final-Xiaomi-isolated-armeabi-v7a.apk",
+  "source_differences_from_measured": [
+    "pubspec.yaml"
+  ],
+  "measurement": {
+    "utc": "2026-10-02T09:41:26.311242+00:00",
+    "status": "COMPLETE_MATCHED_WINDOWS",
+    "baseline_frozen_ui_commit": "67c08c980d5e884e34f3d272962df98c04b5772b",
+    "optimized_commit": "0fa262183a8da71ed247e22818778759f9f8a231",
+    "renderer_and_media_stack_unchanged": true,
+    "single_ui_variable": "optimized-overlay-paced",
+    "rows": [
+      {
+        "scene": "settled-first",
+        "baseline": {
+          "frames": 170,
+          "inputs": 10,
+          "build": {
+            "p50Us": 850,
+            "p95Us": 5159,
+            "maxUs": 77131,
+            "overBudget": 4
+          },
+          "raster": {
+            "p50Us": 63802,
+            "p95Us": 73003,
+            "maxUs": 75452,
+            "overBudget": 160
+          },
+          "totalSpan": {
+            "p50Us": 120269,
+            "p95Us": 135462,
+            "maxUs": 140417,
+            "overBudget": 160
+          }
+        },
+        "optimized": {
+          "frames": 262,
+          "inputs": 10,
+          "build": {
+            "p50Us": 827,
+            "p95Us": 4641,
+            "maxUs": 60944,
+            "overBudget": 4
+          },
+          "raster": {
+            "p50Us": 37919,
+            "p95Us": 42096,
+            "maxUs": 188874,
+            "overBudget": 236
+          },
+          "totalSpan": {
+            "p50Us": 66378,
+            "p95Us": 78838,
+            "maxUs": 218325,
+            "overBudget": 243
+          }
+        },
+        "raster_p95_reduction_percent": 42.33661630343959,
+        "baseline_raster_over_budget_percent": 94.11764705882354,
+        "optimized_raster_over_budget_percent": 90.07633587786259,
+        "baseline_focus": {
+          "observed": 10,
+          "p95Us": 15730
+        },
+        "optimized_focus": {
+          "observed": 10,
+          "p95Us": 18439
+        },
+        "baseline_postframe": {
+          "observed": 10,
+          "p95Us": 15287
+        },
+        "optimized_postframe": {
+          "observed": 10,
+          "p95Us": 17983
+        },
+        "baseline_duration_us": 17184569,
+        "optimized_duration_us": 17291023,
+        "baseline_cache_start": {
+          "currentSize": 28,
+          "currentSizeBytes": 8959200,
+          "liveImageCount": 25,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "optimized_cache_start": {
+          "currentSize": 28,
+          "currentSizeBytes": 8959200,
+          "liveImageCount": 24,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "baseline_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "optimized_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "catalog_and_focus_match": true,
+        "actual_input_intervals_baseline_us": [
+          1562109,
+          1522599,
+          1530007,
+          1532182,
+          1531973,
+          1555935,
+          1538219,
+          1521304,
+          1539359
+        ],
+        "actual_input_intervals_optimized_us": [
+          1528283,
+          1538004,
+          1541329,
+          1544855,
+          1547574,
+          1553388,
+          1528705,
+          1561816,
+          1552988
+        ]
+      },
+      {
+        "scene": "settled-warm",
+        "baseline": {
+          "frames": 169,
+          "inputs": 10,
+          "build": {
+            "p50Us": 821,
+            "p95Us": 4527,
+            "maxUs": 5308,
+            "overBudget": 0
+          },
+          "raster": {
+            "p50Us": 63764,
+            "p95Us": 73133,
+            "maxUs": 73968,
+            "overBudget": 159
+          },
+          "totalSpan": {
+            "p50Us": 121432,
+            "p95Us": 134846,
+            "maxUs": 143944,
+            "overBudget": 159
+          }
+        },
+        "optimized": {
+          "frames": 266,
+          "inputs": 10,
+          "build": {
+            "p50Us": 821,
+            "p95Us": 3487,
+            "maxUs": 6317,
+            "overBudget": 0
+          },
+          "raster": {
+            "p50Us": 37843,
+            "p95Us": 40134,
+            "maxUs": 50095,
+            "overBudget": 241
+          },
+          "totalSpan": {
+            "p50Us": 65383,
+            "p95Us": 76431,
+            "maxUs": 91097,
+            "overBudget": 247
+          }
+        },
+        "raster_p95_reduction_percent": 45.121901193715566,
+        "baseline_raster_over_budget_percent": 94.0828402366864,
+        "optimized_raster_over_budget_percent": 90.6015037593985,
+        "baseline_focus": {
+          "observed": 10,
+          "p95Us": 13209
+        },
+        "optimized_focus": {
+          "observed": 10,
+          "p95Us": 20221
+        },
+        "baseline_postframe": {
+          "observed": 10,
+          "p95Us": 12742
+        },
+        "optimized_postframe": {
+          "observed": 10,
+          "p95Us": 19750
+        },
+        "baseline_duration_us": 17281523,
+        "optimized_duration_us": 17298277,
+        "baseline_cache_start": {
+          "currentSize": 32,
+          "currentSizeBytes": 9864000,
+          "liveImageCount": 25,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "optimized_cache_start": {
+          "currentSize": 32,
+          "currentSizeBytes": 9864000,
+          "liveImageCount": 24,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "baseline_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "optimized_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "catalog_and_focus_match": true,
+        "actual_input_intervals_baseline_us": [
+          1559816,
+          1532857,
+          1525799,
+          1552267,
+          1566795,
+          1545538,
+          1514173,
+          1518884,
+          1544078
+        ],
+        "actual_input_intervals_optimized_us": [
+          1550205,
+          1569038,
+          1557616,
+          1528277,
+          1543286,
+          1530412,
+          1548323,
+          1522657,
+          1572300
+        ]
+      },
+      {
+        "scene": "rapid-warm",
+        "baseline": {
+          "frames": 21,
+          "inputs": 10,
+          "build": {
+            "p50Us": 1168,
+            "p95Us": 7829,
+            "maxUs": 10893,
+            "overBudget": 0
+          },
+          "raster": {
+            "p50Us": 63499,
+            "p95Us": 79311,
+            "maxUs": 282264,
+            "overBudget": 20
+          },
+          "totalSpan": {
+            "p50Us": 121079,
+            "p95Us": 334122,
+            "maxUs": 340799,
+            "overBudget": 20
+          }
+        },
+        "optimized": {
+          "frames": 14,
+          "inputs": 10,
+          "build": {
+            "p50Us": 3197,
+            "p95Us": 8910,
+            "maxUs": 8910,
+            "overBudget": 0
+          },
+          "raster": {
+            "p50Us": 36504,
+            "p95Us": 53665,
+            "maxUs": 53665,
+            "overBudget": 13
+          },
+          "totalSpan": {
+            "p50Us": 68361,
+            "p95Us": 93648,
+            "maxUs": 93648,
+            "overBudget": 13
+          }
+        },
+        "raster_p95_reduction_percent": 32.33599374613861,
+        "baseline_raster_over_budget_percent": 95.23809523809524,
+        "optimized_raster_over_budget_percent": 92.85714285714286,
+        "baseline_focus": {
+          "observed": 5,
+          "p95Us": 233972
+        },
+        "optimized_focus": {
+          "observed": 7,
+          "p95Us": 36258
+        },
+        "baseline_postframe": {
+          "observed": 10,
+          "p95Us": 274907
+        },
+        "optimized_postframe": {
+          "observed": 10,
+          "p95Us": 45506
+        },
+        "baseline_duration_us": 2939370,
+        "optimized_duration_us": 2960716,
+        "baseline_cache_start": {
+          "currentSize": 32,
+          "currentSizeBytes": 9864000,
+          "liveImageCount": 25,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "optimized_cache_start": {
+          "currentSize": 32,
+          "currentSizeBytes": 9864000,
+          "liveImageCount": 24,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "baseline_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 5,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "optimized_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 3,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "catalog_and_focus_match": true,
+        "actual_input_intervals_baseline_us": [
+          19947,
+          35824,
+          20558,
+          22464,
+          18935,
+          19274,
+          33452,
+          20084,
+          21409
+        ],
+        "actual_input_intervals_optimized_us": [
+          20511,
+          32144,
+          28292,
+          28048,
+          20445,
+          28351,
+          27795,
+          24266,
+          24983
+        ]
+      },
+      {
+        "scene": "vertical-first",
+        "baseline": {
+          "frames": 139,
+          "inputs": 8,
+          "build": {
+            "p50Us": 1277,
+            "p95Us": 26974,
+            "maxUs": 58577,
+            "overBudget": 9
+          },
+          "raster": {
+            "p50Us": 78039,
+            "p95Us": 87376,
+            "maxUs": 90010,
+            "overBudget": 136
+          },
+          "totalSpan": {
+            "p50Us": 147243,
+            "p95Us": 164046,
+            "maxUs": 171903,
+            "overBudget": 136
+          }
+        },
+        "optimized": {
+          "frames": 201,
+          "inputs": 8,
+          "build": {
+            "p50Us": 903,
+            "p95Us": 6007,
+            "maxUs": 66494,
+            "overBudget": 8
+          },
+          "raster": {
+            "p50Us": 48325,
+            "p95Us": 54073,
+            "maxUs": 63143,
+            "overBudget": 191
+          },
+          "totalSpan": {
+            "p50Us": 88158,
+            "p95Us": 104099,
+            "maxUs": 201687,
+            "overBudget": 193
+          }
+        },
+        "raster_p95_reduction_percent": 38.11458524079839,
+        "baseline_raster_over_budget_percent": 97.84172661870504,
+        "optimized_raster_over_budget_percent": 95.02487562189054,
+        "baseline_focus": {
+          "observed": 8,
+          "p95Us": 402652
+        },
+        "optimized_focus": {
+          "observed": 8,
+          "p95Us": 371987
+        },
+        "baseline_postframe": {
+          "observed": 8,
+          "p95Us": 63982
+        },
+        "optimized_postframe": {
+          "observed": 8,
+          "p95Us": 68645
+        },
+        "baseline_duration_us": 12509151,
+        "optimized_duration_us": 12514108,
+        "baseline_cache_start": {
+          "currentSize": 32,
+          "currentSizeBytes": 9864000,
+          "liveImageCount": 25,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "optimized_cache_start": {
+          "currentSize": 32,
+          "currentSizeBytes": 9864000,
+          "liveImageCount": 24,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "baseline_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "optimized_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "catalog_and_focus_match": true,
+        "actual_input_intervals_baseline_us": [
+          1320828,
+          1336432,
+          1363018,
+          1320147,
+          1310458,
+          1370428,
+          1350760
+        ],
+        "actual_input_intervals_optimized_us": [
+          1349095,
+          1357063,
+          1325622,
+          1353558,
+          1303314,
+          1316597,
+          1362703
+        ]
+      },
+      {
+        "scene": "vertical-warm",
+        "baseline": {
+          "frames": 139,
+          "inputs": 8,
+          "build": {
+            "p50Us": 967,
+            "p95Us": 6356,
+            "maxUs": 19173,
+            "overBudget": 2
+          },
+          "raster": {
+            "p50Us": 76963,
+            "p95Us": 87370,
+            "maxUs": 88447,
+            "overBudget": 136
+          },
+          "totalSpan": {
+            "p50Us": 145159,
+            "p95Us": 161712,
+            "maxUs": 169816,
+            "overBudget": 136
+          }
+        },
+        "optimized": {
+          "frames": 203,
+          "inputs": 8,
+          "build": {
+            "p50Us": 883,
+            "p95Us": 4966,
+            "maxUs": 16323,
+            "overBudget": 0
+          },
+          "raster": {
+            "p50Us": 48099,
+            "p95Us": 52403,
+            "maxUs": 61687,
+            "overBudget": 191
+          },
+          "totalSpan": {
+            "p50Us": 87192,
+            "p95Us": 102212,
+            "maxUs": 113452,
+            "overBudget": 193
+          }
+        },
+        "raster_p95_reduction_percent": 40.02174659494106,
+        "baseline_raster_over_budget_percent": 97.84172661870504,
+        "optimized_raster_over_budget_percent": 94.08866995073892,
+        "baseline_focus": {
+          "observed": 8,
+          "p95Us": 420255
+        },
+        "optimized_focus": {
+          "observed": 8,
+          "p95Us": 362588
+        },
+        "baseline_postframe": {
+          "observed": 8,
+          "p95Us": 83082
+        },
+        "optimized_postframe": {
+          "observed": 8,
+          "p95Us": 84553
+        },
+        "baseline_duration_us": 12389411,
+        "optimized_duration_us": 12487212,
+        "baseline_cache_start": {
+          "currentSize": 54,
+          "currentSizeBytes": 14814400,
+          "liveImageCount": 25,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "optimized_cache_start": {
+          "currentSize": 54,
+          "currentSizeBytes": 14814400,
+          "liveImageCount": 24,
+          "pendingImageCount": 0,
+          "maximumSizeBytes": 104857600
+        },
+        "baseline_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "optimized_boundaries": {
+          "excludedOldFrames": 0,
+          "excludedAfterStopFrames": 0,
+          "unknownFrameNumbersExcluded": 0,
+          "duplicateFramesExcluded": 0,
+          "droppedFramesAtLimit": 0,
+          "droppedFocusEventsAtLimit": 0,
+          "earlyPostFrameCallbacksExcluded": 0,
+          "synthesizedInputsExcluded": 0,
+          "deadlineCallbackLateUs": 0,
+          "inputsWithoutFocus": 0,
+          "inputsWithoutLaterFrame": 0,
+          "inputsWithSubmittedFrameOutsideTimingSample": 0,
+          "focusEventsWithoutPendingInput": 0
+        },
+        "catalog_and_focus_match": true,
+        "actual_input_intervals_baseline_us": [
+          1288744,
+          1363743,
+          1316595,
+          1331462,
+          1321447,
+          1329525,
+          1315319
+        ],
+        "actual_input_intervals_optimized_us": [
+          1336323,
+          1352378,
+          1325060,
+          1337324,
+          1331346,
+          1320422,
+          1315147
+        ]
+      }
+    ],
+    "limitations": [
+      "Same fixed injected-key script; actual input intervals differ and are recorded",
+      "Framework input/focus/postframe observations do not measure native or physical display latency",
+      "First and warm scenes separate; process restarts preserve data/settings, not identical in-memory caches",
+      "Small fixed scene sample; no claim of all content or all TV hardware reaching frame budget"
+    ]
+  },
+  "installed": {
+    "utc": "2026-10-02T09:42:02.278175+00:00",
+    "stage": "final",
+    "result": "INSTALLED_BYTES_VERIFIED",
+    "candidate_sha256": "1f49893b42b7efb51fa04e06fd9fed5759c41da91086bea9d51baeba6f0fef4a",
+    "old_test_version": 203181,
+    "finished_utc": "2026-10-02T09:42:17.922309+00:00",
+    "version_code": 203191,
+    "version_name": "2.3.1-tv-ui-fusion.3",
+    "user_id": "10074",
+    "probe_enabled": false,
+    "original_packages_unchanged": true,
+    "test_uid_data_directory_first_install_preserved": true,
+    "no_uninstall_clear_or_downgrade": true,
+    "frozen_commit": "83752494b2888c3e0338584ef02a3d55b9b00e00"
+  },
+  "formal_smoke": {
+    "utc": "2026-10-02T09:58:40.635919+00:00",
+    "result": "FINAL_PROBE_DISABLED_PRODUCT_SMOKE_PASS_WITH_EXPLICIT_LIMITS",
+    "source_commit": "83752494b2888c3e0338584ef02a3d55b9b00e00",
+    "version_code": 203191,
+    "apk_sha256": "1f49893b42b7efb51fa04e06fd9fed5759c41da91086bea9d51baeba6f0fef4a",
+    "steps": {
+      "108-final-product-home": {
+        "label": "108-final-product-home",
+        "utc": "2026-10-02T09:42:27.072721+00:00",
+        "focus": [
+          "热门"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "10eb3c0afbeff9f507a51ce930b47283b2882edb8e902d54d6f5878a9343281c",
+        "observation_sha256": "b3775b27cd7f4407fc768cb7331a93efd99168da6a03fba65a75283fb1507182"
+      },
+      "109-final-history-origin": {
+        "label": "109-final-history-origin",
+        "utc": "2026-10-02T09:43:36.200239+00:00",
+        "focus": [
+          "飙马野郎 JOJO的奇妙冒险 第一赛段 · 第2集"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "aaf7d01cecbf623615d018001364b84f502abac1d745750153d12ed08043e2cf",
+        "observation_sha256": "f7bdbc36255fd8d3b7fe756db911065dab266b3437ab2c88f0fc7e456a58d4d0"
+      },
+      "110-final-history-detail": {
+        "label": "110-final-history-detail",
+        "utc": "2026-10-02T09:43:43.803853+00:00",
+        "focus": [
+          "开始观看"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "05f6b7039da33922dc786338ed92252bf98a6711401d86d313e678d0ab6c22c5",
+        "observation_sha256": "2417a0987d345c9ced2971c5570c092612c88303f7cce2e23e9bd0d7cf60b600"
+      },
+      "111-final-history-player-loading": {
+        "label": "111-final-history-player-loading",
+        "utc": "2026-10-02T09:44:30.168081+00:00",
+        "focus": [
+          "正在播放\n第2集"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "1fb8934f60c06418e1972d2fbfb71f8d567623056f27515291720819d681f844",
+        "observation_sha256": "22c1523cb0fef0da99f0306e6c69b0310487a4cb331c1698c92af9d8ebc71db0"
+      },
+      "112-final-history-player-paused": {
+        "label": "112-final-history-player-paused",
+        "utc": "2026-10-02T09:50:03.318689+00:00",
+        "focus": [
+          "播放"
+        ],
+        "position": "07:28",
+        "duration": "24:12",
+        "play_control": "播放",
+        "screenshot_sha256": "5f17978a829b3c6add4c6416cc3a8e9384d7618b7d45bdf16302810aa881f679",
+        "observation_sha256": "9c4bc6072581bfd79831bafd953171ad9e14ecbf19ab0841519a01ec25f9ce40"
+      },
+      "113-final-history-player-playing": {
+        "label": "113-final-history-player-playing",
+        "utc": "2026-10-02T09:54:55.619866+00:00",
+        "focus": [
+          "暂停"
+        ],
+        "position": "07:34",
+        "duration": "24:12",
+        "play_control": "暂停",
+        "screenshot_sha256": "247a077c0d594f1609bfd651c5b243c04d92370754d28c75e45b72c4fbd7e47d",
+        "observation_sha256": "a8e5ca5758a8cd8be5baf10eb250304e3f6866281465ebffebd7b466f1c1a36d"
+      },
+      "114-final-history-exit": {
+        "label": "114-final-history-exit",
+        "utc": "2026-10-02T09:55:05.025471+00:00",
+        "focus": [
+          "开始观看"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "05f6b7039da33922dc786338ed92252bf98a6711401d86d313e678d0ab6c22c5",
+        "observation_sha256": "a0c86e5efac55d63f815368083b0c12ec507849539ea68295aad15bf6e47a341"
+      },
+      "115-final-history-origin-return": {
+        "label": "115-final-history-origin-return",
+        "utc": "2026-10-02T09:55:32.794739+00:00",
+        "focus": [
+          "飙马野郎 JOJO的奇妙冒险 第一赛段 · 第2集"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "5198b6e2e1698ed61ca76dbeb287d0f5953cf00fcba0310f8e19ff19501d8bf3",
+        "observation_sha256": "f95d7f97e947404b6375492015270d9bbfe8e47adf62b6a4f32c9244d5204daf"
+      },
+      "118-final-home-down-valid": {
+        "label": "118-final-home-down-valid",
+        "utc": "2026-10-02T09:56:16.430311+00:00",
+        "focus": [
+          "尼古喵喵\n2 号节目\n2"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "60e785a6980d6b6a61cef4ce56aa5096d77bfd228584de50538f682b8c3536a9",
+        "observation_sha256": "0e5bcc94aad18123b227e5fac3ef1d2e33a98fa192cc10b5c6f68f7e97b54878"
+      },
+      "119-final-home-card1-probe-off": {
+        "label": "119-final-home-card1-probe-off",
+        "utc": "2026-10-02T09:56:50.871047+00:00",
+        "focus": [
+          "FX战士久留美\n1 号节目\n1"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "36d94402eeb46b148dec693825a3bba1cd94583d55910df8da592a3201e96718",
+        "observation_sha256": "4a88cc5fca3925d688b3b01fba4525738d7214b2d8f4d643105bdbd376270786"
+      }
+    },
+    "real_episode2_frame_visually_inspected": true,
+    "history_resume_elapsed_seconds": 333.150608,
+    "observed_resume_position_seconds": 448,
+    "resume_interpretation": "Position exceeds loading-to-observation interval: nonzero persisted resume observed, not exact seek timing.",
+    "progress_observed_seconds": 6,
+    "home_origin_focus_restored": true,
+    "final_ui": "Home catalog card 1 focused; player exited after pause",
+    "probe_enabled": false,
+    "own_process_log_counts": {
+      "probe_markers": 0,
+      "resolved_video_url": 0,
+      "fatal_exception": 0,
+      "out_of_memory": 0,
+      "mpv_open_failure": 0
+    },
+    "log_sha256": "9cbcee530a6874cb51b2b2ebff72b03020232268003b00a4a0bcbab4f241fb80",
+    "resolution_log": {
+      "file": "111-final-history-player-loading.log",
+      "sha256": "e6bbe90bd71e6e6f1089a316d793a2e4c67b9e6826cbe99416f53374e6631e33",
+      "resolved_url_count": 1
+    },
+    "logs_note": "Own-PID snapshots are bounded; earlier URL handoff is in loading snapshot, not assumed retained in final snapshot.",
+    "original_three_packages_unchanged": true,
+    "test_uid_data_first_install_preserved": true,
+    "manual_audio_and_lipsync": "NOT_VERIFIED",
+    "source_rights": "NOT_ESTABLISHED",
+    "dynamic_source_note": "Source episode list now has three entries; episode 2 resumes successfully.",
+    "invalid_navigation": [
+      "DOWN and LEFT shorthand were rejected by host argparse before device input at 116; DOWN shorthand rejected at 117. Correct DPAD_DOWN/DPAD_LEFT confirmed at 118/119. F10 did reach device at 116 and 119; probe markers absent."
+    ]
+  },
+  "protection": {
+    "utc": "2026-10-02T09:58:40.642110+00:00",
+    "result": "EIGHT_ORIGINAL_TREES_UNCHANGED",
+    "count": 8,
+    "compared_fields": "Exact repositories array: path, HEAD, branch, NUL status hash/text, each dirty file SHA256",
+    "before_sha256": "58c1f5bcb62066819ad5e641aaafb9921d1e243e67a1fb0a7aa86b8e5feaa69e",
+    "after_sha256": "9dc477729d2c62136d557375dfd0f10c7f05b8dec6f586fcedfbc932def9c512",
+    "original_three_tv_packages_unchanged": true,
+    "latest_package_receipt_sha256": "186640412cf6b34539dc8e901707e1e886a26836567e77a8d3f182d0e9cf44dc",
+    "current_test_version_code": 203191
+  },
+  "visual_comparison": {
+    "result": "STATIC_SAME_CARD_VISUAL_COMPARISON_PASS",
+    "size": [
+      1920,
+      1080
+    ],
+    "before": "baseline-datamatch-settled-first-before.png",
+    "after": "optimized-overlay-settled-first-before.png",
+    "before_sha256": "8ac76381f25a529a909b75700647a5dba915779e4906e57c38ae2c112718ddfd",
+    "after_sha256": "b7a0a348aba2b0ab2a6f4af7d643da20eca24c81caae9a89406f44418072c46e",
+    "mean_absolute_rgb_difference": [
+      0.1912528935185185,
+      0.18315489969135804,
+      0.18329427083333333
+    ],
+    "max_absolute_rgb_difference": [
+      2,
+      3,
+      3
+    ],
+    "after_screenshot_valid_but_its_incomplete_performance_log_excluded": true,
+    "pixel_transition_tests": "Five fade fractions, DPR1/2, original two-gradient rendering versus cached overlay",
+    "no_claim_of_all_content_pixel_equivalence": true
+  },
+  "regression": {
+    "full_tests": 639,
+    "full_source": "e498a5b3829339a3f1348f8b880d42e3ccc23d89",
+    "post_transport_probe_tests": 13,
+    "analyzer_errors": 0,
+    "analyzer_warnings": 0,
+    "analyzer_infos": 32
+  },
+  "probe_transport_change": {
+    "old_probe_sha256": "071c3223bfea7e3039a1e0cb46af44784cca261372b4ebe4759aedafdbd8ba6e",
+    "new_probe_sha256": "acc7d8774e1bd6a6a6b89c55bf5d08ff2af932d847459fe9e265d3f3968b7820",
+    "collector_clock_window_bounds_statistics_and_encoder_unchanged": true,
+    "only_probe_delta": "Post-stop, post-1500ms-drain production onLog callback uses SDK debugPrintThrottled",
+    "old_baseline_remains_valid": "Measurement code and fixed scene are identical; only completed-report transport changes",
+    "invalid_window": "optimized-overlay-settled-first",
+    "incomplete_parts": 155,
+    "expected_parts": 164,
+    "missing_tail": [
+      156,
+      157,
+      158,
+      159,
+      160,
+      161,
+      162,
+      163,
+      164
+    ],
+    "invalid_window_used_for_metrics": false,
+    "host_capture": "Before-window run IDs excluded; after-window snapshots accumulate envelopes with a bounded 18-poll limit",
+    "log_buffer_or_system_settings_changed": false
+  },
+  "technical_playback_receipt": "evidence/tv-optimization-20261002/playback-technical-loop.json",
+  "limitations": [
+    "TV official metadata search timed out twice; no visible results pass",
+    "Audio/lipsync not manually verified; source rights not established",
+    "Most frames exceed 60Hz budget; first horizontal raster max188.874ms",
+    "Small fixed scene sample; no universal device/content claim"
+  ],
+  "final_git_receipt": "evidence/tv-optimization-20261002/optimization-final-evidence-git.json",
+  "no_private_targets_credentials_or_raw_media_urls": true
+}

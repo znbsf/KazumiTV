@@ -1,0 +1,405 @@
+{
+  "utc": "2026-10-02T18:04:31.043671+00:00",
+  "status": "FIXED_SURFACES_INSTALLED_AND_MEASURED_WITH_LIMITS",
+  "source_commit": "e06979114d6d0d5447684faef2532a8b70e3b1a5",
+  "branch": "codex/flutter-tv-main-ui-fusion-20261002",
+  "full_tests": 640,
+  "analyzer": {
+    "errors": 0,
+    "warnings": 0,
+    "infos": 32
+  },
+  "full_test_receipt": "evidence/fusion-checks/test-20261002T175418665685Z.json",
+  "analyzer_receipt": "evidence/fusion-checks/analyze-20261002T175523197449Z.json",
+  "artifact": {
+    "result": "CANDIDATE_INSTALL_GATES_PASS",
+    "stage": "cover-final",
+    "frozen_commit": "e06979114d6d0d5447684faef2532a8b70e3b1a5",
+    "sha256": "1f7709ec73c622a81969a4f89816f43210b838c9a460f0e11e72e1c68c7e48fe",
+    "bytes": 31642818,
+    "version_code": 203231,
+    "version_name": "2.3.1-tv-fixed-surfaces.3",
+    "package": "com.znbsf.kazumi.flutterlab.test",
+    "abi": "armeabi-v7a",
+    "certificate_sha256": [
+      "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4"
+    ],
+    "probe_enabled": false,
+    "compose_default": false,
+    "original_libmpv_bytes_unchanged": true
+  },
+  "latest_verified_installation": {
+    "utc": "2026-10-02T17:57:20.980350+00:00",
+    "stage": "cover-final",
+    "result": "INSTALLED_BYTES_VERIFIED",
+    "candidate_sha256": "1f7709ec73c622a81969a4f89816f43210b838c9a460f0e11e72e1c68c7e48fe",
+    "old_test_version": 203211,
+    "finished_utc": "2026-10-02T17:57:36.802915+00:00",
+    "version_code": 203231,
+    "version_name": "2.3.1-tv-fixed-surfaces.3",
+    "user_id": "10074",
+    "probe_enabled": false,
+    "original_packages_unchanged": true,
+    "test_uid_data_directory_first_install_preserved": true,
+    "no_uninstall_clear_or_downgrade": true,
+    "frozen_commit": "e06979114d6d0d5447684faef2532a8b70e3b1a5"
+  },
+  "physical_device_candidate_installed": true,
+  "last_verified_physical_device_version": 203231,
+  "probe_marker_absent": true,
+  "original_libmpv_bytes_verified": true,
+  "physical_device_new_performance_acceptance": "LIMITED_MEASUREMENTS_NOT_STABLE_60FPS",
+  "screenshots": [
+    {
+      "name": "01-fixed-theme-home-EMULATOR-CONTROLLED-SAMPLE.png",
+      "sha256": "042273aa2f4d2b3de3dbcf36d8cb82ffda4077b4f541df91ea0b084999e12707",
+      "scope": "EMULATOR_CONTROLLED_SAMPLE",
+      "library_uploaded": true
+    },
+    {
+      "name": "02-fixed-theme-detail-EMULATOR-CONTROLLED-SAMPLE.png",
+      "sha256": "4c46cce633ba3269bf1d5812256207650c3c4da32f488b915172153445080a50",
+      "scope": "EMULATOR_CONTROLLED_SAMPLE",
+      "library_uploaded": true
+    }
+  ],
+  "metrics": {
+    "baseline-horizontal-on-v2": {
+      "frames": 91,
+      "raster": {
+        "p50Us": 38177,
+        "p95Us": 42472,
+        "maxUs": 45317,
+        "overBudget": 85
+      },
+      "build": {
+        "p50Us": 962,
+        "p95Us": 5230,
+        "maxUs": 8324,
+        "overBudget": 0
+      },
+      "cpu": {
+        "cpuTimeUs": 2040000.0,
+        "coveredMidpointUs": 5025000.0,
+        "oneCorePercent": 40.59701492537314,
+        "machineCapacityPercent": 10.149253731343284
+      },
+      "coverage": {
+        "resourceSamples": 14,
+        "validIntervals": 10,
+        "conservativeIntervalUs": 4860000,
+        "windowDurationUs": 5522004,
+        "timeFraction": 0.8801152625025263,
+        "framesTotal": 91,
+        "framesWithExecutionTime": 91,
+        "fullyContainedRasterFrames": 80,
+        "boundaryOrUncoveredFrames": 11,
+        "framesMissingExecutionTime": 0,
+        "invalidFrameNumbers": []
+      },
+      "pssKiB": {
+        "before": 132432,
+        "after": 132000
+      },
+      "cache": null,
+      "nativeRepeatCount": 6,
+      "focusRestored": true
+    },
+    "fixed-horizontal-on-v2": {
+      "frames": 48,
+      "raster": {
+        "p50Us": 37113,
+        "p95Us": 44462,
+        "maxUs": 46430,
+        "overBudget": 45
+      },
+      "build": {
+        "p50Us": 1959,
+        "p95Us": 5341,
+        "maxUs": 10220,
+        "overBudget": 0
+      },
+      "cpu": {
+        "cpuTimeUs": 1110000.0,
+        "coveredMidpointUs": 5005000.0,
+        "oneCorePercent": 22.17782217782218,
+        "machineCapacityPercent": 5.544455544455545
+      },
+      "coverage": {
+        "resourceSamples": 14,
+        "validIntervals": 10,
+        "conservativeIntervalUs": 4840000,
+        "windowDurationUs": 5480666,
+        "timeFraction": 0.883104352646193,
+        "framesTotal": 48,
+        "framesWithExecutionTime": 48,
+        "fullyContainedRasterFrames": 45,
+        "boundaryOrUncoveredFrames": 3,
+        "framesMissingExecutionTime": 0,
+        "invalidFrameNumbers": []
+      },
+      "pssKiB": {
+        "before": 102931,
+        "after": 103148
+      },
+      "cache": null,
+      "nativeRepeatCount": 6,
+      "focusRestored": true
+    },
+    "baseline-detail-on-v2": {
+      "frames": 199,
+      "raster": {
+        "p50Us": 18812,
+        "p95Us": 39369,
+        "maxUs": 40086,
+        "overBudget": 116
+      },
+      "build": {
+        "p50Us": 1241,
+        "p95Us": 25350,
+        "maxUs": 120296,
+        "overBudget": 11
+      },
+      "cpu": {
+        "cpuTimeUs": 5040000.0,
+        "coveredMidpointUs": 12015000.0,
+        "oneCorePercent": 41.947565543071164,
+        "machineCapacityPercent": 10.486891385767791
+      },
+      "coverage": {
+        "resourceSamples": 29,
+        "validIntervals": 24,
+        "conservativeIntervalUs": 11640000,
+        "windowDurationUs": 12685620,
+        "timeFraction": 0.9175743873772034,
+        "framesTotal": 199,
+        "framesWithExecutionTime": 199,
+        "fullyContainedRasterFrames": 179,
+        "boundaryOrUncoveredFrames": 20,
+        "framesMissingExecutionTime": 0,
+        "invalidFrameNumbers": []
+      },
+      "pssKiB": {
+        "before": 130781,
+        "after": 133240
+      },
+      "cache": null,
+      "nativeRepeatCount": 0,
+      "focusRestored": true
+    },
+    "fixed-detail-on-v2-warm": {
+      "frames": 144,
+      "raster": {
+        "p50Us": 11338,
+        "p95Us": 36520,
+        "maxUs": 38574,
+        "overBudget": 48
+      },
+      "build": {
+        "p50Us": 2968,
+        "p95Us": 35228,
+        "maxUs": 115460,
+        "overBudget": 10
+      },
+      "cpu": {
+        "cpuTimeUs": 4110000.0,
+        "coveredMidpointUs": 12040000.0,
+        "oneCorePercent": 34.136212624584715,
+        "machineCapacityPercent": 8.534053156146179
+      },
+      "coverage": {
+        "resourceSamples": 29,
+        "validIntervals": 24,
+        "conservativeIntervalUs": 11690000,
+        "windowDurationUs": 12753991,
+        "timeFraction": 0.9165758388883919,
+        "framesTotal": 144,
+        "framesWithExecutionTime": 144,
+        "fullyContainedRasterFrames": 135,
+        "boundaryOrUncoveredFrames": 9,
+        "framesMissingExecutionTime": 0,
+        "invalidFrameNumbers": []
+      },
+      "pssKiB": {
+        "before": 102723,
+        "after": 104148
+      },
+      "cache": null,
+      "nativeRepeatCount": 0,
+      "focusRestored": true
+    }
+  },
+  "playback": {
+    "utc": "2026-10-02T18:04:30.974107+00:00",
+    "result": "FORMAL_PLAYBACK_AND_RETURN_SMOKE_PASS_WITH_LIMITS",
+    "version_code": 203231,
+    "source_commit": "e06979114d6d0d5447684faef2532a8b70e3b1a5",
+    "apk_sha256": "1f7709ec73c622a81969a4f89816f43210b838c9a460f0e11e72e1c68c7e48fe",
+    "probe_enabled": false,
+    "steps": {
+      "123-cover-final-home": {
+        "utc": "2026-10-02T17:58:16.677532+00:00",
+        "focus": [
+          "FX战士久留美\n1 号节目\n1"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "19de6f1468978ad0352c34f157fc15037ef414a805d609b5ac705ca27b6c3396",
+        "observation_sha256": "f6119a88c99546a504cbf770cc821f508afd481d176ea5215a25e3f39dd7e26a"
+      },
+      "125-cover-final-episode2-origin": {
+        "utc": "2026-10-02T17:59:01.156916+00:00",
+        "focus": [
+          "飙马野郎 JOJO的奇妙冒险 第一赛段 · 第2集"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "53feac4ebfbf6b5a1aefa659b5d2a9b0e799930d298b98113daaac91a2abc01e",
+        "observation_sha256": "e8b4e9357910e325e9b41e8b7ef90e6130421dc0b712c0e74afa52d90c4cb868"
+      },
+      "126-cover-final-history-detail": {
+        "utc": "2026-10-02T17:59:06.786662+00:00",
+        "focus": [
+          "开始观看"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "02b7f92c6fd04b473613508d0f54e679ebcad76c52fd822f0acedc9c5bb44cf2",
+        "observation_sha256": "0c61ce8af5020866e26fa63220c37c92a423974c142033142bf3457a5f47b873"
+      },
+      "127-cover-final-player-loading": {
+        "utc": "2026-10-02T17:59:13.125464+00:00",
+        "focus": [
+          "正在播放\n第2集"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "52582e6ac019f722788180b89c6cb7a64782c953a43c8749421f27fc563551d7",
+        "observation_sha256": "e0f15ba9b2cbf2b309f3257fa0abc3b4e6378045ad7df1a187360fde82b88287"
+      },
+      "128b-cover-final-paused-controls": {
+        "utc": "2026-10-02T18:01:29.768411+00:00",
+        "focus": [
+          "选集"
+        ],
+        "position": "09:01",
+        "duration": "24:12",
+        "play_control": "播放",
+        "screenshot_sha256": "aaef1a375232f2804f40d31d63eb6d54583024ff5194a5955591db2ab82b6eaa",
+        "observation_sha256": "14e1b6b52b0772b79d066f43f59d809d21af44e63cecd3c7ee900c1ef63dd4f5"
+      },
+      "129-cover-final-playing": {
+        "utc": "2026-10-02T18:02:03.681709+00:00",
+        "focus": [
+          "暂停"
+        ],
+        "position": "09:06",
+        "duration": "24:12",
+        "play_control": "暂停",
+        "screenshot_sha256": "ec4e531c308907f55251fed439e5564daa7f3998ca9ee3eb76578dca19e02e7d",
+        "observation_sha256": "55bc393ed110679030c56dc65e97b84c9607293cf38c635fde7c8ed5d01f02f3"
+      },
+      "130-cover-final-exit-detail": {
+        "utc": "2026-10-02T18:02:27.658809+00:00",
+        "focus": [
+          "开始观看"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "02b7f92c6fd04b473613508d0f54e679ebcad76c52fd822f0acedc9c5bb44cf2",
+        "observation_sha256": "d74723a9b096a7a5f82799c0e88994100ab9a452cfd75235478d2ea715a579d7"
+      },
+      "131-cover-final-origin-return": {
+        "utc": "2026-10-02T18:03:31.319481+00:00",
+        "focus": [
+          "飙马野郎 JOJO的奇妙冒险 第一赛段 · 第2集"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "2e386f878e30e820cbc6db620590f8149ac926b0a3a46dd84940715e2449ba91",
+        "observation_sha256": "82ffb61dd92b5f9421c3c5492673dcfaead066c775f2530a643e823808a5c21d"
+      },
+      "132-cover-final-home-card1": {
+        "utc": "2026-10-02T18:03:40.084587+00:00",
+        "focus": [
+          "FX战士久留美\n1 号节目\n1"
+        ],
+        "position": null,
+        "duration": null,
+        "play_control": null,
+        "screenshot_sha256": "883d1bbc87e758f9032d7d943624149b4ae0a13eb85ab1c10953ec9509fc98ee",
+        "observation_sha256": "eb33f90d7422fbb75b1a856dd2b78d2b6044031d42fa1187d5f17ace46cb0c4f"
+      }
+    },
+    "progress_observed_seconds": 5,
+    "history_episode2_resumed": true,
+    "real_video_frame_visually_inspected": true,
+    "home_origin_focus_restored": true,
+    "own_process_log_counts": {
+      "probe_markers": 0,
+      "fatal_exception": 0,
+      "out_of_memory": 0,
+      "mpv_open_failure": 0
+    },
+    "original_three_packages_unchanged": true,
+    "test_uid_data_first_install_preserved": true,
+    "final_ui": "Home card1; playback exited",
+    "manual_audio_and_lipsync": "NOT_VERIFIED",
+    "app_keyup_release_tail": "NOT_VERIFIED",
+    "real_remote_hardware": "NOT_VERIFIED",
+    "source_rights": "NOT_ESTABLISHED",
+    "logs_note": "Own-PID snapshots only; raw URLs remain private locally"
+  },
+  "unresolved_approval_blockers": [],
+  "approval_history": "Earlier auto-review refusals preserved locally; direct user confirmation resolved them before successful actions.",
+  "protection": {
+    "original_packages_unchanged": 3,
+    "original_repositories_unchanged": 8,
+    "dirty_file_hashes_unchanged": true,
+    "receipt": "evidence/resource-protection-final.json",
+    "sha256": "635cb74b3499e4c0d7858def72ccc8ee04d2d49298e828192cf0f56a7a8cf10c"
+  },
+  "runtime": {
+    "utc": "2026-10-02T17:58:00.059659+00:00",
+    "owned_emulator_stopped": true,
+    "owned_emulator_pid": 30748,
+    "avd_data_preserved": true,
+    "owned_fixture_server_stopped": true,
+    "fixture_port_closed": 18801,
+    "active_build_test_sampling_sessions": [],
+    "source_commit": "e06979114d6d0d5447684faef2532a8b70e3b1a5",
+    "version_code": 203231,
+    "probe_marker_absent": true,
+    "apk_sha256": "1f7709ec73c622a81969a4f89816f43210b838c9a460f0e11e72e1c68c7e48fe",
+    "original_libmpv_bytes_verified": true
+  },
+  "limits": [
+    "No stable 60fps claim",
+    "GPU utilization and temperature unavailable without extra privileges; no escalation",
+    "GC events not collected",
+    "Vertical baseline window ended at Settings and is excluded from paired acceptance",
+    "PSS endpoints include report/observation overhead; not a leak test",
+    "Manual audible sound and lip sync not verified",
+    "Video source redistribution rights not established",
+    "Earlier TV metadata endpoint timeouts remain separate",
+    "App-level key-up, release-tail focus/scroll stability and real remote hardware are NOT_VERIFIED",
+    "Performance numbers are from 203211 before the local cover-handoff correction, not from the final probe-off build"
+  ],
+  "visual_receipt": "evidence/tv-resource-20261002/fixed-TV-detail-continuity.json",
+  "probe_equivalence": "evidence/tv-resource-20261002/probe-format-equivalence.json",
+  "measured_source_commit": "2d4126fa06c9cdddcede54acdd4be2b14c757028",
+  "measured_version_code": 203211,
+  "cover_handoff_fix": {
+    "source_commit": "e06979114d6d0d5447684faef2532a8b70e3b1a5",
+    "change": "Keep outgoing TV cover opaque during incoming 180ms fade",
+    "performance_remeasured_after_cover_fix": false,
+    "previous_video": "transition-review-tv/review.md",
+    "final_video": "cover-final-TV-detail-continuity.mp4"
+  }
+}

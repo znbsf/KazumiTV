@@ -1,0 +1,48 @@
+// TV-only identity/signing overlay. Normal Android variants remain unchanged.
+def tvAppId = project.findProperty('kazumiTvApplicationId')?.toString()
+def tvSigned = project.findProperty('kazumiTvSigned')?.toString() == 'true'
+def tvLabel = project.findProperty('kazumiTvLabel')?.toString() ?: 'KazumiTV Flutter'
+if (tvAppId != null && !(tvAppId ==~ /[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+/)) {
+    throw new GradleException('Invalid kazumiTvApplicationId')
+}
+if (tvSigned && tvAppId == null) {
+    throw new GradleException('Signed TV builds require an explicitly approved applicationId')
+}
+if (tvSigned && tvAppId in ['com.znbsf.kazumi.compose.tv', 'com.predidit.kazumi.tv', 'com.znbsf.kazumi.tv', 'com.znbsf.kazumi.flutterlab.test']) {
+    throw new GradleException('This preview must use a new applicationId and preserve all existing applications')
+}
+def requiredSigning = { String name ->
+    def value = System.getenv(name)
+    if (value == null || value.isEmpty()) throw new GradleException('Missing TV signing environment variable: ' + name)
+    return value
+}
+android {
+    flavorDimensions 'device'
+    if (tvSigned) {
+        signingConfigs {
+            tvRelease {
+                storeFile file(requiredSigning('TV_KEYSTORE_PATH'))
+                storePassword requiredSigning('TV_KEYSTORE_PASSWORD')
+                keyAlias requiredSigning('TV_KEY_ALIAS')
+                keyPassword requiredSigning('TV_KEY_PASSWORD')
+            }
+        }
+    }
+    productFlavors {
+        tv {
+            dimension 'device'
+            if (tvAppId != null) {
+                applicationId tvAppId
+                applicationIdSuffix ''
+            } else {
+                applicationIdSuffix '.tv'
+            }
+            minSdkVersion 24
+            manifestPlaceholders = [kazumiTvLabel: tvLabel]
+            buildConfigField 'boolean', 'IS_TV_BUILD', 'true'
+            if (tvSigned) signingConfig signingConfigs.tvRelease
+        }
+    }
+    // The existing build type has debug signing; override it explicitly.
+    if (tvSigned) buildTypes.release.signingConfig signingConfigs.tvRelease
+}
