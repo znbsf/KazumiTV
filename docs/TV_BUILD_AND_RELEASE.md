@@ -1,6 +1,6 @@
 # TV 构建与发布维护
 
-0.4.0 正式版沿用包名 `com.znbsf.kazumi.fluttertv` 及 preview 的长期证书，基础版本号递增为 `20325`。main 已保留原生与 Flutter 两条历史，preview 和原生归档继续保留。发行由维护者在本机完成，CI 不接收签名秘密。
+0.4.0 正式版沿用包名 `com.znbsf.kazumi.fluttertv`，从本版起固定使用新的长期发布证书，基础版本号递增为 `20325`。preview 需卸载后重新安装；后续正式版保持同一证书。main 已保留原生与 Flutter 两条历史，preview 和原生归档继续保留。发行由维护者在本机完成，CI 不接收签名秘密。
 
 ## 工具链与无秘密 CI
 
@@ -14,7 +14,7 @@
 
 ## 本机签名与三个 ABI
 
-使用审阅后的精确提交构建。0.4.0 复用 preview 已有的长期发布证书，不能重新生成或替换；凭据由本机受控流程提供给签名进程，使用现有 `TV_KEYSTORE_PATH`、`TV_KEYSTORE_PASSWORD`、`TV_KEY_ALIAS`、`TV_KEY_PASSWORD` 环境接口，材料不进入仓库或制品。构建命令不包含密码值：
+使用审阅后的精确提交构建。0.4.0 的长期证书及随机密码已按维护者要求固定在本机；密码使用 Windows 当前用户 DPAPI 加密保存，目录仅当前用户和 SYSTEM 可访问。后续签名自动复用，不再次询问密码、不自动生成替代证书。完整保留签名目录及当前 Windows 用户配置，不能只复制加密密码到另一账户后假定可解密。凭据由本机受控流程提供给签名进程，使用现有 `TV_KEYSTORE_PATH`、`TV_KEYSTORE_PASSWORD`、`TV_KEY_ALIAS`、`TV_KEY_PASSWORD` 环境接口，材料不进入仓库或制品。构建命令不包含密码值：
 
 ```sh
 flutter pub get --enforce-lockfile
@@ -29,7 +29,9 @@ flutter build apk --release --pub --flavor tv --split-per-abi \
 git diff --exit-code -- pubspec.lock
 ```
 
-输出为 `build/app/outputs/flutter-apk/app-<ABI>-tv-release.apk`。本次本机发行使用等价的分步流程：先省略 `kazumiTvSigned` 构建 release 模式中间包，再由维护者在本机窗口输入密码，用 Android Build Tools 36.0.0 的 `apksigner` 替换中间签名。签名前后逐项比较 ZIP 非签名内容，并复核对齐、发布证书及不可调试状态；中间包不安装、不发布。
+输出为 `build/app/outputs/flutter-apk/app-<ABI>-tv-release.apk`。本次本机发行使用等价的分步流程：先省略 `kazumiTvSigned` 构建 release 模式中间包，再由本机签名脚本解锁固定凭据，用 Android Build Tools 36.0.0 的 `apksigner` 替换中间签名。签名前后逐项比较 ZIP 非签名内容，并复核对齐、发布证书及不可调试状态；中间包不安装、不发布。
+
+本版程序构建于 `678d00379eef2299b296a1ff8478ce7bdb7df8d0`；正式标签在此基础上只修订 README、CHANGELOG 和本维护文档的签名说明。已核对其余全部 Git 文件内容一致，复用相同程序构建；源码包保留最终说明，核验 JSON 同时记录程序构建提交与发行提交。
 
 基础编号乘 10 后按 ABI 加 1/2/4：ARMv7 203251、ARM64 203252、x86_64 203254。新 appId 的版本序列独立于原生或实验包，后续同包升级须保持兼容证书并递增编号。
 
