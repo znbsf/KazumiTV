@@ -1,0 +1,327 @@
+{
+  "updated_utc": "2026-10-04T05:57:47.645441+00:00",
+  "program_source": "13aa3847e5045ad37995f2dc65662b4c4c2bd0f0",
+  "baseline": "e8bd8a3b13440860e4ab672b5a55a11e0a69e72b",
+  "candidate": {
+    "source_sha": "13aa3847e5045ad37995f2dc65662b4c4c2bd0f0",
+    "apk": "KazumiTV-playback-x86_64.apk",
+    "sha256": "aedbe11272ead7a2b911e379f92b951e2af90c3b0c39619ccdbf1525f06a2473",
+    "bytes": 31188728,
+    "application_id": "com.znbsf.kazumi.fluttertv.candidate",
+    "version_code": 203314,
+    "version_name": "0.4.0-playback",
+    "abi": "x86_64",
+    "certificate_sha256": "fe3f74f8c6f7bf2af6edffbed9c0293e37cb876beffa6dd5055b8971542892a4",
+    "libmpv_sha256": "fed6d87e0eaa54b6be12578b31a20f1bd09f6aa9d52b0008e4dc88a5887c5926",
+    "probe_marker_absent": true,
+    "installed": true,
+    "installed_bytes_verified": true,
+    "published": false
+  },
+  "environment": {
+    "avd": "Kazumi_Flutter_Fusion_API36_20261002",
+    "serial": "emulator-5600",
+    "api": 36,
+    "abi": "x86_64",
+    "webview": "143.0.7499.24",
+    "cores": 2,
+    "ram_mib": 2048,
+    "startup_free_gib": 11.67,
+    "shutdown_utc": "2026-10-04T05:53:57.490858+00:00"
+  },
+  "result": "PASS bounded real-source selection/parse/play/pause/resume/episode switch/history restore",
+  "observations": {
+    "paused_seconds": 146,
+    "paused_observation_interval_seconds": 323.385,
+    "after_resume_seconds": 154,
+    "history_restored_seconds": 164,
+    "history_route_to_capture_seconds": 27.99,
+    "episode3": "00:41 / 25:46",
+    "episode2": "00:06 -> 00:13 / 25:16",
+    "episode1": "00:05 / 48:44"
+  },
+  "deterministic_validation": {
+    "original_implementation_failed": 7,
+    "targeted_passed": 26,
+    "full_passed": 670,
+    "full_failed": 0,
+    "full_skipped": 0,
+    "analyze": "no errors/warnings"
+  },
+  "native_coverage": "Real modern WebView handoff and sequential worker reuse. No instrumentation or synchronous FFI added.",
+  "deterministic_only_cases": [
+    "iframe/normal mode round trips",
+    "artificial stale callback isolation",
+    "signed escaped URL byte preservation",
+    "bridge-not-ready timing",
+    "redirect matrix"
+  ],
+  "failures_and_limits": [
+    "7sefun pre-media TLS -100/-107 and parse timeout",
+    "baimao episodes1/2 resolve distinct URLs but media open fails; one PC manifest GET returned404, not equivalent to AVD headers/network",
+    "DM84 2012 JOJO source timed out before media; another DM84 multi-episode source succeeded",
+    "FX history restore visual evidence preceded a TCP read error while paused; no endurance guarantee",
+    "danmaku API403 is separate from video delivery",
+    "211ms rapid input only activated episode1; not a native stale callback test",
+    "No physical device, manual audio or lip sync acceptance"
+  ],
+  "excluded_or_corrected_labels": {
+    "34": "loading, not first frame",
+    "44": "side panel, not pause proof",
+    "50": "source sheet",
+    "54": "history management, no deletion",
+    "76": "rapid input guard rejected before any rapid input",
+    "77": "episode1 activation only"
+  },
+  "captures": [
+    {
+      "label": "47-fx-paused-time",
+      "xml_sha256": "700d0ef5cc310088c388ecc69d425cf220f8cdeb43f4b348018db4e615eff891",
+      "captured_utc": "2026-10-04T05:37:46.735153+00:00",
+      "visible_description": "FX战士久留美\n1\n02:26 / 23:34\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "bf893d0508d22012f6e9895b03806cb7833661032cd7a52f97d3223e1af77c37"
+    },
+    {
+      "label": "48-fx-pause-stable",
+      "xml_sha256": "700d0ef5cc310088c388ecc69d425cf220f8cdeb43f4b348018db4e615eff891",
+      "captured_utc": "2026-10-04T05:43:10.120305+00:00",
+      "visible_description": "FX战士久留美\n1\n02:26 / 23:34\n上下查看控制 · 进度条左右快进退"
+    },
+    {
+      "label": "49-fx-resume-advance",
+      "xml_sha256": "101bd05513f624bbcb350e86a4a397d04f1b4a3b1b985db1cacb99c4300d333c",
+      "captured_utc": "2026-10-04T05:43:21.010363+00:00",
+      "visible_description": "FX战士久留美\n1\n02:34 / 23:34\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "df2e39adec9dcf514cb529abe2ce54bada6bb0f7b15e1c67e3b24b1523c6b9cc"
+    },
+    {
+      "label": "53-history-page",
+      "xml_sha256": "10971c33562c9ceada58f8af58f70a799d891010b225adc5ca8ec57fb52306f3",
+      "captured_utc": "2026-10-04T05:44:28.484247+00:00",
+      "visible_description": "历史记录"
+    },
+    {
+      "label": "55-fx-history-detail",
+      "xml_sha256": "2844e30d555a0ebc398215a9d7c6f59bd71e57486bf45cab76ae937dc4add15d",
+      "captured_utc": "2026-10-04T05:44:59.900283+00:00",
+      "visible_description": "加载中\n视频资源解析中"
+    },
+    {
+      "label": "56-fx-history-resumed",
+      "xml_sha256": "d87395e6820ed5abccdd8ed84c8194de711e6054698e58fb132ce6d6e120f927",
+      "captured_utc": "2026-10-04T05:45:25.174292+00:00",
+      "visible_description": "FX战士久留美\n1\n02:44 / 23:34\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "c22a3974b0ec51f09ee34736106777f7d50f80b7d568c4d4b100ff00d09c37e7"
+    },
+    {
+      "label": "66-jojo-episode1-result",
+      "xml_sha256": "caf793fdd9739200ea86d246eb5428867db0e3b56cbdb78b7439ed4a3e5394c4",
+      "captured_utc": "2026-10-04T05:48:16.818162+00:00",
+      "visible_description": "暂时无法播放\n视频解析超时，请重试",
+      "png_sha256": "192fc2b0bfb7160241e4accfc1840f53eb0f8fbe9c91d437805e8d5e4089b0d1"
+    },
+    {
+      "label": "69-dm84-episode3-playing",
+      "xml_sha256": "ca4848e6462873a17c531def4d02d4664b3a76d33db78db2a8e75b7fd507dac6",
+      "captured_utc": "2026-10-04T05:49:51.501130+00:00",
+      "visible_description": "JOJO的奇妙冒险 飙马野郎\n3\n00:41 / 25:46\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "d94cf962363973fafd71cfb147c65d541b41aad812e696f08e9b30429b8a0018"
+    },
+    {
+      "label": "73-dm84-episode2-result",
+      "xml_sha256": "b68f0d0560e43899a84c671f9649ff498a1750602307fc429d37a004d416b55a",
+      "captured_utc": "2026-10-04T05:50:54.606797+00:00",
+      "visible_description": "JOJO的奇妙冒险 飙马野郎\n2\n00:06 / 25:16\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "c42d687a4f37761596ff523a0fb8c1c436d8c9d4347140a3ff7609f5df81a22e"
+    },
+    {
+      "label": "74-episode2-advance",
+      "xml_sha256": "f139de77db48e41dc29151fd186da05311861a1dcf3aed95baca136f403efad1",
+      "captured_utc": "2026-10-04T05:51:36.612037+00:00",
+      "visible_description": "JOJO的奇妙冒险 飙马野郎\n2\n00:13 / 25:16\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "64499993ef21c729cfd0ddcf00749d4c465f3ea42f5caac12d71c677b3ea1ee2"
+    },
+    {
+      "label": "77-rapid-switch-final",
+      "xml_sha256": "92074dbfd559bf0bf50d1fb79d235ba917593ee428f935ff09c1a3bca2aff2cf",
+      "captured_utc": "2026-10-04T05:52:58.332952+00:00",
+      "visible_description": "JOJO的奇妙冒险 飙马野郎\n1\n00:05 / 48:44\n上下查看控制 · 进度条左右快进退",
+      "png_sha256": "5005f67835ff2d87a23c27c2b0cae40b1f25c3ca614babbed18967b1ceda2169"
+    }
+  ],
+  "events_without_urls": [
+    {
+      "device_time": "10-04 05:24:27.964",
+      "kind": "episode",
+      "episode": "第01集"
+    },
+    {
+      "device_time": "10-04 05:24:28.459",
+      "kind": "webview_created"
+    },
+    {
+      "device_time": "10-04 05:30:00.861",
+      "kind": "episode",
+      "episode": "第1集"
+    },
+    {
+      "device_time": "10-04 05:30:00.880",
+      "kind": "webview_created"
+    },
+    {
+      "device_time": "10-04 05:30:03.690",
+      "kind": "media_resolved",
+      "url_sha256": "2cfd252035a0e8d6a73d44deeae87a932de38751ca91f55464bb43da329644a5",
+      "has_query": false
+    },
+    {
+      "device_time": "10-04 05:30:03.843",
+      "kind": "player_initialized"
+    },
+    {
+      "device_time": "10-04 05:30:04.498",
+      "kind": "player_error",
+      "message": "<url-redacted> | Failed to open <url-redacted>"
+    },
+    {
+      "device_time": "10-04 05:32:57.622",
+      "kind": "episode",
+      "episode": "第2集"
+    },
+    {
+      "device_time": "10-04 05:32:59.190",
+      "kind": "media_resolved",
+      "url_sha256": "91b110426bd49cbbf75aff3db32828046ae079589f5f6dcccb2488bdf0cc2d53",
+      "has_query": false
+    },
+    {
+      "device_time": "10-04 05:32:59.289",
+      "kind": "player_initialized"
+    },
+    {
+      "device_time": "10-04 05:33:00.012",
+      "kind": "player_error",
+      "message": "<url-redacted> | Failed to open <url-redacted>"
+    },
+    {
+      "device_time": "10-04 05:34:39.145",
+      "kind": "episode",
+      "episode": "1"
+    },
+    {
+      "device_time": "10-04 05:34:39.164",
+      "kind": "webview_created"
+    },
+    {
+      "device_time": "10-04 05:34:41.146",
+      "kind": "media_resolved",
+      "url_sha256": "ba360fb5178e64dfa01a27388a965066ada0b494a0f35d8d3723e00200555d36",
+      "has_query": true
+    },
+    {
+      "device_time": "10-04 05:34:41.237",
+      "kind": "player_initialized"
+    },
+    {
+      "device_time": "10-04 05:44:57.185",
+      "kind": "episode",
+      "episode": "1"
+    },
+    {
+      "device_time": "10-04 05:44:57.200",
+      "kind": "webview_created"
+    },
+    {
+      "device_time": "10-04 05:44:58.819",
+      "kind": "media_resolved",
+      "url_sha256": "ba360fb5178e64dfa01a27388a965066ada0b494a0f35d8d3723e00200555d36",
+      "has_query": true
+    },
+    {
+      "device_time": "10-04 05:44:58.941",
+      "kind": "player_initialized"
+    },
+    {
+      "device_time": "10-04 05:45:27.792",
+      "kind": "player_error",
+      "message": "<url-redacted> | tcp: ffurl_read returned 0xffffff92"
+    },
+    {
+      "device_time": "10-04 05:47:49.233",
+      "kind": "episode",
+      "episode": "1"
+    },
+    {
+      "device_time": "10-04 05:47:49.255",
+      "kind": "webview_created"
+    },
+    {
+      "device_time": "10-04 05:48:58.316",
+      "kind": "episode",
+      "episode": "3"
+    },
+    {
+      "device_time": "10-04 05:48:58.341",
+      "kind": "webview_created"
+    },
+    {
+      "device_time": "10-04 05:49:00.011",
+      "kind": "media_resolved",
+      "url_sha256": "46653f90d185682fe56c5073429809ec0ab5d3de0071b137f002de96754fa964",
+      "has_query": true
+    },
+    {
+      "device_time": "10-04 05:49:00.108",
+      "kind": "player_initialized"
+    },
+    {
+      "device_time": "10-04 05:50:42.419",
+      "kind": "episode",
+      "episode": "2"
+    },
+    {
+      "device_time": "10-04 05:50:43.701",
+      "kind": "media_resolved",
+      "url_sha256": "668c5121f8c9a52aff7214b0002bfb2ed9862be89e74f88b9941d560ecf13c99",
+      "has_query": true
+    },
+    {
+      "device_time": "10-04 05:50:43.804",
+      "kind": "player_initialized"
+    },
+    {
+      "device_time": "10-04 05:52:46.319",
+      "kind": "episode",
+      "episode": "1"
+    },
+    {
+      "device_time": "10-04 05:52:47.978",
+      "kind": "media_resolved",
+      "url_sha256": "6ef1fecae4162b48224e8616115f3705069c940596e06ee91e39e94b0d3ff06f",
+      "has_query": true
+    },
+    {
+      "device_time": "10-04 05:52:48.085",
+      "kind": "player_initialized"
+    }
+  ],
+  "candidate_log_markers": {
+    "FATAL EXCEPTION": 0,
+    "Fatal signal": 0,
+    "Unhandled Exception": 0,
+    "KAZUMI_TV_PERF": 0
+  },
+  "preserved": {
+    "protected_repositories": 8,
+    "changed_repositories": [],
+    "old_dirty_files_unchanged": true,
+    "candidate_data_identity_preserved": true,
+    "other_installed_packages_unchanged": true,
+    "other_project_emulator_untouched": true,
+    "system_proxy_power_unchanged": true,
+    "physical_device_actions": false
+  },
+  "evidence_root": "evidence/playback-feasibility-20261004/emulator",
+  "raw_log_sha256": "6639220323daee4084a2a71f63cf808fd4049afb8d6b8a1f34ab3c0d87668200",
+  "raw_log_publication": false
+}

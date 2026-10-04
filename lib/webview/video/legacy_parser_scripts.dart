@@ -1,6 +1,6 @@
-/// The fallback runs on WebViews without document-start script support.
-/// Keep every binding scoped and make installation idempotent: load callbacks
-/// can refer to the same document, and asynchronous replies can outlive a page.
+/// Shared by the fallback and Android document-start parser. Keep syntax
+/// compatible with WebView 66, bindings scoped and installation idempotent:
+/// load callbacks can share a document and async replies can outlive a page.
 String legacyVideoParserScript(
     {required int session, required bool iframeOnly}) {
   return _script
@@ -152,11 +152,11 @@ const _script = r'''
     hookNetwork(win);
     var observer = new win.MutationObserver(function () { scanDocument(win); });
     state.observers.push(observer);
-    if (doc.documentElement) {
-      observer.observe(doc.documentElement, {
-        childList: true, subtree: true, attributes: true, attributeFilter: ['src']
-      });
-    }
+    // At document start even documentElement can be absent. Watching the
+    // Document also catches elements created after DOMContentLoaded.
+    observer.observe(doc, {
+      childList: true, subtree: true, attributes: true, attributeFilter: ['src']
+    });
     listen(doc, 'DOMContentLoaded', function () { scanDocument(win); });
     listen(doc, 'loadedmetadata', function (event) {
       if (!state.iframeOnly && event.target.nodeName === 'VIDEO') scanVideo(event.target, win);
@@ -180,6 +180,9 @@ const _script = r'''
     for (var k = 0; k < state.listeners.length; k++) state.listeners[k]();
     state.pending = {};
   };
+  // Modern Android has no fallback polling timer. Flush sources discovered
+  // before the bridge becomes available, even if the DOM never changes again.
+  listen(window, 'flutterInAppWebViewPlatformReady', function () { state.scan(); });
   install(window);
 })();
 ''';

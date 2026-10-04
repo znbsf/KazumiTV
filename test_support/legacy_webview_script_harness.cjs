@@ -36,8 +36,8 @@ function realm(href = 'https://site.example/watch/1') {
     return { set href(value) { result = new URL(value, href).href; }, get href() { return result; } };
   };
   document.querySelectorAll = name => name === 'iframe' ? frames : videos;
-  const window = { document, Response, XMLHttpRequest: XHR, MutationObserver: Observer,
-    location: { href }, flutter_inappwebview: { callHandler: (...args) => calls.push(args) } };
+  const window = eventTarget({ document, Response, XMLHttpRequest: XHR, MutationObserver: Observer,
+    location: { href }, flutter_inappwebview: { callHandler: (...args) => calls.push(args) } });
   const context = vm.createContext({ window, document });
   return { window, document, calls, observers, frames, videos,
     run: script => vm.runInContext(script, context),
@@ -160,6 +160,29 @@ async function check(name, action) { await action(); checks.push({ name, passed:
     page.run(scripts.iframe1);
     assert.equal(page.window.Response.prototype.text, original);
     assert.deepEqual(page.calls, [['JSBridgeDebug', 'https://site.example/player?url=https://media.example/a.mp4', 1]]);
+  });
+  await check('document-start observes late elements before a document root exists', async () => {
+    const page = realm();
+    page.document.documentElement = null;
+    page.run(scripts.normal1);
+    assert.equal(page.observers[0].target, page.document);
+    page.document.documentElement = {};
+    page.document.fire('DOMContentLoaded');
+    page.videos.push(video('/media/late.mp4'));
+    page.mutations();
+    assert.deepEqual(page.calls, [['VideoBridgeDebug', 'https://site.example/media/late.mp4', 1]]);
+  });
+  await check('bridge-ready flushes early results once without a polling timer', async () => {
+    const page = realm(), bridge = page.window.flutter_inappwebview;
+    page.window.flutter_inappwebview = null;
+    page.videos.push(video('/media/early.mp4'));
+    page.run(scripts.normal1);
+    page.window.flutter_inappwebview = bridge;
+    page.window.fire('flutterInAppWebViewPlatformReady');
+    page.window.fire('flutterInAppWebViewPlatformReady');
+    assert.deepEqual(page.calls, [['VideoBridgeDebug', 'https://site.example/media/early.mp4', 1]]);
+    page.window.__kazumiVideoParser.dispose();
+    assert.equal(page.window.listeners.flutterInAppWebViewPlatformReady.length, 0);
   });
   process.stdout.write(JSON.stringify({ checks }));
 })().catch(error => { process.stderr.write(error.stack); process.exitCode = 1; });

@@ -1,19 +1,22 @@
-import 'dart:async';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
+import 'package:kazumi/webview/video/legacy_parser_scripts.dart';
+import 'package:kazumi/webview/video/video_parser_url.dart';
 import 'package:flutter_inappwebview_platform_interface/flutter_inappwebview_platform_interface.dart';
 import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
     as android_webview;
-import 'package:kazumi/utils/media.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
 class VideoWebviewAndroidImpl
     extends VideoWebviewController<PlatformInAppWebViewController> {
+  static const _parserScriptGroup = 'kazumi-video-parser';
   PlatformHeadlessInAppWebView? headlessWebView;
-  bool hasInjectedScripts = false;
-  bool shouldInjectIframeRedirect = false;
+  bool _hasRegisteredHandlers = false;
+  bool _useLegacyParser = false;
+  bool _pageActive = false;
+  int _session = 0;
 
   @override
   Future<void> init() async {
@@ -32,15 +35,15 @@ class VideoWebviewAndroidImpl
           geolocationEnabled: false,
         ),
         onWebViewCreated: (controller) {
-          print('[WebView] Created');
+          KazumiLogger().i('[WebView] Created');
           webviewController = controller;
           initEventController.add(true);
         },
         onLoadStart: (controller, url) async {
-          logEventController.add('started loading: $url');
+          _log('started loading: $url');
         },
         onLoadStop: (controller, url) {
-          logEventController.add('loading completed: $url');
+          _log('loading completed: $url');
         },
       ),
     );
@@ -51,241 +54,100 @@ class VideoWebviewAndroidImpl
   Future<void> loadUrl(String url, bool useLegacyParser,
       {int offset = 0}) async {
     await unloadPage();
-    if (!hasInjectedScripts) {
-      addJavaScriptHandlers(useLegacyParser);
-      await addUserScripts(useLegacyParser);
-      hasInjectedScripts = true;
+    if (!_hasRegisteredHandlers) {
+      _addJavaScriptHandlers();
+      _hasRegisteredHandlers = true;
     }
+    // A pooled WebView serves different rules, and old documents can reply
+    // after navigation. Replace only our scripts with this request's mode
+    // and generation; Dart callbacks alone cannot identify an old document.
+    await webviewController?.removeUserScriptsByGroupName(
+        groupName: _parserScriptGroup);
+    await webviewController?.addUserScripts(userScripts: [
+      UserScript(
+        groupName: _parserScriptGroup,
+        source: legacyVideoParserScript(
+            session: _session, iframeOnly: useLegacyParser),
+        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+      ),
+    ]);
     count = 0;
     this.offset = offset;
+    _useLegacyParser = useLegacyParser;
     isIframeLoaded = false;
     isVideoSourceLoaded = false;
-    shouldInjectIframeRedirect = true;
+    _pageActive = true;
     videoLoadingEventController.add(true);
-
     await webviewController?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
   }
 
-  void addJavaScriptHandlers(bool useLegacyParser) {
-    logEventController.add('Adding LogBridge handler');
+  void _addJavaScriptHandlers() {
     webviewController?.addJavaScriptHandler(
-        handlerName: 'LogBridge',
-        callback: (args) {
-          String message = args[0].toString();
-          if (message.contains('about:blank')) {
-            return;
-          }
-          logEventController.add(message);
-        });
-
-    if (useLegacyParser) {
-      logEventController.add('Adding JSBridgeDebug handler');
-      webviewController?.addJavaScriptHandler(
-          handlerName: 'JSBridgeDebug',
-          callback: (args) {
-            String message = args[0].toString();
-            logEventController.add('Callback received: $message');
-            logEventController.add(
-                'If there is audio but no video, please report it to the rule developer.');
-            if ((message.contains('http') || message.startsWith('//')) &&
-                !message.contains('googleads') &&
-                !message.contains('googlesyndication.com') &&
-                !message.contains('prestrain.html') &&
-                !message.contains('prestrain%2Ehtml') &&
-                !message.contains('adtrafficquality')) {
-              logEventController.add('Parsing video source $message');
-              String encodedUrl = Uri.encodeFull(message);
-              if (decodeVideoSource(encodedUrl) != encodedUrl) {
-                isIframeLoaded = true;
-                isVideoSourceLoaded = true;
-                videoLoadingEventController.add(false);
-                logEventController.add(
-                    'Loading video source ${decodeVideoSource(encodedUrl)}');
-                unloadPage();
-                final videoUrl = decodeVideoSource(encodedUrl);
-                notifyVideoSourceResolved(videoUrl);
-              }
-            }
-          });
-    } else {
-      logEventController.add('Adding VideoBridgeDebug handler');
-      webviewController?.addJavaScriptHandler(
-          handlerName: 'VideoBridgeDebug',
-          callback: (args) {
-            String message = args[0].toString();
-            logEventController.add('Callback received: $message');
-            if (message.contains('http') && !isVideoSourceLoaded) {
-              logEventController.add('Loading video source: $message');
-              isIframeLoaded = true;
-              isVideoSourceLoaded = true;
-              videoLoadingEventController.add(false);
-              unloadPage();
-              notifyVideoSourceResolved(message);
-            }
-          });
-    }
+      handlerName: 'LogBridge',
+      callback: (args) {
+        if (args.isNotEmpty && !args[0].toString().contains('about:blank')) {
+          _log(args[0].toString());
+        }
+      },
+    );
+    webviewController?.addJavaScriptHandler(
+      handlerName: 'JSBridgeDebug',
+      callback: (args) {
+        if (!_isCurrentReply(args)) return;
+        final url = embeddedVideoParserUrl(args[0].toString());
+        if (url != null) _resolve(url);
+      },
+    );
+    webviewController?.addJavaScriptHandler(
+      handlerName: 'VideoBridgeDebug',
+      callback: (args) {
+        if (!_isCurrentReply(args) || _useLegacyParser) return;
+        final url = args[0].toString();
+        if (isVideoParserNetworkUrl(url) && !isVideoParserAdUrl(url)) {
+          _resolve(url);
+        }
+      },
+    );
   }
 
-  Future<void> addUserScripts(bool useLegacyParser) async {
-    final List<UserScript> scripts = [];
+  bool _isCurrentReply(List<dynamic> args) =>
+      _pageActive &&
+      !isVideoSourceLoaded &&
+      args.length >= 2 &&
+      args[1] == _session;
 
-    if (useLegacyParser) {
-      logEventController.add('Adding JSBridgeDebug UserScript');
-      const String jsBridgeDebugScript = """
-        window.flutter_inappwebview.callHandler('LogBridge', 'JSBridgeDebug script loaded: ' + window.location.href);
-        function processIframeElement(iframe) {
-          window.flutter_inappwebview.callHandler('LogBridge', 'Processing iframe element');
-          let src = iframe.getAttribute('src');
-          if (src) {
-            window.flutter_inappwebview.callHandler('JSBridgeDebug', src);
-          }
-        }
-
-        const _observer = new MutationObserver((mutations) => {
-          window.flutter_inappwebview.callHandler('LogBridge', 'Scanning for iframes...');
-          mutations.forEach(mutation => {
-            if (mutation.type === 'attributes' && mutation.target.nodeName === 'IFRAME') {
-              processIframeElement(mutation.target);
-            } else {
-              mutation.addedNodes.forEach(node => {
-                if (node.nodeName === 'IFRAME') processIframeElement(node);
-                if (node.querySelectorAll) {
-                  node.querySelectorAll('iframe').forEach(processIframeElement);
-                }
-              });
-            }
-          });  
-        });
-
-        _observer.observe(document.documentElement, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['src']
-        });
-      """;
-      scripts.add(UserScript(
-        source: jsBridgeDebugScript,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      ));
-    } else {
-      logEventController.add('Adding VideoBridgeDebug UserScripts');
-      const String blobParserScript = """
-        window.flutter_inappwebview.callHandler('LogBridge', 'BlobParser script loaded: ' + window.location.href);
-        const _r_text = window.Response.prototype.text;
-        window.Response.prototype.text = function () {
-            return new Promise((resolve, reject) => {
-                _r_text.call(this).then((text) => {
-                    resolve(text);
-                    if (text.trim().startsWith("#EXTM3U")) {
-                        window.flutter_inappwebview.callHandler('LogBridge', 'M3U8 source found: ' + this.url);
-                        window.flutter_inappwebview.callHandler('VideoBridgeDebug', this.url);
-                    }
-                }).catch(reject);
-            });
-        }
-
-        const _open = window.XMLHttpRequest.prototype.open;
-        window.XMLHttpRequest.prototype.open = function (...args) {
-            this.addEventListener("load", () => {
-                try {
-                    let content = this.responseText;
-                    if (content.trim().startsWith("#EXTM3U")) {
-                        window.flutter_inappwebview.callHandler('LogBridge', 'M3U8 source found: ' + args[1]);
-                        window.flutter_inappwebview.callHandler('VideoBridgeDebug', args[1]);
-                    };
-                } catch {}
-            });
-            return _open.apply(this, args);
-        };
-      """;
-
-      const String videoTagParserScript = """
-        window.flutter_inappwebview.callHandler('LogBridge', 'VideoTagParser script loaded: ' + window.location.href);
-        const _observer = new MutationObserver((mutations) => {
-          window.flutter_inappwebview.callHandler('LogBridge', 'Scanning for video elements...');
-          for (const mutation of mutations) {
-            if (mutation.type === "attributes" && mutation.target.nodeName === "VIDEO") {
-              if (processVideoElement(mutation.target)) return;
-              continue;
-            }
-            for (const node of mutation.addedNodes) {
-              if (node.nodeName === "VIDEO") {
-                if (processVideoElement(node)) return;
-              }
-              if (node.querySelectorAll) {
-                for (const video of node.querySelectorAll("video")) {
-                  if (processVideoElement(video)) return;
-                }
-              }
-            }
-          }
-        });
-        function processVideoElement(video) {
-          window.flutter_inappwebview.callHandler('LogBridge', 'Scanning video element for source URL');
-          let src = video.getAttribute('src');
-          if (src && src.trim() !== '' && !src.startsWith('blob:') && !src.includes('googleads')) {
-            _observer.disconnect();
-            window.flutter_inappwebview.callHandler('LogBridge', 'VIDEO source found: ' + src);
-            window.flutter_inappwebview.callHandler('VideoBridgeDebug', src);
-            return true;
-          }
-          const sources = video.getElementsByTagName('source');
-          for (let source of sources) {
-            src = source.getAttribute('src');
-            if (src && src.trim() !== '' && !src.startsWith('blob:') && !src.includes('googleads')) {
-              _observer.disconnect();
-              window.flutter_inappwebview.callHandler('LogBridge', 'VIDEO source found (source tag): ' + src);
-              window.flutter_inappwebview.callHandler('VideoBridgeDebug', src);
-              return true;
-            }
-          }
-        }
-
-        function setupVideoProcessing() {
-          for (const video of document.querySelectorAll("video")) {
-            if (processVideoElement(video)) return;
-          }
-          _observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true,
-            attributeFilter: ['src']
-          });
-        }
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', setupVideoProcessing);
-        } else {
-          setupVideoProcessing();
-        }
-    """;
-      scripts.add(UserScript(
-        source: blobParserScript,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      ));
-      scripts.add(UserScript(
-        source: videoTagParserScript,
-        injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-      ));
-    }
-
-    await webviewController?.addUserScripts(
-      userScripts: scripts,
-    );
+  void _resolve(String url) {
+    isIframeLoaded = true;
+    isVideoSourceLoaded = true;
+    _pageActive = false;
+    videoLoadingEventController.add(false);
+    _log('Loading video source: $url');
+    notifyVideoSourceResolved(url);
+    // The source service owns and awaits page retirement before reuse.
+    // Starting a second, unawaited about:blank here can clear the next page.
   }
 
   @override
   Future<void> unloadPage() async {
-    await webviewController!
-        .loadUrl(urlRequest: URLRequest(url: WebUri("about:blank")));
+    _pageActive = false;
+    _session++;
+    await webviewController?.loadUrl(
+        urlRequest: URLRequest(url: WebUri('about:blank')));
   }
 
   @override
   Future<void> dispose() async {
+    _pageActive = false;
+    _session++;
     await headlessWebView?.dispose();
     headlessWebView = null;
     webviewController = null;
+    _hasRegisteredHandlers = false;
     disposeEventControllers();
+  }
+
+  void _log(String message) {
+    if (!logEventController.isClosed) logEventController.add(message);
   }
 
   Future<void> _setupProxy() async {

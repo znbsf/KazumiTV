@@ -6,7 +6,7 @@ import 'package:kazumi/webview/video/legacy_parser_scripts.dart';
 
 void main() {
   test(
-      'production fallback scripts execute across navigation and hook lifetimes',
+      'shared production parser scripts execute across navigation and hook lifetimes',
       () async {
     final process = await Process.start(
         'node', ['test_support/legacy_webview_script_harness.cjs']);
@@ -27,7 +27,7 @@ void main() {
     expect(code, 0, reason: await errors);
     final report = jsonDecode(await output) as Map<String, dynamic>;
     final checks = report['checks'] as List<dynamic>;
-    expect(checks, hasLength(8));
+    expect(checks, hasLength(10));
     expect(checks.every((check) => check['passed'] == true), isTrue);
   });
 }

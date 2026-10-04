@@ -8,7 +8,7 @@ import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
     as android_webview;
-import 'package:kazumi/utils/media.dart';
+import 'package:kazumi/webview/video/video_parser_url.dart';
 import 'package:kazumi/utils/http_headers.dart';
 
 class VideoWebviewImpl
@@ -41,12 +41,12 @@ class VideoWebviewImpl
         shouldInterceptRequest: (controller, request) async {
           if (!_pageActive || isVideoSourceLoaded) return null;
           final url = request.url.toString();
-          if (_isAdUrl(url)) return null;
+          if (isVideoParserAdUrl(url)) return null;
           // An iframe's public query can expose the media URL before its
           // JavaScript player fails on an older WebView. Reuse the existing
           // legacy decoder in both modes; no page code or authentication is
           // changed, and cross-origin documents remain inaccessible.
-          final embedded = _embeddedMediaUrl(url);
+          final embedded = embeddedVideoParserUrl(url);
           if (embedded != null) {
             _resolve(embedded, 'Native intercepted embedded video URL');
           } else if (!useLegacyParser &&
@@ -109,7 +109,7 @@ class VideoWebviewImpl
       handlerName: 'JSBridgeDebug',
       callback: (args) {
         if (!_isCurrentReply(args)) return;
-        final url = _embeddedMediaUrl(args[0].toString());
+        final url = embeddedVideoParserUrl(args[0].toString());
         if (url != null) _resolve(url, 'Iframe embedded video URL');
       },
     );
@@ -118,7 +118,7 @@ class VideoWebviewImpl
       callback: (args) {
         if (!_isCurrentReply(args) || useLegacyParser) return;
         final url = args[0].toString();
-        if (_isNetworkUrl(url) && !_isAdUrl(url)) {
+        if (isVideoParserNetworkUrl(url) && !isVideoParserAdUrl(url)) {
           _resolve(url, 'Video source URL');
         }
       },
@@ -223,54 +223,17 @@ class VideoWebviewImpl
     disposeEventControllers();
   }
 
-  String? _embeddedMediaUrl(String source) {
-    if (!_isNetworkUrl(source) || _isAdUrl(source)) return null;
-    try {
-      final encoded = Uri.encodeFull(source);
-      final extracted = decodeVideoSource(encoded);
-      if (extracted == encoded) return null;
-      // decodeVideoSource applies encodeFull to its extracted value. Undo
-      // exactly that outer encoding, then let Uri preserve already escaped
-      // query bytes: signed token a%2Fb must not become a%252Fb.
-      final decoded = Uri.parse(Uri.decodeFull(extracted)).toString();
-      if (!_isNetworkUrl(decoded) || _isAdUrl(decoded)) {
-        return null;
-      }
-      final path = Uri.parse(decoded).path.toLowerCase();
-      if (!path.endsWith('.m3u8') && !path.endsWith('.mp4')) return null;
-      return decoded;
-    } on FormatException {
-      return null;
-    }
-  }
-
-  bool _isNetworkUrl(String url) {
-    final uri = Uri.tryParse(url);
-    return uri != null &&
-        (uri.scheme == 'http' || uri.scheme == 'https') &&
-        uri.host.isNotEmpty;
-  }
-
   bool _isM3U8Url(String url) =>
-      _isNetworkUrl(url) && Uri.parse(url).path.toLowerCase().endsWith('.m3u8');
+      isVideoParserNetworkUrl(url) &&
+      Uri.parse(url).path.toLowerCase().endsWith('.m3u8');
 
   bool _isRangeVideoRequest(String url, Map<String, String>? headers) {
-    if (!_isNetworkUrl(url) || headers == null) return false;
+    if (!isVideoParserNetworkUrl(url) || headers == null) return false;
     final range = headers['Range'] ?? headers['range'];
     if (range == null || !range.startsWith('bytes=')) return false;
     final path = Uri.parse(url).path.toLowerCase();
     return !RegExp(r'\.(js|css|html|json|png|jpg|gif|svg|woff2?|wasm)$')
         .hasMatch(path);
-  }
-
-  bool _isAdUrl(String url) {
-    final lower = url.toLowerCase();
-    return lower.contains('googleads') ||
-        lower.contains('googlesyndication') ||
-        lower.contains('adtrafficquality') ||
-        lower.contains('doubleclick') ||
-        lower.contains('prestrain.html') ||
-        lower.contains('prestrain%2ehtml');
   }
 
   void _log(String message) {
