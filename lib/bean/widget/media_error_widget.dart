@@ -7,11 +7,17 @@ class MediaErrorWidget extends StatelessWidget {
     required this.title,
     required this.errMsg,
     required this.icon,
+    this.onRetry,
+    this.retryText = '重试',
+    this.actions = const [],
   });
 
   final String title;
   final String errMsg;
   final IconData icon;
+  final VoidCallback? onRetry;
+  final String retryText;
+  final List<Widget> actions;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +34,9 @@ class MediaErrorWidget extends StatelessWidget {
         title: title,
         errMsg: errMsg,
         icon: icon,
+        onRetry: onRetry,
+        retryText: retryText,
+        actions: actions,
         compact: true,
       ),
     );

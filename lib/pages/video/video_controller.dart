@@ -26,6 +26,7 @@ import 'package:kazumi/utils/episode_url.dart';
 import 'package:kazumi/utils/http_headers.dart';
 import 'package:kazumi/utils/media.dart';
 import 'package:kazumi/utils/async_session.dart';
+import 'package:kazumi/services/player/episode_identity.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 
 part 'video_controller.g.dart';
@@ -61,8 +62,9 @@ abstract class _VideoPageController with Store implements Disposable {
   _VideoPageController(
     this.historyController,
     this.downloadRepository,
-    this.downloadManager,
-  );
+    this.downloadManager, {
+    WebViewVideoSourceService? videoSourceService,
+  }) : _videoSourceService = videoSourceService;
 
   late BangumiItem bangumiItem;
   EpisodeInfo episodeInfo = EpisodeInfo.fromTemplate();
@@ -147,6 +149,7 @@ abstract class _VideoPageController with Store implements Disposable {
   final IDownloadManager downloadManager;
 
   WebViewVideoSourceService? _videoSourceService;
+  int _requestedOffset = 0;
 
   final StreamController<String> _logStreamController =
       StreamController<String>.broadcast();
@@ -417,6 +420,103 @@ abstract class _VideoPageController with Store implements Disposable {
     _errorMessage = message;
   }
 
+  /// A failed new episode must never inherit the previous player's position.
+  int recoveryOffset(PlayerController playerController) {
+    if (playingEpisode != selectedEpisode ||
+        playerController.playback.playerDuration <= Duration.zero) {
+      return _requestedOffset;
+    }
+    return episodeTransferOffset(
+      position: playerController.playback.playerPosition,
+      duration: playerController.playback.playerDuration,
+    );
+  }
+
+  void _handlePlaybackFailure(
+      String message, AsyncSession session, PlayerController playerController) {
+    if (session.isStale) return;
+    _requestedOffset = recoveryOffset(playerController);
+    _playbackSessions.cancel();
+    _danmakuSessions.cancel();
+    playerController.danmaku.finishDanmakuLoad();
+    playingEpisode = null;
+    _failLoading('播放器加载失败：$message');
+    unawaited(playerController.stop().catchError((Object error) {
+      KazumiLogger().w('VideoPageController: failed to stop failed playback',
+          error: error);
+    }));
+  }
+
+  Future<void> retryCurrentEpisode({
+    required PlayerController playerController,
+  }) =>
+      changeEpisode(
+        selectedEpisode.episode,
+        currentRoad: selectedEpisode.road,
+        offset: recoveryOffset(playerController),
+        playerController: playerController,
+      );
+
+  Future<void> selectEpisode(
+    int episode, {
+    required int road,
+    required PlayerController playerController,
+  }) async {
+    if (selectedEpisode ==
+        VideoEpisodeSelection(episode: episode, road: road)) {
+      if (_errorMessage != null) {
+        await retryCurrentEpisode(playerController: playerController);
+      }
+      return;
+    }
+    await changeEpisode(episode,
+        currentRoad: road, playerController: playerController);
+  }
+
+  ({int episode, int road, int offset})? recoveryOnRoad(
+      int road, PlayerController playerController) {
+    final current =
+        playingEpisode ?? (_errorMessage != null ? selectedEpisode : null);
+    if (isOfflineMode ||
+        _loading ||
+        (playerController.playback.loading && _errorMessage == null) ||
+        current == null ||
+        road < 0 ||
+        road >= roadList.length ||
+        current.road < 0 ||
+        current.road >= roadList.length) {
+      return null;
+    }
+    final identity = episodeIdentityForRoad(
+        roadList[current.road], current.episode,
+        baseUrl: currentPlugin.baseUrl);
+    final match = identity == null
+        ? null
+        : matchingEpisodeIdentity(
+            identity,
+            episodeIdentitiesForRoad(roadList[road],
+                baseUrl: currentPlugin.baseUrl));
+    if (match == null) return null;
+    return (
+      episode: match + 1,
+      road: road,
+      offset: recoveryOffset(playerController)
+    );
+  }
+
+  Future<void> cancelEpisodeLoad({
+    required PlayerController playerController,
+  }) async {
+    _requestedOffset = recoveryOffset(playerController);
+    _playbackSessions.cancel();
+    _danmakuSessions.cancel();
+    _videoSourceService?.cancel();
+    playerController.danmaku.finishDanmakuLoad();
+    playingEpisode = null;
+    _failLoading('已取消加载，可重试当前集或选择其他线路');
+    await playerController.stop();
+  }
+
   Future<void> changeEpisode(
     int episode, {
     int currentRoad = 0,
@@ -428,6 +528,7 @@ abstract class _VideoPageController with Store implements Disposable {
       episode: episode,
       road: currentRoad,
     );
+    _requestedOffset = offset;
     _beginEpisodeSwitch(selection);
     _danmakuSessions.cancel();
     playerController.danmaku.finishDanmakuLoad();
@@ -507,6 +608,7 @@ abstract class _VideoPageController with Store implements Disposable {
     _finishLoading();
     final resolvedOffset =
         offset > 0 ? offset : getHistoryOffsetFor(_playbackHistoryIdentity!);
+    _requestedOffset = resolvedOffset;
 
     KazumiLogger().i(
         'VideoPageController: offline episode changed to ${resolvedEpisode.historyEpisodeNumber} (index: ${selection.episode}), path: $localPath');
@@ -534,6 +636,8 @@ abstract class _VideoPageController with Store implements Disposable {
           ? (position, duration) => historyController
               .updateHistory(historyIdentity, position, duration: duration)
           : null,
+      onPlaybackError: (message) =>
+          _handlePlaybackFailure(message, session, playerController),
     );
 
     final initialized = await playerController.init(params);
@@ -541,6 +645,7 @@ abstract class _VideoPageController with Store implements Disposable {
       playingEpisode = selection;
       unawaited(_loadPlaybackDanmaku(playerController, params, session));
     } else if (session.isActive) {
+      _failLoading('本地视频加载失败，请重试或选择其他集数');
       _playbackSessions.cancel();
     }
   }
@@ -659,6 +764,8 @@ abstract class _VideoPageController with Store implements Disposable {
             ? (position, duration) => historyController
                 .updateHistory(historyIdentity, position, duration: duration)
             : null,
+        onPlaybackError: (message) =>
+            _handlePlaybackFailure(message, session, playerController),
       );
 
       final initialized = await playerController.init(params);
@@ -669,6 +776,7 @@ abstract class _VideoPageController with Store implements Disposable {
         );
         unawaited(_loadPlaybackDanmaku(playerController, params, session));
       } else if (session.isActive) {
+        _failLoading('视频已解析，但播放器加载失败。请重试当前集或更换线路');
         _playbackSessions.cancel();
       }
     } on VideoSourceTimeoutException {

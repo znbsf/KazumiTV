@@ -205,6 +205,7 @@ class PlayerController implements Disposable {
         offset: params.offset,
         videoSourceFormat: params.videoSourceFormat,
         onHistoryProgress: params.onHistoryProgress,
+        onPlaybackError: params.onPlaybackError,
       );
     } catch (e) {
       if (initialization.isStale) {

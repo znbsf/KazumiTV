@@ -14,6 +14,7 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/media_error_widget.dart';
+import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/download/download_episode_sheet.dart';
@@ -24,11 +25,11 @@ import 'package:kazumi/pages/player/player_item.dart';
 import 'package:kazumi/pages/video/episode_selection_panel.dart';
 import 'package:kazumi/pages/video/player_content_tabs.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
+import 'package:kazumi/pages/video/playback_recovery_shortcuts.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 import 'package:kazumi/services/player/pip_utils.dart';
 import 'package:kazumi/services/player/online_history_resume.dart';
-import 'package:kazumi/services/player/episode_identity.dart';
 import 'package:kazumi/services/player/timed_shutdown_service.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
@@ -341,40 +342,23 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void _resumeOnRoad(int road) {
-    final playing = videoPageController.playingEpisode;
-    final roads = videoPageController.roadList;
-    if (videoPageController.isOfflineMode ||
-        videoPageController.loading ||
-        playerController.playback.loading ||
-        playing == null ||
-        road < 0 ||
-        road >= roads.length ||
-        playing.road < 0 ||
-        playing.road >= roads.length) {
-      return;
-    }
-    final baseUrl = videoPageController.currentPlugin.baseUrl;
-    final current = episodeIdentityForRoad(
-      roads[playing.road],
-      playing.episode,
-      baseUrl: baseUrl,
-    );
-    final match = current == null
-        ? null
-        : matchingEpisodeIdentity(
-            current,
-            episodeIdentitiesForRoad(roads[road], baseUrl: baseUrl),
-          );
-    if (match == null) {
+    final target = videoPageController.recoveryOnRoad(road, playerController);
+    if (target == null) {
       KazumiDialog.showToast(message: '无法确定同一集，请手动选集（从头播放）');
       return;
     }
-    final offset = episodeTransferOffset(
-      position: playerController.playback.playerPosition,
-      duration: playerController.playback.playerDuration,
-    );
     _closeTabBodyAnimated();
-    changeEpisode(match + 1, currentRoad: road, offset: offset);
+    changeEpisode(target.episode,
+        currentRoad: target.road, offset: target.offset);
+  }
+
+  Future<void> _retryCurrentEpisode() async {
+    if (!mounted || _isClosing) return;
+    clearWebviewLog();
+    hideDebugConsole();
+    _closeTabBodyAnimated();
+    await videoPageController.retryCurrentEpisode(
+        playerController: playerController);
   }
 
   void _showEpisodeGuide() {
@@ -552,65 +536,71 @@ class _VideoPageState extends State<VideoPage>
         builder: (context) {
           final bool isPip = videoPageController.isPip;
           final bool videoFillsWindow = isLandscape || isPip;
-          return Scaffold(
-            appBar: null,
-            body: SafeArea(
-              top: !videoPageController.isFullscreen && !isPip,
-              bottom: false,
-              left: !videoPageController.isFullscreen && !isPip,
-              right: !videoPageController.isFullscreen && !isPip,
-              child: Stack(
-                alignment: Alignment.centerRight,
-                children: [
-                  Column(
-                    children: [
-                      Flexible(
-                        flex: videoFillsWindow ? 1 : 0,
-                        child: Container(
-                          color: Colors.black,
-                          height: videoFillsWindow
-                              ? MediaQuery.sizeOf(context).height
-                              : MediaQuery.sizeOf(context).width * 9 / 16,
-                          width: MediaQuery.sizeOf(context).width,
-                          child: Focus(
-                            focusNode: keyboardFocus,
-                            descendantsAreFocusable: !TvMode.enabled ||
-                                !videoPageController.showTabBody,
-                            // This node is the player's global shortcut
-                            // receiver. TV controls may request it explicitly
-                            // while the overlay is hidden, but it must not
-                            // become an invisible stop between visible buttons.
-                            skipTraversal: TvMode.enabled,
-                            // On TV the episode rail owns initial focus while
-                            // it is visible. PlayerItem is mounted later, once
-                            // loading completes, and must not steal that focus.
-                            autofocus: !TvMode.enabled ||
-                                !videoPageController.showTabBody,
-                            child: playerBody,
+          return PlaybackRecoveryShortcuts(
+            enabled: !_isClosing &&
+                (playerController.playback.loading ||
+                    videoPageController.errorMessage != null),
+            onBack: () => onBackPressed(context),
+            child: Scaffold(
+              appBar: null,
+              body: SafeArea(
+                top: !videoPageController.isFullscreen && !isPip,
+                bottom: false,
+                left: !videoPageController.isFullscreen && !isPip,
+                right: !videoPageController.isFullscreen && !isPip,
+                child: Stack(
+                  alignment: Alignment.centerRight,
+                  children: [
+                    Column(
+                      children: [
+                        Flexible(
+                          flex: videoFillsWindow ? 1 : 0,
+                          child: Container(
+                            color: Colors.black,
+                            height: videoFillsWindow
+                                ? MediaQuery.sizeOf(context).height
+                                : MediaQuery.sizeOf(context).width * 9 / 16,
+                            width: MediaQuery.sizeOf(context).width,
+                            child: Focus(
+                              focusNode: keyboardFocus,
+                              descendantsAreFocusable: !TvMode.enabled ||
+                                  !videoPageController.showTabBody,
+                              // This node is the player's global shortcut
+                              // receiver. TV controls may request it explicitly
+                              // while the overlay is hidden, but it must not
+                              // become an invisible stop between visible buttons.
+                              skipTraversal: TvMode.enabled,
+                              // On TV the episode rail owns initial focus while
+                              // it is visible. PlayerItem is mounted later, once
+                              // loading completes, and must not steal that focus.
+                              autofocus: !TvMode.enabled ||
+                                  !videoPageController.showTabBody,
+                              child: playerBody,
+                            ),
                           ),
                         ),
-                      ),
-                      if (!videoFillsWindow) Expanded(child: tabBody),
-                    ],
-                  ),
-                  if (isLandscape &&
-                      videoPageController.showTabBody &&
-                      !isPip) ...[
-                    if (disableAnimations) ...[
-                      sideTabMask,
-                      sideTabBody,
-                    ] else ...[
-                      FadeTransition(
-                        opacity: _maskOpacityAnimation,
-                        child: sideTabMask,
-                      ),
-                      SlideTransition(
-                        position: _rightOffsetAnimation,
-                        child: sideTabBody,
-                      ),
+                        if (!videoFillsWindow) Expanded(child: tabBody),
+                      ],
+                    ),
+                    if (isLandscape &&
+                        videoPageController.showTabBody &&
+                        !isPip) ...[
+                      if (disableAnimations) ...[
+                        sideTabMask,
+                        sideTabBody,
+                      ] else ...[
+                        FadeTransition(
+                          opacity: _maskOpacityAnimation,
+                          child: sideTabMask,
+                        ),
+                        SlideTransition(
+                          position: _rightOffsetAnimation,
+                          child: sideTabBody,
+                        ),
+                      ],
                     ],
                   ],
-                ],
+                ),
               ),
             ),
           );
@@ -687,6 +677,17 @@ class _VideoPageState extends State<VideoPage>
                           title: '暂时无法播放',
                           errMsg: errorMessage,
                           icon: Icons.videocam_off_outlined,
+                          onRetry: _retryCurrentEpisode,
+                          retryText: '重试当前集',
+                          actions: [
+                            StateActionButton.tonal(
+                              onPressed: _showEpisodeGuide,
+                              text: videoPageController.isOfflineMode
+                                  ? '选择集数'
+                                  : '选集 / 换线路',
+                              icon: Icons.video_library_outlined,
+                            ),
+                          ],
                         );
                       }
                       return Center(
@@ -704,6 +705,16 @@ class _VideoPageState extends State<VideoPage>
                                   ? '视频资源解析中'
                                   : '视频资源解析成功, 播放器加载中',
                               style: const TextStyle(color: Colors.white),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton.icon(
+                              onPressed: () =>
+                                  videoPageController.cancelEpisodeLoad(
+                                      playerController: playerController),
+                              icon:
+                                  const Icon(Icons.close, color: Colors.white),
+                              label: const Text('取消加载',
+                                  style: TextStyle(color: Colors.white)),
                             ),
                           ],
                         ),
@@ -760,13 +771,8 @@ class _VideoPageState extends State<VideoPage>
                               Icons.refresh_outlined,
                               color: Colors.white,
                             ),
-                            onPressed: () {
-                              changeEpisode(
-                                videoPageController.selectedEpisode.episode,
-                                currentRoad:
-                                    videoPageController.selectedEpisode.road,
-                              );
-                            },
+                            tooltip: '重试当前集',
+                            onPressed: _retryCurrentEpisode,
                           ),
                           Visibility(
                             visible: MediaQuery.sizeOf(context).width >
@@ -804,7 +810,9 @@ class _VideoPageState extends State<VideoPage>
           ),
         ),
         Positioned.fill(
-          child: playerController.playback.loading && !_isClosing
+          child: (playerController.playback.loading ||
+                      videoPageController.errorMessage != null) &&
+                  !_isClosing
               ? Container()
               : PlayerItem(
                   playerController: playerController,
@@ -878,12 +886,12 @@ class _VideoPageState extends State<VideoPage>
             onResumeRoad:
                 videoPageController.isOfflineMode ? null : _resumeOnRoad,
             onEpisodeSelected: (episode, road) {
-              if (episode == videoPageController.selectedEpisode.episode &&
-                  road == videoPageController.selectedEpisode.road) {
-                return;
-              }
+              if (!mounted || _isClosing) return;
               _closeTabBodyAnimated();
-              changeEpisode(episode, currentRoad: road);
+              clearWebviewLog();
+              hideDebugConsole();
+              videoPageController.selectEpisode(episode,
+                  road: road, playerController: playerController);
             },
             onDownload: (road) => showAdaptiveBottomSheet<void>(
               context: context,

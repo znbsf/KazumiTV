@@ -345,6 +345,7 @@ abstract class _PlayerPlaybackController with Store {
     int offset = 0,
     VideoSourceFormat videoSourceFormat = VideoSourceFormat.auto,
     PlaybackProgressWriter? onHistoryProgress,
+    void Function(String message)? onPlaybackError,
   }) async {
     startOffset = offset;
     superResolutionMode = SuperResolutionMode.fromStorageValue(
@@ -517,8 +518,12 @@ abstract class _PlayerPlaybackController with Store {
             isBuffering: playerBuffering,
           );
           if (actionableMessage != null) {
-            KazumiDialog.showToast(
-                message: actionableMessage, showActionButton: true);
+            if (onPlaybackError != null) {
+              onPlaybackError(actionableMessage);
+            } else {
+              KazumiDialog.showToast(
+                  message: actionableMessage, showActionButton: true);
+            }
           } else if (showPlayerError) {
             KazumiDialog.showToast(
                 message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
