@@ -39,6 +39,13 @@ class BangumiTimelineCard extends StatelessWidget {
 
   // Shared by the grid and card to keep their text-scaled heights in sync.
   static double heightFor(TextScaler scaler, {bool compact = false}) {
+    if (TvMode.enabled) {
+      // Includes the focus frame (10), card padding (12), two title lines
+      // and one metadata/rating line. Grow for accessibility text scaling.
+      return 22 +
+          math.max(
+              72.0, scaler.scale(16) * 1.35 * 2 + 4 + scaler.scale(12) * 4 / 3);
+    }
     final titleHeight = scaler.scale(_titleFontSize) * _titleLineHeight * 2;
     final labelHeight = scaler.scale(_labelFontSize) * _labelLineHeight;
     final footerHeight =
@@ -86,12 +93,17 @@ class BangumiTimelineCard extends StatelessWidget {
             height:
                 heightFor(MediaQuery.textScalerOf(context), compact: compact),
             child: Padding(
-              padding: const EdgeInsets.all(_contentPadding),
+              padding: EdgeInsets.all(TvMode.enabled ? 6 : _contentPadding),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildCover(context),
-                  SizedBox(width: compact ? 12 : 16),
+                  SizedBox(
+                      width: TvMode.enabled
+                          ? 12
+                          : compact
+                              ? 12
+                              : 16),
                   Expanded(child: _buildDetails(context)),
                 ],
               ),
@@ -103,6 +115,8 @@ class BangumiTimelineCard extends StatelessWidget {
     if (!TvMode.enabled) return card;
     return TvFocusableSurface(
       onPressed: onTap,
+      focusScale: 1,
+      borderRadius: _cornerRadius,
       child: card,
     );
   }
@@ -114,6 +128,51 @@ class BangumiTimelineCard extends StatelessWidget {
     final title =
         translatedName.isNotEmpty ? translatedName : bangumiItem.name.trim();
     final supportingText = _supportingText(title);
+
+    if (TvMode.enabled) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 16,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface)),
+          const SizedBox(height: 4),
+          Row(children: [
+            Expanded(
+                child: Text(supportingText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        height: 4 / 3,
+                        color: colors.onSurfaceVariant))),
+            if (showRating) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.star_rounded, size: 14, color: colors.primary),
+              const SizedBox(width: 3),
+              Text(
+                  bangumiItem.ratingScore > 0
+                      ? bangumiItem.ratingScore.toStringAsFixed(1)
+                      : '—',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                      fontSize: 12,
+                      height: 4 / 3,
+                      fontWeight: FontWeight.w700)),
+            ],
+            if (isWatching) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.bookmark_rounded, size: 16, color: colors.primary),
+            ],
+          ]),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,7 +237,11 @@ class BangumiTimelineCard extends StatelessWidget {
         : bangumiItem.images['large'] ?? '';
     return ExcludeSemantics(
       child: SizedBox(
-        width: compact ? 80 : 88,
+        width: TvMode.enabled
+            ? 50
+            : compact
+                ? 80
+                : 88,
         child: LayoutBuilder(
           builder: (context, constraints) => Hero(
             tag: bangumiItem.id,

@@ -15,6 +15,7 @@ import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/pages/timeline/timeline_controller.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/anime_season.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 part 'timeline_options.dart';
 part 'timeline_week_selector.dart';
@@ -152,8 +153,9 @@ class _TimelinePageState extends State<TimelinePage> {
           (constraints.maxWidth - sidePadding * 2).clamp(0.0, 1280.0);
       final inset = (constraints.maxWidth - contentWidth) / 2;
       final minCardWidth = scaler.scale(16) > 24 ? 440.0 : 340.0;
-      final columns =
-          ((contentWidth + 12) / (minCardWidth + 12)).floor().clamp(1, 3);
+      final columns = ((contentWidth + 12) / (minCardWidth + 12))
+          .floor()
+          .clamp(1, TvMode.enabled ? 2 : 3);
       return Observer(builder: (context) {
         final loading = _controller.isLoading;
         final failed = _controller.isTimeOut;
@@ -161,13 +163,14 @@ class _TimelinePageState extends State<TimelinePage> {
         final calendar = _controller.filterCalendar(watchingIds);
         final today = DateTime.now();
         final currentSeason = isSameSeason(_controller.selectedDate, today);
-        final seasonHeader = narrowPortrait
+        final seasonHeader = narrowPortrait || TvMode.enabled
             ? null
             : _buildSeasonHeader(context,
                 loading: loading, compact: constraints.maxHeight < 500);
-        final weekHeight = _TimelineWeekSelector.heightFor(scaler) + 16;
+        final weekGap = TvMode.enabled ? 8.0 : 16.0;
+        final weekHeight = _TimelineWeekSelector.heightFor(scaler) + weekGap;
         final weekSelector = Padding(
-          padding: EdgeInsets.fromLTRB(inset, 0, inset, 16),
+          padding: EdgeInsets.fromLTRB(inset, 0, inset, weekGap),
           child: _TimelineWeekSelector(
             counts: calendar.map((day) => day.length).toList(),
             todayIndex: currentSeason ? today.weekday - 1 : null,
@@ -177,14 +180,25 @@ class _TimelinePageState extends State<TimelinePage> {
         return Scaffold(
           appBar: SysAppBar(
             needTopOffset: false,
-            toolbarHeight: 72,
-            title: narrowPortrait
-                ? _buildSeasonPicker(context, loading: loading, inAppBar: true)
-                : Text(
-                    '时间表',
-                    style: theme.textTheme.headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
+            toolbarHeight: TvMode.enabled ? 48 : 72,
+            title: TvMode.enabled
+                ? Row(children: [
+                    Text('时间表',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 24),
+                    Flexible(
+                        child: _buildSeasonPicker(context,
+                            loading: loading, inAppBar: true)),
+                  ])
+                : narrowPortrait
+                    ? _buildSeasonPicker(context,
+                        loading: loading, inAppBar: true)
+                    : Text(
+                        '时间表',
+                        style: theme.textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(right: 12),

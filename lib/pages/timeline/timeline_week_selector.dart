@@ -13,8 +13,9 @@ class _TimelineWeekSelector extends StatelessWidget {
 
   static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
-  static double heightFor(TextScaler scaler) =>
-      40 + scaler.scale(20) + scaler.scale(16);
+  static double heightFor(TextScaler scaler) => TvMode.enabled
+      ? 24 + scaler.scale(20)
+      : 40 + scaler.scale(20) + scaler.scale(16);
 
   @override
   Widget build(BuildContext context) {
@@ -46,11 +47,11 @@ class _TimelineWeekSelector extends StatelessWidget {
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
             labelStyle: theme.textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
-            overlayColor: WidgetStateProperty.resolveWith((states) =>
-                states.contains(WidgetState.hovered) ||
-                        states.contains(WidgetState.focused)
-                    ? colors.primary.withValues(alpha: .08)
-                    : null),
+            overlayColor: WidgetStateProperty.resolveWith((states) => states
+                        .contains(WidgetState.hovered) ||
+                    states.contains(WidgetState.focused)
+                ? colors.primary.withValues(alpha: TvMode.enabled ? .32 : .08)
+                : null),
             splashBorderRadius: BorderRadius.circular(24),
             tabs: [
               for (var day = 0; day < 7; day++)
@@ -63,11 +64,15 @@ class _TimelineWeekSelector extends StatelessWidget {
                     excludeSemantics: true,
                     child: SizedBox(
                       width: scrollable ? minTabWidth : null,
-                      child: Column(
+                      child: Flex(
+                        direction:
+                            TvMode.enabled ? Axis.horizontal : Axis.vertical,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(day == todayIndex ? '今天' : '周${_weekdays[day]}'),
-                          const SizedBox(height: 4),
+                          SizedBox(
+                              height: TvMode.enabled ? 0 : 4,
+                              width: TvMode.enabled ? 8 : 0),
                           Text(
                             isLoading ? '—' : '${counts[day]}',
                             style: TextStyle(
