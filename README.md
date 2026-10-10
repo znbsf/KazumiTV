@@ -5,6 +5,8 @@
 
 [下载 0.4.1 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.1) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
 
+维护入口：[当前项目状态](docs/PROJECT-STATUS.md) · [开发经验](docs/ENGINEERING-LESSONS.md)
+
 ## 可以做什么
 
 - **遥控器浏览**：单排横向导航、五列海报卡片、向下持续加载；清晰的焦点高亮，返回时恢复浏览位置。
