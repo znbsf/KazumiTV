@@ -301,7 +301,7 @@ class _InfoPageState extends State<InfoPage>
   void initState() {
     super.initState();
     _initialCoverUrl =
-        NetworkImgLayer.tvListCoverUrl(widget.inputBangumiItem.images);
+        NetworkImgLayer.tvInitialCoverUrl(widget.inputBangumiItem.images);
     if (TvMode.enabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {

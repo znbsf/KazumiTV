@@ -203,6 +203,11 @@ void main() {
       const listUrl = 'https://fixture.invalid/list-cover.png';
       const largeUrl = 'https://fixture.invalid/large-cover.png';
       final list = _poster(Colors.green, 80, 120);
+      final catalog = {
+        'medium': listUrl,
+        'common': 'https://fixture.invalid/not-yet-displayed-common.png',
+        'large': largeUrl,
+      };
       (await _pending(listUrl, 80)).complete(ImageInfo(image: list));
       final largeReady = await _pending(largeUrl, 158);
       await tester.pumpWidget(
@@ -219,10 +224,10 @@ void main() {
 
       await tester.pumpWidget(
         _app(
-          const NetworkImgLayer(
+          NetworkImgLayer(
             key: ValueKey('detail'),
             src: largeUrl,
-            placeholderSrc: listUrl,
+            placeholderSrc: NetworkImgLayer.tvInitialCoverUrl(catalog),
             width: 158,
             height: 237,
           ),

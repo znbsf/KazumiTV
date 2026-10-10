@@ -64,6 +64,11 @@ class NetworkImgLayer extends StatelessWidget {
     return large.isNotEmpty ? large : tvListCoverUrl(images);
   }
 
+  /// Detail may be opened from either a thumbnail row or a larger home card.
+  /// Reuse the exact frame the user saw, without assuming one list URL size.
+  static String tvInitialCoverUrl(Map<String, String> images) =>
+      _TvDisplayedCovers.latestUrl(images.values) ?? tvListCoverUrl(images);
+
   static Widget heroFlightShuttleBuilder(
     BuildContext flightContext,
     Animation<double> animation,
@@ -201,6 +206,14 @@ abstract final class _TvDisplayedCovers {
   static int _bytes = 0;
 
   static int _size(ImageInfo info) => info.image.width * info.image.height * 4;
+
+  static String? latestUrl(Iterable<String> candidates) {
+    final urls = candidates.map((url) => url.trim()).toSet();
+    for (final url in _frames.keys.toList().reversed) {
+      if (urls.contains(url)) return url;
+    }
+    return null;
+  }
 
   static ImageInfo? read(String url) {
     final frame = _frames.remove(url);
