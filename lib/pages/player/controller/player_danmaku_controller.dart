@@ -21,6 +21,11 @@ enum DanmakuLoadStatus {
   failed,
 }
 
+/// The request belongs to an episode or dialog that is no longer active.
+class DanmakuLoadCancelled implements Exception {
+  const DanmakuLoadCancelled();
+}
+
 class DanmakuLoadResult {
   const DanmakuLoadResult({
     required this.danmakus,
@@ -142,6 +147,8 @@ abstract class _PlayerDanmakuController with Store {
   bool danmakuLoading = false;
 
   int bangumiID = 0;
+  int _danmakuLoadGeneration = 0;
+  int get danmakuLoadGeneration => _danmakuLoadGeneration;
   int _scheduledDanmakuGeneration = 0;
   final DanmakuTimelineCursor _timelineCursor = DanmakuTimelineCursor();
 
@@ -215,6 +222,7 @@ abstract class _PlayerDanmakuController with Store {
 
   @action
   void beginDanmakuLoad() {
+    _danmakuLoadGeneration++;
     danDanmakus.clear();
     if (TvMode.enabled) invalidateScheduledDanmakus(resetTimeline: true);
     danmakuLoading = true;
@@ -241,11 +249,16 @@ abstract class _PlayerDanmakuController with Store {
 
   @action
   void finishDanmakuLoad({bool disableDanmaku = false}) {
+    _danmakuLoadGeneration++;
     if (disableDanmaku) {
       danDanmakus.clear();
       danmakuOn = false;
     }
     danmakuLoading = false;
+  }
+
+  void cancelDanmakuLoadIfCurrent(int generation) {
+    if (generation == _danmakuLoadGeneration) finishDanmakuLoad();
   }
 
   Future<DanmakuLoadResult> _fetchCachedDanmaku(
@@ -357,18 +370,23 @@ abstract class _PlayerDanmakuController with Store {
   @action
   Future<bool> getDanDanmakuByEpisodeID(int episodeID) async {
     KazumiLogger().i('PlayerController: attempting to get danmaku $episodeID');
-    if (TvMode.enabled) invalidateScheduledDanmakus(resetTimeline: true);
-    danmakuLoading = true;
+    beginDanmakuLoad();
+    final generation = _danmakuLoadGeneration;
     try {
-      danDanmakus.clear();
       var res = await DanmakuApi.getDanDanmakuByEpisodeID(episodeID);
+      if (generation != _danmakuLoadGeneration) {
+        throw const DanmakuLoadCancelled();
+      }
       addDanmakus(res);
       return res.isNotEmpty;
     } catch (e) {
+      if (generation != _danmakuLoadGeneration) {
+        throw const DanmakuLoadCancelled();
+      }
       KazumiLogger().w('PlayerController: failed to get danmaku', error: e);
       rethrow;
     } finally {
-      danmakuLoading = false;
+      if (generation == _danmakuLoadGeneration) danmakuLoading = false;
     }
   }
 

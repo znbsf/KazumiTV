@@ -1481,14 +1481,28 @@ class _PlayerItemState extends State<PlayerItem>
             ),
           );
           videoPageController.cancelAutomaticDanmakuLoad();
-          final hasDanmakus = await task.wait(
-            playerController.danmaku
-                .getDanDanmakuByEpisodeID(episode.episodeId),
+          int? requestGeneration;
+          final hasDanmakus = await task.loading(
+            message: '弹幕加载中',
+            action: () {
+              final request = playerController.danmaku
+                  .getDanDanmakuByEpisodeID(episode.episodeId);
+              requestGeneration =
+                  playerController.danmaku.danmakuLoadGeneration;
+              return request;
+            },
+            onCancel: () {
+              final generation = requestGeneration;
+              if (generation != null) {
+                playerController.danmaku.cancelDanmakuLoadIfCurrent(generation);
+              }
+            },
           );
           playerController.danmaku.setDanmakuEnabled(hasDanmakus);
           KazumiDialog.showToast(message: hasDanmakus ? '弹幕切换成功' : '未找到弹幕内容');
         },
         onError: (error, stackTrace) {
+          if (error is DanmakuLoadCancelled) return;
           KazumiDialog.showToast(message: '弹幕检索错误: $error');
         },
       );
