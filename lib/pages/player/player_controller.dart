@@ -392,6 +392,8 @@ class PlayerController implements Disposable {
     if (_shutdownFuture != null) {
       return;
     }
+    danmaku.finishDanmakuLoad();
+    danmaku.invalidateScheduledDanmakus(resetTimeline: true);
     final shutdown = _shutdownResources();
     _shutdownFuture = shutdown;
     unawaited(

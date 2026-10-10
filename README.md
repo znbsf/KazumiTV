@@ -33,6 +33,8 @@
 
 当前正式版：**0.4.0**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
 
+0.4.1 仍为未发布候选：升级数据保留和基础播放恢复已通过实机验证，弹幕应用接入及真实弹幕、现场音画同步验收待完成。main 的源码归并不等于正式发布；详见[候选记录](docs/RELEASE-0.4.1-CANDIDATE.md)和[弹幕接入门槛](docs/DANDANPLAY-ACCESS.md)。
+
 | 安装包 | 适用系统 |
 |---|---|
 | [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.0/KazumiTV-0.4.0-armeabi-v7a.apk) | 32 位 ARM Android |
