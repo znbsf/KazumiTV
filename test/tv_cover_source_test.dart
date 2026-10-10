@@ -13,7 +13,9 @@ void main() {
       'large': 'https://fixture.invalid/original.png',
     };
     final original = Map<String, String>.of(images);
-    expect(NetworkImgLayer.tvListCoverUrl(images), images['medium']);
+    expect(NetworkImgLayer.tvListCoverUrl(images), images['common']);
+    expect(NetworkImgLayer.tvListCoverUrl(images, thumbnail: true),
+        images['medium']);
     expect(NetworkImgLayer.tvDetailCoverUrl(images), images['large']);
     expect(images, original);
   });
@@ -53,6 +55,7 @@ void main() {
     final item = focusItem(1)
       ..images = {
         'medium': 'https://fixture.invalid/poster.png',
+        'common': 'https://fixture.invalid/common.png',
         'large': 'https://fixture.invalid/original.png',
       };
     var selections = 0;
@@ -60,7 +63,7 @@ void main() {
     controller.select(item,
         imageUrl: NetworkImgLayer.tvListCoverUrl(item.images));
     expect(controller.value, same(item));
-    expect(controller.imageUrl, item.images['medium']);
+    expect(controller.imageUrl, item.images['common']);
     controller.select(item);
     expect(controller.value, same(item));
     expect(controller.imageUrl, item.images['large']);

@@ -44,10 +44,15 @@ class NetworkImgLayer extends StatelessWidget {
   @visibleForTesting
   static void clearTvCoverMemory() => _TvDisplayedCovers.clear();
 
-  /// TV grids request the catalog thumbnail; detail keeps the original large
-  /// URL. Both are carried by the same Dart item, including rewritten mirrors.
-  static String tvListCoverUrl(Map<String, String> images) {
-    for (final kind in ['medium', 'common', 'large']) {
+  /// P1/mirror medium covers are only 200px wide: too small for ~324px TV
+  /// home posters. Common is a bounded 400px source; compact rows retain the
+  /// thumbnail. Decode sizing still follows the rendered size and device DPR.
+  static String tvListCoverUrl(Map<String, String> images,
+      {bool thumbnail = false}) {
+    final kinds = thumbnail
+        ? ['medium', 'common', 'large']
+        : ['common', 'large', 'medium'];
+    for (final kind in kinds) {
       final url = images[kind]?.trim() ?? '';
       if (url.isNotEmpty) return url;
     }

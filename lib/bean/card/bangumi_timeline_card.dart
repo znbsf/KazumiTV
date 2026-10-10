@@ -233,7 +233,7 @@ class BangumiTimelineCard extends StatelessWidget {
   Widget _buildCover(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final imageUrl = TvMode.enabled
-        ? NetworkImgLayer.tvListCoverUrl(bangumiItem.images)
+        ? NetworkImgLayer.tvListCoverUrl(bangumiItem.images, thumbnail: true)
         : bangumiItem.images['large'] ?? '';
     return ExcludeSemantics(
       child: SizedBox(

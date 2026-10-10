@@ -301,7 +301,8 @@ class _BangumiHistoryCardVState extends State<BangumiHistoryCardV>
                       child: NetworkImgLayer(
                         src: TvMode.enabled
                             ? NetworkImgLayer.tvListCoverUrl(
-                                widget.historyItem.bangumiItem.images)
+                                widget.historyItem.bangumiItem.images,
+                                thumbnail: true)
                             : widget.historyItem.bangumiItem.images['large'] ??
                                 '',
                         width: imageWidth,
