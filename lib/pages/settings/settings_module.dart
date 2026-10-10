@@ -102,7 +102,7 @@ final settingsModule = createModule(
           applicationLegalese: 'Kazumi · GNU General Public License v3.0',
         ),
       )
-      ..module(historyModule)
+      ..module(createHistoryModule())
       ..module(downloadModule);
   },
 );
