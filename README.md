@@ -3,7 +3,7 @@
 为 Android TV 和遥控器设计的动画浏览与播放应用。
 基于 **[Predidit/Kazumi](https://github.com/Predidit/Kazumi)**：延续上游的 Flutter/Dart 业务、规则与 media-kit 播放能力，结合本仓库原生 TV 版本的布局和交互工作，形成当前 Flutter TV 融合版。**本项目是独立衍生项目，不是上游官方 TV 版本。**
 
-[下载 0.4.0 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.0) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
+[下载 0.4.1 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.1) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
 
 ## 可以做什么
 
@@ -31,15 +31,15 @@
 
 ## 下载与安装
 
-当前正式版：**0.4.0**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
+当前正式版：**0.4.1**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
 
-0.4.1 仍为未发布候选：升级数据保留和基础播放恢复已通过实机验证，弹幕应用接入及真实弹幕、现场音画同步验收待完成。main 的源码归并不等于正式发布；详见[候选记录](docs/RELEASE-0.4.1-CANDIDATE.md)和[弹幕接入门槛](docs/DANDANPLAY-ACCESS.md)。
+0.4.1 正式版基于 `9f5fe263` / 构建号 `20338`：修复弹幕取消/切集状态、恢复合法应用认证注入和历史入口；时间线采用两列三完整行的小海报，首页采用400px清晰图源。小米电视 ARMv7 已实测保留数据升级及播放，用户已确认对白有声、口型同步，暂停和快进后正常。详见 [0.4.1 发布记录](docs/RELEASE-0.4.1.md)。
 
 | 安装包 | 适用系统 |
 |---|---|
-| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.0/KazumiTV-0.4.0-armeabi-v7a.apk) | 32 位 ARM Android |
-| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.0/KazumiTV-0.4.0-arm64-v8a.apk) | 64 位 ARM Android |
-| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.0/KazumiTV-0.4.0-x86_64.apk) | x86_64 Android / 模拟器 |
+| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.1/KazumiTV-0.4.1-armeabi-v7a.apk) | 32 位 ARM Android |
+| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.1/KazumiTV-0.4.1-arm64-v8a.apk) | 64 位 ARM Android |
+| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.1/KazumiTV-0.4.1-x86_64.apk) | x86_64 Android / 模拟器 |
 
 1. 下载并侧载 APK，在启动器打开 **KazumiTV**。
 2. 首次启动按引导准备规则与播放来源，再从作品详情选择来源和剧集。
