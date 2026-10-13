@@ -1,4 +1,7 @@
 import 'dart:io';
+
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_dialog_text_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -86,49 +89,7 @@ class _SmallestPlayerItemPanelState extends State<SmallestPlayerItemPanel> {
   static const double _danmakuIconSize = 24.0;
   static const double _loadingIndicatorStrokeWidth = 2.0;
 
-  void showForwardChange() {
-    KazumiDialog.show(builder: (context) {
-      String input = "";
-      return AlertDialog(
-        title: const Text('跳过秒数'),
-        content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-          return TextField(
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
-            decoration: InputDecoration(
-              floatingLabelBehavior: FloatingLabelBehavior.never,
-              labelText: playerController.playback.buttonSkipTime.toString(),
-            ),
-            onChanged: (value) {
-              input = value;
-            },
-          );
-        }),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
-              '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (input != "") {
-                playerController.setButtonForwardTime(int.parse(input));
-                KazumiDialog.dismiss();
-              } else {
-                KazumiDialog.dismiss();
-              }
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      );
-    });
-  }
+  void showForwardChange() => showSmallestPlayerForwardTimeDialog(playerController);
 
   @override
   void initState() {
@@ -813,4 +774,63 @@ class _SmallestPlayerItemPanelState extends State<SmallestPlayerItemPanel> {
       ),
     );
   }
+}
+
+void showSmallestPlayerForwardTimeDialog(PlayerController playerController) {
+  KazumiDialog.show(builder: (context) {
+    String input = "";
+    return AlertDialog(
+      title: const Text('跳过秒数'),
+      content: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+        TextField field([TextEditingController? controller]) =>
+            TextField(
+              controller: controller,
+              autofocus: controller != null,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              decoration: InputDecoration(
+                floatingLabelBehavior: FloatingLabelBehavior.never,
+                labelText: playerController.playback.buttonSkipTime.toString(),
+              ),
+              onChanged: (value) {
+                input = value;
+              },
+            );
+        return TvMode.enabled
+            ? TvDialogTextEntry(title: '跳过秒数', builder: field)
+            : field();
+      }),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => KazumiDialog.dismiss(),
+          child: Text(
+            '取消',
+            style: TextStyle(color: Theme.of(context).colorScheme.outline),
+          ),
+        ),
+        TextButton(
+          onPressed: () async {
+            if (input != "") {
+              final value = int.tryParse(input);
+              if (value == null) {
+                KazumiDialog.showToast(context: context, message: '请输入数字');
+                return;
+              }
+              if (value <= 0) {
+                KazumiDialog.showToast(context: context, message: '请输入大于0的数字');
+                return;
+              }
+              playerController.setButtonForwardTime(value);
+              KazumiDialog.dismiss();
+            } else {
+              KazumiDialog.dismiss();
+            }
+          },
+          child: const Text('确定'),
+        ),
+      ],
+    );
+  });
 }

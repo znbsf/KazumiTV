@@ -1,3 +1,5 @@
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -144,7 +146,8 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
     return items;
   }
 
-  Widget _sortButton() => MenuAnchor(
+  Widget _sortButton() => TvSettingsMenuAnchor(
+        consumeOutsideTap: false,
         builder: (context, controller, _) => TextButton.icon(
           onPressed: () =>
               controller.isOpen ? controller.close() : controller.open(),
@@ -172,7 +175,8 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
           icon: Icons.travel_explore_rounded,
         ),
         const SizedBox(height: 20),
-        TextField(
+        TvTextEntry(
+            child: TextField(
           controller: _search,
           onChanged: (_) => setState(() {}),
           decoration: ruleInputDecoration(context,
@@ -184,7 +188,7 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
                       tooltip: '清除搜索',
                       onPressed: () => setState(_search.clear),
                       icon: const Icon(Icons.close_rounded))),
-        ),
+        )),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,

@@ -17,6 +17,12 @@ class CreditsPage extends StatelessWidget {
               title: '贡献',
               children: const [
                 AboutLinkTile(
+                  icon: Icons.account_tree_outlined,
+                  title: '上游项目致谢',
+                  subtitle: 'Predidit/Kazumi · 保留原作者版权与 GPL-3.0 许可',
+                  url: ApiEndpoints.upstreamProjectUrl,
+                ),
+                AboutLinkTile(
                   icon: Icons.people_outline_rounded,
                   title: '贡献者',
                   url: '${ApiEndpoints.sourceUrl}/graphs/contributors',

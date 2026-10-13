@@ -1,4 +1,6 @@
+import 'package:kazumi/bean/widget/tv_slider_navigation.dart';
 import 'package:flutter/material.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 import 'package:kazumi/bean/dialog/material_bottom_sheet.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
@@ -66,6 +68,16 @@ class _DanmakuTimeOffsetSheetState extends State<DanmakuTimeOffsetSheet> {
     if (_offset == offset) {
       return;
     }
+    // Directional traversal remembers a previous target even after that
+    // button becomes disabled. Drop that history when availability changes.
+    final targetsChanged =
+        (_offset == _minDanmakuTimeOffset) != (offset == _minDanmakuTimeOffset) ||
+        (_offset == _maxDanmakuTimeOffset) != (offset == _maxDanmakuTimeOffset) ||
+        (_offset == 0) != (offset == 0);
+    if (TvMode.enabled && targetsChanged) {
+      FocusTraversalGroup.maybeOf(context)
+          ?.invalidateScopeData(FocusScope.of(context));
+    }
     setState(() {
       _offset = offset;
     });
@@ -123,14 +135,15 @@ class _DanmakuTimeOffsetSheetState extends State<DanmakuTimeOffsetSheet> {
                     ),
                   ]),
                   const SizedBox(height: 16),
-                  Slider(
+                  TvSliderNavigation(
+                      child: Slider(
                     value: _offset,
                     min: _minDanmakuTimeOffset,
                     max: _maxDanmakuTimeOffset,
                     divisions: _danmakuTimeOffsetDivisions,
                     label: formatDanmakuTimeOffset(_offset),
                     onChanged: _updateOffset,
-                  ),
+                  )),
                   Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [

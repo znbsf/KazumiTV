@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Telegram 群组
-    url: https://t.me/kazumi_app
-    about: 如果你需要讨论和帮助，也可以加入 Telegram 群组。
+  - name: KazumiTV 讨论与使用帮助
+    url: https://github.com/znbsf/KazumiTV/discussions
+    about: 本仓库的使用讨论；问题报告请使用 KazumiTV Issues 模板。

@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -197,7 +198,7 @@ void main() {
     app.collection.collectibles.clear();
     await tester.pumpAndSettle();
     await _back(tester);
-    final search = tester.widget<SearchBar>(find.byType(SearchBar));
+    final search = tester.widget<TvTextEntry>(find.byType(TvTextEntry)).child;
     expect(search.focusNode?.hasPrimaryFocus, isTrue);
     expect(tester.takeException(), isNull);
   });
@@ -222,7 +223,7 @@ void main() {
   testWidgets('collection new filter cancels an in-flight detail return',
       (tester) async {
     final app = await _mount(tester);
-    final search = tester.widget<SearchBar>(find.byType(SearchBar));
+    final search = tester.widget<TvTextEntry>(find.byType(TvTextEntry)).child;
     await _open(tester, 2);
     await rootNavigatorKey.currentState!.maybePop();
     // Public search UI callback wins before the return realization frame.
@@ -234,6 +235,80 @@ void main() {
     expect(_card(2), findsNothing);
     expect(search.focusNode!.hasPrimaryFocus, isTrue);
     expect(app.opened, [2]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty collection sort left reaches search navigation and cancel',
+      (tester) async {
+    final app = await _mount(tester, count: 0);
+    tester.view.physicalSize = const Size(1920, 1080);
+    await tester.pumpAndSettle();
+    final sync = Focus.of(tester.element(find.byIcon(Icons.sync_rounded)));
+    final sort = Focus.of(tester.element(find.byIcon(Icons.sort_rounded)));
+    final search = tester.widget<TvTextEntry>(find.byType(TvTextEntry)).child;
+    sync.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(sort.hasPrimaryFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(search.focusNode!.hasPrimaryFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tv-text-editor')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('tv-text-editor')), 'draft');
+    tester.testTextInput.hide();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(search.controller!.text, isEmpty);
+    expect(search.focusNode!.hasPrimaryFocus, isTrue);
+    expect(app.opened, isEmpty);
+    expect(app.collection.collectibles, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty collection sidebar categories retain vertical navigation',
+      (tester) async {
+    await _mount(tester, count: 0);
+    tester.view.physicalSize = const Size(1920, 1080);
+    await tester.pumpAndSettle();
+    final search = tester.widget<TvTextEntry>(find.byType(TvTextEntry)).child;
+    final all = Focus.of(tester.element(find.descendant(
+        of: find.byKey(const ValueKey('collect-filter-all')),
+        matching: find.byIcon(Icons.video_library_outlined))));
+    final watching = Focus.of(tester.element(find.descendant(
+        of: find.byKey(const ValueKey('collect-filter-1')),
+        matching: find.byIcon(Icons.play_circle_outline_rounded))));
+    all.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    expect(watching.hasPrimaryFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+    await tester.pumpAndSettle();
+    expect(all.hasPrimaryFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(search.focusNode!.hasPrimaryFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('non TV collection keeps direct SearchBar editing',
+      (tester) async {
+    TvMode.setEnabledForTesting(false);
+    await _mount(tester, count: 0);
+    expect(find.byType(TvTextEntry), findsNothing);
+    final search = tester.widget<SearchBar>(find.byType(SearchBar));
+    search.focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(find.byType(AlertDialog), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

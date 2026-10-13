@@ -3,29 +3,33 @@ import 'package:kazumi/bean/widget/content_section.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 
 class TvRemoteHelp extends StatelessWidget {
-  const TvRemoteHelp({super.key});
+  const TvRemoteHelp({super.key, this.includeHome = true});
+  final bool includeHome;
 
   @override
   Widget build(BuildContext context) => Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1000),
           child: Column(children: [
-            for (final group in _tvRemoteGroups)
+            for (var g = includeHome ? 0 : 1; g < _tvRemoteGroups.length; g++)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: TvFocusableSurface(
-                  onPressed: () {},
-                  child: ContentSection.group(
-                    title: group.title,
-                    children: [
-                      for (final item in group.items)
-                        ListTile(
-                          leading: Icon(item.icon),
-                          title: Text(item.title),
-                          subtitle: Text(item.description),
+                child: ContentSection.group(
+                  title: _tvRemoteGroups[g].title,
+                  children: [
+                    for (var i = 0; i < _tvRemoteGroups[g].items.length; i++)
+                      TvFocusableSurface(
+                        key: ValueKey('tv-remote-help-item-$g-$i'),
+                        focusScale: 1,
+                        onPressed: () {},
+                        child: ListTile(
+                          leading: Icon(_tvRemoteGroups[g].items[i].icon),
+                          title: Text(_tvRemoteGroups[g].items[i].title),
+                          subtitle:
+                              Text(_tvRemoteGroups[g].items[i].description),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
           ]),
@@ -98,7 +102,7 @@ const List<_TvRemoteGroup> _tvRemoteGroups = [
       _TvRemoteMapping(
         Icons.play_circle_outline_rounded,
         '播放与定位',
-        '播放/暂停键；左右键或媒体键快退、快进；频道键切换上下集',
+        '播放/暂停、媒体快进退、频道前后集为固定映射；左右键默认寻址且可自定义，控件显示时仍用于导航',
       ),
       _TvRemoteMapping(
         Icons.view_list_rounded,
@@ -144,7 +148,7 @@ const List<_TvRemoteGroup> _tvRemoteGroups = [
       _TvRemoteMapping(
         Icons.keyboard_rounded,
         '自定义按键',
-        '右侧页签可修改播放器通用快捷键；上述 TV 兼容映射保持固定，避免设备差异导致失效',
+        '操作设置的“自定义按键”可修改普通键和左右键；OK、上下、返回、媒体及 TV 专用键保持固定功能',
       ),
     ],
   ),

@@ -98,7 +98,11 @@ void main() {
       final bytes = await tester.runAsync(() => frame.toByteData());
       // Well inside the moving page, away from its edge shadow. The old red
       // page is still painted underneath; it must not bleed into this pixel.
-      expect(bytes!.getUint32((400 * frame.width + 760) * 4), 0x101611FF);
+      final color = Theme.of(tester.element(find.byKey(incoming)))
+          .scaffoldBackgroundColor
+          .toARGB32();
+      final rgba = ((color & 0x00ffffff) << 8) | ((color >> 24) & 0xff);
+      expect(bytes!.getUint32((400 * frame.width + 760) * 4), rgba);
       frame.dispose();
     }
 

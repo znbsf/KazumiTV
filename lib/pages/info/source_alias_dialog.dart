@@ -36,18 +36,20 @@ void _showCustomKeywordDialog({
   KazumiDialog.show(
     builder: (context) => AlertDialog(
       title: const Text('修改检索词'),
-      content: TextFormField(
-        initialValue: initialKeyword,
-        autofocus: true,
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          labelText: '检索关键词',
-          helperText: '仅检索来源：$sourceName',
-          helperMaxLines: 3,
-          border: const OutlineInputBorder(),
+      content: TvTextEditingShortcuts(
+        child: TextFormField(
+          initialValue: initialKeyword,
+          autofocus: true,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            labelText: '检索关键词',
+            helperText: '仅检索来源：$sourceName',
+            helperMaxLines: 3,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (value) => keyword = value,
+          onFieldSubmitted: submit,
         ),
-        onChanged: (value) => keyword = value,
-        onFieldSubmitted: submit,
       ),
       actions: [
         TextButton(

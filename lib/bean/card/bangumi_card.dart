@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/numeric_shortcut_visibility.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
@@ -133,7 +134,7 @@ class BangumiCardV extends StatelessWidget {
                         Positioned(
                           left: 8,
                           top: 8,
-                          child: _ChannelNumberBadge(number: channelNumber!),
+                          child: NumericShortcutVisibility(child: _ChannelNumberBadge(number: channelNumber!)),
                         ),
                       if (TvVisuals.fixedSurfaces)
                         IgnorePointer(
@@ -197,7 +198,7 @@ class BangumiCardV extends StatelessWidget {
                           Positioned(
                             left: 8,
                             top: 8,
-                            child: _ChannelNumberBadge(number: channelNumber!),
+                            child: NumericShortcutVisibility(child: _ChannelNumberBadge(number: channelNumber!)),
                           ),
                       ],
                     );

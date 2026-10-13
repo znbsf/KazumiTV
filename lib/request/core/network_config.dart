@@ -13,7 +13,6 @@ class NetworkConfig {
     this.sendTimeout,
     this.proxyHost,
     this.proxyPort,
-    this.allowBadCertificates = false,
     this.enableLog = true,
   });
 
@@ -22,7 +21,6 @@ class NetworkConfig {
   final Duration? sendTimeout;
   final String? proxyHost;
   final int? proxyPort;
-  final bool allowBadCertificates;
   final bool enableLog;
 
   bool get hasProxy => proxyHost != null && proxyPort != null;
@@ -36,9 +34,8 @@ class NetworkConfig {
         } else if (Platform.isWindows) {
           client.findProxy = SystemProxyService.findProxy;
         }
-        if (allowBadCertificates) {
-          client.badCertificateCallback = (cert, host, port) => true;
-        }
+        // A proxy changes routing only. Keep the platform trust chain and
+        // hostname verification for both direct and CONNECT requests.
         return client;
       },
     );
@@ -51,7 +48,6 @@ class NetworkConfig {
     String? proxyHost,
     int? proxyPort,
     bool? clearProxy,
-    bool? allowBadCertificates,
     bool? enableLog,
   }) {
     final shouldClearProxy = clearProxy ?? false;
@@ -61,7 +57,6 @@ class NetworkConfig {
       sendTimeout: sendTimeout ?? this.sendTimeout,
       proxyHost: shouldClearProxy ? null : proxyHost ?? this.proxyHost,
       proxyPort: shouldClearProxy ? null : proxyPort ?? this.proxyPort,
-      allowBadCertificates: allowBadCertificates ?? this.allowBadCertificates,
       enableLog: enableLog ?? this.enableLog,
     );
   }
@@ -97,7 +92,6 @@ class NetworkConfig {
       sendTimeout: sendTimeout,
       proxyHost: parsed.$1,
       proxyPort: parsed.$2,
-      allowBadCertificates: true,
     );
   }
 }

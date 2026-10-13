@@ -174,7 +174,10 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                   if (facts.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(facts.join(' · '),
-                        style: TvVisuals.caption.copyWith(color: TvVisuals.muted)),
+                        style: TvVisuals.caption.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
                   ],
                   const SizedBox(height: 12),
                   // The same Dart playback/collection actions remain available
@@ -188,7 +191,10 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                   if (item.nameCn.isNotEmpty && item.name != item.nameCn) ...[
                     const SizedBox(height: 8),
                     Text(item.name,
-                        style: TvVisuals.caption.copyWith(color: TvVisuals.muted)),
+                        style: TvVisuals.caption.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
                   ],
                   const SizedBox(height: 12),
                   const Text('简介', style: TvVisuals.title),

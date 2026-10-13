@@ -66,7 +66,14 @@ class NetworkErrorMapper {
           stackTrace: error.stackTrace,
         );
       case DioExceptionType.unknown:
-        final connection = await _connectionLabel();
+        // Upstream Predidit/Kazumi 4960f9c04246eb52e1f36728f0f5c60ae6fa54dc.
+        // Optional connectivity context must not mask or stall the real error.
+        var connection = '';
+        try {
+          connection = await _connectionLabel().timeout(
+            const Duration(seconds: 1),
+          );
+        } catch (_) {}
         return NetworkException(
           type: NetworkExceptionType.unknown,
           message: '$connection 网络异常'.trimLeft(),

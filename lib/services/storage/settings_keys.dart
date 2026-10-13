@@ -51,6 +51,8 @@ class SettingKey<T> {
 // Add new settings here. SettingsKeys is the public typed registry used by
 // callers; new keys can use literal string names directly.
 class SettingsKeys {
+  static const showNumericShortcutBadges = SettingKey<bool>(
+      'showNumericShortcutBadges', true, group: SettingGroup.interface);
   static const hAenable = SettingKey<bool>(
     _SettingBoxKey.hAenable,
     true,
@@ -574,6 +576,7 @@ class SettingsKeys {
   );
 
   static final List<SettingKey<Object?>> all = [
+    showNumericShortcutBadges,
     hAenable,
     hardwareDecoder,
     searchEnhanceEnable,

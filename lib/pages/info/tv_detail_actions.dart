@@ -75,9 +75,9 @@ class _TvDetailActionsState extends State<TvDetailActions> {
         duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            width: 2,
+            width: 3,
             color: node.hasPrimaryFocus
                 ? Theme.of(context).colorScheme.primary
                 : Colors.transparent,
@@ -93,18 +93,18 @@ class _TvDetailActionsState extends State<TvDetailActions> {
     final actionStyle = ButtonStyle(
       textStyle: const WidgetStatePropertyAll(TvVisuals.control),
       shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       side: const WidgetStatePropertyAll(BorderSide.none),
       backgroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.focused)
-            ? Colors.white.withValues(alpha: .12)
+            ? Theme.of(context).colorScheme.primaryContainer
             : Colors.transparent,
       ),
       foregroundColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.focused)
-            ? TvVisuals.accent
-            : TvVisuals.text,
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.onSurface,
       ),
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: 12, vertical: 6),

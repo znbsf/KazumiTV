@@ -1,3 +1,5 @@
+import 'package:kazumi/bean/settings/bounded_settings_scroll_view.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:flutter/material.dart';
 
@@ -89,7 +91,7 @@ class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
               padding: materialBottomSheetTabsPadding, labels: ['外观', '播放']),
           Expanded(
               child: TabBarView(children: [
-            ListView(
+            BoundedSettingsScrollView(
               key: const PageStorageKey('danmaku-appearance'),
               padding: materialBottomSheetContentPadding,
               children: [
@@ -99,9 +101,13 @@ class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
                     value: _option.fontSize,
                     min: 10,
                     max: isCompact() ? 32 : 48,
+                    // TV arrows advance exactly one point; touch remains continuous.
+                    divisions: TvMode.enabled ? (isCompact() ? 22 : 38) : null,
                     valueLabel: '${_option.fontSize.floor()}',
                     onChanged: (value) {
-                      final fontSize = value.floorToDouble();
+                      final fontSize = TvMode.enabled
+                          ? value.roundToDouble()
+                          : value.floorToDouble();
                       _applyOption(_option.copyWith(fontSize: fontSize));
                       GStorage.putSetting<double>(
                           SettingsKeys.danmakuFontSize, fontSize);
@@ -112,11 +118,17 @@ class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
                     value: _option.opacity,
                     min: 0.1,
                     max: 1,
+                    divisions: TvMode.enabled ? 18 : null,
                     valueLabel: '${(_option.opacity * 100).round()}%',
                     onChanged: (value) {
-                      _applyOption(_option.copyWith(opacity: value));
-                      GStorage.putSetting<double>(SettingsKeys.danmakuOpacity,
-                          double.parse(value.toStringAsFixed(2)));
+                      final opacity =
+                          TvMode.enabled ? (value * 100).round() / 100 : value;
+                      _applyOption(_option.copyWith(opacity: opacity));
+                      GStorage.putSetting<double>(
+                          SettingsKeys.danmakuOpacity,
+                          TvMode.enabled
+                              ? opacity
+                              : double.parse(value.toStringAsFixed(2)));
                     },
                   ),
                   SettingsSliderTile(
@@ -169,7 +181,7 @@ class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
                 ),
               ],
             ),
-            ListView(
+            BoundedSettingsScrollView(
               key: const PageStorageKey('danmaku-playback'),
               padding: materialBottomSheetContentPadding,
               children: [

@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -307,7 +308,8 @@ class _PluginTestPageState extends State<PluginTestPage> {
     );
   }
 
-  Widget _buildKeywordInput() => TextField(
+  Widget _buildKeywordInput() => TvTextEntry(
+          child: TextField(
         controller: testKeywordController,
         decoration: ruleInputDecoration(context,
             label: '测试关键词',
@@ -316,7 +318,7 @@ class _PluginTestPageState extends State<PluginTestPage> {
         enabled: !isTesting,
         textInputAction: TextInputAction.search,
         onSubmitted: (_) => _startTest(),
-      );
+      ));
 
   Widget _buildErrorWidget(ThemeData theme) => Container(
         padding: const EdgeInsets.all(12.0),

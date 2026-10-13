@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -21,6 +22,8 @@ import 'package:kazumi/utils/search_parser.dart';
 import 'package:kazumi/bean/widget/tv_search_entry.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+
+import 'package:kazumi/bean/widget/tv_range_slider.dart';
 
 part 'search_filter_sheet.dart';
 part 'search_widgets.dart';

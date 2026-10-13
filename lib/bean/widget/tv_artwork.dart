@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:kazumi/bean/widget/tv_artwork_preparation.dart';
 import 'package:kazumi/bean/widget/tv_backdrop_overlay.dart';
-import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
@@ -196,7 +195,10 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
           _observeGeometry(geometry);
           return IgnorePointer(
             child: ColoredBox(
-              color: widget.oled ? Colors.black : TvVisuals.background,
+              color:
+                  widget.oled && Theme.of(context).brightness == Brightness.dark
+                      ? Colors.black
+                      : Theme.of(context).colorScheme.surface,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -225,7 +227,11 @@ class _TvAmbientBackdropState extends State<TvAmbientBackdrop> {
                               artwork: _displayed!,
                             ),
                     ),
-                  if (!widget.oled) TvBackdropOverlay(geometry: geometry),
+                  if (!widget.oled)
+                    TvBackdropOverlay(
+                        key: ValueKey(Theme.of(context).colorScheme.surface),
+                        geometry: geometry,
+                        color: Theme.of(context).colorScheme.surface),
                 ],
               ),
             ),

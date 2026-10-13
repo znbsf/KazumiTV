@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -418,7 +419,8 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
             useUrl: _useUrl, enabled: !busy, onChanged: _changeSource),
         const SizedBox(height: 16),
         if (_useUrl) ...[
-          TextField(
+          TvTextEntry(
+              child: TextField(
             controller: _urlController,
             focusNode: _urlFocus,
             readOnly: busy,
@@ -441,7 +443,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
                 icon: const Icon(Icons.content_paste_rounded),
               ),
             ),
-          ),
+          )),
           const SizedBox(height: 8),
           Text('使用可直接访问的 HTTP 或 HTTPS 图片地址',
               style: type.bodySmall?.copyWith(color: colors.onSurfaceVariant)),

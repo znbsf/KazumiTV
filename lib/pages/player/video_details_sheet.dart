@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:kazumi/pages/settings/tv_remote_help.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -351,68 +352,11 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
     });
   }
 
-  Widget _buildRemoteTab(BuildContext context) {
-    return ListView(
-      padding: materialBottomSheetContentPadding,
-      children: [
-        ContentSection.group(
-          title: '播放',
-          children: const [
-            ListTile(
-              leading: Icon(Icons.play_circle_outline_rounded),
-              title: Text('播放、暂停与定位'),
-              subtitle: Text('播放/暂停键；左右方向键快退/快进；频道键切换上下集'),
-            ),
-            ListTile(
-              leading: Icon(Icons.subtitles_rounded),
-              title: Text('弹幕'),
-              subtitle: Text('字幕/CC、音轨或红色功能键'),
-            ),
-          ],
-        ),
-        ContentSection.group(
-          title: '浏览',
-          children: const [
-            ListTile(
-              leading: Icon(Icons.view_list_rounded),
-              title: Text('选集'),
-              subtitle: Text('EPG/Guide、Top Menu 或黄色功能键'),
-            ),
-            ListTile(
-              leading: Icon(Icons.favorite_outline_rounded),
-              title: Text('收藏'),
-              subtitle: Text('收藏键或绿色功能键'),
-            ),
-            ListTile(
-              leading: Icon(Icons.info_outline_rounded),
-              title: Text('播放信息'),
-              subtitle: Text('INFO 或蓝色功能键'),
-            ),
-            ListTile(
-              leading: Icon(Icons.help_outline_rounded),
-              title: Text('遥控器帮助'),
-              subtitle: Text('HELP、MENU、右键菜单或 F1'),
-            ),
-          ],
-        ),
-        ContentSection.group(
-          title: '系统按键',
-          children: const [
-            ListTile(
-              leading: Icon(Icons.volume_up_rounded),
-              title: Text('音量'),
-              subtitle: Text('交由 Android TV 处理，以兼容电视、CEC、ARC 和功放'),
-            ),
-            ListTile(
-              leading: Icon(Icons.keyboard_return_rounded),
-              title: Text('返回与退出'),
-              subtitle: Text('返回键关闭当前面板；Stop/Exit 退出播放器'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  Widget _buildRemoteTab(BuildContext context) => ListView(
+        key: const PageStorageKey('video-details-remote-help'),
+        padding: materialBottomSheetContentPadding,
+        children: const [TvRemoteHelp(includeHome: false)],
+      );
 
   Widget _buildLogRow(BuildContext context, _LogEntry entry) {
     final theme = Theme.of(context);

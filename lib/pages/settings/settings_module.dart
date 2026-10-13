@@ -1,3 +1,5 @@
+import 'package:kazumi/pages/about/tv_license_page.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/pages/about/about_module.dart';
@@ -96,11 +98,13 @@ final settingsModule = createModule(
       // Root route: the license browser must cover the settings shell.
       ..route(
         '/about/license',
-        child: (context, state) => const LicensePage(
-          applicationName: 'Kazumi',
-          applicationVersion: ApiEndpoints.version,
-          applicationLegalese: 'Kazumi · GNU General Public License v3.0',
-        ),
+        child: (context, state) => TvMode.enabled
+            ? const TvLicensePage()
+            : const LicensePage(
+                applicationName: 'KazumiTV',
+                applicationVersion: ApiEndpoints.version,
+                applicationLegalese: 'Kazumi · GNU General Public License v3.0',
+              ),
       )
       ..module(createHistoryModule())
       ..module(downloadModule);

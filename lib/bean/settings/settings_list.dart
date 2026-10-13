@@ -1,4 +1,7 @@
+import 'package:kazumi/bean/widget/tv_settings_tile_reveal.dart';
 import 'package:flutter/material.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_slider_navigation.dart';
 
 import 'package:kazumi/bean/widget/content_section.dart';
 import 'package:kazumi/bean/widget/split_list_row.dart';
@@ -18,6 +21,21 @@ class SettingsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Widget section(Widget child) => Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: child,
+          ),
+        );
+    if (TvMode.enabled) {
+      // Settings are bounded, small lists. Keep every section mounted so the
+      // remote can traverse and wrap to the actual first/last control rather
+      // than the edge of ListView's current cache window.
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(children: sections.map(section).toList()),
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 12),
       itemCount: sections.length,
@@ -91,12 +109,39 @@ class SettingsRadioSection<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final section = SettingsSection(title: title, tiles: tiles);
+    if (TvMode.enabled) {
+      // Keep desktop RadioGroup traversal away from the focusable TV rows.
+      // Each visual indicator below still uses RadioGroup for its value.
+      return _TvSettingsRadioScope<T>(
+        groupValue: groupValue,
+        onChanged: onChanged,
+        child: section,
+      );
+    }
     return RadioGroup<T>(
       groupValue: groupValue,
       onChanged: onChanged,
-      child: SettingsSection(title: title, tiles: tiles),
+      child: section,
     );
   }
+}
+
+class _TvSettingsRadioScope<T> extends InheritedWidget {
+  const _TvSettingsRadioScope({
+    required this.groupValue,
+    required this.onChanged,
+    required super.child,
+  });
+  final T? groupValue;
+  final ValueChanged<T?> onChanged;
+
+  static _TvSettingsRadioScope<T>? maybeOf<T>(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_TvSettingsRadioScope<T>>();
+
+  @override
+  bool updateShouldNotify(_TvSettingsRadioScope<T> oldWidget) =>
+      groupValue != oldWidget.groupValue || onChanged != oldWidget.onChanged;
 }
 
 Color _disabledOn(BuildContext context) =>
@@ -248,7 +293,8 @@ class SettingsSliderTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Padding(
+    return TvSettingsTileReveal(
+        child: Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -281,7 +327,8 @@ class SettingsSliderTile extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Slider(
+          TvSliderNavigation(
+              child: Slider(
             value: value,
             min: min,
             max: max,
@@ -289,10 +336,10 @@ class SettingsSliderTile extends StatelessWidget {
             showValueIndicator: ShowValueIndicator.never,
             padding: EdgeInsets.zero,
             onChanged: onChanged,
-          ),
+          )),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -359,10 +406,23 @@ class SettingsTile<T> extends StatelessWidget {
     }
     switch (_kind) {
       case _TileKind.plain:
+        if (onPressed == null &&
+            TvMode.enabled &&
+            description != null &&
+            trailing == null &&
+            value == null) {
+          // Read-only explanations must be reachable so remote traversal can
+          // reveal them below the final interactive setting.
+          return () {};
+        }
         return onPressed == null ? null : () => onPressed!(context);
       case _TileKind.toggle:
         return onToggle == null ? null : () => onToggle!(null);
       case _TileKind.radio:
+        final tvRegistry = _TvSettingsRadioScope.maybeOf<T>(context);
+        if (tvRegistry != null) {
+          return () => tvRegistry.onChanged(radioValue);
+        }
         final registry = RadioGroup.maybeOf<T>(context);
         return registry == null ? null : () => registry.onChanged(radioValue);
     }
@@ -374,8 +434,10 @@ class SettingsTile<T> extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final secondary =
         enabled ? colorScheme.onSurfaceVariant : _disabledOn(context);
+    final tvRadioScope = _TvSettingsRadioScope.maybeOf<T>(context);
 
-    return InkWell(
+    return TvSettingsTileReveal(
+        child: InkWell(
       onTap: _tapHandler(context),
       onHighlightChanged: SplitListRow.pressReporterOf(context),
       child: Padding(
@@ -408,19 +470,35 @@ class SettingsTile<T> extends StatelessWidget {
               ],
               if (_kind == _TileKind.toggle) ...[
                 const SizedBox(width: 12),
-                Switch(
-                  value: initialValue ?? false,
-                  onChanged: enabled ? onToggle : null,
+                // The row owns TV navigation and activation. A second focus
+                // target here can trap arrows in RadioGroup or toggle a setting
+                // merely while traversing an edge of the page.
+                ExcludeFocus(
+                  excluding: TvMode.enabled,
+                  child: Switch(
+                    value: initialValue ?? false,
+                    onChanged: enabled ? onToggle : null,
+                  ),
                 ),
               ],
               if (_kind == _TileKind.radio) ...[
                 const SizedBox(width: 12),
-                Radio<T>(value: radioValue as T, enabled: enabled),
+                ExcludeFocus(
+                  excluding: TvMode.enabled,
+                  child: tvRadioScope != null
+                      ? RadioGroup<T>(
+                          groupValue: tvRadioScope.groupValue,
+                          onChanged: tvRadioScope.onChanged,
+                          child: Radio<T>(
+                              value: radioValue as T, enabled: enabled),
+                        )
+                      : Radio<T>(value: radioValue as T, enabled: enabled),
+                ),
               ],
             ],
           ),
         ),
       ),
-    );
+    ));
   }
 }

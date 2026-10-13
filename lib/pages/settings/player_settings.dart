@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_dialog_text_entry.dart';
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_modular/flutter_modular.dart';
@@ -171,18 +174,24 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
         title: Text(title),
         content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
-          return TextField(
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-            ],
-            decoration: InputDecoration(
-              floatingLabelBehavior: FloatingLabelBehavior.never,
-              labelText: initialValue,
-            ),
-            onChanged: (value) {
-              input = value;
-            },
-          );
+          TextField field([TextEditingController? controller]) =>
+              TextField(
+                controller: controller,
+                autofocus: controller != null,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: InputDecoration(
+                  floatingLabelBehavior: FloatingLabelBehavior.never,
+                  labelText: initialValue,
+                ),
+                onChanged: (value) {
+                  input = value;
+                },
+              );
+          return TvMode.enabled
+              ? TvDialogTextEntry(title: title, builder: field)
+              : field();
         }),
         actions: <Widget>[
           TextButton(
@@ -448,7 +457,7 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
                 },
                 title: Text('日志等级'),
                 description: Text('播放器内部日志等级'),
-                value: MenuAnchor(
+                value: TvSettingsMenuAnchor(
                   consumeOutsideTap: true,
                   controller: playerLogLevelMenuController,
                   builder: (_, __, ___) {
@@ -560,7 +569,7 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
                   }
                 },
                 title: Text('默认视频比例'),
-                value: MenuAnchor(
+                value: TvSettingsMenuAnchor(
                   consumeOutsideTap: true,
                   controller: playerAspectRatioMenuController,
                   builder: (_, __, ___) {

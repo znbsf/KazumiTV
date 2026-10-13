@@ -1,4 +1,8 @@
-# 贡献指引
+# KazumiTV 贡献指南
+
+本指南针对独立衍生仓库 [znbsf/KazumiTV](https://github.com/znbsf/KazumiTV)。问题和提案请使用本仓库 [Issues](https://github.com/znbsf/KazumiTV/issues) / [Discussions](https://github.com/znbsf/KazumiTV/discussions)，Pull Request 提交到本仓库。
+
+本项目源于 Kazumi，详见[上游项目致谢](../../README.md#开源与许可)。保留上游作者署名、版权与 GPL-3.0 许可；请勿将本仓库的 TV 问题默认转交上游。TV 构建、签名与发布步骤以[本仓库构建说明](../../docs/TV_BUILD_AND_RELEASE.md)为准。
 
 欢迎您提交 Pull Request 来一起建设这个项目！
 
@@ -18,8 +22,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/Predidit/Kazumi.git
-cd Kazumi
+git clone https://github.com/znbsf/KazumiTV.git
+cd KazumiTV
 
 # 检查 Flutter SDK 状态并下载相关包
 flutter doctor -v
@@ -109,7 +113,7 @@ fix(network): fix proxy issues
 
 ### 推送 PR 之后
 
-KiloCode Bot 会对您的 PR 和改动先进行检查。如果出现了问题, 您需要进行修复。
+请根据本仓库实际启用的 CI 和维护者审阅意见处理检查结果。
 当检查通过、没有合并冲突且审查者没有其他意见时, PR 会被合并。
 
 如果最终 PR 未被接受合并, 通常可能是因为该实现有以下问题之一: 

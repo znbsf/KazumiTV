@@ -8,7 +8,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/bean/widget/tv_artwork_preparation.dart';
-import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 
 import 'support/tv_focus_fixtures.dart';
@@ -65,6 +64,7 @@ Widget _app(WidgetTester tester, {bool oled = false}) {
   addTearDown(tester.view.resetPhysicalSize);
   return MaterialApp(
     debugShowCheckedModeBanner: false,
+    theme: ThemeData.dark(),
     home: Scaffold(body: TvAmbientBackdrop(oled: oled)),
   );
 }
@@ -158,29 +158,33 @@ Widget _referenceBackdrop(ui.Image a, ui.Image b, bool wide, double progress) {
         ),
       );
   return ColoredBox(
-    color: TvVisuals.background,
+    color: ThemeData.light().colorScheme.surface,
     child: Stack(fit: StackFit.expand, children: [
       layer(a, 1 - progress),
       layer(b, progress),
-      const DecoratedBox(
+      DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xCC101611),
-              Color(0x85101611),
-              Color(0x45101611),
-              Color(0xB8101611)
+              ThemeData.light().colorScheme.surface.withAlpha(0xCC),
+              ThemeData.light().colorScheme.surface.withAlpha(0x85),
+              ThemeData.light().colorScheme.surface.withAlpha(0x45),
+              ThemeData.light().colorScheme.surface.withAlpha(0xB8)
             ],
             stops: [0, .24, .62, 1],
           ),
         ),
       ),
-      const DecoratedBox(
+      DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0x45101611), Colors.transparent, Color(0x45101611)],
+            colors: [
+              ThemeData.light().colorScheme.surface.withAlpha(0x45),
+              Colors.transparent,
+              ThemeData.light().colorScheme.surface.withAlpha(0x45)
+            ],
             stops: [0, .55, 1],
           ),
         ),
@@ -408,7 +412,8 @@ void main() {
       of: find.byType(TvAmbientBackdrop),
       matching: find.byType(ColoredBox),
     );
-    expect(tester.widget<ColoredBox>(background).color, TvVisuals.background);
+    expect(tester.widget<ColoredBox>(background).color,
+        ThemeData.dark().colorScheme.surface);
 
     tvArtworkController.select(item);
     await tester.pump(const Duration(milliseconds: 260));

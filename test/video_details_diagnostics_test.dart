@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:kazumi/pages/settings/tv_remote_help.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -98,6 +100,45 @@ Future<void> _selectStatus(WidgetTester tester) async {
 void main() {
   setUp(() => TvMode.setEnabledForTesting(true));
   tearDown(() => TvMode.setEnabledForTesting(false));
+
+  testWidgets(
+      'remote sheet shares row focus, scrolls to end and exits without native calls',
+      (tester) async {
+    final playback = _FakePlaybackController(Future.value(_diagnostics));
+    final player = _FakePlayerController(playback);
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => Scaffold(
+                body: TextButton(
+                    onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => VideoDetailsSheet(
+                                playerController: player,
+                                initialTab: VideoDetailsTab.remote))),
+                    child: const Text('Open remote help'))))));
+    await tester.tap(find.text('Open remote help'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TvRemoteHelp), findsOneWidget);
+    final first = find.byKey(const ValueKey('tv-remote-help-item-1-0'));
+    Focus.of(tester.element(
+            find.descendant(of: first, matching: find.byType(ListTile))))
+        .requestFocus();
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 9; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+    final list = find.byKey(const PageStorageKey('video-details-remote-help'));
+    final scroll = tester.state<ScrollableState>(
+        find.descendant(of: list, matching: find.byType(Scrollable)).first);
+    expect(scroll.position.pixels, greaterThan(200));
+    expect(playback.diagnosticsReadCount, 0);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(VideoDetailsSheet), findsNothing);
+    expect(find.text('Open remote help'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final initialTab in [VideoDetailsTab.remote, VideoDetailsTab.logs]) {
     testWidgets('TV ${initialTab.name} starts without reading diagnostics',

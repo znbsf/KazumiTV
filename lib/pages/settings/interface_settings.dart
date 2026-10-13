@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -59,7 +60,7 @@ class _InterfaceSettingsPageState extends State<InterfaceSettingsPage> {
               },
               title: Text('启动界面设置'),
               description: Text('设置应用开启时的默认页面'),
-              value: MenuAnchor(
+              value: TvSettingsMenuAnchor(
                 consumeOutsideTap: true,
                 controller: defaultPageMenuController,
                 builder: (_, __, ___) {

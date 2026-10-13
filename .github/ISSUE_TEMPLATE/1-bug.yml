@@ -7,8 +7,8 @@ body:
     attributes:
       value: |
         请填写以下内容，以方便我们进行问题定位和修复。
-        填写前，请先查看 [Issues 列表](https://github.com/Predidit/Kazumi/issues) 查看是否已经有和你主题重复的 Issue。重复 Issue 会被关闭。
-        如果你的 Kazumi 版本不为最新版，请先更新再重试查看问题是否仍然存在。旧版本的 Issue 可能不会被处理，因为新版可能已经修复了问题。 
+        填写前，请先查看 [Issues 列表](https://github.com/znbsf/KazumiTV/issues) 查看是否已经有和你主题重复的 Issue。重复 Issue 会被关闭。
+        如果你的 KazumiTV 版本不为最新版，请先更新再重试查看问题是否仍然存在。旧版本的 Issue 可能不会被处理，因为新版可能已经修复了问题。
 
   - type: textarea
     id: description
@@ -21,8 +21,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: Kazumi 版本
-      description: '你所使用的 Kazumi 版本。版本号可以在 我的-设置-关于 页面底部找到。'
+      label: KazumiTV 版本
+      description: '你所使用的 KazumiTV 版本。版本号可以在 我的-设置-关于 页面底部找到。'
     validations:
       required: true
 
@@ -84,7 +84,7 @@ body:
 
         </details>
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: screenshots
@@ -94,14 +94,37 @@ body:
     validations:
       required: false
 
+
+  - type: input
+    id: tv-model
+    attributes:
+      label: 电视 / 盒子型号
+      description: 填写品牌和完整型号；模拟器请注明 AVD / CPU 架构，非 TV 设备请说明。
+    validations:
+      required: false
+
+  - type: input
+    id: tv-android-version
+    attributes:
+      label: Android / Android TV / Google TV 版本
+      description: 填写系统版本；不知道时可写未知。不要填写设备序列号。
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        本表单用于独立衍生项目 KazumiTV，不会提交给上游 Kazumi。
+        日志和截图会公开：请删除 token、Cookie、账号信息、签名播放 URL、设备标识和私有地址。无需提供凭据；无法安全脱敏时请描述现象，不要上传原始日志。
+
   - type: checkboxes
     id: validations
     attributes:
       label: 提交前确认
       options:
-        - label: 我已经查看了 [Issues 列表](https://github.com/Predidit/Kazumi/issues) ，没有发现重复问题。
+        - label: 我已经查看了 [Issues 列表](https://github.com/znbsf/KazumiTV/issues) ，没有发现重复问题。
           required: true
-        - label: 我已经提交了日志信息，并说明了问题和复现步骤。
+        - label: 我已说明问题和复现步骤；如附有日志或截图，已删除其中的敏感信息。
           required: true
-        - label: 我正在使用最新版本的 Kazumi 应用，问题没有被修复。
+        - label: 我正在使用最新版本的 KazumiTV 应用，问题没有被修复。
           required: true

@@ -24,23 +24,23 @@ class AboutPage extends StatelessWidget {
                   children: const [
                     AboutLinkTile(
                       icon: Icons.code_rounded,
-                      title: '源代码',
+                      title: 'KazumiTV 源代码',
                       url: ApiEndpoints.sourceUrl,
                     ),
                     AboutLinkTile(
                       icon: Icons.language_rounded,
-                      title: '项目主页',
+                      title: 'KazumiTV 项目介绍',
                       url: ApiEndpoints.projectUrl,
                     ),
                     AboutLinkTile(
                       icon: Icons.bug_report_rounded,
-                      title: '问题反馈',
+                      title: 'KazumiTV 问题反馈',
                       url: '${ApiEndpoints.sourceUrl}/issues',
                     ),
                     AboutLinkTile(
                       icon: Icons.forum_rounded,
-                      title: 'Telegram',
-                      url: ApiEndpoints.telegramGroup,
+                      title: 'KazumiTV 讨论',
+                      url: '${ApiEndpoints.sourceUrl}/discussions',
                     ),
                   ],
                 ),
@@ -112,7 +112,7 @@ class _ProjectHeader extends StatelessWidget {
           Semantics(
             header: true,
             child: Text(
-              'Kazumi',
+              'KazumiTV',
               style: theme.textTheme.displayMedium?.copyWith(
                 color: colors.primary,
                 fontWeight: FontWeight.w600,
@@ -128,7 +128,7 @@ class _ProjectHeader extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '基于自定义规则的开源番剧应用',
+            '面向 Android TV 与遥控器的独立开源番剧应用',
             style: theme.textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),

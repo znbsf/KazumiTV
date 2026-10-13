@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
@@ -116,7 +117,8 @@ class _HistoryListViewState extends State<HistoryListView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextField(
+                          TvTextEntry(
+                              child: TextField(
                             controller: _searchController,
                             focusNode: _searchFocus,
                             textInputAction: TextInputAction.search,
@@ -145,7 +147,7 @@ class _HistoryListViewState extends State<HistoryListView> {
                             onChanged: (value) =>
                                 _updateFilters(() => _query = value),
                             onSubmitted: (_) => _searchFocus.unfocus(),
-                          ),
+                          )),
                           const SizedBox(height: 16),
                           Wrap(
                             spacing: 8,

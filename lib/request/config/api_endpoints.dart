@@ -8,10 +8,10 @@ class ApiEndpoints {
   static const int apiLevel = 8;
 
   /// 项目主页
-  static const String projectUrl = "https://kazumi.app/";
+  static const String projectUrl = "https://github.com/znbsf/KazumiTV";
 
   /// Github 项目主页
-  static const String sourceUrl = "https://github.com/Predidit/Kazumi";
+  static const String sourceUrl = "https://github.com/znbsf/KazumiTV";
 
   /// 图标作者
   static const String iconUrl = "https://www.pixiv.net/users/66219277";
@@ -26,14 +26,13 @@ class ApiEndpoints {
 
   /// 在线升级
   static const String latestApp =
-      'https://api.github.com/repos/Predidit/Kazumi/releases/latest';
+      'https://api.github.com/repos/znbsf/KazumiTV/releases/latest';
 
   /// Bangumi 镜像测试后端
   static const String bangumiMirrorDomain = 'https://api.kazumi.fyi';
 
-  /// Kazumi 镜像后端应用更新
-  static const String latestAppMirror =
-      '$bangumiMirrorDomain/kazumi/v1/app/latest';
+  /// Upstream acknowledgement only; never used as an update source.
+  static const String upstreamProjectUrl = 'https://github.com/Predidit/Kazumi';
 
   /// 弹弹官网
   static const String dandanIndex = 'https://www.dandanplay.com/';
@@ -47,8 +46,7 @@ class ApiEndpoints {
   /// Bangumi 鉴权 API
   static const String bangumiAuthAPIMirrorDomain = 'https://api.bgmapi.com';
 
-  /// Telegram 群组
-  static const String telegramGroup = 'https://t.me/kazumi_app';
+  // No project-specific Telegram or sponsorship destination is configured.
 
   /// 番剧信息
   static const String bangumiInfoByID = '/v0/subjects/{0}';

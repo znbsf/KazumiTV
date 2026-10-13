@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
@@ -47,7 +48,8 @@ class _DanmakuShieldEditorState extends State<DanmakuShieldEditor> {
           title: '添加规则',
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            TextField(
+            TvTextEntry(
+                child: TextField(
               controller: textEditingController,
               decoration: InputDecoration(
                 hintText: '关键词或 /正则表达式/',
@@ -60,7 +62,7 @@ class _DanmakuShieldEditorState extends State<DanmakuShieldEditor> {
                 ),
               ),
               onSubmitted: (_) => _addRule(),
-            ),
+            )),
             const SizedBox(height: 8),
             Text('包含关键词的弹幕会被隐藏。用 / / 包裹正则表达式。',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(

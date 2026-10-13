@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_form_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -67,7 +68,6 @@ class _ProxyEditorPageState extends State<ProxyEditorPage> {
           sendTimeout: const Duration(seconds: 10),
           proxyHost: parsed.$1,
           proxyPort: parsed.$2,
-          allowBadCertificates: true,
           enableLog: false,
         ),
       );
@@ -98,7 +98,7 @@ class _ProxyEditorPageState extends State<ProxyEditorPage> {
               key: _formKey,
               child: Column(
                 children: [
-                  TextFormField(
+                  TvTextFormEntry(
                     controller: urlController,
                     decoration: const InputDecoration(
                       labelText: '代理地址',
@@ -116,7 +116,7 @@ class _ProxyEditorPageState extends State<ProxyEditorPage> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
+                  TvTextFormEntry(
                     controller: testUrlController,
                     decoration: const InputDecoration(
                       labelText: '测试地址',

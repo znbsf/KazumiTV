@@ -1,10 +1,10 @@
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/card/palette_card.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/storage/storage.dart';
-import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/theme_provider.dart';
 import 'package:kazumi/bean/settings/color_type.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -42,7 +42,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     themeProvider = context.read<ThemeProvider>();
   }
 
-  void setTheme(Color? color) {
+  Future<void> setTheme(Color? color, {bool persistSelection = true}) async {
     var defaultDarkTheme = ThemeData(
         useMaterial3: true,
         fontFamily: themeProvider.currentFontFamily,
@@ -63,11 +63,13 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
           pageTransitionsTheme: pageTransitionsTheme2024),
       oledEnhance ? oledTheme : defaultDarkTheme,
     );
-    defaultThemeColor = color?.toARGB32().toRadixString(16) ?? 'default';
-    GStorage.putSetting(SettingsKeys.themeColor, defaultThemeColor);
+    if (persistSelection) {
+      defaultThemeColor = color?.toARGB32().toRadixString(16) ?? 'default';
+      await GStorage.putSetting(SettingsKeys.themeColor, defaultThemeColor);
+    }
   }
 
-  void resetTheme() {
+  Future<void> resetTheme() async {
     var defaultDarkTheme = ThemeData(
         useMaterial3: true,
         fontFamily: themeProvider.currentFontFamily,
@@ -89,7 +91,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
       oledEnhance ? oledTheme : defaultDarkTheme,
     );
     defaultThemeColor = 'default';
-    GStorage.putSetting(SettingsKeys.themeColor, 'default');
+    await GStorage.putSetting(SettingsKeys.themeColor, 'default');
   }
 
   void updateTheme(String theme) async {
@@ -122,7 +124,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     } else {
       color = Color(int.parse(defaultThemeColor, radix: 16));
     }
-    setTheme(color);
+    setTheme(color, persistSelection: false);
   }
 
   @override
@@ -144,7 +146,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                   }
                 },
                 title: Text('深色模式'),
-                value: MenuAnchor(
+                value: TvSettingsMenuAnchor(
                   consumeOutsideTap: true,
                   controller: menuController,
                   builder: (_, __, ___) {
@@ -251,52 +253,19 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                 leading: Icons.palette_rounded,
                 enabled: !useDynamicColor,
                 onPressed: (_) async {
-                  KazumiDialog.show(builder: (context) {
-                    return AlertDialog(
-                      title: Text('配色方案'),
-                      content: StatefulBuilder(builder:
-                          (BuildContext context, StateSetter setState) {
-                        final List<Map<String, dynamic>> colorThemes =
-                            colorThemeTypes;
-                        return Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: isDesktop() ? 8 : 0,
-                          children: [
-                            ...colorThemes.map(
-                              (e) {
-                                final index = colorThemes.indexOf(e);
-                                return GestureDetector(
-                                  onTap: () {
-                                    index == 0
-                                        ? resetTheme()
-                                        : setTheme(e['color']);
-                                    KazumiDialog.dismiss();
-                                  },
-                                  child: Column(
-                                    children: [
-                                      PaletteCard(
-                                        color: e['color'],
-                                        selected: (e['color']
-                                                    .value
-                                                    .toRadixString(16) ==
-                                                defaultThemeColor ||
-                                            (defaultThemeColor == 'default' &&
-                                                index == 0)),
-                                      ),
-                                      Text(e['label']),
-                                    ],
-                                  ),
-                                );
-                              },
-                            )
-                          ],
-                        );
-                      }),
-                    );
-                  });
+                  final selected = await showDialog<int>(
+                      context: context,
+                      builder: (_) =>
+                          ThemePaletteDialog(selectedColor: defaultThemeColor));
+                  if (!mounted || selected == null) return;
+                  if (selected == 0) {
+                    await resetTheme();
+                  } else {
+                    await setTheme(colorThemeTypes[selected]['color']);
+                  }
+                  if (mounted) setState(() {});
                 },
-                title: Text('配色方案'),
+                title: const Text('配色方案'),
               ),
               SettingsTile.switchTile(
                 leading: Icons.colorize_rounded,
@@ -324,7 +293,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                   } else {
                     color = Color(int.parse(defaultThemeColor, radix: 16));
                   }
-                  setTheme(color);
+                  setTheme(color, persistSelection: false);
                   setState(() {});
                 },
                 title: Text('使用系统字体'),
@@ -387,4 +356,51 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
       ),
     );
   }
+}
+
+/// A native focusable button gives every swatch the same remote/touch action.
+/// Cancel returns null; the page persists only an explicitly selected color.
+class ThemePaletteDialog extends StatelessWidget {
+  const ThemePaletteDialog({super.key, required this.selectedColor});
+  final String selectedColor;
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('配色方案'),
+        content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+                child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                  for (var index = 0; index < colorThemeTypes.length; index++)
+                    OutlinedButton(
+                      key: ValueKey('theme-palette-$index'),
+                      autofocus: selectedColor == 'default'
+                          ? index == 0
+                          : (colorThemeTypes[index]['color'] as Color)
+                                  .toARGB32()
+                                  .toRadixString(16) ==
+                              selectedColor,
+                      onPressed: () => Navigator.of(context).pop(index),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        PaletteCard(
+                            color: colorThemeTypes[index]['color'],
+                            selected: selectedColor == 'default'
+                                ? index == 0
+                                : (colorThemeTypes[index]['color'] as Color)
+                                        .toARGB32()
+                                        .toRadixString(16) ==
+                                    selectedColor),
+                        Text(colorThemeTypes[index]['label']),
+                      ]),
+                    ),
+                ]))),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'))
+        ],
+      );
 }

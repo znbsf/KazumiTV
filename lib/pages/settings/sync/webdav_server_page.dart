@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_form_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 
@@ -92,7 +93,7 @@ class _WebDavServerPageState extends State<WebDavServerPage> {
                   child: Column(
                     spacing: 20,
                     children: [
-                      TextFormField(
+                      TvTextFormEntry(
                         controller: _url,
                         enabled: !_busy,
                         keyboardType: TextInputType.url,
@@ -114,7 +115,7 @@ class _WebDavServerPageState extends State<WebDavServerPage> {
                           return null;
                         },
                       ),
-                      TextFormField(
+                      TvTextFormEntry(
                         controller: _username,
                         enabled: !_busy,
                         textInputAction: TextInputAction.next,
@@ -124,7 +125,7 @@ class _WebDavServerPageState extends State<WebDavServerPage> {
                           border: OutlineInputBorder(),
                         ),
                       ),
-                      TextFormField(
+                      TvTextFormEntry(
                         controller: _password,
                         enabled: !_busy,
                         obscureText: !_passwordVisible,

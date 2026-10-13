@@ -1,3 +1,6 @@
+import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
+import 'package:kazumi/pages/player/tv_player_focus.dart';
+import 'package:kazumi/pages/player/player_shortcut_platform_actions.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 
 import 'dart:async';
@@ -652,18 +655,21 @@ class _PlayerItemState extends State<PlayerItem>
     if (!videoPageController.isPip) handleFullscreen();
   }
 
-  void handleShortcutExitFullscreen() {
-    if (videoPageController.isFullscreen && !isTablet()) {
+  Future<void> handleShortcutExitFullscreen() => dispatchShortcutExitFullscreen(
+    fullscreen: videoPageController.isFullscreen,
+    tablet: isTablet(),
+    desktop: isDesktop(),
+    macOS: Platform.isMacOS,
+    exitFullscreen: () {
       try {
         playerController.danmaku.clearAndInvalidateScheduledDanmakus();
       } catch (_) {}
       DisplayModeService.exitFullScreen();
       videoPageController.isFullscreen = !videoPageController.isFullscreen;
-    } else if (!Platform.isMacOS) {
-      playerController.pause();
-      windowManager.hide();
-    }
-  }
+    },
+    pause: playerController.pause,
+    hideWindow: windowManager.hide,
+  );
 
   void _toggleVideoController() {
     if (playerController.panel.showVideoController) {
@@ -1105,7 +1111,7 @@ class _PlayerItemState extends State<PlayerItem>
     _cancelHideTimer();
     playerController.panel.showVideoController = false;
     if (TvMode.enabled && !videoPageController.showTabBody) {
-      widget.keyboardFocus.requestFocus();
+      requestPlayerFocusIfCurrent(context, widget.keyboardFocus);
     }
   }
 
@@ -1390,12 +1396,14 @@ class _PlayerItemState extends State<PlayerItem>
           final query = await task.show<String>(
             builder: (context) => AlertDialog(
               title: const Text('弹幕检索'),
-              content: TextFormField(
-                initialValue: keyword,
-                decoration: const InputDecoration(hintText: '番剧名'),
-                onChanged: (value) => keyword = value,
-                onFieldSubmitted: (value) =>
-                    KazumiDialog.dismiss(context: context, popWith: value),
+              content: TvTextEditingShortcuts(
+                child: TextFormField(
+                  initialValue: keyword,
+                  decoration: const InputDecoration(hintText: '番剧名'),
+                  onChanged: (value) => keyword = value,
+                  onFieldSubmitted: (value) =>
+                      KazumiDialog.dismiss(context: context, popWith: value),
+                ),
               ),
               actions: [
                 TextButton(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -41,10 +42,13 @@ void main() async {
   if (TvMode.enabled) {
     FocusManager.instance.highlightStrategy =
         FocusHighlightStrategy.alwaysTraditional;
-    await SystemChrome.setPreferredOrientations(const [
+    // A system media browser can warm audio_service's engine before an Activity
+    // exists. Its platform orientation request has no handler/reply yet, so it
+    // must never gate runApp. MainActivity also sets landscape on attachment.
+    unawaited(SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
-    ]);
+    ]));
   }
   if (Platform.isAndroid || Platform.isIOS) {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

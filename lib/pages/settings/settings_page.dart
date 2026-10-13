@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/settings/bounded_settings_scroll_view.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/tv_focus_scope.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
@@ -182,8 +183,39 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
+  KeyEventResult _onRailKey(FocusNode node, KeyEvent event) {
+    if (!TvMode.enabled) return KeyEventResult.ignored;
+    final up = event.logicalKey == LogicalKeyboardKey.arrowUp;
+    final down = event.logicalKey == LogicalKeyboardKey.arrowDown;
+    if (!up && !down) return KeyEventResult.ignored;
+    final paths = [
+      for (final group in _settingsGroups)
+        for (final category in group.categories) category.path
+    ];
+    final index = paths.indexWhere(
+        (path) => _railNodes[path] == FocusManager.instance.primaryFocus);
+    // The first category keeps its upward doorway to the toolbar Back button.
+    if (index < 0 || (up && index == 0)) return KeyEventResult.ignored;
+    if (event is KeyDownEvent || event is KeyRepeatEvent) {
+      final target = _railNode(paths[(index + (down ? 1 : -1)) % paths.length]);
+      target.requestFocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !target.hasFocus || target.context == null) return;
+        Scrollable.ensureVisible(target.context!,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+        Scrollable.ensureVisible(target.context!,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart);
+      });
+    }
+    return KeyEventResult.handled;
+  }
+
   void _enterPane() {
-    final previous = _paneFocus.focusedChild;
+    FocusNode? previous = _paneFocus.focusedChild;
+    // The embedded Navigator inserts scopes between the pane and its control.
+    while (previous is FocusScopeNode) {
+      previous = previous.focusedChild;
+    }
     if (previous != null &&
         previous is! FocusScopeNode &&
         previous.canRequestFocus) {
@@ -196,6 +228,49 @@ class _SettingsPageState extends State<SettingsPage> {
         return;
       }
     }
+  }
+
+  bool _moveLeftWithinPane() {
+    final current = FocusManager.instance.primaryFocus;
+    if (current == null || current.context == null) return false;
+    final origin = current.rect;
+    FocusNode? target;
+    double distance = double.infinity;
+    for (final candidate in _paneFocus.traversalDescendants) {
+      if (candidate == current ||
+          candidate is FocusScopeNode ||
+          !candidate.canRequestFocus ||
+          candidate.context == null) {
+        continue;
+      }
+      var hidden = false;
+      candidate.context!.visitAncestorElements((element) {
+        if (element.widget is Offstage &&
+            (element.widget as Offstage).offstage) {
+          hidden = true;
+          return false;
+        }
+        return true;
+      });
+      if (hidden) continue;
+      final rect = candidate.rect;
+      // Only the same horizontal control band keeps Left in the pane. A
+      // different row/toolbar must not prevent the explicit rail doorway.
+      if (rect.isEmpty ||
+          rect.center.dx >= origin.center.dx - 1 ||
+          rect.bottom <= origin.top ||
+          rect.top >= origin.bottom) {
+        continue;
+      }
+      final delta = origin.center.dx - rect.center.dx;
+      if (delta < distance) {
+        target = candidate;
+        distance = delta;
+      }
+    }
+    if (target == null) return false;
+    FocusTraversalPolicy.defaultTraversalRequestFocusCallback(target);
+    return true;
   }
 
   final _outletKey = GlobalKey<RouterOutletState>();
@@ -294,12 +369,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   width: wide ? 280 : 0,
                   child: Offstage(
                     offstage: !wide,
-                    child: _SettingsMenu(
-                      wide: true,
-                      selectedPath: _selectedCategoryPath,
-                      onSelect: _replaceCategory,
-                      nodeForPath: TvMode.enabled ? _railNode : null,
-                      onEnterPane: _enterPane,
+                    child: Focus(
+                      canRequestFocus: false,
+                      onKeyEvent: _onRailKey,
+                      child: _SettingsMenu(
+                        wide: true,
+                        selectedPath: _selectedCategoryPath,
+                        onSelect: _replaceCategory,
+                        nodeForPath: TvMode.enabled ? _railNode : null,
+                        onEnterPane: _enterPane,
+                      ),
                     ),
                   ),
                 ),
@@ -309,9 +388,11 @@ class _SettingsPageState extends State<SettingsPage> {
                     onKeyEvent: (node, event) {
                       if (TvMode.enabled &&
                           wide &&
-                          event is KeyDownEvent &&
+                          (event is KeyDownEvent || event is KeyRepeatEvent) &&
                           event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                        _railNode(_selectedCategoryPath).requestFocus();
+                        if (!_moveLeftWithinPane()) {
+                          _railNode(_selectedCategoryPath).requestFocus();
+                        }
                         return KeyEventResult.handled;
                       }
                       return KeyEventResult.ignored;
@@ -386,7 +467,7 @@ class _SettingsMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-      child: ListView(
+      child: BoundedSettingsScrollView(
         padding: wide
             ? const EdgeInsets.fromLTRB(4, 0, 0, 12)
             : const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -459,7 +540,7 @@ class _RailDestination extends StatelessWidget {
           canRequestFocus: false,
           onKeyEvent: (_, event) {
             if (TvMode.enabled &&
-                event is KeyDownEvent &&
+                (event is KeyDownEvent || event is KeyRepeatEvent) &&
                 event.logicalKey == LogicalKeyboardKey.arrowRight) {
               onEnterPane?.call();
               return KeyEventResult.handled;

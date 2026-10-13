@@ -306,13 +306,15 @@ class _PopularPageState extends State<PopularPage> {
     // in-flight reveal. This input still invalidates old async load epochs,
     // but only a real replacement destination supersedes the focus request.
     final pending = _pendingGridChannel;
-    final waitingAtLoadedEnd = event.logicalKey == LogicalKeyboardKey.arrowDown &&
-        pending != null &&
-        pending >= 1 &&
-        pending <= count &&
-        (currentIndex ~/ columns + 1) * columns >= count &&
-        (popularController.isLoadingMore ||
-            (!popularController.canLoadMore && !popularController.canRetryLoad));
+    final waitingAtLoadedEnd =
+        event.logicalKey == LogicalKeyboardKey.arrowDown &&
+            pending != null &&
+            pending >= 1 &&
+            pending <= count &&
+            (currentIndex ~/ columns + 1) * columns >= count &&
+            (popularController.isLoadingMore ||
+                (!popularController.canLoadMore &&
+                    !popularController.canRetryLoad));
     if (waitingAtLoadedEnd) {
       if (TvInputLifecycle.active) {
         _traceGrid('disposition', {'reason': 'pending_loaded_boundary'},
@@ -1196,7 +1198,9 @@ class _PopularPageState extends State<PopularPage> {
                       summary,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TvVisuals.body.copyWith(color: TvVisuals.muted),
+                      style: TvVisuals.body.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ],
                 );
@@ -1381,7 +1385,7 @@ class _PopularPageState extends State<PopularPage> {
         titleSpacing: 32,
         backgroundColor: WidgetStateColor.resolveWith((states) =>
             states.contains(WidgetState.scrolledUnder)
-                ? TvVisuals.background
+                ? Theme.of(context).colorScheme.surface
                 : Colors.transparent),
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -1704,7 +1708,7 @@ class _RecentWatchHeader extends SliverPersistentHeaderDelegate {
   Widget build(
           BuildContext context, double shrinkOffset, bool overlapsContent) =>
       ColoredBox(
-          color: TvVisuals.background.withValues(alpha: .9),
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: .9),
           child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child:

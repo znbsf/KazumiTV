@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -248,18 +250,21 @@ class _RuleImportDialogState extends State<_RuleImportDialog> {
             children: [
               const Text('支持多条 kazumi:// 链接、单条 JSON 或 JSON 数组。同名规则会被替换。'),
               const SizedBox(height: 20),
-              TextField(
-                controller: _text,
-                enabled: !_saving,
-                minLines: 4,
-                maxLines: 8,
-                onChanged: (_) => setState(() => _error = null),
-                decoration: ruleInputDecoration(context,
-                        label: '规则内容', hint: '在这里粘贴规则链接或 JSON')
-                    .copyWith(
-                        alignLabelWithHint: true,
-                        errorText: _error,
-                        errorMaxLines: 4),
+              TvTextEntry(
+                title: '导入规则',
+                child: TextField(
+                  controller: _text,
+                  enabled: !_saving,
+                  minLines: 4,
+                  maxLines: 8,
+                  onChanged: (_) => setState(() => _error = null),
+                  decoration: ruleInputDecoration(context,
+                          label: '规则内容', hint: '在这里粘贴规则链接或 JSON')
+                      .copyWith(
+                          alignLabelWithHint: true,
+                          errorText: _error,
+                          errorMaxLines: 4),
+                ),
               ),
             ],
           ),

@@ -12,12 +12,47 @@ class TvLoopTraversalPolicy extends ReadingOrderTraversalPolicy {
   @override
   bool inDirection(FocusNode currentNode, TraversalDirection direction) {
     final scope = currentNode.nearestScope;
+    final origin = currentNode.rect;
     final previous = scope?.directionalTraversalEdgeBehavior;
     if (scope != null) {
       scope.directionalTraversalEdgeBehavior = TraversalEdgeBehavior.closedLoop;
     }
     try {
-      return super.inDirection(currentNode, direction);
+      final moved = super.inDirection(currentNode, direction);
+      if (moved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final target = FocusManager.instance.primaryFocus;
+          final context = target?.context;
+          if (target == null ||
+              target == currentNode ||
+              context == null ||
+              !context.mounted ||
+              target.nearestScope != scope ||
+              ModalRoute.of(context)?.isCurrent == false) {
+            return;
+          }
+          final rect = target.rect;
+          final wrapped = switch (direction) {
+            TraversalDirection.down => rect.top < origin.top,
+            TraversalDirection.up => rect.bottom > origin.bottom,
+            TraversalDirection.right => rect.left < origin.left,
+            TraversalDirection.left => rect.right > origin.right,
+          };
+          if (!wrapped) return;
+          // Native directional history predates the jump across the page.
+          // Keeping it makes the next opposite arrow skip the final row.
+          if (scope != null) invalidateScopeData(scope);
+          // Directional traversal reveals only the travelling edge. On a wrap
+          // that edge belongs to the opposite end of the viewport, so reveal
+          // both edges after the native scroll settles.
+          Scrollable.ensureVisible(context,
+              alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+          Scrollable.ensureVisible(context,
+              alignmentPolicy:
+                  ScrollPositionAlignmentPolicy.keepVisibleAtStart);
+        });
+      }
+      return moved;
     } finally {
       if (scope != null && previous != null) {
         scope.directionalTraversalEdgeBehavior = previous;

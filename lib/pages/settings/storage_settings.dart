@@ -7,14 +7,16 @@ import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/services/storage/image_cache_service.dart';
 
 class StorageSettingsPage extends StatefulWidget {
-  const StorageSettingsPage({super.key});
+  const StorageSettingsPage({super.key, this.cache});
+
+  final ImageCacheService? cache;
 
   @override
   State<StorageSettingsPage> createState() => _StorageSettingsPageState();
 }
 
 class _StorageSettingsPageState extends State<StorageSettingsPage> {
-  final _cache = ImageCacheService();
+  late final _cache = widget.cache ?? ImageCacheService();
   late Future<int> _cacheSize = _cache.sizeInBytes();
   bool _clearing = false;
 
@@ -34,6 +36,7 @@ class _StorageSettingsPageState extends State<StorageSettingsPage> {
         content: const Text('图片会在下次加载时重新下载。视频、记录和设置不会删除。'),
         actions: [
           TextButton(
+            autofocus: true,
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('取消'),
           ),

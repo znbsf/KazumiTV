@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/player/tv_player_controls.dart';
 
 void main() {
@@ -42,7 +41,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('player action remains visible and green when remotely focused',
+  testWidgets('player action remains visible and themed when remotely focused',
       (tester) async {
     final farFocus = FocusNode();
     addTearDown(farFocus.dispose);
@@ -74,7 +73,11 @@ void main() {
     expect(activations, 1);
     expect(tester.getRect(find.text('操作 11')).right, lessThanOrEqualTo(260));
     final text = tester.widget<Text>(find.text('操作 11'));
-    expect(text.style?.color, TvVisuals.accent);
+    expect(
+        text.style?.color,
+        Theme.of(tester.element(find.byType(TvPlayerAction).first))
+            .colorScheme
+            .primary);
     expect(text.style?.fontSize, 14);
     expect(tester.takeException(), isNull);
   });
@@ -133,7 +136,11 @@ void main() {
     expect(find.bySemanticsLabel('下一集'), findsOneWidget);
     expect(tester.widget<Tooltip>(find.byType(Tooltip)).message, '下一集');
     final icon = tester.widget<Icon>(find.byIcon(Icons.skip_next_rounded));
-    expect(icon.color, TvVisuals.accent);
+    expect(
+        icon.color,
+        Theme.of(tester.element(find.byType(TvPlayerAction).first))
+            .colorScheme
+            .primary);
     expect(tester.getSize(find.byType(TvPlayerAction)), const Size(38, 38));
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.tap(find.byIcon(Icons.skip_next_rounded));

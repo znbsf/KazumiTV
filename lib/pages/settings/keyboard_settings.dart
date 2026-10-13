@@ -1,5 +1,8 @@
+import 'package:kazumi/bean/settings/bounded_settings_scroll_view.dart';
+import 'package:kazumi/utils/device.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:kazumi/pages/player/player_keyboard_shortcuts.dart';
 import 'package:kazumi/pages/settings/tv_remote_help.dart';
 
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -40,6 +43,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
 
   // An empty original value marks a new, uncommitted binding.
   String originalValue = '';
+  FocusNode? _recordingReturnFocus;
 
   late Map<String, List<String>> shortcuts;
 
@@ -78,7 +82,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
 
   @override
   void dispose() {
-    cancelListening();
+    cancelListening(restoreFocus: false);
     focusNode.dispose();
     for (final node in _tvSectionFocusNodes) {
       node.dispose();
@@ -87,7 +91,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
   }
 
   // Also called during dispose; do not setState here.
-  void cancelListening() {
+  void cancelListening({bool restoreFocus = true}) {
     if (!isListening) return;
     final func = listeningFunction!;
     final keys = shortcuts[func]!;
@@ -103,15 +107,30 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
     listeningFunction = null;
     listeningIndex = null;
     originalValue = '';
+    if (restoreFocus) _restoreRecordingFocus();
+  }
+
+  void _restoreRecordingFocus() {
+    final target = _recordingReturnFocus;
+    _recordingReturnFocus = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          !isListening &&
+          target?.context != null &&
+          target!.canRequestFocus) {
+        target.requestFocus();
+      }
+    });
   }
 
   void beginListening(String func, int index) {
+    _recordingReturnFocus = FocusManager.instance.primaryFocus;
     originalValue = shortcuts[func]![index];
     shortcuts[func]![index] = '...';
     listeningFunction = func;
     listeningIndex = index;
 
-    Future.delayed(const Duration(milliseconds: 50), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       focusNode.requestFocus();
     });
@@ -120,6 +139,10 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
   bool handleShortcutInput(String rawKey) {
     if (!isListening || rawKey.isEmpty) return false;
 
+    if (TvMode.enabled && isTvReservedShortcutLabel(rawKey)) {
+      KazumiDialog.showToast(message: '此键由 TV 固定映射或系统保留，请换一个键；返回可取消');
+      return true;
+    }
     final func = listeningFunction!;
     final index = listeningIndex!;
 
@@ -143,6 +166,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
       originalValue = '';
     });
     GStorage.putStringListSettingByName('shortcut_$func', shortcuts[func]!);
+    _restoreRecordingFocus();
 
     return true;
   }
@@ -220,83 +244,118 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
     final textTheme = Theme.of(context).textTheme;
 
     final showCustomShortcuts = !TvMode.enabled || _tvSection == 1;
-    return SettingsDetailScaffold(
-      title: Text(TvMode.enabled ? '遥控器与操作设置' : '操作设置'),
-      actions: [
-        if (showCustomShortcuts)
-          IconButton(
-            icon: const Icon(Icons.settings_backup_restore_rounded),
-            tooltip: '恢复默认',
-            onPressed: restoreDefaults,
-          ),
-      ],
-      body: FocusScope(
-        autofocus: true,
-        child: Focus(
-          focusNode: focusNode,
-          canRequestFocus: isListening,
-          skipTraversal: true,
-          descendantsAreFocusable: true,
-          onKeyEvent: (node, event) {
-            if (event is! KeyDownEvent) return KeyEventResult.ignored;
-            if (!isListening) return KeyEventResult.ignored;
+    return PopScope(
+      canPop: !isListening,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && isListening) setState(cancelListening);
+      },
+      child: SettingsDetailScaffold(
+        title: Text(TvMode.enabled ? '遥控器与操作设置' : '操作设置'),
+        actions: [
+          if (showCustomShortcuts)
+            IconButton(
+              icon: const Icon(Icons.settings_backup_restore_rounded),
+              tooltip: '恢复默认',
+              onPressed: restoreDefaults,
+            ),
+        ],
+        body: FocusScope(
+          autofocus: true,
+          child: Focus(
+            focusNode: focusNode,
+            canRequestFocus: isListening,
+            skipTraversal: true,
+            descendantsAreFocusable: true,
+            onKeyEvent: (node, event) {
+              if (event is! KeyDownEvent) return KeyEventResult.ignored;
+              if (!isListening) return KeyEventResult.ignored;
+              if (event.logicalKey == LogicalKeyboardKey.escape ||
+                  event.logicalKey == LogicalKeyboardKey.goBack ||
+                  event.logicalKey == LogicalKeyboardKey.gameButtonB) {
+                setState(cancelListening);
+                return KeyEventResult.handled;
+              }
 
-            final rawKey = event.logicalKey.keyLabel.isNotEmpty
-                ? event.logicalKey.keyLabel
-                : event.logicalKey.debugName ?? '';
+              final rawKey = event.logicalKey.keyLabel.isNotEmpty
+                  ? event.logicalKey.keyLabel
+                  : event.logicalKey.debugName ?? '';
 
-            final handled = handleShortcutInput(rawKey);
-            return handled ? KeyEventResult.handled : KeyEventResult.ignored;
-          },
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (TvMode.enabled) ...[
-                _buildTvSectionTabs(),
-                const SizedBox(height: 14),
-              ],
-              if (showCustomShortcuts) ...[
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        TvMode.enabled
-                            ? '选择按键标签，再按下遥控器或键盘上的新按键完成修改'
-                            : '点按按键标签，再按下新按键完成修改',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+              final handled = handleShortcutInput(rawKey);
+              return handled ? KeyEventResult.handled : KeyEventResult.ignored;
+            },
+            child: BoundedSettingsScrollView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                StreamBuilder<void>(
+                  stream: GStorage.watchSettings(
+                      [SettingsKeys.showNumericShortcutBadges]),
+                  builder: (context, _) {
+                    final shown = GStorage.getSetting(
+                        SettingsKeys.showNumericShortcutBadges);
+                    return TvFocusableSurface(
+                      key: const ValueKey('numeric-shortcut-badges-setting'),
+                      focusScale: 1,
+                      onPressed: () => GStorage.putSetting(
+                          SettingsKeys.showNumericShortcutBadges, !shown),
+                      child: SwitchListTile(
+                        title: const Text('显示数字快捷键角标'),
+                        subtitle:
+                            const Text('隐藏角标不影响数字键快捷操作；真实频道号、集数和数字键盘保持显示'),
+                        value: shown,
+                        onChanged: (value) => GStorage.putSetting(
+                            SettingsKeys.showNumericShortcutBadges, value),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-                for (final group in displayGroups)
+                const SizedBox(height: 12),
+                if (TvMode.enabled) ...[
+                  _buildTvSectionTabs(),
+                  const SizedBox(height: 14),
+                ],
+                if (showCustomShortcuts) ...[
                   Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 1000),
-                      child: _buildGroupCard(group),
-                    ),
-                  ),
-              ] else ...[
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1000),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        'TV 固定映射负责遥控器兼容；播放器通用按键可在“自定义按键”中调整。',
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          TvMode.enabled
+                              ? '选择按键标签，再按下遥控器或键盘上的新按键完成修改'
+                              : '点按按键标签，再按下新按键完成修改',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                const TvRemoteHelp(),
+                  for (final group in displayGroups)
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: _buildGroupCard(group),
+                      ),
+                    ),
+                ] else ...[
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          'TV 固定映射负责遥控器兼容；播放器通用按键可在“自定义按键”中调整。',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const TvRemoteHelp(),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -406,7 +465,9 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Text(shortcutsChineseName[func] ?? func, style: textTheme.bodyMedium),
+          Text(
+              '${shortcutsChineseName[func] ?? func}${TvMode.enabled && func == 'exitfullscreen' ? '（TV请用返回）' : func == 'screenshot' && isDesktop() ? '（桌面不支持保存）' : ''}',
+              style: textTheme.bodyMedium),
           const SizedBox(width: 12),
           Expanded(
             child: Wrap(
@@ -417,7 +478,9 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
               children: [
                 for (int i = 0; i < keys.length; i++)
                   _buildKeyCap(func, keys, i),
-                _AddKeyButton(onTap: () => onAddKey(func)),
+                _AddKeyButton(
+                    key: ValueKey('shortcut-add-$func'),
+                    onTap: () => onAddKey(func)),
               ],
             ),
           ),
@@ -431,7 +494,10 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
     // Pending placeholders must not count toward the last-binding safeguard.
     final realCount = keys.where((value) => value != '...').length;
     return _KeyCap(
-      label: listening ? '按任意键' : keyAliases[keys[i]] ?? keys[i],
+      key: ValueKey('shortcut-$func-$i'),
+      label: listening
+          ? '按任意键（返回取消）'
+          : '${keyAliases[keys[i]] ?? keys[i]}${TvMode.enabled && isTvReservedShortcutLabel(keys[i]) ? '（TV保留）' : ''}',
       listening: listening,
       onTap: () => onKeyCapTap(func, i),
       onDelete:
@@ -442,6 +508,7 @@ class _KeyboardSettingsPageState extends State<KeyboardSettingsPage> {
 
 class _KeyCap extends StatelessWidget {
   const _KeyCap({
+    super.key,
     required this.label,
     required this.listening,
     required this.onTap,
@@ -482,10 +549,10 @@ class _KeyCap extends StatelessWidget {
               ),
               if (onDelete != null) ...[
                 const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: onDelete,
-                  behavior: HitTestBehavior.opaque,
-                  child: Icon(
+                IconButton(
+                  onPressed: onDelete,
+                  tooltip: '删除按键',
+                  icon: Icon(
                     Icons.close_rounded,
                     size: 14,
                     color: colorScheme.onSurfaceVariant,
@@ -501,7 +568,7 @@ class _KeyCap extends StatelessWidget {
 }
 
 class _AddKeyButton extends StatelessWidget {
-  const _AddKeyButton({required this.onTap});
+  const _AddKeyButton({super.key, required this.onTap});
 
   final VoidCallback onTap;
 

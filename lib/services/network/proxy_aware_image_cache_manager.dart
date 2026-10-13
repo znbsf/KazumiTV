@@ -53,14 +53,13 @@ class _ProxyAwareImageFileService extends FileService {
     final proxy = _currentProxy();
     if (proxy == null) {
       if (Platform.isWindows) {
-        // Unlike the manual proxy path, certificate checks stay strict here.
+        // System and manual proxy routes both retain certificate verification.
         client.findProxy = SystemProxyService.findProxy;
       }
       return client;
     }
 
     client.findProxy = (_) => 'PROXY ${proxy.$1}:${proxy.$2}';
-    client.badCertificateCallback = (cert, host, port) => true;
     return client;
   }
 

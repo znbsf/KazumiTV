@@ -169,6 +169,11 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
       return KeyEventResult.handled;
     }
 
+    // The player may remain mounted while settings are opened on another
+    // route. Read the current persisted map at the next genuine DOWN event.
+    if (event is KeyDownEvent && widget.shortcuts == null) {
+      _shortcuts = _loadShortcuts();
+    }
     final keyLabel = event.logicalKey.keyLabel.isNotEmpty
         ? event.logicalKey.keyLabel
         : event.logicalKey.debugName ?? '';
@@ -316,8 +321,13 @@ Map<String, List<String>> withTvRemoteShortcuts(
       : key.debugName ?? key.keyId.toString();
 
   void add(String action, LogicalKeyboardKey key) {
-    final values = result.putIfAbsent(action, () => <String>[]);
     final keyLabel = label(key);
+    // TV aliases are reserved. Stored legacy bindings must not take priority
+    // just because their action was inserted earlier in the map.
+    for (final entry in result.entries) {
+      if (entry.key != action) entry.value.removeWhere((v) => v == keyLabel);
+    }
+    final values = result.putIfAbsent(action, () => <String>[]);
     if (!values.contains(keyLabel)) values.add(keyLabel);
   }
 
@@ -379,3 +389,9 @@ bool shouldDeferTvKeyToPlatform(LogicalKeyboardKey key) {
       key == LogicalKeyboardKey.audioVolumeDown ||
       key == LogicalKeyboardKey.audioVolumeMute;
 }
+
+/// Fixed TV/system keys cannot be reassigned from the custom keyboard editor.
+bool isTvReservedShortcutLabel(String keyLabel) =>
+    withTvRemoteShortcuts(const <String, List<String>>{})
+        .values
+        .any((keys) => keys.contains(keyLabel));

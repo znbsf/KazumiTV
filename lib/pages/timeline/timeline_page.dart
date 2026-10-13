@@ -177,6 +177,41 @@ class _TimelinePageState extends State<TimelinePage> {
             isLoading: loading || failed,
           ),
         );
+        Widget dayContent(double viewportHeight) =>
+            loading && calendar.every((day) => day.isEmpty)
+                ? _buildLoading(viewportHeight, TvMode.enabled ? 0 : weekHeight)
+                : failed
+                    ? _TimelineScrollView(
+                        slivers: [
+                          SliverPadding(
+                            padding: const EdgeInsets.all(24),
+                            sliver: SliverToBoxAdapter(
+                              child: BangumiMirrorErrorWidget(
+                                onRetry: () => _controller
+                                    .loadSeason(_controller.selectedDate),
+                                onSettingsReturned: () {
+                                  if (mounted) setState(() {});
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : TabBarView(
+                        children: [
+                          for (var day = 0; day < 7; day++)
+                            _buildDay(
+                              context,
+                              day: day,
+                              items: calendar[day],
+                              watchingIds: watchingIds,
+                              columns: columns,
+                              inset: inset,
+                              compact: narrowPortrait,
+                              loading: loading,
+                            ),
+                        ],
+                      );
         return Scaffold(
           appBar: SysAppBar(
             needTopOffset: false,
@@ -214,70 +249,48 @@ class _TimelinePageState extends State<TimelinePage> {
           body: SafeArea(
             top: false,
             child: LayoutBuilder(
-                builder: (context, viewport) => NestedScrollView(
-                      // Keep the outer viewport clamped and unstretched so tabs stay fixed.
-                      physics: const ClampingScrollPhysics(),
-                      scrollBehavior: ScrollConfiguration.of(context).copyWith(
-                        overscroll: false,
-                        scrollbars: false,
-                      ),
-                      headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                        if (seasonHeader != null)
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: EdgeInsets.fromLTRB(inset, 8, inset, 20),
-                              child: seasonHeader,
-                            ),
-                          ),
-                        SliverOverlapAbsorber(
-                          handle:
-                              NestedScrollView.sliverOverlapAbsorberHandleFor(
-                                  context),
-                          sliver: SliverPersistentHeader(
-                            pinned: true,
-                            delegate: _WeekHeaderDelegate(
-                              height: weekHeight,
-                              color: theme.scaffoldBackgroundColor,
-                              child: weekSelector,
-                            ),
-                          ),
+                builder: (context, viewport) => TvMode.enabled
+                    // TV has no collapsing season header. Keep the weekday
+                    // selector outside the grid viewport: overlap injection
+                    // makes focus reveal align row zero behind a pinned header.
+                    ? Column(children: [
+                        SizedBox(height: weekHeight, child: weekSelector),
+                        Expanded(
+                            child: dayContent(viewport.maxHeight - weekHeight)),
+                      ])
+                    : NestedScrollView(
+                        // Keep the outer viewport clamped and unstretched so tabs stay fixed.
+                        physics: const ClampingScrollPhysics(),
+                        scrollBehavior:
+                            ScrollConfiguration.of(context).copyWith(
+                          overscroll: false,
+                          scrollbars: false,
                         ),
-                      ],
-                      body: loading && calendar.every((day) => day.isEmpty)
-                          ? _buildLoading(viewport.maxHeight, weekHeight)
-                          : failed
-                              ? _TimelineScrollView(
-                                  slivers: [
-                                    SliverPadding(
-                                      padding: const EdgeInsets.all(24),
-                                      sliver: SliverToBoxAdapter(
-                                        child: BangumiMirrorErrorWidget(
-                                          onRetry: () => _controller.loadSeason(
-                                              _controller.selectedDate),
-                                          onSettingsReturned: () {
-                                            if (mounted) setState(() {});
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : TabBarView(
-                                  children: [
-                                    for (var day = 0; day < 7; day++)
-                                      _buildDay(
-                                        context,
-                                        day: day,
-                                        items: calendar[day],
-                                        watchingIds: watchingIds,
-                                        columns: columns,
-                                        inset: inset,
-                                        compact: narrowPortrait,
-                                        loading: loading,
-                                      ),
-                                  ],
-                                ),
-                    )),
+                        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                          if (seasonHeader != null)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    EdgeInsets.fromLTRB(inset, 8, inset, 20),
+                                child: seasonHeader,
+                              ),
+                            ),
+                          SliverOverlapAbsorber(
+                            handle:
+                                NestedScrollView.sliverOverlapAbsorberHandleFor(
+                                    context),
+                            sliver: SliverPersistentHeader(
+                              pinned: true,
+                              delegate: _WeekHeaderDelegate(
+                                height: weekHeight,
+                                color: theme.scaffoldBackgroundColor,
+                                child: weekSelector,
+                              ),
+                            ),
+                          ),
+                        ],
+                        body: dayContent(viewport.maxHeight),
+                      )),
           ),
         );
       });
@@ -463,9 +476,10 @@ class _TimelineScrollView extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        SliverOverlapInjector(
-          handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
-        ),
+        if (!TvMode.enabled)
+          SliverOverlapInjector(
+            handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+          ),
         ...slivers,
       ],
     );

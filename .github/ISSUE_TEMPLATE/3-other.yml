@@ -5,8 +5,8 @@ body:
     attributes:
       value: |
         请填写以下内容，以方便我们了解你的目的。
-        填写前，请先查看 [Issues 列表](https://github.com/Predidit/Kazumi/issues) 查看是否已经有和你主题重复的 Issue。重复 Issue 会被关闭。
-        如果你的 Kazumi 版本不为最新版，请先更新。旧版本的 Issue 可能不会被处理，因为新版可能已经解决了你的一些目的。 
+        填写前，请先查看 [Issues 列表](https://github.com/znbsf/KazumiTV/issues) 查看是否已经有和你主题重复的 Issue。重复 Issue 会被关闭。
+        如果你的 KazumiTV 版本不为最新版，请先更新。旧版本的 Issue 可能不会被处理，因为新版可能已经解决了你的一些目的。
 
   - type: textarea
     id: content
@@ -16,12 +16,59 @@ body:
     validations:
       required: true
 
+
+  - type: input
+    id: tv-model
+    attributes:
+      label: 电视 / 盒子型号
+      description: 填写品牌和完整型号；模拟器请注明 AVD / CPU 架构，非 TV 设备请说明。
+    validations:
+      required: false
+
+  - type: input
+    id: tv-android-version
+    attributes:
+      label: Android / Android TV / Google TV 版本
+      description: 填写系统版本；不知道时可写未知。不要填写设备序列号。
+    validations:
+      required: false
+
+  - type: input
+    id: app-version
+    attributes:
+      label: KazumiTV 应用版本
+      description: 请填写关于页面显示的版本及安装包来源；无法确认请说明。
+    validations:
+      required: false
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤或使用场景
+      description: 涉及问题时写明遥控器按键、实际结果与预期结果；功能建议请描述操作流程。
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏日志 / 截图
+      description: 可选。仅附必要片段；删除 token、Cookie、账号信息、签名播放 URL、设备标识和私有地址。无法安全脱敏时请勿上传。
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        本表单用于独立衍生项目 KazumiTV，不会提交给上游 Kazumi。
+        日志和截图会公开：请删除 token、Cookie、账号信息、签名播放 URL、设备标识和私有地址。无需提供凭据；无法安全脱敏时请描述现象，不要上传原始日志。
+
   - type: checkboxes
     id: validations
     attributes:
       label: 提交前确认
       options:
-        - label: 我已经查看了 [Issues 列表](https://github.com/Predidit/Kazumi/issues) ，没有发现重复问题。
+        - label: 我已经查看了 [Issues 列表](https://github.com/znbsf/KazumiTV/issues) ，没有发现重复问题。
           required: true
-        - label: 我正在使用最新版本的 Kazumi 应用，我还是需要这个 Issue。
+        - label: 我正在使用最新版本的 KazumiTV 应用，我还是需要这个 Issue。
           required: true

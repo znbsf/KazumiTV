@@ -1,3 +1,4 @@
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -355,9 +356,12 @@ class _DanmakuSettingsPageState extends State<DanmakuSettingsPage> {
                 value: defaultDanmakuFontSize,
                 min: 10,
                 max: isCompact() ? 32 : 48,
+                // TV arrows advance exactly one point; touch remains continuous.
+                divisions: TvMode.enabled ? (isCompact() ? 22 : 38) : null,
                 valueLabel: '${defaultDanmakuFontSize.floor()}',
-                onChanged: (value) =>
-                    updateDanmakuFontSize(value.floorToDouble()),
+                onChanged: (value) => updateDanmakuFontSize(TvMode.enabled
+                    ? value.roundToDouble()
+                    : value.floorToDouble()),
               ),
               SettingsSliderTile(
                 leading: Icons.format_bold_rounded,
@@ -375,9 +379,11 @@ class _DanmakuSettingsPageState extends State<DanmakuSettingsPage> {
                 value: defaultDanmakuOpacity,
                 min: 0.1,
                 max: 1,
+                divisions: TvMode.enabled ? 18 : null,
                 valueLabel: '${(defaultDanmakuOpacity * 100).round()}%',
-                onChanged: (value) => updateDanmakuOpacity(
-                    double.parse(value.toStringAsFixed(2))),
+                onChanged: (value) => updateDanmakuOpacity(TvMode.enabled
+                    ? (value * 100).round() / 100
+                    : double.parse(value.toStringAsFixed(2))),
               ),
             ],
           ),

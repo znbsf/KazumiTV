@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
@@ -66,7 +67,7 @@ class _DanmakuChConvertTileState extends State<DanmakuChConvertTile> {
           onPressed: (_) => _menuController.isOpen
               ? _menuController.close()
               : _menuController.open(),
-          value: MenuAnchor(
+          value: TvSettingsMenuAnchor(
             controller: _menuController,
             consumeOutsideTap: true,
             menuChildren: [

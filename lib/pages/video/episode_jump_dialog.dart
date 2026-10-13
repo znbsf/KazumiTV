@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -42,7 +43,8 @@ class _EpisodeJumpDialogState extends State<_EpisodeJumpDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: const Text('定位剧集'),
-        content: TextField(
+        content: TvTextEditingShortcuts(
+            child: TextField(
           key: const ValueKey('episode-jump-number'),
           controller: _input,
           autofocus: true,
@@ -53,7 +55,7 @@ class _EpisodeJumpDialogState extends State<_EpisodeJumpDialog> {
             errorText: _error,
           ),
           onSubmitted: (_) => _confirm(),
-        ),
+        )),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context), child: const Text('取消')),

@@ -1,4 +1,6 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:flutter/material.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -206,24 +208,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                           child: Column(
                             children: [
                               for (final option in BangumiSyncPriority.values)
-                                RadioListTile<BangumiSyncPriority>(
-                                  value: option,
-                                  enabled: !_busy,
-                                  title: Text(switch (option) {
-                                    BangumiSyncPriority.localFirst => '以本机为准',
-                                    BangumiSyncPriority.bangumiFirst =>
-                                      '以 Bangumi 为准',
-                                    BangumiSyncPriority.timeFirst => '保留最近更新',
-                                  }),
-                                  subtitle: Text(switch (option) {
-                                    BangumiSyncPriority.localFirst =>
-                                      '用本机状态更新 Bangumi',
-                                    BangumiSyncPriority.bangumiFirst =>
-                                      '用 Bangumi 状态更新本机',
-                                    BangumiSyncPriority.timeFirst =>
-                                      '比较两边的更新时间',
-                                  }),
-                                ),
+                                _priorityTile(option),
                             ],
                           ),
                         ),
@@ -297,6 +282,33 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
         ],
       );
 
+  Widget _priorityTile(BangumiSyncPriority option) {
+    final title = Text(switch (option) {
+      BangumiSyncPriority.localFirst => '以本机为准',
+      BangumiSyncPriority.bangumiFirst => '以 Bangumi 为准',
+      BangumiSyncPriority.timeFirst => '保留最近更新',
+    });
+    final description = Text(switch (option) {
+      BangumiSyncPriority.localFirst => '用本机状态更新 Bangumi',
+      BangumiSyncPriority.bangumiFirst => '用 Bangumi 状态更新本机',
+      BangumiSyncPriority.timeFirst => '比较两边的更新时间',
+    });
+    if (TvMode.enabled) {
+      return SettingsTile<BangumiSyncPriority>.radioTile(
+        title: title,
+        description: description,
+        radioValue: option,
+        enabled: !_busy,
+      );
+    }
+    return RadioListTile<BangumiSyncPriority>(
+      value: option,
+      enabled: !_busy,
+      title: title,
+      subtitle: description,
+    );
+  }
+
   Widget _accountCard(bool configured) => TonalCard(
         child: ExpansionTile(
           initiallyExpanded: !configured,
@@ -314,7 +326,8 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                   : '使用 Access Token 授权'),
           children: [
             const SizedBox(height: 12),
-            TextField(
+            TvTextEntry(
+                child: TextField(
               controller: _tokenController,
               enabled: !_busy,
               obscureText: !_passwordVisible,
@@ -342,7 +355,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
                       : Icons.visibility_rounded),
                 ),
               ),
-            ),
+            )),
             const SizedBox(height: 16),
             Wrap(
               alignment: WrapAlignment.end,

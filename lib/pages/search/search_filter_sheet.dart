@@ -85,14 +85,29 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
     final initialEnd = _draft.dateRange?.end != null
         ? DateTime.tryParse(_draft.dateRange!.end)
         : null;
-    final result = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(1970),
-      lastDate: DateTime(now.year + 3, 12, 31),
-      initialDateRange: initialStart != null && initialEnd != null
-          ? DateTimeRange(start: initialStart, end: initialEnd)
-          : null,
-    );
+    final returnFocus = FocusManager.instance.primaryFocus;
+    final result = TvMode.enabled
+        ? await showDialog<DateTimeRange>(
+            context: context,
+            builder: (_) => _TvSearchDateRangeDialog(
+                initial: _draft.dateRange,
+                firstDate: DateTime(1970),
+                lastDate: DateTime(now.year + 3, 12, 31)))
+        : await showDateRangePicker(
+            context: context,
+            firstDate: DateTime(1970),
+            lastDate: DateTime(now.year + 3, 12, 31),
+            initialDateRange: initialStart != null && initialEnd != null
+                ? DateTimeRange(start: initialStart, end: initialEnd)
+                : null,
+          );
+    if (TvMode.enabled &&
+        mounted &&
+        returnFocus?.context != null &&
+        returnFocus!.canRequestFocus &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      returnFocus.requestFocus();
+    }
     if (!mounted || result == null) return;
     setState(() {
       _draft = _draft.copyWith(
@@ -112,7 +127,8 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
       0,
       10,
     );
-    return RangeSlider(
+    return TvRangeSlider(
+        child: RangeSlider(
       values: values,
       min: 0,
       max: 10,
@@ -131,7 +147,7 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
           );
         });
       },
-    );
+    ));
   }
 
   Widget _buildRankRangeSlider(SearchIntRange range) {
@@ -141,7 +157,8 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
       1,
       10000,
     );
-    return RangeSlider(
+    return TvRangeSlider(
+        child: RangeSlider(
       values: values,
       min: 1,
       max: 10000,
@@ -160,7 +177,7 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
           );
         });
       },
-    );
+    ));
   }
 
   InputDecoration _fieldDecoration(String label) => InputDecoration(
@@ -251,7 +268,8 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
                           ),
                       ])),
                   const SizedBox(height: 12),
-                  TextField(
+                  TvTextEntry(
+                      child: TextField(
                     // Separate scroll offsets from the expansion's boolean state.
                     key: const PageStorageKey('custom-tag-input'),
                     controller: _tagController,
@@ -262,7 +280,7 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
                             onPressed: () => _addTag(_tagController.text),
                             icon: const Icon(Icons.add_rounded))),
                     onSubmitted: _addTag,
-                  ),
+                  )),
                 ],
               ),
               Divider(height: 1, color: colors.outlineVariant),
@@ -429,6 +447,15 @@ class _SearchFilterGroup extends StatelessWidget {
         title: Text(title),
         subtitle: Text(summary),
         initiallyExpanded: initiallyExpanded,
+        onExpansionChanged: (_) {
+          if (!TvMode.enabled) return;
+          final scope = FocusManager.instance.primaryFocus?.enclosingScope;
+          if (scope != null) {
+            // Expansion changes the controls between this header and the old
+            // arrow target. Discard that history before the next direction key.
+            FocusTraversalGroup.of(context).invalidateScopeData(scope);
+          }
+        },
         tilePadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 20),
         shape: const Border(),
@@ -449,4 +476,132 @@ RangeValues _safeRangeValues(
     return RangeValues(safeStart, safeEnd);
   }
   return RangeValues(safeEnd, safeStart);
+}
+
+/// The native calendar input mode keeps arrow keys inside EditableText.
+/// TV uses explicit editors so navigation can reach both dates and actions.
+class _TvSearchDateRangeDialog extends StatefulWidget {
+  const _TvSearchDateRangeDialog(
+      {required this.initial, required this.firstDate, required this.lastDate});
+  final SearchDateRange? initial;
+  final DateTime firstDate, lastDate;
+  @override
+  State<_TvSearchDateRangeDialog> createState() =>
+      _TvSearchDateRangeDialogState();
+}
+
+class _TvSearchDateRangeDialogState extends State<_TvSearchDateRangeDialog> {
+  late final _start = TextEditingController(text: widget.initial?.start ?? '');
+  late final _end = TextEditingController(text: widget.initial?.end ?? '');
+  final _startFocus = FocusNode(debugLabel: 'TV date range start');
+  final _endFocus = FocusNode(debugLabel: 'TV date range end');
+  String? _startError, _endError;
+
+  DateTime? _parse(String value) {
+    if (value.length != 10 ||
+        !RegExp(r'^[0-9]{4}-[0-9]{2}-[0-9]{2}$').hasMatch(value)) {
+      return null;
+    }
+    final year = int.parse(value.substring(0, 4));
+    final month = int.parse(value.substring(5, 7));
+    final day = int.parse(value.substring(8, 10));
+    final date = DateTime(year, month, day);
+    if (date.year != year ||
+        date.month != month ||
+        date.day != day ||
+        date.isBefore(widget.firstDate) ||
+        date.isAfter(widget.lastDate)) {
+      return null;
+    }
+    return date;
+  }
+
+  void _confirm() {
+    final start = _parse(_start.text), end = _parse(_end.text);
+    const invalid = '请输入范围内的有效日期（YYYY-MM-DD）';
+    setState(() {
+      _startError = start == null ? invalid : null;
+      _endError = end == null ? invalid : null;
+      if (start != null && end != null && end.isBefore(start)) {
+        _endError = '结束日期不能早于开始日期';
+      }
+    });
+    if (_startError != null || _endError != null) {
+      (_startError != null ? _startFocus : _endFocus).requestFocus();
+      return;
+    }
+    Navigator.of(context).pop(DateTimeRange(start: start!, end: end!));
+  }
+
+  @override
+  void dispose() {
+    _start.dispose();
+    _end.dispose();
+    _startFocus.dispose();
+    _endFocus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        key: const ValueKey('tv-date-range-dialog'),
+        title: const Text('自定义日期范围'),
+        scrollable: true,
+        content: SizedBox(
+            width: 520,
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                      '${formatDateTime(widget.firstDate)} 至 ${formatDateTime(widget.lastDate)}；确定编辑，返回取消编辑。'),
+                  const SizedBox(height: 16),
+                  TvTextEntry(
+                      key: const ValueKey('tv-date-start'),
+                      child: TextField(
+                        controller: _start,
+                        focusNode: _startFocus,
+                        autofocus: true,
+                        keyboardType: TextInputType.datetime,
+                        textInputAction: TextInputAction.done,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        decoration: InputDecoration(
+                            labelText: '开始日期',
+                            hintText: 'YYYY-MM-DD',
+                            errorText: _startError,
+                            errorMaxLines: 2,
+                            border: const OutlineInputBorder()),
+                        onChanged: (_) => setState(() => _startError = null),
+                      )),
+                  const SizedBox(height: 16),
+                  TvTextEntry(
+                      key: const ValueKey('tv-date-end'),
+                      child: TextField(
+                        controller: _end,
+                        focusNode: _endFocus,
+                        keyboardType: TextInputType.datetime,
+                        textInputAction: TextInputAction.done,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        decoration: InputDecoration(
+                            labelText: '结束日期',
+                            hintText: 'YYYY-MM-DD',
+                            errorText: _endError,
+                            errorMaxLines: 2,
+                            border: const OutlineInputBorder()),
+                        onChanged: (_) => setState(() => _endError = null),
+                      )),
+                ])),
+        actions: [
+          TextButton(
+              key: const ValueKey('tv-date-cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消')),
+          FilledButton(
+              key: const ValueKey('tv-date-confirm'),
+              onPressed: _confirm,
+              child: const Text('确认')),
+        ],
+      );
 }

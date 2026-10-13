@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'project_update_policy.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/request/clients/download_http_client.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
@@ -116,26 +118,17 @@ class AutoUpdater {
 
   final DownloadHttpClient _downloadClient = DownloadHttpClient.instance;
 
-  List<InstallationType> _detectAvailableInstallationTypes() {
-    if (Platform.isWindows) {
-      return [InstallationType.windowsMsix, InstallationType.windowsPortable];
-    }
-    if (Platform.isLinux) {
-      return [InstallationType.linuxDeb, InstallationType.linuxTar];
-    }
-    if (Platform.isMacOS) return [InstallationType.macosDmg];
-    if (Platform.isIOS) return [InstallationType.ios];
-    if (Platform.isAndroid) return [InstallationType.androidApk];
-    return [InstallationType.unknown];
-  }
+  bool get _canCheckProjectRelease => ProjectUpdatePolicy.canCheck(
+      releaseMode: kReleaseMode,
+      tv: TvMode.enabled,
+      version: ApiEndpoints.version);
 
   Future<UpdateInfo?> checkForUpdates() async {
-    // Never offer mobile APKs to the TV flavor.
-    if (TvMode.enabled) return null;
+    if (!_canCheckProjectRelease) return null;
     try {
       final data = await _latestRelease();
 
-      if (!data.containsKey('tag_name')) {
+      if (!ProjectUpdatePolicy.acceptsRelease(data)) {
         throw Exception('无效的响应数据');
       }
 
@@ -143,7 +136,7 @@ class AutoUpdater {
       final currentVersion = ApiEndpoints.version;
 
       if (needUpdate(currentVersion, remoteVersion)) {
-        final availableTypes = _detectAvailableInstallationTypes();
+        final availableTypes = <InstallationType>[];
 
         return UpdateInfo(
           version: remoteVersion,
@@ -151,9 +144,9 @@ class AutoUpdater {
           downloadUrl: '',
           releaseNotes: data['html_url'] ?? '',
           publishedAt: data['published_at'] ?? '',
-          installationType: availableTypes.first,
+          installationType: InstallationType.unknown,
           availableInstallationTypes: availableTypes,
-          assets: data['assets'] ?? [],
+          assets: const [], // Never feed unchecked release assets to the installer.
         );
       }
 
@@ -165,7 +158,11 @@ class AutoUpdater {
   }
 
   Future<Map<String, dynamic>> _latestRelease() async {
-    final raw = await _downloadClient.getPlain(ApiEndpoints.latestAppMirror);
+    final raw =
+        await _downloadClient.getPlain(ApiEndpoints.latestApp, headers: {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'KazumiTV/${ApiEndpoints.version}',
+    });
     final data = json.decode(raw);
     if (data is! Map) {
       throw Exception('Invalid update response');
@@ -174,7 +171,7 @@ class AutoUpdater {
   }
 
   Future<void> autoCheckForUpdates() async {
-    if (TvMode.enabled) return;
+    if (!_canCheckProjectRelease) return;
     final autoUpdate = GStorage.getSetting(SettingsKeys.autoUpdate);
     if (!autoUpdate) return;
 
@@ -189,8 +186,9 @@ class AutoUpdater {
   }
 
   Future<void> manualCheckForUpdates() async {
-    if (TvMode.enabled) {
-      KazumiDialog.showToast(message: 'TV 版本暂不支持应用内更新');
+    if (!_canCheckProjectRelease) {
+      KazumiDialog.showToast(
+          message: '此构建不参与正式版更新；QA 请使用受控同签名升级。版本信息见 KazumiTV 发布页');
       return;
     }
     try {
@@ -224,7 +222,9 @@ class AutoUpdater {
                   ),
                 ],
                 const SizedBox(height: 8),
-                if (!Platform.isLinux && !Platform.isIOS) ...[
+                if (updateInfo.availableInstallationTypes.isNotEmpty &&
+                    !Platform.isLinux &&
+                    !Platform.isIOS) ...[
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
@@ -331,16 +331,17 @@ class AutoUpdater {
                 },
                 child: const Text('查看详情'),
               ),
-            TextButton(
-              onPressed: () {
-                KazumiDialog.dismiss();
-                if (updateInfo.availableInstallationTypes.isNotEmpty) {
-                  _downloadUpdateWithType(
-                      updateInfo, updateInfo.availableInstallationTypes.first);
-                }
-              },
-              child: const Text('立即更新'),
-            ),
+            if (updateInfo.availableInstallationTypes.isNotEmpty)
+              TextButton(
+                onPressed: () {
+                  KazumiDialog.dismiss();
+                  if (updateInfo.availableInstallationTypes.isNotEmpty) {
+                    _downloadUpdateWithType(updateInfo,
+                        updateInfo.availableInstallationTypes.first);
+                  }
+                },
+                child: const Text('立即更新'),
+              ),
           ],
         );
       },
@@ -370,6 +371,10 @@ class AutoUpdater {
 
   Future<void> _downloadUpdateWithType(
       UpdateInfo updateInfo, InstallationType selectedType) async {
+    if (updateInfo.assets.isEmpty) {
+      KazumiDialog.showToast(message: '请从 KazumiTV 发布页核对版本与设备后手动安装');
+      return;
+    }
     try {
       if (selectedType == InstallationType.ios ||
           selectedType == InstallationType.linuxDeb ||

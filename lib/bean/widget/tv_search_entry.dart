@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 
@@ -89,14 +90,15 @@ class _SearchEditorState extends State<_SearchEditor> {
         content: SizedBox(
           width: 560,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
+            TvTextEditingShortcuts(
+                child: TextField(
               key: const Key('tv-search-editor'),
               controller: editor,
               autofocus: true,
               textInputAction: TextInputAction.search,
               onSubmitted: (value) => Navigator.of(context).pop(value),
               decoration: const InputDecoration(hintText: '输入名称或搜索条件'),
-            ),
+            )),
             if (widget.suggestionsBuilder != null)
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 140),

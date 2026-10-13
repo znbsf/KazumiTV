@@ -181,6 +181,12 @@ class FocusFixtureApp extends StatelessWidget {
                     PopularPage(controller: popular));
             sub.route('/history/',
                 child: (_, __) => HistoryPage(controller: history));
+            sub.route('/collect/',
+                child: (_, __) =>
+                    const _FixtureDestination(label: 'collection content'));
+            sub.route('/my/',
+                child: (_, __) =>
+                    const _FixtureDestination(label: 'settings content'));
             sub.route('/timeline/',
                 child: (_, __) => const FocusEpisodeFixture());
           });

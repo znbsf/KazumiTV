@@ -400,7 +400,10 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
               Align(
                 alignment: Alignment.bottomCenter,
                 child: ColoredBox(
-                  color: TvVisuals.background.withValues(alpha: .88),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surface
+                      .withValues(alpha: .88),
                   child: TextButton.icon(
                     onPressed: () => setState(() => _resolve(retry: true)),
                     icon: const Icon(Icons.refresh_rounded, size: 16),

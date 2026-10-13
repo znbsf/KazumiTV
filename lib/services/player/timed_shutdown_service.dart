@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:kazumi/bean/settings/settings_list.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -190,69 +192,99 @@ class _CustomTimerDialogState extends State<_CustomTimerDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('自定义定时'),
-      content: SizedBox(
-        height: 200,
-        child: Row(
-          children: [
-            Expanded(
+      scrollable: TvMode.enabled,
+      content: TvMode.enabled
+          ? SizedBox(
+              width: 420,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('时', style: TextStyle(fontSize: 14)),
-                  const SizedBox(height: 8),
+                  SettingsSliderTile(
+                    title: const Text('小时'),
+                    value: _selectedHours.toDouble(),
+                    valueLabel: '$_selectedHours 小时',
+                    min: 0,
+                    max: 24,
+                    divisions: 24,
+                    onChanged: (value) =>
+                        setState(() => _selectedHours = value.round()),
+                  ),
+                  SettingsSliderTile(
+                    title: const Text('分钟'),
+                    value: _selectedMinutes.toDouble(),
+                    valueLabel: '$_selectedMinutes 分钟',
+                    min: 0,
+                    max: 59,
+                    divisions: 59,
+                    onChanged: (value) =>
+                        setState(() => _selectedMinutes = value.round()),
+                  ),
+                ],
+              ),
+            )
+          : SizedBox(
+              height: 200,
+              child: Row(
+                children: [
                   Expanded(
-                    child: CupertinoPicker(
-                      scrollController: _hoursController,
-                      itemExtent: 40,
-                      onSelectedItemChanged: (index) {
-                        setState(() => _selectedHours = index);
-                      },
-                      children: List.generate(
-                        25,
-                        (index) => Center(
-                          child: Text(
-                            index.toString().padLeft(2, '0'),
-                            style: const TextStyle(fontSize: 20),
+                    child: Column(
+                      children: [
+                        const Text('时', style: TextStyle(fontSize: 14)),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: _hoursController,
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() => _selectedHours = index);
+                            },
+                            children: List.generate(
+                              25,
+                              (index) => Center(
+                                child: Text(
+                                  index.toString().padLeft(2, '0'),
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
+                  const Text(
+                    ':',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        const Text('分', style: TextStyle(fontSize: 14)),
+                        const SizedBox(height: 8),
+                        Expanded(
+                          child: CupertinoPicker(
+                            scrollController: _minutesController,
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() => _selectedMinutes = index);
+                            },
+                            children: List.generate(
+                              60,
+                              (index) => Center(
+                                child: Text(
+                                  index.toString().padLeft(2, '0'),
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-            const Text(
-              ':',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  const Text('分', style: TextStyle(fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: CupertinoPicker(
-                      scrollController: _minutesController,
-                      itemExtent: 40,
-                      onSelectedItemChanged: (index) {
-                        setState(() => _selectedMinutes = index);
-                      },
-                      children: List.generate(
-                        60,
-                        (index) => Center(
-                          child: Text(
-                            index.toString().padLeft(2, '0'),
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
       actions: [
         TextButton(
           onPressed: () => KazumiDialog.dismiss(context: context),

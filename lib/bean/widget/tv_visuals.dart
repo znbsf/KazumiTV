@@ -31,49 +31,37 @@ abstract final class TvVisuals {
   );
 
   static ThemeData theme(ThemeData inherited, {bool oled = false}) {
-    final scheme = ColorScheme.fromSeed(
-      seedColor: accent,
-      brightness: Brightness.dark,
-    ).copyWith(
-      primary: accent,
-      onPrimary: const Color(0xFF173513),
-      surface: oled ? Colors.black : surface,
-      surfaceContainer: surface,
-      surfaceContainerHigh: surface,
-      primaryContainer: selected,
-      onPrimaryContainer: text,
-      secondaryContainer: selected,
-      onSurface: text,
-      onSurfaceVariant: muted,
-    );
-    final base = inherited.textTheme.apply(bodyColor: text, displayColor: text);
+    final useOled = oled && inherited.brightness == Brightness.dark;
+    final scheme = useOled
+        ? inherited.colorScheme.copyWith(surface: Colors.black)
+        : inherited.colorScheme;
+    final base = inherited.textTheme;
     return inherited.copyWith(
-      brightness: Brightness.dark,
       colorScheme: scheme,
       scaffoldBackgroundColor: fixedSurfaces
-          ? (oled ? Colors.black : background)
+          ? (useOled ? Colors.black : inherited.scaffoldBackgroundColor)
           : Colors.transparent,
-      canvasColor: surface,
-      focusColor: accent.withValues(alpha: .24),
-      hoverColor: accent.withValues(alpha: .12),
+      canvasColor: scheme.surface,
+      focusColor: scheme.primary.withValues(alpha: .24),
+      hoverColor: scheme.primary.withValues(alpha: .12),
       textTheme: base.copyWith(
-        headlineLarge: heading,
-        headlineMedium: heading,
-        headlineSmall: heading,
-        titleLarge: title,
-        titleMedium: title,
-        titleSmall: control,
-        bodyLarge: body,
-        bodyMedium: body,
-        bodySmall: caption,
-        labelLarge: control,
-        labelMedium: control,
-        labelSmall: caption,
+        headlineLarge: base.headlineLarge?.merge(heading),
+        headlineMedium: base.headlineMedium?.merge(heading),
+        headlineSmall: base.headlineSmall?.merge(heading),
+        titleLarge: base.titleLarge?.merge(title),
+        titleMedium: base.titleMedium?.merge(title),
+        titleSmall: base.titleSmall?.merge(control),
+        bodyLarge: base.bodyLarge?.merge(body),
+        bodyMedium: base.bodyMedium?.merge(body),
+        bodySmall: base.bodySmall?.merge(caption),
+        labelLarge: base.labelLarge?.merge(control),
+        labelMedium: base.labelMedium?.merge(control),
+        labelSmall: base.labelSmall?.merge(caption),
       ),
-      iconTheme: const IconThemeData(color: text, size: 20),
-      appBarTheme: const AppBarTheme(
+      iconTheme: IconThemeData(color: scheme.onSurface, size: 20),
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
-        foregroundColor: text,
+        foregroundColor: scheme.onSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
       ),

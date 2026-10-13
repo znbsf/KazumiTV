@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 
@@ -25,16 +26,19 @@ class EditorTextField extends StatelessWidget {
       const SizedBox(height: 8),
       Semantics(
         label: label,
-        child: TextField(
-          controller: controller,
-          maxLines: maxLines,
-          autocorrect: false,
-          enableSuggestions: false,
-          style: maxLines > 1
-              ? theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace')
-              : null,
-          decoration: ruleInputDecoration(context, hint: hint),
-        ),
+        child: TvTextEntry(
+            title: label,
+            child: TextField(
+              controller: controller,
+              maxLines: maxLines,
+              autocorrect: false,
+              enableSuggestions: false,
+              style: maxLines > 1
+                  ? theme.textTheme.bodyMedium
+                      ?.copyWith(fontFamily: 'monospace')
+                  : null,
+              decoration: ruleInputDecoration(context, hint: hint),
+            )),
       ),
       if (helper != null) ...[
         const SizedBox(height: 6),

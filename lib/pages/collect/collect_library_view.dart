@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -282,7 +283,10 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
         },
       },
       child: Focus(
-        autofocus: true,
+        // This node observes keys; TV navigation belongs to its controls.
+        autofocus: !TvMode.enabled,
+        canRequestFocus: !TvMode.enabled,
+        skipTraversal: TvMode.enabled,
         onKeyEvent: (_, event) {
           if (event is KeyDownEvent || event is KeyRepeatEvent) _returnEpoch++;
           return KeyEventResult.ignored;
@@ -367,29 +371,50 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
     );
   }
 
-  Widget _searchBar() => SearchBar(
-        controller: _searchController,
-        focusNode: _searchFocus,
-        hintText: '搜索收藏番剧的名称、别名',
-        leading: const Padding(
-          padding: EdgeInsets.only(left: 8),
-          child: Icon(Icons.search_rounded),
-        ),
-        trailing: [
-          if (_query.isNotEmpty)
-            IconButton(
-              tooltip: '清除搜索',
-              onPressed: _clearSearch,
-              icon: const Icon(Icons.close_rounded),
-            ),
-        ],
-        elevation: const WidgetStatePropertyAll(0),
-        backgroundColor: WidgetStatePropertyAll(
-            Theme.of(context).colorScheme.surfaceContainerHigh),
-        constraints: const BoxConstraints(minHeight: 56),
-        onChanged: _search,
-        onSubmitted: (_) => _searchFocus.unfocus(),
-      );
+  Widget _searchBar() => TvMode.enabled
+      ? TvTextEntry(
+          child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocus,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: '搜索收藏番剧的名称、别名',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: '清空搜索',
+                    onPressed: _clearSearch,
+                    icon: const Icon(Icons.close_rounded)),
+            filled: true,
+            fillColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(28)),
+          ),
+          onChanged: _search,
+        ))
+      : SearchBar(
+          controller: _searchController,
+          focusNode: _searchFocus,
+          hintText: '搜索收藏番剧的名称、别名',
+          leading: const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Icon(Icons.search_rounded),
+          ),
+          trailing: [
+            if (_query.isNotEmpty)
+              IconButton(
+                tooltip: '清除搜索',
+                onPressed: _clearSearch,
+                icon: const Icon(Icons.close_rounded),
+              ),
+          ],
+          elevation: const WidgetStatePropertyAll(0),
+          backgroundColor: WidgetStatePropertyAll(
+              Theme.of(context).colorScheme.surfaceContainerHigh),
+          constraints: const BoxConstraints(minHeight: 56),
+          onChanged: _search,
+          onSubmitted: (_) => _searchFocus.unfocus(),
+        );
 
   Widget _categoryStrip(CollectLibraryQuery query) {
     WidgetsBinding.instance.addPostFrameCallback((_) {

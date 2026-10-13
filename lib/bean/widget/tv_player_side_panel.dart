@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:kazumi/bean/widget/tv_visuals.dart';
 
 /// A single translucent background. Children must not repaint canvasColor.
 class TvPlayerSidePanel extends StatelessWidget {
@@ -13,7 +12,7 @@ class TvPlayerSidePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-        color: TvVisuals.surface.withValues(alpha: opacity),
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: opacity),
         child: child,
       );
 }

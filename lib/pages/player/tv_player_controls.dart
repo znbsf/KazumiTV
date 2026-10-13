@@ -49,10 +49,10 @@ class _TvPlayerActionState extends State<TvPlayerAction> {
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
     final color = !enabled
-        ? TvVisuals.muted.withValues(alpha: .5)
+        ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .5)
         : _focused || widget.selected
-            ? TvVisuals.accent
-            : TvVisuals.text;
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.onSurface;
     final iconOnly = widget.iconBuilder != null;
     final action = Semantics(
       label: iconOnly ? widget.label : null,
@@ -82,13 +82,11 @@ class _TvPlayerActionState extends State<TvPlayerAction> {
           return KeyEventResult.ignored;
         },
         child: Material(
-          color: _focused
-              ? Colors.white.withValues(alpha: .12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          color: Theme.of(context).colorScheme.surface.withValues(alpha: .94),
+          borderRadius: BorderRadius.circular(16),
           child: InkWell(
             onTap: widget.onPressed,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(16),
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 minHeight: 38,
@@ -201,10 +199,10 @@ class _TvPlayerProgressState extends State<TvPlayerProgress> {
                 progress: widget.position,
                 total: widget.duration,
                 buffered: widget.buffered,
-                progressBarColor: TvVisuals.accent,
+                progressBarColor: Theme.of(context).colorScheme.primary,
                 baseBarColor: Colors.white.withValues(alpha: .18),
                 bufferedBarColor: Colors.white.withValues(alpha: .4),
-                thumbColor: TvVisuals.accent,
+                thumbColor: Theme.of(context).colorScheme.primary,
                 barHeight: _focused ? 5 : 3,
                 thumbRadius: _focused ? 7 : 4,
                 thumbGlowRadius: 14,
@@ -261,7 +259,8 @@ class TvPlayerSettingsPanel extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TvVisuals.title.copyWith(color: TvVisuals.text),
+                      style: TvVisuals.title.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface),
                     ),
                     const SizedBox(height: 12),
                     TvPlayerAction(

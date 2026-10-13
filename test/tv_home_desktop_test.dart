@@ -157,6 +157,25 @@ void main() {
     TvMode.setEnabledForTesting(false);
   });
 
+  for (final destination in [1, 2, 3, 4]) {
+    testWidgets('shell Back restores originating function $destination',
+        (tester) async {
+      await _mount(tester);
+      final origin = _node(tester, 'TV function $destination');
+      origin.requestFocus();
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.enter);
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+      expect(origin.hasPrimaryFocus, isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(PopularPage), findsOneWidget);
+      expect(origin.hasPrimaryFocus, isTrue);
+      expect(origin.context?.mounted, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
       'home starts on Hot with one navigation row and five larger posters', (
     tester,

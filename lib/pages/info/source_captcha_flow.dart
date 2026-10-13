@@ -317,24 +317,26 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
                 label: const Text('换一张'),
               ),
             ),
-            TextField(
-              controller: _inputController,
-              focusNode: _inputFocus,
-              enabled: !_submitting,
-              autocorrect: false,
-              enableSuggestions: false,
-              textInputAction: TextInputAction.done,
-              onChanged: (_) {
-                if (_inputError != null) setState(() => _inputError = null);
-              },
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                labelText: '验证码',
-                floatingLabelBehavior: FloatingLabelBehavior.always,
-                errorText: _inputError,
-                errorMaxLines: 2,
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            TvTextEditingShortcuts(
+              child: TextField(
+                controller: _inputController,
+                focusNode: _inputFocus,
+                enabled: !_submitting,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onChanged: (_) {
+                  if (_inputError != null) setState(() => _inputError = null);
+                },
+                onSubmitted: (_) => _submit(),
+                decoration: InputDecoration(
+                  labelText: '验证码',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                  errorText: _inputError,
+                  errorMaxLines: 2,
+                  border:
+                      OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
           ],

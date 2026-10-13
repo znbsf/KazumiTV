@@ -74,7 +74,8 @@ class _TvAppShellState extends State<TvAppShell> {
     }
 
     final theme = Theme.of(context);
-    final oled = GStorage.getSetting(SettingsKeys.oledEnhance);
+    final oled = GStorage.getSetting(SettingsKeys.oledEnhance) &&
+        theme.brightness == Brightness.dark;
     return Theme(
       data: TvVisuals.theme(theme, oled: oled),
       child: FocusTraversalGroup(
@@ -83,7 +84,8 @@ class _TvAppShellState extends State<TvAppShell> {
           fit: StackFit.expand,
           children: [
             if (TvVisuals.fixedSurfaces)
-              ColoredBox(color: oled ? Colors.black : TvVisuals.background)
+              ColoredBox(
+                  color: oled ? Colors.black : theme.scaffoldBackgroundColor)
             else
               TvAmbientBackdrop(oled: oled),
             widget.child,

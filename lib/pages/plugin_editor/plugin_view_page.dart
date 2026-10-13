@@ -1,3 +1,5 @@
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -274,7 +276,8 @@ class _PluginViewPageState extends State<PluginViewPage> {
                           ],
                         ),
                         const SizedBox(height: 20),
-                        TextField(
+                        TvTextEntry(
+                            child: TextField(
                           controller: _search,
                           onChanged: (_) => setState(() {}),
                           decoration: ruleInputDecoration(context,
@@ -286,7 +289,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                                       tooltip: '清除搜索',
                                       onPressed: () => setState(_search.clear),
                                       icon: const Icon(Icons.close_rounded))),
-                        ),
+                        )),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
@@ -446,7 +449,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
         ),
       );
 
-  Widget _menu(Plugin plugin, int index) => MenuAnchor(
+  Widget _menu(Plugin plugin, int index) => TvSettingsMenuAnchor(
         consumeOutsideTap: true,
         style: MenuStyle(
           shape: WidgetStatePropertyAll(

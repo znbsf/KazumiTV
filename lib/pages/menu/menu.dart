@@ -265,7 +265,22 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
       return;
     }
     if (_selectedIndex != 0) {
+      final returnFocus =
+          TvMode.enabled ? _functionFocusNodes[_selectedIndex] : null;
       _selectDestination(0);
+      // The home header reparents these nodes after the outlet changes.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            !TvMode.enabled ||
+            _isCovered ||
+            _selectedIndex != 0 ||
+            ModalRoute.of(context)?.isCurrent != true ||
+            returnFocus?.context?.mounted != true ||
+            !returnFocus!.canRequestFocus) {
+          return;
+        }
+        returnFocus.requestFocus();
+      });
       return;
     }
 

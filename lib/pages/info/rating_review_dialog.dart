@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,7 @@ import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_review.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 class RatingReviewDialog extends StatefulWidget {
   const RatingReviewDialog({
@@ -298,7 +300,9 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
           const SingleActivator(LogicalKeyboardKey.enter, meta: true): _submit,
         },
         child: Focus(
-          autofocus: true,
+          autofocus: !TvMode.enabled,
+          canRequestFocus: !TvMode.enabled,
+          skipTraversal: TvMode.enabled,
           child: fullscreen
               ? Dialog.fullscreen(
                   backgroundColor: colors.surface, child: content)
@@ -336,7 +340,8 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
 
   Widget _buildComment() {
     final colors = Theme.of(context).colorScheme;
-    return TextField(
+    return TvTextEntry(
+        child: TextField(
       key: const ValueKey('review-comment'),
       controller: _commentController,
       onChanged: (_) => setState(() {}),
@@ -364,7 +369,7 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
           borderSide: BorderSide(color: colors.primary, width: 2),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildScore() {
@@ -559,7 +564,8 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
         child: _showCustomTag
             ? Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: TextField(
+                child: TvTextEntry(
+                    child: TextField(
                   key: const ValueKey('review-custom-tag'),
                   controller: _tagController,
                   focusNode: _tagFocus,
@@ -581,7 +587,7 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
                       icon: const Icon(Icons.add_rounded),
                     ),
                   ),
-                ),
+                )),
               )
             : const SizedBox.shrink(),
       ),

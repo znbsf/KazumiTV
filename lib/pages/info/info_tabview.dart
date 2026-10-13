@@ -626,7 +626,7 @@ class _TvSynopsisReaderState extends State<TvSynopsisReader> {
 
   @override
   Widget build(BuildContext context) => Dialog(
-        backgroundColor: TvVisuals.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         child: SizedBox(
           width: 950,
           height: MediaQuery.sizeOf(context).height * .8,
@@ -639,7 +639,8 @@ class _TvSynopsisReaderState extends State<TvSynopsisReader> {
                   widget.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TvVisuals.heading.copyWith(color: TvVisuals.text),
+                  style: TvVisuals.heading
+                      .copyWith(color: Theme.of(context).colorScheme.onSurface),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
@@ -655,7 +656,8 @@ class _TvSynopsisReaderState extends State<TvSynopsisReader> {
                       controller: _scroll,
                       child: Text(
                         widget.summary,
-                        style: TvVisuals.body.copyWith(color: TvVisuals.text),
+                        style: TvVisuals.body.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface),
                       ),
                     ),
                   ),

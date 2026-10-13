@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
+import 'package:kazumi/bean/widget/tv_dialog_text_entry.dart';
+
 import 'package:canvas_danmaku/models/danmaku_content_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -261,11 +264,13 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
             final message = await KazumiDialog.show<String>(
               builder: (dialogContext) => AlertDialog(
                 title: const Text('发送弹幕'),
-                content: TextField(
-                  autofocus: true,
-                  controller: textController,
-                  decoration: const InputDecoration(hintText: '发个友善的弹幕'),
-                  onSubmitted: (value) => Navigator.pop(dialogContext, value),
+                content: TvTextEditingShortcuts(
+                  child: TextField(
+                    autofocus: true,
+                    controller: textController,
+                    decoration: const InputDecoration(hintText: '发个友善的弹幕'),
+                    onSubmitted: (value) => Navigator.pop(dialogContext, value),
+                  ),
                 ),
                 actions: [
                   TextButton(
@@ -286,8 +291,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
             if (mounted) textFieldFocus.requestFocus();
           }
         },
-        icon: const Icon(Icons.edit_outlined, color: Colors.white),
-        label: const Text('发送弹幕', style: TextStyle(color: Colors.white)),
+        icon: const Icon(Icons.edit_outlined),
+        label: const Text('发送弹幕'),
       );
     }
     return Observer(
@@ -374,51 +379,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
     );
   }
 
-  void showForwardChange() {
-    KazumiDialog.show(
-      builder: (context) {
-        String input = "";
-        return AlertDialog(
-          title: const Text('跳过秒数'),
-          content: StatefulBuilder(
-            builder: (BuildContext context, StateSetter setState) {
-              return TextField(
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  floatingLabelBehavior: FloatingLabelBehavior.never,
-                  labelText:
-                      playerController.playback.buttonSkipTime.toString(),
-                ),
-                onChanged: (value) {
-                  input = value;
-                },
-              );
-            },
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => KazumiDialog.dismiss(),
-              child: Text(
-                '取消',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (input != "") {
-                  playerController.setButtonForwardTime(int.parse(input));
-                  KazumiDialog.dismiss();
-                } else {
-                  KazumiDialog.dismiss();
-                }
-              },
-              child: const Text('确定'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+  void showForwardChange() => showPlayerForwardTimeDialog(playerController);
 
   @override
   void initState() {
@@ -935,14 +896,14 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
               videoPageController.title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TvVisuals.title.copyWith(color: TvVisuals.text),
+              style: TvVisuals.title.copyWith(color: Colors.white),
             ),
             const SizedBox(height: 4),
             Text(
               episode,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TvVisuals.caption.copyWith(color: TvVisuals.muted),
+              style: TvVisuals.caption.copyWith(color: Colors.white70),
             ),
           ],
         ),
@@ -970,7 +931,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                           return Text(
                             '${durationToString(playerController.playback.currentPosition)} / ${durationToString(playerController.playback.duration)}',
                             style: TvVisuals.caption.copyWith(
-                              color: TvVisuals.text,
+                              color: Colors.white,
                               fontFeatures: const [
                                 FontFeature.tabularFigures()
                               ],
@@ -1069,8 +1030,12 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                                             ),
                                           )
                                         : playerController.danmaku.danmakuOn
-                                            ? danmakuOnIcon(context,
-                                                color: color)
+                                            ? ColorFiltered(
+                                                colorFilter: ColorFilter.mode(
+                                                    color, BlendMode.srcIn),
+                                                child: danmakuOnIcon(context,
+                                                    color: color),
+                                              )
                                             : ColorFiltered(
                                                 colorFilter: ColorFilter.mode(
                                                     color, BlendMode.srcIn),
@@ -1103,7 +1068,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                       Text(
                         '上下查看控制 · 进度条左右快进退',
                         style:
-                            TvVisuals.caption.copyWith(color: TvVisuals.muted),
+                            TvVisuals.caption.copyWith(color: Colors.white70),
                       ),
                     ],
                   ),
@@ -1185,7 +1150,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                 controls.add(
                   Text(
                     '只暂停播放，换集不会重置。',
-                    style: TvVisuals.caption.copyWith(color: TvVisuals.muted),
+                    style: TvVisuals.caption.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 );
                 controls.add(
@@ -1288,7 +1254,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                         child: Text(
                           '追番',
                           style: TvVisuals.control.copyWith(
-                            color: TvVisuals.text,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -1296,7 +1262,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                         acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
                         bangumiItem: videoPageController.bangumiItem,
                         focusNode: _topCollectFocus,
-                        color: TvVisuals.accent,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ],
                   ),
@@ -2079,4 +2045,65 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
       ),
     );
   }
+}
+
+void showPlayerForwardTimeDialog(PlayerController playerController) {
+  KazumiDialog.show(
+    builder: (context) {
+      String input = "";
+      return AlertDialog(
+        title: const Text('跳过秒数'),
+        content: StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            TextField field([TextEditingController? controller]) => TextField(
+                  controller: controller,
+                  autofocus: controller != null,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    floatingLabelBehavior: FloatingLabelBehavior.never,
+                    labelText:
+                        playerController.playback.buttonSkipTime.toString(),
+                  ),
+                  onChanged: (value) {
+                    input = value;
+                  },
+                );
+            return TvMode.enabled
+                ? TvDialogTextEntry(title: '跳过秒数', builder: field)
+                : field();
+          },
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => KazumiDialog.dismiss(),
+            child: Text(
+              '取消',
+              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (input != "") {
+                final value = int.tryParse(input);
+                if (value == null) {
+                  KazumiDialog.showToast(context: context, message: '请输入数字');
+                  return;
+                }
+                if (value <= 0) {
+                  KazumiDialog.showToast(
+                      context: context, message: '请输入大于0的数字');
+                  return;
+                }
+                playerController.setButtonForwardTime(value);
+                KazumiDialog.dismiss();
+              } else {
+                KazumiDialog.dismiss();
+              }
+            },
+            child: const Text('确定'),
+          ),
+        ],
+      );
+    },
+  );
 }

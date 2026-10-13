@@ -5,34 +5,40 @@ import 'package:flutter/material.dart';
 import 'package:kazumi/bean/widget/tv_artwork_preparation.dart';
 import 'package:kazumi/services/logging/logger.dart';
 
-const _vertical = LinearGradient(
-  begin: Alignment.topCenter,
-  end: Alignment.bottomCenter,
-  colors: [
-    Color(0xCC101611),
-    Color(0x85101611),
-    Color(0x45101611),
-    Color(0xB8101611)
-  ],
-  stops: [0, .24, .62, 1],
-);
-const _horizontal = LinearGradient(
-  colors: [Color(0x45101611), Colors.transparent, Color(0x45101611)],
-  stops: [0, .55, 1],
-);
+LinearGradient _vertical(Color color) => LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        color.withAlpha(0xCC),
+        color.withAlpha(0x85),
+        color.withAlpha(0x45),
+        color.withAlpha(0xB8)
+      ],
+      stops: [0, .24, .62, 1],
+    );
+LinearGradient _horizontal(Color color) => LinearGradient(
+      colors: [
+        color.withAlpha(0x45),
+        Colors.transparent,
+        color.withAlpha(0x45)
+      ],
+      stops: [0, .55, 1],
+    );
 
 typedef TvBackdropRasterizer = Future<ui.Image> Function(TvArtworkGeometry);
 
 /// The two original gradients composited over transparent pixels, at display
 /// resolution. Their source-over result is independent of the cover below.
-Future<ui.Image> rasterizeTvBackdropOverlay(TvArtworkGeometry geometry) async {
+Future<ui.Image> rasterizeTvBackdropOverlay(TvArtworkGeometry geometry,
+    {Color color = const Color(0xFF101611)}) async {
   if (!geometry.isUsable) throw ArgumentError('Invalid backdrop geometry');
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   final rect = Rect.fromLTWH(
       0, 0, geometry.pixelWidth.toDouble(), geometry.pixelHeight.toDouble());
-  canvas.drawRect(rect, Paint()..shader = _vertical.createShader(rect));
-  canvas.drawRect(rect, Paint()..shader = _horizontal.createShader(rect));
+  canvas.drawRect(rect, Paint()..shader = _vertical(color).createShader(rect));
+  canvas.drawRect(
+      rect, Paint()..shader = _horizontal(color).createShader(rect));
   final picture = recorder.endRecording();
   try {
     return await picture.toImage(geometry.pixelWidth, geometry.pixelHeight);
@@ -44,8 +50,13 @@ Future<ui.Image> rasterizeTvBackdropOverlay(TvArtworkGeometry geometry) async {
 /// One geometry-specific texture; one async preparation plus latest geometry.
 /// This separate cache is at most 16 MiB, in addition to the cover cache.
 class TvBackdropOverlay extends StatefulWidget {
-  const TvBackdropOverlay({super.key, required this.geometry, this.rasterizer});
+  const TvBackdropOverlay(
+      {super.key,
+      required this.geometry,
+      this.rasterizer,
+      this.color = const Color(0xFF101611)});
   final TvArtworkGeometry geometry;
+  final Color color;
   @visibleForTesting
   final TvBackdropRasterizer? rasterizer;
 
@@ -89,8 +100,10 @@ class _TvBackdropOverlayState extends State<TvBackdropOverlay> {
         ui.Image? prepared;
         if (geometry.isUsable && geometry.pixelBytes <= _maximumBytes) {
           try {
-            prepared = await (widget.rasterizer ??
-                rasterizeTvBackdropOverlay)(geometry);
+            prepared = widget.rasterizer != null
+                ? await widget.rasterizer!(geometry)
+                : await rasterizeTvBackdropOverlay(geometry,
+                    color: widget.color);
           } catch (error) {
             KazumiLogger().w(
                 'TV backdrop overlay preparation failed; retaining original gradients',
@@ -132,9 +145,11 @@ class _TvBackdropOverlayState extends State<TvBackdropOverlay> {
           image: _image!,
           scale: widget.geometry.devicePixelRatio);
     }
-    return const Stack(fit: StackFit.expand, children: [
-      DecoratedBox(decoration: BoxDecoration(gradient: _vertical)),
-      DecoratedBox(decoration: BoxDecoration(gradient: _horizontal)),
+    return Stack(fit: StackFit.expand, children: [
+      DecoratedBox(
+          decoration: BoxDecoration(gradient: _vertical(widget.color))),
+      DecoratedBox(
+          decoration: BoxDecoration(gradient: _horizontal(widget.color))),
     ]);
   }
 }
