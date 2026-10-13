@@ -61,9 +61,11 @@ class PlayerItemPanel extends StatefulWidget {
     required this.showVideoInfo,
     required this.showSyncPlayPanel,
     required this.pauseForTimedShutdown,
+    this.selectSource,
     this.disableAnimations = false,
   });
 
+  final Future<void> Function()? selectSource;
   final PlayerController playerController;
   final VideoPageController videoPageController;
   final void Function(BuildContext) onBackPressed;
@@ -1079,6 +1081,15 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
         },
       );
 
+  Future<void> _selectSourceFromTvSettings() async {
+    await widget.selectSource?.call();
+    if (mounted &&
+        _bottomSettingsFocus.context != null &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      _bottomSettingsFocus.requestFocus();
+    }
+  }
+
   Future<void> _showTvSettings() async {
     if (_tvSettingsHandle != null) return;
     final handle = KazumiDialogHandle<void>();
@@ -1207,6 +1218,12 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                       ),
                     ),
                   ),
+                  if (widget.selectSource != null)
+                    TvPlayerAction(
+                      label: '更换播放源',
+                      onPressed: () =>
+                          pick(() => unawaited(_selectSourceFromTvSettings())),
+                    ),
                   TvPlayerAction(
                     label: '弹幕来源',
                     onPressed: () => pick(widget.showDanmakuSwitch),
@@ -1833,6 +1850,11 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                     );
                   },
                   menuChildren: [
+                    if (widget.selectSource != null)
+                      MenuItemButton(
+                        onPressed: () => unawaited(widget.selectSource!()),
+                        child: const Text('更换播放源'),
+                      ),
                     MenuItemButton(
                       onPressed: () {
                         widget.showDanmakuSwitch();

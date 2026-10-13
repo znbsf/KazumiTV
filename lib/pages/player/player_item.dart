@@ -65,11 +65,13 @@ class PlayerItem extends StatefulWidget {
     required this.exitPlayer,
     required this.keyboardFocus,
     required this.pauseForTimedShutdown,
+    this.selectSource,
     this.disableAnimations = false,
   });
 
   final PlayerController playerController;
   final VideoPageController videoPageController;
+  final Future<void> Function()? selectSource;
   final VoidCallback toggleMenu;
   final VoidCallback showMenuImmediately;
   final VoidCallback showEpisodeGuide;
@@ -1115,6 +1117,23 @@ class _PlayerItemState extends State<PlayerItem>
     }
   }
 
+  Future<void> _selectSource() async {
+    final callback = widget.selectSource;
+    if (callback == null) return;
+    final hold = acquirePlayerPanelHold();
+    _handlePlayerMenuVisibilityChanged(true);
+    try {
+      await callback();
+    } finally {
+      if (mounted) {
+        _handlePlayerMenuVisibilityChanged(false);
+        hold.release();
+      } else {
+        hold.releaseSilently();
+      }
+    }
+  }
+
   PlayerPanelHold acquirePlayerPanelHold() {
     late final PlayerPanelHold hold;
     hold = PlayerPanelHold(
@@ -1853,6 +1872,10 @@ class _PlayerItemState extends State<PlayerItem>
                                   onBackPressed: widget.onBackPressed,
                                   setPlaybackSpeed: setPlaybackSpeed,
                                   showDanmakuSwitch: showDanmakuSwitch,
+                                  selectSource:
+                                      videoPageController.isOfflineMode
+                                          ? null
+                                          : _selectSource,
                                   toggleMenu: widget.toggleMenu,
                                   handleFullscreen: handleFullscreen,
                                   enterAndroidPictureInPicture:
@@ -1885,6 +1908,10 @@ class _PlayerItemState extends State<PlayerItem>
                                   onBackPressed: widget.onBackPressed,
                                   setPlaybackSpeed: setPlaybackSpeed,
                                   showDanmakuSwitch: showDanmakuSwitch,
+                                  selectSource:
+                                      videoPageController.isOfflineMode
+                                          ? null
+                                          : _selectSource,
                                   handleFullscreen: handleFullscreen,
                                   enterAndroidPictureInPicture:
                                       enterAndroidPictureInPicture,

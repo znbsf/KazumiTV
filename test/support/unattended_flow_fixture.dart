@@ -1,3 +1,5 @@
+import 'package:kazumi/services/player/source_switch.dart';
+import 'package:kazumi/services/video_source/video_source_service.dart';
 // Business/routing fixture only. The /video/ destination explicitly replaces
 // native MPV decoding; it never pretends that a widget test played real media.
 import 'dart:async';
@@ -36,6 +38,8 @@ class UnattendedFlowApp extends StatelessWidget {
     required Zone persistenceZone,
     this.initialRoute = '/search/',
     this.sourceSubject,
+    this.switchOrigin,
+    this.createVideoSourceService,
   }) {
     collection =
         _RealIoCollectController(CollectCrudRepository(), persistenceZone);
@@ -70,7 +74,11 @@ class UnattendedFlowApp extends StatelessWidget {
       container.route('/sources/', child: (_, __) {
         final controller = _sourceControllers.putIfAbsent(sourceSubject!.id,
             () => InfoController(collection)..bangumiItem = sourceSubject!);
-        return Scaffold(body: SourceSheet(infoController: controller));
+        return Scaffold(
+            body: SourceSheet(
+                infoController: controller,
+                switchOrigin: switchOrigin,
+                createVideoSourceService: createVideoSourceService));
       });
       container.route('/video/', child: (_, state) {
         final args = state.arguments as OnlineVideoPlaybackArgs;
@@ -86,6 +94,8 @@ class UnattendedFlowApp extends StatelessWidget {
 
   final String initialRoute;
   final BangumiItem? sourceSubject;
+  final SourceSwitchOrigin? switchOrigin;
+  final IVideoSourceService Function()? createVideoSourceService;
   late final Module module;
   late final CollectController collection;
   late final HistoryRepository historyRepository;

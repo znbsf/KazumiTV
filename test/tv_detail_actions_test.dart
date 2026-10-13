@@ -101,6 +101,51 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+      'reselect source is reachable and cancellation restores its focus',
+      (tester) async {
+    final play = FocusNode();
+    addTearDown(play.dispose);
+    var plays = 0;
+    var selections = 0;
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: Builder(
+                builder: (context) => TvDetailActions(
+                      playFocus: play,
+                      onPlay: () => plays++,
+                      onSelectSource: () async {
+                        selections++;
+                        await showModalBottomSheet<void>(
+                            context: context,
+                            builder: (_) => const TextButton(
+                                autofocus: true,
+                                onPressed: null,
+                                child: Text('选源面板')));
+                      },
+                      collectionBuilder: _collection,
+                      onReview: () {},
+                      onUp: () {},
+                      onDown: () {},
+                    )))));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    final sourceFocus = FocusManager.instance.primaryFocus;
+    expect(sourceFocus!.debugLabel, 'TV detail source');
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(selections, 1);
+    expect(plays, 0);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(FocusManager.instance.primaryFocus, same(sourceFocus));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pump();
+    expect(play.hasPrimaryFocus, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mobile info card retains its original collection-only layout',
       (tester) async {
     tester.view.physicalSize = const Size(400, 700);
@@ -142,6 +187,7 @@ void main() {
               tvActions: TvDetailActions(
                 playFocus: playFocus,
                 onPlay: () => plays++,
+                onSelectSource: () {},
                 collectionBuilder: _collection,
                 onReview: () {},
                 onUp: () {},
