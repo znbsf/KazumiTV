@@ -13,7 +13,7 @@
 
 ## 验证与边界
 
-正式版生产源码相对已验收候选只变更版本元数据。候选完成846项全量测试及代表性Android TV/模拟器遥控回归，包含独立弹幕7项、播放弹幕5项、时间偏移、输入法Back、缓存取消、长说明、主题/OLED、按键保存与实际消费。正式版重新测试、三ABI构建签名及ARMv7保数据升级smoke的最终结果以GitHub Release说明为准。
+正式版生产源码相对已验收候选只变更版本元数据。候选完成846项全量测试及代表性Android TV/模拟器遥控回归，包含独立弹幕7项、播放弹幕5项、时间偏移、输入法Back、缓存取消、长说明、主题/OLED、按键保存与实际消费。正式版846项全量测试、静态0错误0警告58 info、三ABI构建签名和ARMv7保数据升级smoke均已通过；[CI检查与三ABI构建](https://github.com/znbsf/KazumiTV/actions/runs/38404754840)全部成功。
 
 没有把所有控件调用点、所有业务分支或所有网站声明为实测通过。搜索双范围、自定义定时器有自动化覆盖；登录、同步、评论、建房等未做真实业务操作。ARM64/x86_64正式包只做构建与产物验证，无实机验收结论。
 
@@ -24,3 +24,5 @@
 正式包名com.znbsf.kazumi.fluttertv，复用长期发布证书，可覆盖升级，请勿卸载或清数据。CI的独立.candidate开发签名包不是正式发布附件。GPL及第三方许可/NOTICE继续保留，精确构建源码ZIP与SHA256SUMS随Release提供；原生依赖来源见[NATIVE_DEPENDENCY_SOURCES.md](NATIVE_DEPENDENCY_SOURCES.md)。
 
 正式证书SHA256：`3225e3b8676eed2d2f28fad6255881120f6335ade615bbb27673d974727ce806`。
+
+正式发布已完成：[v0.4.2](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.2)，Latest，非草稿/预发布；11项公开附件已实际匿名下载并逐个SHA256验证。标签固定源码590001e970e637622422908a9a2e1dcc0d54a999；后续文档提交不改变该批APK源码。
