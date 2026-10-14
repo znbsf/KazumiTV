@@ -16,6 +16,74 @@ const _staleVideo = 'https://example.test/video/stale.m3u8';
 Future<void> _flushAsync() => Future<void>.delayed(Duration.zero);
 
 void main() {
+  for (final stuckPhase in ['load', 'unload']) {
+    test('retires stuck $stuckPhase and lets the next request complete',
+        () async {
+      final gate = Completer<void>();
+      final old = _FakeWebviewController();
+      if (stuckPhase == 'load') {
+        old.onLoad = (_) => gate.future;
+      } else {
+        old.onLoad = (_) async {
+          old.emit(_firstVideo);
+        };
+        old.onUnload = () => gate.future;
+      }
+      final next = _FakeWebviewController();
+      next.onLoad = (_) async {
+        next.emit(_secondVideo);
+      };
+      var creations = 0;
+      final service = WebViewVideoSourceService(
+          controllerFactory: () => creations++ == 0 ? old : next,
+          cleanupTimeout: const Duration(milliseconds: 20));
+      addTearDown(service.dispose);
+      final first = service.resolve(_firstPage, useLegacyParser: false);
+      final firstOutcome =
+          first.then<Object>((s) => s, onError: (Object e) => e);
+      await old.firstLoadStarted.future;
+      await _flushAsync();
+      final second = service.resolve(_secondPage, useLegacyParser: true);
+      final source = await second.timeout(const Duration(seconds: 1));
+      expect(source.url, _secondVideo);
+      expect(creations, 2);
+      expect(old.disposals, 1);
+      expect(old.hasParserListener, isFalse);
+      expect(next.loads, hasLength(1));
+      gate.completeError(StateError('late retired native failure'));
+      await _flushAsync();
+      final outcome = await firstOutcome;
+      if (stuckPhase == 'load') {
+        expect(outcome, isA<VideoSourceCancelledException>());
+      }
+    });
+  }
+  test('load that never returns must not defeat the resolution timeout',
+      () async {
+    final gate = Completer<void>();
+    final controller = _FakeWebviewController()..onLoad = (_) => gate.future;
+    final service = WebViewVideoSourceService(
+        controllerFactory: () => controller,
+        cleanupTimeout: const Duration(milliseconds: 20));
+    Object? outcome;
+    final resolving = service
+        .resolve(_firstPage,
+            useLegacyParser: false, timeout: const Duration(milliseconds: 20))
+        .then<void>((_) {
+      outcome = 'success';
+    }, onError: (Object error) {
+      outcome = error;
+    });
+    await controller.firstLoadStarted.future;
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    final observedBeforeLoadReturned = outcome;
+    // Release the fixture even on the old implementation so this regression
+    // reports an assertion, rather than leaving a test process hung.
+    gate.complete();
+    await resolving;
+    await service.dispose();
+    expect(observedBeforeLoadReturned, isA<VideoSourceTimeoutException>());
+  });
   for (final useLegacyParser in [true, false]) {
     test('captures early URL before load completes (legacy=$useLegacyParser)',
         () async {

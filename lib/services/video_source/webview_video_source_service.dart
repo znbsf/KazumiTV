@@ -11,10 +11,13 @@ import 'package:kazumi/services/video_source/video_source_service.dart';
 class WebViewVideoSourceService implements IVideoSourceService {
   WebViewVideoSourceService({
     VideoWebviewController Function()? controllerFactory,
-  }) : _controllerFactory =
+    Duration cleanupTimeout = const Duration(seconds: 2),
+  })  : _cleanupTimeout = cleanupTimeout,
+        _controllerFactory =
             controllerFactory ?? VideoWebviewControllerFactory.getController;
 
   final VideoWebviewController Function() _controllerFactory;
+  final Duration _cleanupTimeout;
   VideoWebviewController? _webview;
   StreamSubscription? _logSubscription;
 
@@ -69,7 +72,6 @@ class WebViewVideoSourceService implements IVideoSourceService {
     var didStartLoad = false;
     Future<void>? loadFuture;
     StreamSubscription<VideoParserEvent>? parserSubscription;
-    Timer? parserTimer;
     final parserResult = Completer<VideoParserEvent>();
     try {
       if (_webview == null) {
@@ -121,22 +123,14 @@ class WebViewVideoSourceService implements IVideoSourceService {
       );
 
       // 同时监听两个 Future 的错误，避免加载尚未返回时解析流错误
-      // 成为未处理异常。保持原有“loadUrl 完成后开始解析超时”的语义。
+      // 成为未处理异常。期限覆盖加载与解析，防止加载不返回绕过超时。
       final loadedAndParsed = Future.wait<Object?>([
-        loadFuture.then<void>((_) {
-          request.throwIfNotCurrent(_activeRequest);
-          if (!parserResult.isCompleted) {
-            parserTimer = Timer(timeout, () {
-              if (!parserResult.isCompleted) {
-                parserResult
-                    .completeError(VideoSourceTimeoutException(timeout));
-              }
-            });
-          }
-        }),
+        loadFuture,
         parserResult.future,
       ], eagerError: true)
-          .then((results) => results[1] as VideoParserEvent);
+          .then((results) => results[1] as VideoParserEvent)
+          .timeout(timeout,
+              onTimeout: () => throw VideoSourceTimeoutException(timeout));
       final cancelFuture = request.cancelled.then<VideoParserEvent>((_) {
         throw const VideoSourceCancelledException();
       });
@@ -157,7 +151,6 @@ class WebViewVideoSourceService implements IVideoSourceService {
       request.throwIfNotCurrent(_activeRequest);
       rethrow;
     } finally {
-      parserTimer?.cancel();
       await parserSubscription?.cancel();
       if (parserSubscription != null && !parserResult.isCompleted) {
         parserResult.completeError(const VideoSourceCancelledException());
@@ -166,11 +159,17 @@ class WebViewVideoSourceService implements IVideoSourceService {
         // 取消时也要等旧加载命令收尾再卸页，下一请求才可使用同一
         // WebView；卸页期间的迟到事件已不再有本轮订阅。
         try {
-          await loadFuture;
+          await loadFuture?.timeout(_cleanupTimeout);
+        } on TimeoutException {
+          await _retireWebview();
         } catch (_) {
           // 加载异常已由上面的等待路径处理；这里只等待命令收尾。
         }
-        await _webview?.unloadPage();
+        try {
+          await _webview?.unloadPage().timeout(_cleanupTimeout);
+        } catch (_) {
+          await _retireWebview();
+        }
       }
       if (identical(_activeRequest, request)) {
         _activeRequest = null;
@@ -181,6 +180,20 @@ class WebViewVideoSourceService implements IVideoSourceService {
   @override
   void cancel() {
     _activeRequest?.cancel();
+  }
+
+  // A controller with unfinished native work must never be reused. Detach it
+  // before disposal so late events cannot enter the next request's streams.
+  Future<void> _retireWebview() async {
+    final webview = _webview;
+    _webview = null;
+    await _logSubscription?.cancel();
+    _logSubscription = null;
+    try {
+      await webview?.dispose().timeout(_cleanupTimeout);
+    } catch (_) {
+      // Native cleanup is best effort; the retired instance remains isolated.
+    }
   }
 
   @override

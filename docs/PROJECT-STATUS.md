@@ -1,5 +1,7 @@
 # KazumiTV 当前状态
 
+2026-10-14 维护更新：[#10](https://github.com/znbsf/KazumiTV/pull/10) 已以 `ae2d9dab5b036cdde568d6b714ce498fb75a7a3b` 合入 main，显式换源代码已集成，但未发布新版本；其原设备验收边界仍有效。[#11](https://github.com/znbsf/KazumiTV/issues/11) 单独追踪 API 9、设置导航、控制栏动画和 WebView 卡住回收修复，当前为候选分支。规则说明见 [RULES.md](RULES.md)。已发布版本仍是下面的 v0.4.2。
+
 本文件是仓库唯一当前状态入口。历史报告保留原始事实，不从旧结论恢复授权或状态。更新日期：2026-10-13。
 
 ## current：已确认的发布

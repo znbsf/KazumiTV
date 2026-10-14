@@ -25,6 +25,57 @@ void main() {
     await Hive.close();
     await temp.delete(recursive: true);
   });
+  testWidgets('category reselection keeps draft but exits a nested route',
+      (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final module = createModule(register: (c) {
+      c.route('/settings',
+          child: (_, state) => SettingsPage(location: state.uri.path),
+          children: (sub) {
+            sub.route('/player',
+                child: (context, _) => Column(children: [
+                      const TextField(key: ValueKey('category-draft')),
+                      TextButton(
+                          onPressed: () =>
+                              context.pushNamed('/settings/player/detail'),
+                          child: const Text('Open nested fixture')),
+                    ]));
+            sub.route('/player/detail',
+                child: (_, __) => const Center(child: Text('Nested fixture')));
+          });
+    });
+    await tester.pumpWidget(ModularApp(
+        module: module,
+        initialRoute: '/settings/player',
+        child: Builder(
+            builder: (context) => MaterialApp.router(
+                routerConfig: ModularApp.routerConfigOf(context)))));
+    await tester.pumpAndSettle();
+    final draft = find.byKey(const ValueKey('category-draft'));
+    await tester.enterText(draft, 'unsaved fixture');
+    final original = tester.state(draft);
+    final category = find.text('播放设置').first;
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(category);
+      await tester.pumpAndSettle();
+      expect(tester.state(draft), same(original));
+      expect(find.text('unsaved fixture'), findsOneWidget);
+    }
+    await tester.tap(find.text('Open nested fixture'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nested fixture'), findsOneWidget);
+    await tester.tap(category);
+    await tester.pumpAndSettle();
+    expect(find.text('Nested fixture'), findsNothing);
+    expect(find.text('Open nested fixture'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   for (final source in ['system', 'pane toolbar', 'settings toolbar']) {
     testWidgets('backup preview cancels before leaving via $source Back',
         (tester) async {
@@ -35,7 +86,8 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       final directory = Directory('${temp.path}/preview-${source.hashCode}');
-      final service = LocalLibraryBackupService(directory: () async => directory);
+      final service =
+          LocalLibraryBackupService(directory: () async => directory);
       await tester.runAsync(service.saveLocal);
       final storage = HiveLocalLibraryBackupStorage();
       final before = storage.read().fingerprint;
@@ -43,19 +95,23 @@ void main() {
         c.route('/settings',
             child: (_, state) => SettingsPage(location: state.uri.path),
             children: (sub) {
-          sub.route('/sync', child: (context, _) => Center(
-              child: TextButton(onPressed: () {
-                context.pushNamed('/settings/sync/backup');
-              }, child: const Text('Open backup'))));
-          sub.route('/sync/backup', child: (_, __) =>
-              LocalLibraryBackupPage(service: service));
-        });
+              sub.route('/sync',
+                  child: (context, _) => Center(
+                      child: TextButton(
+                          onPressed: () {
+                            context.pushNamed('/settings/sync/backup');
+                          },
+                          child: const Text('Open backup'))));
+              sub.route('/sync/backup',
+                  child: (_, __) => LocalLibraryBackupPage(service: service));
+            });
       });
       await tester.pumpWidget(ModularApp(
           module: module,
           initialRoute: '/settings/sync',
-          child: Builder(builder: (context) => MaterialApp.router(
-              routerConfig: ModularApp.routerConfigOf(context)))));
+          child: Builder(
+              builder: (context) => MaterialApp.router(
+                  routerConfig: ModularApp.routerConfigOf(context)))));
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
         await tester.tap(find.text('Open backup'));
@@ -68,9 +124,11 @@ void main() {
       expect(await tester.runAsync(service.listLocal), hasLength(1));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(preview, 300,
-          scrollable: find.descendant(
-              of: find.byType(LocalLibraryBackupPage),
-              matching: find.byType(Scrollable)).first);
+          scrollable: find
+              .descendant(
+                  of: find.byType(LocalLibraryBackupPage),
+                  matching: find.byType(Scrollable))
+              .first);
       await tester.runAsync(() async {
         await tester.tap(preview);
         await tester.pump();
@@ -82,7 +140,8 @@ void main() {
         await tester.binding.handlePopRoute();
       } else {
         await tester.tap(source == 'pane toolbar'
-            ? find.byType(BackButton).last : find.byType(BackButton).first);
+            ? find.byType(BackButton).last
+            : find.byType(BackButton).first);
       }
       await tester.pumpAndSettle();
       expect(find.byType(LocalLibraryBackupPage), findsOneWidget);
@@ -109,14 +168,16 @@ void main() {
       c.route('/settings',
           child: (_, state) => SettingsPage(location: state.uri.path),
           children: (sub) {
-            sub.route('/keyboard', child: (_, __) => const KeyboardSettingsPage());
+            sub.route('/keyboard',
+                child: (_, __) => const KeyboardSettingsPage());
           });
     });
     await tester.pumpWidget(ModularApp(
         module: module,
         initialRoute: '/settings/keyboard',
-        child: Builder(builder: (context) => MaterialApp.router(
-            routerConfig: ModularApp.routerConfigOf(context)))));
+        child: Builder(
+            builder: (context) => MaterialApp.router(
+                routerConfig: ModularApp.routerConfigOf(context)))));
     await tester.pumpAndSettle();
     expect(FocusManager.instance.primaryFocus?.debugLabel,
         'TV remote guide section');

@@ -1098,7 +1098,11 @@ class _PlayerItemState extends State<PlayerItem>
       playerController.panel.canHidePlayerPanel && _playerPanelHolds.isEmpty;
 
   void showVideoController({bool restartHideTimer = true}) {
-    _panelVisibilityController.forward();
+    // Repeated hover should refresh the hide timer without restarting the
+    // panel ticker. A panel that is hiding must still be allowed to reopen.
+    if (!_panelVisibilityController.isForwardOrCompleted) {
+      _panelVisibilityController.forward();
+    }
     playerController.panel.showVideoController = true;
     if (restartHideTimer && _canHidePlayerPanel) {
       _startHideTimer();

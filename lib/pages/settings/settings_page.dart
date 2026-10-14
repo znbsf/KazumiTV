@@ -292,9 +292,18 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _replaceCategory(String path) {
+    final normalizedPath = _normalizePath(path);
+    final outlet = _outletKey.currentState!;
+    // Nested pushes may leave _location unchanged. Only skip a category
+    // reselection when there is no secondary page to leave.
+    if (!outlet.canPop &&
+        !_isSecondaryRoute &&
+        _selectedCategoryPath == normalizedPath) {
+      return;
+    }
     _categoryNavigation = null;
-    _outletKey.currentState!.navigate(path);
-    setState(() => _location = _normalizePath(path));
+    outlet.navigate(normalizedPath);
+    setState(() => _location = normalizedPath);
   }
 
   Future<void> _pushCategory(String path) async {
