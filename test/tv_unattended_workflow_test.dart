@@ -1,3 +1,6 @@
+import 'package:kazumi/services/player/source_switch.dart';
+import 'package:kazumi/services/video_source/video_source_service.dart';
+import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 // Unattended Dart business/routing loop, not hardware E2E. Pages, controllers,
 // Hive repositories, source rules, HTTP and dialogs are real. Only catalog API
 // transport and the MPV/native media destination have explicit fixture bounds.
@@ -107,6 +110,25 @@ class _ChapterServer {
     }
     await request.response.close();
   }
+}
+
+class _PendingMediaSource implements IVideoSourceService {
+  final pending = <Completer<VideoSource>>[];
+  int cancellations = 0;
+  @override
+  Future<VideoSource> resolve(String url,
+      {required bool useLegacyParser,
+      int offset = 0,
+      Duration timeout = const Duration(seconds: 30)}) {
+    final result = Completer<VideoSource>();
+    pending.add(result);
+    return result.future;
+  }
+
+  @override
+  void cancel() => cancellations++;
+  @override
+  Future<void> dispose() async {}
 }
 
 Map<String, dynamic> _subjectJson(int id) => {
@@ -337,7 +359,10 @@ void main() {
     expect(find.byType(InfoPage), findsOneWidget);
     expect(app.openedSubjectIds.last, 21);
 
-    // The detail page's real remote action row opens its real collection menu.
+    // Reselect source is now between watch and collection in the real row.
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV detail source');
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.pumpAndSettle();
@@ -379,6 +404,25 @@ void main() {
     expect(savedHistory.lastWatchEpisodeName, 'EP1');
     expect(savedHistory.episodePageUrl, '${sourceServer.baseUrl}/primary/1');
     expect(savedHistory.progresses[1]!.progress.inSeconds, 347);
+    await _backUntil(tester, find.byType(InfoPage));
+    // History must not remove the explicit picker, while watch keeps fast resume.
+    final opensBeforeReselect = app.openedVideoArgs.length;
+    await tester.tap(find.text('重新选源'));
+    await _pumpUntil(
+        tester,
+        () => find.byType(SourceSheet).evaluate().isNotEmpty,
+        'Detail reselect must bypass its saved-history fast path');
+    expect(app.openedVideoArgs, hasLength(opensBeforeReselect));
+    await rootNavigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+    expect(GStorage.histories.values.single.progresses[1]!.progress.inSeconds,
+        347);
+    await tester.tap(find.widgetWithText(FilledButton, '开始观看'));
+    await _pumpUntil(
+        tester,
+        () => find.byType(StubNativeVideoBoundary).evaluate().isNotEmpty,
+        'The original watch action must still resume existing history');
+    expect(find.text('subject 21; episode 1; offset 347'), findsOneWidget);
     await _backUntil(tester, find.byType(InfoPage));
     await rootNavigatorKey.currentState!.maybePop();
     await tester.pumpAndSettle();
@@ -505,6 +549,78 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     // Close keep-alive loopback connections before widget timer invariants.
+    DioFactory.pluginDio.close(force: true);
+    DioFactory.apiDio.close(force: true);
+    DioFactory.reset();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+      'player picker cancels stale parsing then returns one prepared source without navigation or history writes',
+      (tester) async {
+    final backend = _PendingMediaSource();
+    final app = UnattendedFlowApp(
+      persistenceZone: persistenceZone,
+      sourcePlugins: [sourceServer.plugin('secondary')],
+      sourceSubject: BangumiItem.fromJson(_subjectJson(21)),
+      initialRoute: '/history/',
+      switchOrigin: const SourceSwitchOrigin(
+          episode: EpisodeIdentity(title: 'EP1', pageUrl: '/old/1'),
+          offset: 77),
+      createVideoSourceService: () => backend,
+    );
+    await tester.pumpWidget(app);
+    await tester.pumpAndSettle();
+    PreparedSourceSwitch? selected;
+    tester
+        .element(find.byType(HistoryPage))
+        .pushNamed<PreparedSourceSwitch>('/sources/')
+        .then((value) => selected = value);
+    await _pumpUntil(
+        tester,
+        () => find.text('Loopback chapter result').evaluate().isNotEmpty,
+        'The shared player picker must search through the real rule engine');
+    Future<void> choose() async {
+      await tester.tap(find.text('Loopback chapter result'));
+      await _pumpUntil(
+          tester,
+          () => find.textContaining('继续 77 秒').evaluate().isNotEmpty,
+          'The live snapshot must offer the unique semantic episode');
+      await tester.tap(find.textContaining('继续 77 秒'));
+      await tester.pump();
+    }
+
+    await choose();
+    // The intentionally pending resolver keeps a progress animation alive.
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(backend.pending, hasLength(1));
+    await rootNavigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+    backend.pending.first.complete(const VideoSource(
+        url: 'https://late.invalid/video.mp4',
+        offset: 77,
+        type: VideoSourceType.online));
+    await tester.pumpAndSettle();
+    expect(selected, isNull);
+    expect(backend.cancellations, greaterThan(0));
+    expect(find.byType(SourceSheet), findsOneWidget);
+    await choose();
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(backend.pending, hasLength(2));
+    backend.pending.last.complete(const VideoSource(
+        url: 'https://new.invalid/video.mp4',
+        offset: 77,
+        type: VideoSourceType.online));
+    await tester.pumpAndSettle();
+    expect(selected!.args.transfer!.episode, 2);
+    expect(selected!.args.transfer!.offset, 77);
+    expect(selected!.source.url, 'https://new.invalid/video.mp4');
+    expect(app.openedVideoArgs, isEmpty,
+        reason: 'The existing player owns commit; no nested video route');
+    expect(GStorage.histories.values, isEmpty);
+    expect(find.byType(SourceSheet), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
     DioFactory.pluginDio.close(force: true);
     DioFactory.apiDio.close(force: true);
     DioFactory.reset();

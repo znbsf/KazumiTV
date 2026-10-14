@@ -16,6 +16,9 @@ import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/pages/collect/collect_controller.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
+import 'package:kazumi/pages/info/source_episode_picker.dart';
+import 'package:kazumi/services/player/source_switch.dart';
+import 'package:kazumi/services/video_source/services.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
 import 'package:kazumi/plugins/plugins.dart';
@@ -35,9 +38,15 @@ part 'source_captcha_flow.dart';
 part 'source_sheet_view.dart';
 
 class SourceSheet extends StatefulWidget {
-  const SourceSheet({super.key, required this.infoController});
+  const SourceSheet(
+      {super.key,
+      required this.infoController,
+      this.switchOrigin,
+      this.createVideoSourceService});
 
   final InfoController infoController;
+  final SourceSwitchOrigin? switchOrigin;
+  final IVideoSourceService Function()? createVideoSourceService;
 
   @override
   State<SourceSheet> createState() => _SourceSheetState();
@@ -47,6 +56,8 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
   final CollectController _collectController = inject<CollectController>();
   final PluginsController _pluginsController = inject<PluginsController>();
   final Map<String, String> _sourceKeywords = {};
+
+  SourceSwitchResolver? _switchResolver;
 
   late final String _keyword;
   late final PluginSearchService _searchService;
@@ -71,6 +82,8 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
   @override
   void dispose() {
     _searchService.cancel();
+    final resolver = _switchResolver;
+    if (resolver != null) unawaited(resolver.dispose());
     _captchaFlow.dispose();
     super.dispose();
   }
@@ -133,14 +146,22 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
             plugin.queryChapterRoads(searchItem.src, cancelToken: cancelToken),
       );
       if (roads.isEmpty) throw ChapterErrorException(plugin.name);
-      final choices = crossSourceResumeChoices(
-        histories: GStorage.histories.values,
-        bangumiId: widget.infoController.bangumiItem.id,
-        pluginName: plugin.name,
+      final target = OnlineVideoPlaybackArgs(
+        bangumiItem: widget.infoController.bangumiItem,
+        plugin: plugin,
+        title: searchItem.name,
         src: searchItem.src,
         roads: roads,
-        baseUrl: plugin.baseUrl,
       );
+      final choices = widget.switchOrigin?.choices(target) ??
+          crossSourceResumeChoices(
+            histories: GStorage.histories.values,
+            bangumiId: widget.infoController.bangumiItem.id,
+            pluginName: plugin.name,
+            src: searchItem.src,
+            roads: roads,
+            baseUrl: plugin.baseUrl,
+          );
       CrossSourceResume? transfer;
       var allowHistoryResume = true;
       if (choices.isNotEmpty) {
@@ -155,6 +176,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
                         child: ListView.builder(
                           itemCount: choices.length,
                           itemBuilder: (context, i) => TextButton(
+                              autofocus: i == 0,
                               onPressed: () => Navigator.pop(context, i),
                               child: Text('${roads[choices[i].road].name} · '
                                   '${roads[choices[i].road].identifier[choices[i].episode - 1]} · '
@@ -169,6 +191,30 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
                 ));
         if (choice >= 0 && choice < choices.length) transfer = choices[choice];
         allowHistoryResume = choice >= 0;
+      }
+      if (widget.switchOrigin != null) {
+        transfer ??= await task.show<CrossSourceResume>(
+          builder: (_) => SourceEpisodePicker(target: target),
+        );
+        final selected = OnlineVideoPlaybackArgs(
+          bangumiItem: target.bangumiItem,
+          plugin: plugin,
+          title: target.title,
+          src: target.src,
+          roads: roads,
+          transfer: transfer,
+          allowHistoryResume: false,
+        );
+        final resolver = _switchResolver ??= SourceSwitchResolver(
+            widget.createVideoSourceService?.call() ??
+                WebViewVideoSourceService());
+        final prepared = await task.loading(
+          message: '正在解析新源，原播放保持不变',
+          onCancel: resolver.cancel,
+          action: () => resolver.prepare(selected),
+        );
+        task.withContext((context) => Navigator.of(context).pop(prepared));
+        return;
       }
       task.withContext((context) => context.pushNamed(
             '/video/',

@@ -27,6 +27,11 @@ import 'package:kazumi/pages/video/player_content_tabs.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/video/playback_recovery_shortcuts.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
+import 'package:kazumi/pages/info/info_controller.dart';
+import 'package:kazumi/pages/info/source_sheet.dart';
+import 'package:kazumi/pages/collect/collect_controller.dart';
+import 'package:kazumi/services/player/source_switch.dart';
+import 'package:kazumi/services/player/episode_identity.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 import 'package:kazumi/services/player/pip_utils.dart';
 import 'package:kazumi/services/player/online_history_resume.dart';
@@ -62,6 +67,7 @@ class _VideoPageState extends State<VideoPage>
   VideoPageController get videoPageController => widget.videoPageController;
   bool _didInitializePlayback = false;
   bool _isClosing = false;
+  bool _sourceSwitchOpen = false;
   HistoryController get historyController => widget.historyController;
   DownloadController get downloadController => widget.downloadController;
   late bool playResume;
@@ -656,6 +662,57 @@ class _VideoPageState extends State<VideoPage>
     );
   }
 
+  Future<void> _selectSource() async {
+    if (_sourceSwitchOpen || _isClosing || videoPageController.isOfflineMode) {
+      return;
+    }
+    _sourceSwitchOpen = true;
+    final focus = FocusManager.instance.primaryFocus;
+    final revision = videoPageController.playbackRevision;
+    final episode =
+        videoPageController.resolveEpisode(videoPageController.playbackEpisode);
+    final info = InfoController(inject<CollectController>())
+      ..bangumiItem = videoPageController.bangumiItem;
+    try {
+      final prepared = await showAdaptiveBottomSheet<PreparedSourceSwitch>(
+        context: context,
+        builder: (_) => SourceSheet(
+          infoController: info,
+          switchOrigin: SourceSwitchOrigin(
+            episode: episode == null
+                ? null
+                : EpisodeIdentity(
+                    title: episode.displayTitle, pageUrl: episode.pageUrl),
+            offset: videoPageController.recoveryOffset(playerController),
+          ),
+        ),
+      );
+      if (!mounted || _isClosing || prepared == null) return;
+      final switched = await videoPageController.switchSource(prepared,
+          expectedRevision: revision, playerController: playerController);
+      if (mounted && !_isClosing && !switched) {
+        KazumiDialog.showToast(message: '换源未完成，可重试或选择其他播放源');
+      }
+    } finally {
+      _sourceSwitchOpen = false;
+      if (mounted && !_isClosing) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              _isClosing ||
+              ModalRoute.of(context)?.isCurrent != true) {
+            return;
+          }
+          if (focus?.context != null && focus!.canRequestFocus) {
+            focus.requestFocus();
+          } else if (keyboardFocus.context != null &&
+              keyboardFocus.canRequestFocus) {
+            keyboardFocus.requestFocus();
+          }
+        });
+      }
+    }
+  }
+
   Widget get playerBody {
     final bool playerLoading = playerController.playback.loading;
     return Stack(
@@ -687,6 +744,12 @@ class _VideoPageState extends State<VideoPage>
                                   : '选集 / 换线路',
                               icon: Icons.video_library_outlined,
                             ),
+                            if (!videoPageController.isOfflineMode)
+                              StateActionButton.tonal(
+                                onPressed: _selectSource,
+                                text: '更换播放源',
+                                icon: Icons.swap_horiz_rounded,
+                              ),
                           ],
                         );
                       }
@@ -820,6 +883,7 @@ class _VideoPageState extends State<VideoPage>
                   toggleMenu: _toggleTabBodyAnimated,
                   showMenuImmediately: _showTabBodyImmediately,
                   showEpisodeGuide: _showEpisodeGuide,
+                  selectSource: _selectSource,
                   hideMenuImmediately: _hideTabBodyImmediately,
                   changeEpisode: changeEpisode,
                   onBackPressed: onBackPressed,

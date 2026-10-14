@@ -121,11 +121,11 @@ class _InfoPageState extends State<InfoPage>
     return KeyEventResult.ignored;
   }
 
-  Future<void> _startWatching() async {
+  Future<void> _startWatching({bool reselectSource = false}) async {
     if (_startingPlayback) return;
     _startingPlayback = true;
     try {
-      if (TvMode.enabled) {
+      if (TvMode.enabled && !reselectSource) {
         final histories = inject<IHistoryRepository>().getAllHistories().where(
               (item) => item.bangumiItem.id == infoController.bangumiItem.id,
             );
@@ -538,6 +538,8 @@ class _InfoPageState extends State<InfoPage>
                                       ? TvDetailActions(
                                           playFocus: _tvPlayFocus,
                                           onPlay: _startWatching,
+                                          onSelectSource: () => _startWatching(
+                                              reselectSource: true),
                                           collectionBuilder: (focusNode) =>
                                               CollectButton.extend(
                                             bangumiItem:

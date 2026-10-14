@@ -8,6 +8,8 @@ import 'package:hive_ce/hive.dart';
 import 'package:kazumi/bean/widget/media_error_widget.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/download/download_module.dart';
+import 'package:kazumi/modules/history/history_module.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 import 'package:kazumi/pages/player/controller/player_danmaku_controller.dart';
@@ -20,6 +22,8 @@ import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/repositories/download_repository.dart';
 import 'package:kazumi/services/download/download_manager.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/player/source_switch.dart';
+import 'package:kazumi/services/player/cross_source_resume.dart';
 import 'package:kazumi/services/video_source/services.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
@@ -33,6 +37,14 @@ class _Paths extends PathProviderPlatform {
 }
 
 class _History implements HistoryController {
+  final writes = <String>[];
+  @override
+  Future<void> updateHistory(
+      PlaybackHistoryIdentity identity, Duration progress,
+      {Duration duration = Duration.zero}) async {
+    writes.add(identity.pluginName);
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
 }
@@ -76,6 +88,8 @@ class _Source implements WebViewVideoSourceService {
 
 class _Playback implements PlayerPlaybackController {
   @override
+  bool playing = true;
+  @override
   bool loading = true;
   @override
   Duration playerPosition = Duration.zero;
@@ -111,6 +125,11 @@ class _Player implements PlayerController {
   }
 
   @override
+  Future<void> pause({bool enableSync = true}) async {
+    playback.playing = false;
+  }
+
+  @override
   Future<void> stop() async {
     stops++;
     playback.loading = true;
@@ -126,6 +145,7 @@ void main() {
   late _Source source;
   late _Player player;
   late VideoPageController controller;
+  late _History history;
   setUpAll(() async {
     temporary = await Directory.systemTemp.createTemp('kazumi_recovery_');
     PathProviderPlatform.instance = _Paths(temporary.path);
@@ -137,10 +157,10 @@ void main() {
     await temporary.delete(recursive: true);
   });
   setUp(() {
+    history = _History();
     source = _Source();
     player = _Player();
-    controller = VideoPageController(
-        _History(), _Downloads(), _DownloadManager(),
+    controller = VideoPageController(history, _Downloads(), _DownloadManager(),
         videoSourceService: source);
     controller.applyPlaybackArgs(OnlineVideoPlaybackArgs(
       bangumiItem: focusItem(1),
@@ -161,7 +181,158 @@ void main() {
       ],
     ));
   });
-  tearDown(() => controller.dispose());
+  tearDown(() {
+    controller.dispose();
+    TvMode.setEnabledForTesting(false);
+  });
+
+  PreparedSourceSwitch candidate() => PreparedSourceSwitch(
+        OnlineVideoPlaybackArgs(
+          bangumiItem: focusItem(1),
+          plugin:
+              Plugin.fromJson({'name': 'new', 'baseURL': 'https://new.test'}),
+          title: 'New source',
+          src: '/new',
+          roads: [
+            Road(
+                name: 'reversed',
+                data: ['/two', '/one'],
+                identifier: ['第2集', '第1集'])
+          ],
+          allowHistoryResume: false,
+          transfer: const CrossSourceResume(
+              bangumiId: 1,
+              pluginName: 'new',
+              src: '/new',
+              road: 0,
+              episode: 1,
+              episodePageUrl: 'https://new.test/two',
+              offset: 42),
+        ),
+        const VideoSource(
+            url: 'https://new.test/video.mp4',
+            offset: 42,
+            type: VideoSourceType.online),
+      );
+
+  test('source switch commits pre-resolved media without a second parse',
+      () async {
+    await controller.changeEpisode(2, playerController: player);
+    final revision = controller.playbackRevision;
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: revision, playerController: player),
+        isTrue);
+    expect(source.requests, hasLength(1));
+    expect(controller.currentPlugin.name, 'new');
+    expect(controller.playbackEpisode.episode, 1);
+    expect(controller.currentHistoryIdentity!.episodeTitle, '第2集');
+    expect(player.initializations.last.offset, 42);
+  });
+
+  test(
+      'failed native initialization restores original source, position and pause',
+      () async {
+    await controller.changeEpisode(2, playerController: player);
+    player.playback.playerPosition = const Duration(seconds: 81);
+    player.playback.playing = false;
+    player.initialize = (params) async => params.pluginName != 'new';
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: controller.playbackRevision,
+            playerController: player),
+        isFalse);
+    expect(controller.currentPlugin.name, 'fixture');
+    expect(controller.src, '/subject');
+    expect(controller.playingEpisode!.episode, 2);
+    expect(controller.currentHistoryIdentity!.pluginName, 'fixture');
+    expect(player.initializations.last.offset, 81);
+    expect(player.playback.playing, isFalse);
+    expect(source.requests, hasLength(1));
+  });
+
+  test('failed target cannot write history during init or after rollback',
+      () async {
+    TvMode.setEnabledForTesting(true);
+    await controller.changeEpisode(2, playerController: player);
+    player.initialize = (params) async {
+      await params.onHistoryProgress
+          ?.call(const Duration(seconds: 42), const Duration(minutes: 24));
+      return params.pluginName != 'new';
+    };
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: controller.playbackRevision,
+            playerController: player),
+        isFalse);
+    final failedParams = player.initializations
+        .firstWhere((params) => params.pluginName == 'new');
+    await failedParams.onHistoryProgress!
+        .call(const Duration(seconds: 43), const Duration(minutes: 24));
+    expect(history.writes, isEmpty);
+    await player.initializations.last.onHistoryProgress!
+        .call(const Duration(seconds: 44), const Duration(minutes: 24));
+    expect(history.writes, ['fixture']);
+  });
+
+  test('switch failure from error screen restores original retry identity',
+      () async {
+    source.answer =
+        (_, __) => Future.error(const VideoSourceNotFoundException());
+    await controller.changeEpisode(2, offset: 17, playerController: player);
+    final oldError = controller.errorMessage;
+    player.initialize = (_) async => false;
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: controller.playbackRevision,
+            playerController: player),
+        isFalse);
+    expect(controller.currentPlugin.name, 'fixture');
+    expect(controller.selectedEpisode.episode, 2);
+    expect(controller.errorMessage, oldError);
+    expect(controller.recoveryOffset(player), 17);
+  });
+
+  test('duplicate and stale source commits cannot replace newer playback',
+      () async {
+    await controller.changeEpisode(2, playerController: player);
+    final oldRevision = controller.playbackRevision;
+    final pending = Completer<bool>();
+    player.initialize = (params) =>
+        params.pluginName == 'new' ? pending.future : Future.value(true);
+    final switching = controller.switchSource(candidate(),
+        expectedRevision: oldRevision, playerController: player);
+    await Future<void>.delayed(Duration.zero);
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: oldRevision, playerController: player),
+        isFalse);
+    player.initialize = (_) async => true;
+    await controller.changeEpisode(2, playerController: player);
+    pending.complete(false);
+    expect(await switching, isFalse);
+    expect(controller.currentPlugin.name, 'new');
+    expect(controller.selectedEpisode.episode, 2);
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: oldRevision, playerController: player),
+        isFalse);
+  });
+
+  test('dispose rejects a late source switch without restoring a dead route',
+      () async {
+    await controller.changeEpisode(2, playerController: player);
+    final pending = Completer<bool>();
+    player.initialize = (_) => pending.future;
+    final switching = controller.switchSource(candidate(),
+        expectedRevision: controller.playbackRevision,
+        playerController: player);
+    await Future<void>.delayed(Duration.zero);
+    controller.dispose();
+    pending.complete(false);
+    expect(await switching, isFalse);
+    expect(player.initializations, hasLength(2));
+  });
 
   for (final failure in [
     const VideoSourceTimeoutException(Duration(seconds: 15)),
@@ -267,6 +438,7 @@ void main() {
         (params) => params.episode == 1 ? pending.future : Future.value(true);
     final old = controller.changeEpisode(1, playerController: player);
     await Future<void>.delayed(Duration.zero);
+    player.initialize = (_) async => true;
     await controller.changeEpisode(2, playerController: player);
     pending.complete(false);
     await old;

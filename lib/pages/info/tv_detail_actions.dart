@@ -9,6 +9,7 @@ class TvDetailActions extends StatefulWidget {
     super.key,
     required this.playFocus,
     required this.onPlay,
+    this.onSelectSource,
     required this.collectionBuilder,
     required this.onReview,
     required this.onUp,
@@ -17,6 +18,7 @@ class TvDetailActions extends StatefulWidget {
 
   final FocusNode playFocus;
   final VoidCallback onPlay;
+  final VoidCallback? onSelectSource;
   final Widget Function(FocusNode focusNode) collectionBuilder;
   final VoidCallback onReview;
   final VoidCallback onUp;
@@ -27,13 +29,20 @@ class TvDetailActions extends StatefulWidget {
 }
 
 class _TvDetailActionsState extends State<TvDetailActions> {
+  final _sourceFocus = FocusNode(debugLabel: 'TV detail source');
   final _collectFocus = FocusNode(debugLabel: 'TV detail collect');
   final _reviewFocus = FocusNode(debugLabel: 'TV detail review');
 
-  List<FocusNode> get _nodes => [widget.playFocus, _collectFocus, _reviewFocus];
+  List<FocusNode> get _nodes => [
+        widget.playFocus,
+        if (widget.onSelectSource != null) _sourceFocus,
+        _collectFocus,
+        _reviewFocus
+      ];
 
   @override
   void dispose() {
+    _sourceFocus.dispose();
     _collectFocus.dispose();
     _reviewFocus.dispose();
     super.dispose();
@@ -136,6 +145,19 @@ class _TvDetailActionsState extends State<TvDetailActions> {
                 ),
               ),
             ),
+            if (widget.onSelectSource != null)
+              _highlight(
+                _sourceFocus,
+                SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    focusNode: _sourceFocus,
+                    onPressed: widget.onSelectSource,
+                    icon: const Icon(Icons.swap_horiz_rounded),
+                    label: const Text('重新选源'),
+                  ),
+                ),
+              ),
             _highlight(
               _collectFocus,
               SizedBox(

@@ -46,9 +46,11 @@ class SmallestPlayerItemPanel extends StatefulWidget {
     required this.showVideoInfo,
     required this.showSyncPlayPanel,
     required this.pauseForTimedShutdown,
+    this.selectSource,
     this.disableAnimations = false,
   });
 
+  final Future<void> Function()? selectSource;
   final PlayerController playerController;
   final VideoPageController videoPageController;
   final void Function(BuildContext) onBackPressed;
@@ -491,6 +493,11 @@ class _SmallestPlayerItemPanelState extends State<SmallestPlayerItemPanel> {
               );
             },
             menuChildren: [
+              if (widget.selectSource != null)
+                MenuItemButton(
+                  onPressed: () => widget.selectSource!(),
+                  child: const Text('更换播放源'),
+                ),
               SubmenuButton(
                 menuChildren: [
                   for (final aspectRatioMode in PlayerAspectRatio.values)
