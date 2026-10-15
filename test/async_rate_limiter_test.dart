@@ -1,15 +1,15 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/utils/async_rate_limiter.dart';
 
 void main() {
   group('AsyncRateLimiter', () {
-    test('first acquire completes immediately without unnecessary delay', () async {
-      final limiter = AsyncRateLimiter(const Duration(milliseconds: 50));
-      final stopwatch = Stopwatch()..start();
+    test('first acquire completes immediately without unnecessary delay',
+        () async {
+      final clock = _ControlledClock();
+      final limiter = clock.limiter();
       await limiter.acquire();
-      stopwatch.stop();
-
-      expect(stopwatch.elapsedMilliseconds, lessThan(30));
+      expect(clock.waits, isEmpty);
     });
 
     test('serial sequential calls maintain at least period spacing', () async {
@@ -31,7 +31,8 @@ void main() {
       }
     });
 
-    test('concurrent callers are spaced apart into sequential time slots', () async {
+    test('concurrent callers are spaced apart into sequential time slots',
+        () async {
       const period = Duration(milliseconds: 40);
       final limiter = AsyncRateLimiter(period);
 
@@ -52,7 +53,8 @@ void main() {
       }
     });
 
-    test('run passes return value and preserves rate limit on failure', () async {
+    test('run passes return value and preserves rate limit on failure',
+        () async {
       const period = Duration(milliseconds: 40);
       final limiter = AsyncRateLimiter(period);
 
@@ -72,4 +74,66 @@ void main() {
       expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(70));
     });
   });
+
+  test('an early timer wake cannot grant a slot before the deadline', () async {
+    final clock = _ControlledClock();
+    final limiter = clock.limiter();
+    await limiter.acquire();
+    var granted = false;
+    final second = limiter.acquire().then((_) => granted = true);
+    await Future<void>.delayed(Duration.zero);
+    await clock.wakeAllAt(33);
+    expect(granted, isFalse);
+    expect(clock.waits.single, const Duration(milliseconds: 7));
+    await clock.wakeAllAt(40);
+    await second;
+    expect(granted, isTrue);
+  });
+
+  test('late timers do not release queued callers in a catch-up burst',
+      () async {
+    final clock = _ControlledClock();
+    final limiter = clock.limiter();
+    final grants = <int>[];
+    Future<void> acquire() async {
+      await limiter.acquire();
+      grants.add(clock.now.inMilliseconds);
+    }
+
+    await acquire();
+    final second = acquire();
+    final third = acquire();
+    await Future<void>.delayed(Duration.zero);
+    await clock.wakeAllAt(100);
+    expect(grants, [0, 100]);
+    expect(clock.waits.single, const Duration(milliseconds: 40));
+    await clock.wakeAllAt(140);
+    await Future.wait([second, third]);
+    expect(grants, [0, 100, 140]);
+  });
+}
+
+class _ControlledClock {
+  Duration now = Duration.zero;
+  final waits = <Duration>[];
+  final pending = <Completer<void>>[];
+  AsyncRateLimiter limiter() =>
+      AsyncRateLimiter(const Duration(milliseconds: 40),
+          elapsed: () => now,
+          delay: (duration) {
+            waits.add(duration);
+            final completer = Completer<void>();
+            pending.add(completer);
+            return completer.future;
+          });
+  Future<void> wakeAllAt(int milliseconds) async {
+    now = Duration(milliseconds: milliseconds);
+    final due = List<Completer<void>>.of(pending);
+    pending.clear();
+    waits.clear();
+    for (final completer in due) {
+      completer.complete();
+    }
+    await Future<void>.delayed(Duration.zero);
+  }
 }
