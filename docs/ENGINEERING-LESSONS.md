@@ -33,3 +33,13 @@
 发布附件、hash和验收边界见[发布记录](RELEASE-0.4.1.md)；本地截图/日志原件保存在独立证据目录，公开文档不夹带用户数据。旧结果保留原始版本，适用性不明时标记needs_recheck。
 
 整理方法参考：[orchestrate-engineering v1.1.0，固定SHA fa5991f](https://github.com/znbsf/codex-personal-skills/blob/fa5991fb6eed39600505c38c1069df95dd636cf9/skills/orchestrate-engineering/SKILL.md)。仅采用证据关联和分层方法，不由该skill新增权限或安装工具。
+# 2026-10-14：稳定上游移植（#11）
+
+- 审查目标 SHA 不代表整仓已合并；先逐文件核对已移植能力，再选择最小改动。TV fork 不直接 rebase 已共享 main。
+- WebView 超时必须覆盖 load 与 parser；取消后旧 load/unload 也可能不返回。先移除事件订阅，有限等待后退出复用并尝试释放，防止旧操作堵住串行队列。此次不覆盖 init 卡住，不保证底层原生资源最终释放。
+- 回归用可控 Future 复现旧代码失败；测试 load 不返回、取消后的下一请求、unload 卡住和迟到失败，同时保留早到解析事件与正常复用测试。设备行为仍需独立验收。
+- 当前状态只更新 PROJECT-STATUS.md；规则教程见 RULES.md。不要将候选分支或合成数据测试写成已发布/真机通过。
+
+## main 合并前固定检查
+
+每次合并重新执行 [main 保护与合并检查](MAIN-MERGE-CHECKLIST.md)，不能把其他 PR 的授权、旧 head 的 CI 或仅凭 `mergeable=true` 当作当前 PR 可以合并的依据；当前会话已明确授予的有效授权继续适用。规则可在任务期间变化；读不到保护配置必须报告权限限制，不能视为没有保护。
