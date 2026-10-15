@@ -1,12 +1,16 @@
 # KazumiTV 当前状态
 
+2026-10-15 最新核对：PR #12 head `ab5ea883a08708cf2a291269c88468273bed7295` 的 [CI 38746978591](https://github.com/znbsf/KazumiTV/actions/runs/38746978591) 于14:12:31 UTC全部成功：871项测试，静态0 error / 0 warning、58 info，三ABI构建与产物校验通过。PR仍为草稿、未合并、未发布。QA生产代码仍对应 `dae2bbede53f225a3f0c135181f0981f502ddcce`；下方869项为旧head结果。验收边界及正式升级/签名/附件待办见[稳定发布准备](ISSUE11-RELEASE-READINESS.md)。
+
+独立设备研究见[桌面/ADB状态与回滚](TV-DESKTOP-ADB-STATUS.md)：LTv普通入口可用，Home Button Fix已关闭，临时设置包状态已恢复，原HOME保留；开机启动、HOME接管与ADB持续可用分别记录，不作为稳定版已修复功能。
+
 2026-10-15 第二阶段补充：新增超时后取消/重试及连续换源历史身份回归，七文件70项通过；Android 9换源取消前后暂停位置90444ms一致、焦点回设置，正常退出后媒体会话清空。没有新增生产代码修复；实际超时与纯遥控取消仍有未测边界，详见[第二阶段记录](ISSUE11-TV-STAGE2-20261015.md)。
 
 2026-10-15 维护验收：PR #12程序head `dae2bbede53f225a3f0c135181f0981f502ddcce` 已通过869项CI及三ABI候选校验，API36模拟器和Android9独立QA核心链路已有实测。纯遥控及长播补充结果见 [第一阶段记录](ISSUE11-TV-STAGE1-20261015.md)，前序范围分别见 [模拟器记录](ISSUE11-EMULATOR-QA-20261015.md) 与 [电视首轮记录](ISSUE11-TV-QA-20261015.md)。候选仍为草稿，未合并、未发布；不能把未测的完整搜索链路、纯遥控加载取消或音画同步写成通过。维护时使用 [项目TV验收技能](../.agents/skills/android-tv-ui-qa/SKILL.md)。
 
 2026-10-14 维护更新：[#10](https://github.com/znbsf/KazumiTV/pull/10) 已以 `ae2d9dab5b036cdde568d6b714ce498fb75a7a3b` 合入 main，显式换源代码已集成，但未发布新版本；其原设备验收边界仍有效。[#11](https://github.com/znbsf/KazumiTV/issues/11) 单独追踪 API 9、设置导航、控制栏动画和 WebView 卡住回收修复，当前为候选分支。规则说明见 [RULES.md](RULES.md)。已发布版本仍是下面的 v0.4.2。
 
-本文件是仓库唯一当前状态入口。历史报告保留原始事实，不从旧结论恢复授权或状态。更新日期：2026-10-13。
+本文件是仓库唯一当前状态入口。历史报告保留原始事实，不从旧结论恢复授权或状态。更新日期：2026-10-15。
 
 ## current：已确认的发布
 

@@ -1,5 +1,7 @@
 # TV构建与发布维护
 
+当前稳定修复候选的精确head、CI终态、设备边界和正式发布待办见[#11发布准备](ISSUE11-RELEASE-READINESS.md)，执行前仍以[项目状态](PROJECT-STATUS.md)与当前授权为准。[桌面/ADB研究](TV-DESKTOP-ADB-STATUS.md)不混入稳定版发布范围。
+
 当前版本、状态和验收范围只在[项目状态](PROJECT-STATUS.md)维护。[旧0.4.0构建与签名记录](history/2026-10-10/TV_BUILD_AND_RELEASE.md)保留历史复现信息。
 
 ## 工具链与检查
