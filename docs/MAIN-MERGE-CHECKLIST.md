@@ -28,6 +28,8 @@ commits/{head_sha}/status
 
 ## 2026-10-14 16:13 UTC 快照
 
+后续复核（2026-10-15 07:00 UTC）：下方是历史快照。规则25095474现已匹配`~DEFAULT_BRANCH`，main的有效规则为deletion与non_fast_forward，branch元数据protected=true。没有required PR/reviews/checks规则；bypass仍为空、never。经典保护连接器403后，CLI补查为404 Branch not protected。PR12仍draft，原head四项checks成功，无reviews/review threads；legacy statuses为空（其汇总pending不是检查失败）。未修改保护，也不从这些只读结果推导合并许可。
+
 - main：`ae2d9dab5b036cdde568d6b714ce498fb75a7a3b`，即 #10 的历史合并。#10 合并于 15:29:18 UTC；下面规则创建于 16:10:23 UTC，不应声称 #10 按这套新规则合并。
 - ruleset [init / 25095474](https://github.com/znbsf/KazumiTV/rules/25095474)：仓库级 branch 规则，`enforcement=active`；ref `include=[]`、`exclude=[]`，没有目标分支。只列出 `deletion` 和 `non_fast_forward`，没有 PR 审批或 required checks 规则；`bypass_actors=[]`、`current_user_can_bypass=never`。这些是规则自身设置，不能因为 active 就说已应用到 main。
 - main 有效规则接口返回 `[]`。branch 元数据 `protected=false`。连接器读取经典保护得到 403（集成权限不足），随后已有 CLI 的同一只读查询明确返回 404 `Branch not protected`。结论来自补充证据，不是把 403 当作无保护。
