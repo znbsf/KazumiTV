@@ -62,10 +62,12 @@ class PlayerItemPanel extends StatefulWidget {
     required this.showSyncPlayPanel,
     required this.pauseForTimedShutdown,
     this.selectSource,
+    this.showPlaybackInfo,
     this.disableAnimations = false,
   });
 
   final Future<void> Function()? selectSource;
+  final VoidCallback? showPlaybackInfo;
   final PlayerController playerController;
   final VideoPageController videoPageController;
   final void Function(BuildContext) onBackPressed;
@@ -151,6 +153,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
   final FocusNode _bottomSettingsFocus = FocusNode(
     debugLabel: 'player-bottom-settings',
   );
+  final FocusNode _bottomInfoFocus =
+      FocusNode(debugLabel: 'player-bottom-info');
   final FocusNode _tvProgressFocus = FocusNode(debugLabel: 'player-progress');
   KazumiDialogHandle<void>? _tvSettingsHandle;
   PlayerPanelHold? _danmakuTextFieldHold;
@@ -186,6 +190,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
       _bottomEpisodesFocus,
       _bottomFullscreenFocus,
       _bottomSettingsFocus,
+      _bottomInfoFocus,
       _tvProgressFocus,
     ]) {
       node.dispose();
@@ -606,6 +611,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
           _bottomEpisodesFocus,
           _bottomNextFocus,
           _bottomDanmakuFocus,
+          if (widget.showPlaybackInfo != null) _bottomInfoFocus,
           _bottomSettingsFocus,
         ]
       : <FocusNode>[
@@ -1051,6 +1057,18 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                                 },
                               ),
                               const SizedBox(width: 4),
+                              if (widget.showPlaybackInfo != null) ...[
+                                TvPlayerAction(
+                                  focusNode: _bottomInfoFocus,
+                                  label: 'INFO · 番剧资料',
+                                  iconBuilder: (color) => Icon(
+                                      Icons.info_outline,
+                                      color: color,
+                                      size: 24),
+                                  onPressed: widget.showPlaybackInfo,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
                               TvPlayerAction(
                                 focusNode: _bottomSettingsFocus,
                                 label: '设置',

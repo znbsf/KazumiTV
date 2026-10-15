@@ -122,7 +122,7 @@ const List<_TvRemoteGroup> _tvRemoteGroups = [
       _TvRemoteMapping(
         Icons.info_outline_rounded,
         '播放信息',
-        'INFO 或蓝色功能键，查看硬解、帧率、缓存和丢帧',
+        'INFO 或蓝色功能键查看番剧资料；设置中的播放信息查看硬解、帧率、缓存和丢帧',
       ),
       _TvRemoteMapping(
         Icons.stop_circle_outlined,

@@ -1,5 +1,7 @@
 # #11 稳定修复发布准备
 
+2026-10-15 15:26 UTC 状态更新：PR #12 已按用户授权正常合并，merge SHA `286ab90d7f59279fdd01675002cad4b3eacf6b41`，未发布版本。以下 draft/未合并描述保留为合并前证据。后续 INFO 进展见 [INFO 方案](STABLE-INFO-PLAN.md)，当前入口见 [项目状态](PROJECT-STATUS.md)。原纯文档记录 ed555894 已保留并移植到 INFO 分支为 8ca653f4。
+
 2026-10-15核对：[PR #12](https://github.com/znbsf/KazumiTV/pull/12) head `ab5ea883a08708cf2a291269c88468273bed7295`，base/main `ae2d9dab5b036cdde568d6b714ce498fb75a7a3b`（含已合并#10），仍open/draft、未合并。正式发布仍v0.4.2。本页是准备清单，不是合并或发布授权。
 
 本轮后续本地提交仅保存七份文档，未推送、未触发新CI。下述CI验证只对应 `ab5ea883`，不代表本地文档提交经过新CI。

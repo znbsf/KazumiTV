@@ -1,5 +1,7 @@
 # KazumiTV 当前状态
 
+2026-10-15 后续授权与状态：PR #12已正常合并至main，merge SHA `286ab90d7f59279fdd01675002cad4b3eacf6b41`，未发布。精简INFO在独立 `feat/stable-playback-info` 实施，范围、源码依据与测试计划见[INFO方案](STABLE-INFO-PLAN.md)。下方“草稿/未合并”是合并前历史记录；当前INFO不引入频道/EPG/排期，后续仅建新draft PR，未授权合并INFO或发布版本。
+
 2026-10-15 最新核对：PR #12 head `ab5ea883a08708cf2a291269c88468273bed7295` 的 [CI 38746978591](https://github.com/znbsf/KazumiTV/actions/runs/38746978591) 于14:12:31 UTC全部成功：871项测试，静态0 error / 0 warning、58 info，三ABI构建与产物校验通过。PR仍为草稿、未合并、未发布。QA生产代码仍对应 `dae2bbede53f225a3f0c135181f0981f502ddcce`；下方869项为旧head结果。验收边界及正式升级/签名/附件待办见[稳定发布准备](ISSUE11-RELEASE-READINESS.md)。
 
 独立设备研究见[桌面/ADB状态与回滚](TV-DESKTOP-ADB-STATUS.md)：LTv普通入口可用，Home Button Fix已关闭，临时设置包状态已恢复，原HOME保留；开机启动、HOME接管与ADB持续可用分别记录，不作为稳定版已修复功能。
