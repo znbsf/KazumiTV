@@ -431,6 +431,69 @@ void main() {
     expect(controller.errorMessage, isNull);
   });
 
+  test(
+      'timeout retry can be cancelled and retried without late-error pollution',
+      () async {
+    source.answer = (_, __) =>
+        Future.error(const VideoSourceTimeoutException(Duration(seconds: 15)));
+    await controller.changeEpisode(2, offset: 71, playerController: player);
+    expect(controller.errorMessage, isNotNull);
+    expect(controller.loading, isFalse);
+
+    final pending = Completer<VideoSource>();
+    source.answer = (_, __) => pending.future;
+    final retry = controller.retryCurrentEpisode(playerController: player);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.loading, isTrue);
+    await controller.cancelEpisodeLoad(playerController: player);
+    expect(controller.loading, isFalse);
+    expect(controller.errorMessage, contains('已取消加载'));
+
+    source.answer = null;
+    await controller.retryCurrentEpisode(playerController: player);
+    pending.completeError(const VideoSourceNotFoundException());
+    await retry;
+    expect(source.requests.map((request) => request.offset), [71, 71, 71]);
+    expect(player.initializations, hasLength(1));
+    expect(player.initializations.single.episode, 2);
+    expect(player.initializations.single.offset, 71);
+    expect(controller.errorMessage, isNull);
+    expect(controller.playingEpisode,
+        const VideoEpisodeSelection(episode: 2, road: 0));
+  });
+
+  test('repeated source commits retain history identity and ignore old errors',
+      () async {
+    TvMode.setEnabledForTesting(true);
+    await controller.changeEpisode(2, playerController: player);
+    final original = player.initializations.single;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      expect(
+          await controller.switchSource(candidate(),
+              expectedRevision: controller.playbackRevision,
+              playerController: player),
+          isTrue);
+    }
+    expect(source.requests, hasLength(1));
+    for (final old in player.initializations.take(3)) {
+      await old.onHistoryProgress!
+          .call(const Duration(seconds: 99), const Duration(minutes: 24));
+    }
+    // A retired native session may still flush its last real progress. Its
+    // captured identity must not be rewritten as the current source.
+    expect(history.writes, ['fixture', 'new', 'new']);
+    final current = player.initializations.last;
+    await current.onHistoryProgress!
+        .call(const Duration(seconds: 43), const Duration(minutes: 24));
+    expect(history.writes, ['fixture', 'new', 'new', 'new']);
+    controller.dispose();
+    original.onPlaybackError!('late original failure after exit');
+    await current.onHistoryProgress!
+        .call(const Duration(seconds: 44), const Duration(minutes: 24));
+    expect(history.writes, ['fixture', 'new', 'new', 'new', 'new']);
+    expect(controller.errorMessage, isNull);
+  });
+
   test('late failed initialization cannot overwrite a newer successful episode',
       () async {
     final pending = Completer<bool>();
