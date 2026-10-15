@@ -1,5 +1,7 @@
 # 稳定版 INFO 验证记录
 
+状态更新（2026-10-15 16:24 UTC）：用户明确批准远端推送和草稿PR后，同一推送重试成功，已创建 [草稿 PR #13](https://github.com/znbsf/KazumiTV/pull/13)。下文审批阻塞为历史记录，已解除；CI待终态，未合并INFO或发布。没有重复本地构建或设备验收。
+
 2026-10-15 UTC。PR #12 已正常合并到 main，merge SHA `286ab90d7f59279fdd01675002cad4b3eacf6b41`，未发布新版本。INFO 位于独立分支 `feat/stable-playback-info`，产品提交 `b3055c3d424738c9c1e319f422c318ca9de50245`。原纯文档 ed555894 保留，移植提交为 8ca653f4。
 
 ## 实现边界

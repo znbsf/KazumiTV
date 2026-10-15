@@ -1,5 +1,7 @@
 # KazumiTV 当前状态
 
+2026-10-15 16:24 UTC：用户明确批准后 INFO 分支推送成功，已创建 [草稿 PR #13](https://github.com/znbsf/KazumiTV/pull/13)，目标 main；下文推送阻塞已解除。源码仍为 b3055c3d，877项本地测试及电视验收记录不变，远端CI待完成。未合并INFO或发布；后续以该PR精确head的检查结果为准。
+
 2026-10-15 INFO 本地交付：`b3055c3d` 完成精简卡片，877项全量测试、静态0 error/0 warning（58 info）、ARMv7独立QA构建及Android 9电视开关/焦点/播放状态验收通过，见[INFO验证记录](STABLE-INFO-VALIDATION-20261015.md)。远端推送被自动审批拒绝（需要明确推送/建PR授权），尚无INFO PR或CI结果，未合并INFO或发布。PR #12已经合并，不能与INFO待交付状态混淆。
 
 2026-10-15 后续授权与状态：PR #12已正常合并至main，merge SHA `286ab90d7f59279fdd01675002cad4b3eacf6b41`，未发布。精简INFO在独立 `feat/stable-playback-info` 实施，范围、源码依据与测试计划见[INFO方案](STABLE-INFO-PLAN.md)。下方“草稿/未合并”是合并前历史记录；当前INFO不引入频道/EPG/排期，后续仅建新draft PR，未授权合并INFO或发布版本。
