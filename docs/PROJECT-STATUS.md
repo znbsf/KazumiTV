@@ -1,8 +1,8 @@
 # KazumiTV 当前状态
 
-2026-10-16：PR #10/#12/#13/#14 已合并，main 程序基线为 `127ecb3d1b98aea781eab44b7ced038cf11d26f0`；CI 38877589578 的 checks 与三 ABI 构建均成功。用户已批准先发布稳定修复与 INFO，再独立开发确认后的兼容播放功能。
+2026-10-16：稳定版 [v0.4.3](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.3) 已公开为 Latest，0.4.3+20393。标签 `9fb923c26647e944c9107ab3635ce1aca2ccf057` 与 PR #16 的 main 合并 `ab273c1aca02238cf03d6f523dac7ef259e4830b` 完整树一致。main CI 38885389953 四项成功；11项正式附件已匿名下载核验SHA256。ARMv7正式包同签名保数据升级及短播回归完成；其他ABI未作实机验收。
 
-当前准备 **0.4.3+20393**，见 [发布说明](RELEASE-0.4.3.md)。正式 Release 尚待签名、资产核验和升级检查完成；当前已公开版本仍为 v0.4.2。CI candidate 不作为正式发布包。默认 mediacodec_embed 不变，不纳入 AV1/输出切换实验、个人电视或频道/EPG preview。
+后续 [确认后兼容播放](CONFIRMED-PLAYBACK-RECOVERY.md) 独立开发，仅准备草稿PR，未合并、未发布，不改变 v0.4.3。个人电视/频道/EPG preview 仍独立。
 
 下方记录是既往状态快照，旧授权阻塞、草稿或未合并描述已被本段最新事实取代，不据历史状态继续操作。
 
@@ -29,7 +29,7 @@
 
 本文件是仓库唯一当前状态入口。历史报告保留原始事实，不从旧结论恢复授权或状态。更新日期：2026-10-15。
 
-## current：已确认的发布
+## 历史发布：v0.4.2
 
 - 正式版：[v0.4.2](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.2)，Latest，非草稿/预发布。
 - 标签对应源码：`590001e970e637622422908a9a2e1dcc0d54a999`；0.4.2+20392，三ABI versionCode 203921/203922/203924。

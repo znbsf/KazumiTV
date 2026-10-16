@@ -1,5 +1,7 @@
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'dart:async';
+import 'package:kazumi/services/player/confirmed_playback_recovery.dart';
+import 'package:kazumi/pages/player/controller/playback_recovery_snapshot.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_volume_controller/flutter_volume_controller.dart';
@@ -162,11 +164,61 @@ class PlayerController implements Disposable {
     unawaited(GStorage.putSetting<double>(SettingsKeys.defaultVolume, clamped));
   }
 
-  Future<bool> init(PlaybackInitParams params) async {
+  final recovery = ConfirmedPlaybackRecovery();
+  RecoverySession? _recoverySession;
+  PlaybackRecoverySnapshot? _recoverySnapshot;
+  PlaybackInitParams? _recoveryParams;
+  RecoverySession? get pendingRecovery => !playback.loading &&
+          _recoverySession?.phase == RecoveryPhase.awaitingConfirmation
+      ? _recoverySession
+      : null;
+
+  Future<bool> recoverWithSoftware(RecoverySession session) async {
+    final snapshot = _recoverySnapshot;
+    final params = _recoveryParams;
+    if (snapshot == null || params == null || !recovery.confirm(session))
+      return false;
+    bool succeeded = false;
+    try {
+      seeking.invalidateInteractiveSeek();
+      danmaku.clearAndInvalidateScheduledDanmakus();
+      succeeded = await _initialize(params,
+          recoverySnapshot: snapshot, recoverySession: session);
+    } catch (error) {
+      KazumiLogger().w('Player: recovery could not complete', error: error);
+    } finally {
+      await recovery.settle(session, succeeded: succeeded, stop: () async {
+        try {
+          await playback.stop();
+        } catch (error) {
+          KazumiLogger().w('Player: recovery cleanup failed', error: error);
+        }
+      }, applyResult: (ok) {
+        playback.recoveryBlocksCompletion =
+            !ok || playback.recoveryHasNativeError;
+        if (!ok) playback.loading = false;
+      });
+    }
+    return succeeded;
+  }
+
+  Future<bool> init(PlaybackInitParams params) => _initialize(params);
+
+  Future<bool> _initialize(
+    PlaybackInitParams params, {
+    PlaybackRecoverySnapshot? recoverySnapshot,
+    RecoverySession? recoverySession,
+  }) async {
     if (_initializations.isClosed) {
       return false;
     }
     final initialization = _initializations.begin();
+    final session = recoverySession ?? recovery.begin();
+    if (recoverySession == null) {
+      _recoverySession = session;
+      _recoverySnapshot = null;
+      _recoveryParams = params;
+    }
 
     videoUrl = params.videoUrl;
     isLocalPlayback = params.isLocalPlayback;
@@ -180,11 +232,14 @@ class PlayerController implements Disposable {
         'PlayerController: ${params.isLocalPlayback ? "local" : "online"} playback, url: ${params.videoUrl}');
 
     playback.resetForInit();
+    playback.recoveryBlocksCompletion = recoverySnapshot != null;
     debug.playerLogLevel = GStorage.getSetting(SettingsKeys.playerLogLevel);
-    playback.playerSpeed = GStorage.getSetting(SettingsKeys.defaultPlaySpeed);
-    panel.aspectRatioMode = PlayerAspectRatio.fromStorageValue(
-      GStorage.getSetting(SettingsKeys.defaultAspectRatioType),
-    );
+    playback.playerSpeed = recoverySnapshot?.rate ??
+        GStorage.getSetting(SettingsKeys.defaultPlaySpeed);
+    if (recoverySnapshot == null)
+      panel.aspectRatioMode = PlayerAspectRatio.fromStorageValue(
+        GStorage.getSetting(SettingsKeys.defaultAspectRatioType),
+      );
 
     playback.buttonSkipTime = GStorage.getSetting(SettingsKeys.buttonSkipTime);
     playback.arrowKeySkipTime =
@@ -192,9 +247,9 @@ class PlayerController implements Disposable {
     try {
       await _releasePlaybackResources();
     } catch (_) {}
-    if (initialization.isStale) {
+    if (initialization.isStale) return false;
+    if (recoverySnapshot != null && !playback.lastReleaseSucceeded)
       return false;
-    }
 
     final Player? player;
     try {
@@ -203,6 +258,15 @@ class PlayerController implements Disposable {
         params.adBlockerEnabled,
         canInstall: () => initialization.isActive,
         offset: params.offset,
+        recoverySnapshot: recoverySnapshot,
+        onDirectDecoderFailure: recoverySnapshot == null && TvMode.enabled
+            ? (snapshot) {
+                if (!initialization.isActive) return;
+                session.directOutput = true;
+                if (recovery.reportFailure(session))
+                  _recoverySnapshot = snapshot;
+              }
+            : null,
         videoSourceFormat: params.videoSourceFormat,
         onHistoryProgress: params.onHistoryProgress,
         onPlaybackError: params.onPlaybackError,
@@ -270,6 +334,25 @@ class PlayerController implements Disposable {
     await setPlaybackSpeed(playback.playerSpeed);
     if (!_ownsInitialization(initialization, player)) {
       return false;
+    }
+    if (recoverySnapshot != null) {
+      try {
+        final replacement = player;
+        final restored = await restoreRecoveredPlayer(
+            replacement,
+            recoverySnapshot,
+            () => _ownsInitialization(initialization, replacement));
+        if (!restored || playback.recoveryHasNativeError) return false;
+        danmaku.clearAndInvalidateScheduledDanmakus();
+        if (recoverySnapshot.playing) {
+          danmaku.canvasController.resume();
+        } else {
+          danmaku.canvasController.pause();
+        }
+      } catch (error) {
+        KazumiLogger().w('Player: software recovery failed', error: error);
+        return false;
+      }
     }
     KazumiLogger().i('PlayerController: video initialized');
     playback.loading = false;
@@ -346,6 +429,7 @@ class PlayerController implements Disposable {
     if (TvMode.enabled) danmaku.invalidateScheduledDanmakus();
     danmaku.canvasController.pause();
     try {
+      playback.setPlaybackIntent(player, false);
       await player.pause();
     } catch (_) {
       return;
@@ -364,6 +448,7 @@ class PlayerController implements Disposable {
     if (player == null) return;
     danmaku.canvasController.resume();
     try {
+      playback.setPlaybackIntent(player, true);
       await player.play();
     } catch (_) {
       return;
@@ -388,6 +473,7 @@ class PlayerController implements Disposable {
   /// removed. Immediate ownership detachment happens synchronously before this
   /// method returns.
   void beginShutdown() {
+    recovery.invalidate();
     _initializations.close();
     if (_shutdownFuture != null) {
       return;
@@ -438,6 +524,7 @@ class PlayerController implements Disposable {
   }
 
   Future<void> stop() async {
+    recovery.invalidate();
     _initializations.cancel();
     await _releasePlaybackResources();
   }
