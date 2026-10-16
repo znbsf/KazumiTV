@@ -128,6 +128,8 @@ abstract class _PlayerSyncPlayController with Store {
               duration: const Duration(seconds: 5),
               showActionButton: true,
               actionLabel: '重新连接',
+              isActionCurrent: () =>
+                  !_connectionSessions.isClosed && !hasSession,
               onActionPressed: () => createRoom(room, username, changeEpisode),
             );
           }
