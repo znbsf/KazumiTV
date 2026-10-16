@@ -1,5 +1,6 @@
 import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
 import 'package:kazumi/pages/player/tv_player_focus.dart';
+import 'package:kazumi/pages/player/tv_playback_info.dart';
 import 'package:kazumi/pages/player/player_shortcut_platform_actions.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 
@@ -421,7 +422,7 @@ class _PlayerItemState extends State<PlayerItem>
       'showcontrols': _showTvControls,
       'showepisodes': widget.showEpisodeGuide,
       'togglefavorite': _toggleFavorite,
-      'showdetails': _showVideoDetails,
+      'showdetails': _showPlaybackInfo,
       'showremotehelp': _showRemoteHelp,
       'back': () => widget.onBackPressed(context),
       'exitplayer': widget.exitPlayer,
@@ -507,6 +508,47 @@ class _PlayerItemState extends State<PlayerItem>
 
   void _showVideoDetails() {
     showVideoDetailsSheet(context, playerController: playerController);
+  }
+
+  final _playbackInfo = TvPlaybackInfoPresenter();
+
+  void _showPlaybackInfo() {
+    if (!TvMode.enabled) {
+      _showVideoDetails();
+      return;
+    }
+    if (!mounted || _playbackInfo.isOpen) return;
+    final hold = acquirePlayerPanelHold();
+    _handlePlayerMenuVisibilityChanged(true);
+    unawaited(_playbackInfo
+        .show(context,
+            fallbackFocus: widget.keyboardFocus,
+            builder: (_) => Observer(builder: (_) {
+                  final item = videoPageController.bangumiItem;
+                  final selection = videoPageController.playbackEpisode;
+                  return TvPlaybackInfoCard(
+                      info: TvPlaybackInfoData.fromPlayback(
+                          title: item.nameCn.trim().isNotEmpty
+                              ? item.nameCn
+                              : item.name,
+                          fallbackTitle: videoPageController.title,
+                          sourceName: videoPageController.isOfflineMode
+                              ? videoPageController.offlinePluginName
+                              : videoPageController.currentPlugin.name,
+                          images: item.images,
+                          roads: videoPageController.roadList,
+                          roadIndex: selection.road,
+                          episodeIndex: selection.episode),
+                      onClose: _playbackInfo.close);
+                }))
+        .whenComplete(() {
+      if (mounted) {
+        _handlePlayerMenuVisibilityChanged(false);
+        hold.release();
+      } else {
+        hold.releaseSilently();
+      }
+    }));
   }
 
   void _showRemoteHelp() {
@@ -658,20 +700,20 @@ class _PlayerItemState extends State<PlayerItem>
   }
 
   Future<void> handleShortcutExitFullscreen() => dispatchShortcutExitFullscreen(
-    fullscreen: videoPageController.isFullscreen,
-    tablet: isTablet(),
-    desktop: isDesktop(),
-    macOS: Platform.isMacOS,
-    exitFullscreen: () {
-      try {
-        playerController.danmaku.clearAndInvalidateScheduledDanmakus();
-      } catch (_) {}
-      DisplayModeService.exitFullScreen();
-      videoPageController.isFullscreen = !videoPageController.isFullscreen;
-    },
-    pause: playerController.pause,
-    hideWindow: windowManager.hide,
-  );
+        fullscreen: videoPageController.isFullscreen,
+        tablet: isTablet(),
+        desktop: isDesktop(),
+        macOS: Platform.isMacOS,
+        exitFullscreen: () {
+          try {
+            playerController.danmaku.clearAndInvalidateScheduledDanmakus();
+          } catch (_) {}
+          DisplayModeService.exitFullScreen();
+          videoPageController.isFullscreen = !videoPageController.isFullscreen;
+        },
+        pause: playerController.pause,
+        hideWindow: windowManager.hide,
+      );
 
   void _toggleVideoController() {
     if (playerController.panel.showVideoController) {
@@ -1686,6 +1728,7 @@ class _PlayerItemState extends State<PlayerItem>
 
   @override
   void dispose() {
+    _playbackInfo.close();
     _releaseProbeState?.call();
     // The route-scoped PlayerController owns playback disposal.
     _fullscreenListener();
@@ -1899,6 +1942,7 @@ class _PlayerItemState extends State<PlayerItem>
                                       _handlePlayerMenuVisibilityChanged,
                                   handleDanmaku: handleDanmaku,
                                   showVideoInfo: showVideoInfo,
+                                  showPlaybackInfo: _showPlaybackInfo,
                                   showSyncPlayPanel: showSyncPlayPanel,
                                   pauseForTimedShutdown:
                                       widget.pauseForTimedShutdown,

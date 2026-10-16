@@ -1,5 +1,7 @@
 # 已有工具及验证边界
 
+当前回滚与设备研究边界见[桌面/ADB状态](../../../../docs/TV-DESKTOP-ADB-STATUS.md)，稳定验收边界见[发布准备](../../../../docs/ISSUE11-RELEASE-READINESS.md)。下文为分阶段观察，不能把早期故障当当前状态或恢复历史授权。换源取消对照前后暂停/位置/焦点；受控超时取消重试不替代实机自然超时。
+
 本轮复用了任务环境已有的 `adb-lowres-prototype` 引擎（`capture.py` 和 `latest_frame.py`）。使用前从当前任务的工具记录定位目录并读其 README，再通过 `--tool-root` 传入；本仓库不捆绑该外部引擎。使用环境已有 Python、adb 与 FFmpeg，工具位置不构成设备操作授权。
 
 ```powershell

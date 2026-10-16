@@ -1,5 +1,7 @@
 # #11 第二阶段补充回归
 
+后续CI终态：head `ab5ea883a08708cf2a291269c88468273bed7295` 的 [run 38746978591](https://github.com/znbsf/KazumiTV/actions/runs/38746978591) 于2026-10-15 14:12:31 UTC全部成功，871 tests passed，静态0 error / 0 warning、58 info，三ABI构建与校验通过。正式发布步骤和未测边界见[发布准备](ISSUE11-RELEASE-READINESS.md)。下文保留设备与本地测试发生时的基线。
+
 2026-10-15 13:55 UTC。基线 PR #12 head `b90e38498010d8301f160380437fb6ce29336bda`；程序源码仍为 `dae2bbede53f225a3f0c135181f0981f502ddcce`。本轮新增测试和记录，没有修改生产代码、依赖或重建 APK。
 
 ## 受控回归
