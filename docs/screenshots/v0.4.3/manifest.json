@@ -1,0 +1,32 @@
+{
+  "version": "0.4.3",
+  "captured_date": "2026-10-16",
+  "source_commit": "9fb923c26647e944c9107ab3635ce1aca2ccf057",
+  "processing": "JPEG quality 88, progressive, original size, no content edits",
+  "images": [
+    {
+      "file": "home.jpg",
+      "source_sha256": "1c3c517e0fd195d542e1d6ca568bbe1cce282c8cf3a8d9454fac6ccfa1d51d1e",
+      "sha256": "d03625a0a0ba8b72db1452b9c1f4b41f2dc7abaf5830eb05323568a899e0adb5",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 485445
+    },
+    {
+      "file": "player.jpg",
+      "source_sha256": "eded21f19957d0d120c15846b9b00f35c113fcdc9a31f6077d73a1d06d565265",
+      "sha256": "7090df02f7e8d3901331d441eb3b2113756f233b10dbc9630983f4c248b82581",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 294401
+    },
+    {
+      "file": "info.jpg",
+      "source_sha256": "b10f1c131fbba53ac68bf6decf0e95e220d5c45af38051318a803531f57a6e7e",
+      "sha256": "e7af391dec8c97bfa5bf512b5b910e55ee5ea2505629e508c853c199949477a9",
+      "width": 1920,
+      "height": 1080,
+      "bytes": 266613
+    }
+  ]
+}
