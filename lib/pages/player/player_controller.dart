@@ -338,6 +338,8 @@ class PlayerController implements Disposable {
     if (recoverySnapshot != null) {
       try {
         final replacement = player;
+        if (!await playback.waitForRecoveredFrame(replacement) ||
+            !_ownsInitialization(initialization, replacement)) return false;
         final restored = await restoreRecoveredPlayer(
             replacement,
             recoverySnapshot,

@@ -67,6 +67,10 @@ final class _OwnedPlayer {
   StreamSubscription<double>? _rateProbeSubscription;
   bool intendedPlaying = false;
   bool hasNativeError = false;
+  final recoveryAborted = Completer<void>();
+  void abortRecoveryWait() {
+    if (!recoveryAborted.isCompleted) recoveryAborted.complete();
+  }
   bool ready = false;
   bool released = false;
   final List<StreamSubscription<dynamic>> subscriptions = [];
@@ -91,6 +95,7 @@ final class _OwnedPlayer {
   }
 
   Future<void> _dispose() async {
+    abortRecoveryWait();
     // Capture synchronously before the native player is detached/disposed.
     final finalHistory = recordHistory();
     ready = false;
@@ -563,6 +568,7 @@ abstract class _PlayerPlaybackController with Store {
       candidate.subscriptions.add(player.stream.error.listen((event) {
         if (isCurrentPlayer(player) && recoverySnapshot != null) {
           candidate.hasNativeError = true;
+          candidate.abortRecoveryWait();
           recoveryBlocksCompletion = true;
           completed = false;
         }
@@ -571,6 +577,7 @@ abstract class _PlayerPlaybackController with Store {
           final actionableMessage = PlayerErrorMapper.toActionableMessage(
             event,
             isBuffering: playerBuffering,
+            softwareRecovery: recoverySnapshot != null,
           );
           if (actionableMessage != null) {
             if (onPlaybackError != null) {
@@ -773,6 +780,19 @@ abstract class _PlayerPlaybackController with Store {
     } else {
       await play();
     }
+  }
+
+  Future<bool> waitForRecoveredFrame(Player player) {
+    final owner = _ownedPlayer;
+    final output = videoController;
+    if (owner == null || owner.player != player || output == null) {
+      return Future.value(false);
+    }
+    return waitForRecoveryFrame(
+      firstFrame: output.waitUntilFirstFrameRendered,
+      aborted: owner.recoveryAborted.future,
+      isCurrent: () => isCurrentPlayer(player) && !owner.hasNativeError,
+    );
   }
 
   Future<void> stop() async {

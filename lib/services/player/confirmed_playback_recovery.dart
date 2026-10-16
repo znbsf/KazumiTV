@@ -1,3 +1,19 @@
+import 'dart:async';
+
+/// Opening media only accepts a native command; it does not prove decoding.
+Future<bool> waitForRecoveryFrame({
+  required Future<void> firstFrame,
+  required Future<void> aborted,
+  required bool Function() isCurrent,
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final rendered = await Future.any<bool>([
+    firstFrame.then((_) => true, onError: (Object _) => false),
+    aborted.then((_) => false),
+  ]).timeout(timeout, onTimeout: () => false);
+  return rendered && isCurrent();
+}
+
 /// Explicit failure evidence from the pinned mpv decoder, never URL/error-text
 /// heuristics or buffering/completion alone.
 bool isDirectDecoderFailure({required String prefix, required String text}) =>
