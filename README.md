@@ -17,19 +17,21 @@
 
 ## 界面
 
-以下为当前 Flutter TV 融合界面的实际截图，非历史原生版。节目资料与可播放来源以在线服务的实际返回为准。
+以下截图来自 **v0.4.3 正式包**的 Android TV 实机验收（2026-10-16），不是个人电视/EPG 预览或兼容播放实验。节目资料、弹幕与可播放来源以在线服务的实际返回为准。
 
-**首页 · 横向分类与向下浏览**
+**首页 · 最近观看、横向分类与五列海报**
 
-![KazumiTV Flutter TV 首页：单排导航与五列海报](docs/screenshots/flutter-tv/home.png)
+![KazumiTV v0.4.3 首页：最近观看入口、横向分类导航与五列海报](docs/screenshots/v0.4.3/home.jpg)
 
-**详情 · 作品资料与观看入口**
+**播放器 · 真实视频画面、弹幕与遥控控制栏**
 
-![KazumiTV Flutter TV 详情页](docs/screenshots/flutter-tv/detail.png)
+![KazumiTV v0.4.3 播放器：暂停的视频画面、弹幕、进度条与选集和 INFO 按钮](docs/screenshots/v0.4.3/player.jpg)
 
-**播放器 · 遥控器操作与播放进度**
+**INFO · 当前作品、来源与下一集**
 
-![KazumiTV Flutter TV 播放器](docs/screenshots/flutter-tv/player.png)
+![KazumiTV v0.4.3 INFO 卡片：作品封面、当前集数、播放来源、下一集与返回播放按钮](docs/screenshots/v0.4.3/info.jpg)
+
+截图保留实际界面，仅压缩图片体积；[截图来源与说明](docs/screenshots/v0.4.3/README.md)。截图不代表所有来源、设备或长时间播放均已验证。
 
 ## 下载与安装
 
