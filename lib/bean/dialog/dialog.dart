@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/utils/constants.dart';
 
 /// Single-use ownership of a route, including before its first frame.
@@ -35,6 +36,8 @@ class KazumiDialogHandle<T> {
 class KazumiDialog {
   static final KazumiDialogObserver observer = KazumiDialogObserver();
   static int _toastRevision = 0;
+  static Future<void>? _tvActionTail;
+  static final Set<(BuildContext, String, String?)> _tvActions = {};
 
   KazumiDialog._internal();
 
@@ -83,8 +86,57 @@ class KazumiDialog {
     bool showActionButton = false,
     String? actionLabel,
     VoidCallback? onActionPressed,
+    bool Function()? isActionCurrent,
     Duration duration = const Duration(seconds: 2),
   }) {
+    if (context != null && !context.mounted) return;
+    // A transient SnackBar outside the page's focus scope is not a reachable
+    // remote action. Keep passive notices transient, but give TV actions their
+    // own route, focus and lifetime. Serialize them instead of replacing one.
+    if (TvMode.enabled && showActionButton && onActionPressed != null) {
+      final owner = context ??
+          rootNavigatorKey.currentContext ??
+          observer.navigator?.context;
+      if (owner == null || !owner.mounted) return;
+      final action = (owner, message, actionLabel);
+      if (!_tvActions.add(action)) return;
+      final pending = (_tvActionTail ?? Future<void>.value()).then((_) async {
+        if (!owner.mounted || isActionCurrent?.call() == false) return;
+        final accepted = await show<bool>(
+          context: owner,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('提示'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                autofocus: true,
+                onPressed: () =>
+                    dismiss(context: dialogContext, popWith: false),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () => dismiss(context: dialogContext, popWith: true),
+                child: Text(actionLabel ?? '确定'),
+              ),
+            ],
+          ),
+        );
+        if (accepted == true &&
+            owner.mounted &&
+            isActionCurrent?.call() != false) {
+          onActionPressed();
+        }
+      }).catchError((Object error, StackTrace stack) {
+        // A failing action must not prevent subsequent prompts from opening.
+        debugPrint('Kazumi Dialog Error: TV action failed: $error');
+      });
+      _tvActionTail = pending;
+      unawaited(pending.whenComplete(() {
+        _tvActions.remove(action);
+        if (identical(_tvActionTail, pending)) _tvActionTail = null;
+      }));
+      return;
+    }
     final messenger = _resolveScaffoldMessenger(context);
     if (messenger != null && messenger.mounted) {
       final toastContext =
@@ -108,7 +160,8 @@ class KazumiDialog {
                       label: actionLabel ?? 'Dismiss',
                       onPressed: () {
                         // Let SnackBarAction close the old toast before replacing it.
-                        if (onActionPressed != null) {
+                        if (onActionPressed != null &&
+                            isActionCurrent?.call() != false) {
                           scheduleMicrotask(onActionPressed);
                         }
                       },

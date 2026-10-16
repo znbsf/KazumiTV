@@ -18,6 +18,7 @@ import 'package:kazumi/services/download/background_download_service.dart';
 import 'package:kazumi/services/platform/windows_shortcut.dart';
 import 'package:kazumi/services/platform/platform_environment_service.dart';
 import 'package:kazumi/services/update/startup_update_check.dart';
+import 'package:kazumi/services/update/startup_rule_update_check.dart';
 import 'package:kazumi/navigation.dart';
 
 class InitPage extends StatefulWidget {
@@ -94,7 +95,20 @@ class _InitPageState extends State<InitPage> {
         await updateController.checkUpdate(type: 'auto');
       },
     ));
+    final ruleController = pluginsController;
+    final checkRules =
+        GStorage.getSetting(SettingsKeys.checkPluginUpdateOnStartup);
     _startDefaultPage();
+    // The init route is replaced above. Present even an immediately completed
+    // check only after the destination has acquired its initial focus.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(runStartupRuleUpdateCheck(
+        check: () =>
+            ruleController.checkPluginUpdatesOnStartup(enabled: checkRules),
+        update: () =>
+            updateAllPluginsWithFeedback(ruleController, ensureCatalog: false),
+      ));
+    });
   }
 
   void _setupBackgroundDownloadNavigation() {
@@ -291,37 +305,11 @@ class _InitPageState extends State<InitPage> {
   Future<void> _pluginInit() async {
     try {
       await pluginsController.init();
-      unawaited(_pluginUpdate());
     } catch (error, stackTrace) {
       KazumiLogger().e(
         'Plugin: failed to initialize rules',
         error: error,
         stackTrace: stackTrace,
-      );
-    }
-  }
-
-  Future<void> _pluginUpdate() async {
-    final checkOnStartup =
-        GStorage.getSetting(SettingsKeys.checkPluginUpdateOnStartup);
-    late final int count;
-    try {
-      count = await pluginsController.checkPluginUpdatesOnStartup(
-        enabled: checkOnStartup,
-      );
-    } catch (_) {
-      return;
-    }
-    if (count != 0) {
-      KazumiDialog.showToast(
-        message: '检测到 $count 条规则可以更新',
-        showActionButton: true,
-        actionLabel: '全部更新',
-        onActionPressed: () => updateAllPluginsWithFeedback(
-          pluginsController,
-          ensureCatalog: false,
-        ),
-        duration: const Duration(seconds: 5),
       );
     }
   }

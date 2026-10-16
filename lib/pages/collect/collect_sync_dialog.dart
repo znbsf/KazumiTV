@@ -4,6 +4,7 @@ import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/bangumi/sync_priority.dart';
 import 'package:kazumi/modules/collect/collect_sync_plan.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 enum CollectSyncDestination { webDavSettings, bangumiSettings }
 
@@ -259,6 +260,7 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
             : [
                 if (!_finished || failed)
                   TextButton(
+                    autofocus: TvMode.enabled,
                     style: TextButton.styleFrom(
                       minimumSize: const Size(64, 48),
                     ),
@@ -268,6 +270,7 @@ class _CollectSyncDialogState extends State<CollectSyncDialog> {
                   ),
                 if (widget.plan.canSync)
                   StateActionButton(
+                    autofocus: TvMode.enabled && _finished && !failed,
                     onPressed: _finished && !failed
                         ? () => Navigator.of(context).pop()
                         : _start,

@@ -1507,6 +1507,11 @@ class _PopularPageState extends State<PopularPage> {
           }
           if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
             _tagSelectionTimer?.cancel();
+            // An empty failed first page has no card to focus. Let the
+            // normal directional policy reach its retry/settings actions.
+            if (popularController.isTimeOut && _visibleBangumiList.isEmpty) {
+              return KeyEventResult.ignored;
+            }
             final recent = node.enclosingScope?.traversalDescendants.where(
                 (n) =>
                     n.context != null &&

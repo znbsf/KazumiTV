@@ -603,9 +603,8 @@ void main() {
     _expectVisibleFocus(tester, 22);
     life.stop();
     observedInputs.addAll(life.report()['appEvents'] as List);
-    expect(observedInputs
-        .where((e) => e['key'] == 'down')
-        .map((e) => e['type']),
+    expect(
+        observedInputs.where((e) => e['key'] == 'down').map((e) => e['type']),
         ['down', 'repeat', 'repeat', 'repeat', 'repeat', 'up']);
   }, timeout: const Timeout(Duration(seconds: 30)));
 
@@ -693,6 +692,44 @@ void main() {
         reason: 'The short tail stops automatic and boundary requests');
     expect(controller.isTimeOut, isFalse);
   }, timeout: const Timeout(Duration(seconds: 30)));
+
+  testWidgets('empty first page allows DOWN to retry and SELECT recovers',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(
+        () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
+    final controller = TvPopularController();
+    final offsets = <int>[];
+    DioFactory.apiDio.interceptors.insert(0, InterceptorsWrapper(
+      onRequest: (options, handler) {
+        offsets.add(int.parse(options.uri.queryParameters['offset']!));
+        handler.resolve(
+            Response(requestOptions: options, statusCode: 200, data: {
+          'data':
+              offsets.length == 1 ? <Map<String, Object>>[] : _subjects(1, 24)
+        }));
+      },
+    ));
+    await tester.runAsync(() => controller.queryBangumiByTrend());
+    await tester.pumpWidget(MaterialApp(
+        home: TvAppShell(child: PopularPage(controller: controller))));
+    await tester.pumpAndSettle();
+    expect(controller.isTimeOut, isTrue);
+    final popular = find.byWidgetPredicate((widget) =>
+        widget is TvFocusableSurface &&
+        widget.focusNode?.debugLabel == 'TV category 热门番组');
+    tester.widget<TvFocusableSurface>(popular).focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    await _press(tester, LogicalKeyboardKey.arrowDown);
+    await _press(tester, LogicalKeyboardKey.select);
+    expect(offsets, [0, 0]);
+    expect(controller.trendList.length, 24);
+    expect(controller.isTimeOut, isFalse);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('empty append is reachable by DOWN and retries the same cursor',
       (tester) async {
