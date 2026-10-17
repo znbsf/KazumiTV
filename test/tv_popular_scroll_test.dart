@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:kazumi/modules/bangumi/bangumi_item.dart';
+import 'package:kazumi/services/storage/home_catalog_cache.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,6 +66,14 @@ Future<void> _press(WidgetTester tester, LogicalKeyboardKey key) async {
   await tester.pumpAndSettle();
 }
 
+class _MemoryHomeCache extends HomeCatalogCache {
+  @override
+  Future<HomeCatalogSnapshot?> read(bool mirror) async => null;
+  @override
+  Future<void> write(
+      bool mirror, List<BangumiItem> items, DateTime updated) async {}
+}
+
 void main() {
   late Directory temp;
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -77,7 +87,13 @@ void main() {
     await Hive.close();
     await temp.delete(recursive: true);
   });
-  setUp(() {
+  setUp(() async {
+    for (final file in temp
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.contains('home-catalog-'))) {
+      file.deleteSync();
+    }
     TvMode.setEnabledForTesting(true);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
@@ -479,7 +495,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.runAsync(
         () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
-    final controller = TvPopularController();
+    final controller = TvPopularController(homeCache: _MemoryHomeCache());
     final offsets = <int>[];
     VoidCallback? finishAppend;
     var appendCompleted = false;
@@ -617,7 +633,7 @@ void main() {
     // Hive writes use real filesystem completion, outside the widget clock.
     await tester.runAsync(
         () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
-    final controller = TvPopularController();
+    final controller = TvPopularController(homeCache: _MemoryHomeCache());
     final offsets = <int>[];
     final appendStarted = Completer<void>();
     VoidCallback? finishAppend;
@@ -701,7 +717,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.runAsync(
         () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
-    final controller = TvPopularController();
+    final controller = TvPopularController(homeCache: _MemoryHomeCache());
     final offsets = <int>[];
     DioFactory.apiDio.interceptors.insert(0, InterceptorsWrapper(
       onRequest: (options, handler) {
@@ -739,7 +755,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.runAsync(
         () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
-    final controller = TvPopularController();
+    final controller = TvPopularController(homeCache: _MemoryHomeCache());
     final offsets = <int>[];
     var appendAttempts = 0;
     FocusNode? focusAtRetry;
@@ -810,4 +826,39 @@ void main() {
     expect(offsets, [0, 24, 24]);
     expect(tester.takeException(), isNull);
   }, timeout: const Timeout(Duration(seconds: 30)));
+  testWidgets(
+      'home refresh is reachable by remote and returns focus to categories',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(
+        () => GStorage.putSetting(SettingsKeys.enableBangumiProxy, true));
+    final controller = TvPopularController(homeCache: _MemoryHomeCache());
+    DioFactory.apiDio.interceptors.insert(0,
+        InterceptorsWrapper(onRequest: (o, h) {
+      h.resolve(Response(
+          requestOptions: o,
+          statusCode: 200,
+          data: {'data': _subjects(1, 24)}));
+    }));
+    await tester.runAsync(() => controller.queryBangumiByTrend());
+    await tester.pumpWidget(MaterialApp(
+        home: TvAppShell(child: PopularPage(controller: controller))));
+    await tester.pumpAndSettle();
+    final categories = tester
+        .widgetList<TvFocusableSurface>(find.byWidgetPredicate((w) =>
+            w is TvFocusableSurface &&
+            (w.focusNode?.debugLabel?.startsWith('TV category ') ?? false)))
+        .toList();
+    categories.last.focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    await _press(tester, LogicalKeyboardKey.arrowRight);
+    expect(
+        FocusManager.instance.primaryFocus?.debugLabel, 'Refresh home cache');
+    await _press(tester, LogicalKeyboardKey.arrowLeft);
+    expect(categories.first.focusNode!.hasFocus, true);
+    expect(tester.takeException(), isNull);
+  });
 }

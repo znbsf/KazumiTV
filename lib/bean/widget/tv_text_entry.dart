@@ -1,14 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_target.dart';
 
 /// TV navigation selects an action; only explicit activation opens an editor.
 /// Non-TV keeps the original field, callbacks and pointer interaction intact.
 class TvTextEntry extends StatefulWidget {
-  const TvTextEntry({super.key, required this.child, this.title});
+  const TvTextEntry(
+      {super.key,
+      required this.child,
+      this.title,
+      this.allowPhoneKeyboard = true});
   final TextField child;
   final String? title;
+
+  /// Set false for credentials even if a show-password toggle makes them visible.
+  /// Label checks and obscureText are additional safeguards, not classification.
+  final bool allowPhoneKeyboard;
 
   @override
   State<TvTextEntry> createState() => _TvTextEntryState();
@@ -30,7 +41,17 @@ class _TvTextEntryState extends State<TvTextEntry> {
     _opening = true;
     final result = await showDialog<String>(
       context: context,
-      builder: (_) => _TvTextEditor(field: field, title: widget.title),
+      builder: (_) => _TvTextEditor(
+          field: field,
+          title: widget.title,
+          allowPhoneKeyboard: widget.allowPhoneKeyboard,
+          onPhoneConfirm: (value) {
+            if (!mounted) return;
+            field.controller?.value = TextEditingValue(
+                text: value,
+                selection: TextSelection.collapsed(offset: value.length));
+            field.onChanged?.call(value);
+          }),
     );
     _opening = false;
     if (!mounted) return;
@@ -90,9 +111,15 @@ class _TvTextEntryState extends State<TvTextEntry> {
 }
 
 class _TvTextEditor extends StatefulWidget {
-  const _TvTextEditor({required this.field, this.title});
+  const _TvTextEditor(
+      {required this.field,
+      required this.allowPhoneKeyboard,
+      required this.onPhoneConfirm,
+      this.title});
   final TextField field;
   final String? title;
+  final bool allowPhoneKeyboard;
+  final ValueChanged<String> onPhoneConfirm;
   @override
   State<_TvTextEditor> createState() => _TvTextEditorState();
 }
@@ -118,7 +145,12 @@ class _TvTextEditorState extends State<_TvTextEditor> {
   @override
   Widget build(BuildContext context) {
     final field = widget.field;
-    return AlertDialog(
+    final label = widget.title ?? field.decoration?.labelText ?? '文本输入';
+    final allowed = widget.allowPhoneKeyboard &&
+        !field.obscureText &&
+        !RegExp(r'password|token|secret|密码|密钥|口令', caseSensitive: false)
+            .hasMatch(label);
+    final dialog = AlertDialog(
       title: Text(widget.title ??
           field.decoration?.labelText ??
           field.decoration?.hintText ??
@@ -150,9 +182,27 @@ class _TvTextEditorState extends State<_TvTextEditor> {
           ))),
       actions: [
         TextButton(onPressed: () => _close(), child: const Text('取消')),
+        if (allowed) const PhoneKeyboardButton(),
         FilledButton(
             onPressed: () => _close(_draft.text), child: const Text('确定')),
       ],
     );
+    if (!allowed) return dialog;
+    return PhoneKeyboardEditorTarget(
+        controller: _draft,
+        label: label,
+        maxLength: field.maxLength != null && field.maxLength! > 0
+            ? field.maxLength!
+            : 2048,
+        inputFormatters: [
+          if (field.maxLines == 1)
+            FilteringTextInputFormatter.singleLineFormatter,
+          ...?field.inputFormatters,
+        ],
+        onConfirm: () {
+          widget.onPhoneConfirm(_draft.text);
+          _close();
+        },
+        child: dialog);
   }
 }

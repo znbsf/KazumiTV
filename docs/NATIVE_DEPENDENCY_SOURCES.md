@@ -2,6 +2,8 @@
 
 本版沿用固定 media-kit `994465d9bfca3f39d0b41199d16e7fd93fe97881`，未改动 libmpv 二进制。APK 内的 Dart/Flutter 依赖声明以及 MiSans、native 依赖原文可从设置中的许可证页查看；字体保持原始字节。
 
+`media_kit_video` 1.2.5 由上述固定版本的本地源码快照保存至 [third_party/media_kit_video](../third_party/media_kit_video)，通过 path override 构建，并保留其 [MIT LICENSE](../third_party/media_kit_video/LICENSE)。本地补丁将 Android 首帧证据从视频尺寸改为 Flutter SurfaceTexture 消费帧通知，隔离旧输出的迟到通知；SurfaceProducer 不伪报首帧。补丁边界、API 依据及待执行测试见 [KAZUMITV-PATCH.md](../third_party/media_kit_video/KAZUMITV-PATCH.md)。该修改不替换任何 libmpv 二进制。
+
 ## 固定构建来源
 
 - [libmpv Android v1.2.7](https://github.com/Predidit/libmpv-android-video-build/releases/tag/v1.2.7)，构建提交 `dd2bfba8209bcd22e2d4c79f125b40e619e637ed`。

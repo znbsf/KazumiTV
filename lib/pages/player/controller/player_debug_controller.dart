@@ -54,6 +54,7 @@ abstract class _PlayerDebugController with Store {
     await playerLogSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerLogSubscription = player.stream.log.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerLog.add(event.toString());
       if (playerDebugMode) {
         KazumiLogger().i("MPV: ${event.toString()}", forceLog: true);
@@ -62,42 +63,50 @@ abstract class _PlayerDebugController with Store {
     await playerWidthSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerWidthSubscription = player.stream.width.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerWidth = event ?? 0;
     });
     await playerHeightSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerHeightSubscription = player.stream.height.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerHeight = event ?? 0;
     });
     await playerVideoParamsSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerVideoParamsSubscription = player.stream.videoParams.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerVideoParams = event.toString();
     });
     await playerAudioParamsSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerAudioParamsSubscription = player.stream.audioParams.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerAudioParams = event.toString();
     });
     await playerPlaylistSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerPlaylistSubscription = player.stream.playlist.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerPlaylist = event.toString();
     });
     await playerTracksSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerTracksSubscription = player.stream.track.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerAudioTracks = event.audio.toString();
       playerVideoTracks = event.video.toString();
     });
     await playerAudioBitrateSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerAudioBitrateSubscription = player.stream.audioBitrate.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerAudioBitrate = event.toString();
     });
     await playerVideoBitrateSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;
     playerVideoBitrateSubscription = player.stream.videoBitrate.listen((event) {
+      if (!isCurrentPlayer(player)) return;
       playerVideoBitrate = event.toString();
     });
   }

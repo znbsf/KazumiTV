@@ -1,6 +1,9 @@
 import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_target.dart';
 
 /// Remote focus is an action, not an editable field. Text editing starts only
 /// after explicit activation, in its own route so BACK restores this entry.
@@ -37,6 +40,9 @@ class _TvSearchEntryState extends State<TvSearchEntry> {
       context: context,
       builder: (context) => _SearchEditor(
         initialText: widget.controller.text,
+        onPhoneConfirm: (text) {
+          if (mounted) widget.controller.text = text;
+        },
         suggestionsBuilder: widget.suggestionsBuilder,
       ),
     );
@@ -66,8 +72,12 @@ class _TvSearchEntryState extends State<TvSearchEntry> {
 }
 
 class _SearchEditor extends StatefulWidget {
-  const _SearchEditor({required this.initialText, this.suggestionsBuilder});
+  const _SearchEditor(
+      {required this.initialText,
+      required this.onPhoneConfirm,
+      this.suggestionsBuilder});
   final String initialText;
+  final ValueChanged<String> onPhoneConfirm;
   final WidgetBuilder? suggestionsBuilder;
 
   @override
@@ -84,7 +94,16 @@ class _SearchEditorState extends State<_SearchEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
+  Widget build(BuildContext context) => PhoneKeyboardEditorTarget(
+      controller: editor,
+      label: '搜索关键词',
+      maxLength: 120,
+      inputFormatters: [FilteringTextInputFormatter.singleLineFormatter],
+      onConfirm: () {
+        widget.onPhoneConfirm(editor.text);
+        Navigator.of(context).pop();
+      },
+      child: AlertDialog(
         title: const Text('搜索番剧'),
         scrollable: true,
         content: SizedBox(
@@ -113,10 +132,11 @@ class _SearchEditorState extends State<_SearchEditor> {
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('取消'),
           ),
+          const PhoneKeyboardButton(),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(editor.text),
             child: const Text('检索'),
           ),
         ],
-      );
+      ));
 }

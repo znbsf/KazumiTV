@@ -6,25 +6,29 @@ class _SourceSearchGroup {
     required this.keyword,
     required this.status,
     required this.results,
+    this.unsearched = false,
   });
 
   final String name;
   final String keyword;
   final PluginSearchStatus status;
   final List<SearchItem> results;
+  final bool unsearched;
 
-  bool get isSearching => status == PluginSearchStatus.pending;
+  bool get isSearching => !unsearched && status == PluginSearchStatus.pending;
   bool get hasResults =>
       status == PluginSearchStatus.success && results.isNotEmpty;
 
-  String get statusLabel => switch (status) {
-        PluginSearchStatus.pending => '检索中…',
-        PluginSearchStatus.success =>
-          results.isEmpty ? '无结果' : '${results.length} 个结果',
-        PluginSearchStatus.noResult => '无结果',
-        PluginSearchStatus.error => '检索失败',
-        PluginSearchStatus.captcha => '需要验证',
-      };
+  String get statusLabel => unsearched
+      ? '选择此来源搜索'
+      : switch (status) {
+          PluginSearchStatus.pending => '检索中…',
+          PluginSearchStatus.success =>
+            results.isEmpty ? '无结果' : '${results.length} 个结果',
+          PluginSearchStatus.noResult => '无结果',
+          PluginSearchStatus.error => '检索失败',
+          PluginSearchStatus.captcha => '需要验证',
+        };
 }
 
 enum _SourceDisplay { preview, expanded, collapsed }
@@ -273,6 +277,15 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   }
 
   Widget _buildSourceBody(_SourceSearchGroup group, {required bool showAll}) {
+    if (group.unsearched) {
+      return Padding(
+          padding: const EdgeInsets.all(12),
+          child: TextButton.icon(
+            onPressed: () => widget.onRetry(group.name),
+            icon: const Icon(Icons.search),
+            label: Text('搜索 ${group.name}'),
+          ));
+    }
     if (!group.hasResults) {
       return SplitListRow(
         topRadius: splitListOuterRadius,

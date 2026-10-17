@@ -20,8 +20,9 @@ class _PlayerItemSurfaceState extends State<PlayerItemSurface> {
   Widget build(BuildContext context) {
     final playerController = widget.playerController;
     return Observer(builder: (context) {
-      if (playerController.playback.loading ||
-          playerController.playback.videoController == null) {
+      // Keep the texture mounted while initialization waits for its first frame.
+      // The page owns the loading/cancel overlay above this rendering surface.
+      if (playerController.playback.videoController == null) {
         return Container(
           color: Colors.black,
           child: const Center(
@@ -32,6 +33,7 @@ class _PlayerItemSurfaceState extends State<PlayerItemSurface> {
 
       final aspectRatioMode = playerController.panel.aspectRatioMode;
       final video = Video(
+        key: ObjectKey(playerController.playback.videoController),
         controller: playerController.playback.videoController!,
         controls: NoVideoControls,
         pauseUponEnteringBackgroundMode: false,

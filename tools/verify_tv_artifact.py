@@ -42,12 +42,15 @@ def main():
     with zipfile.ZipFile(a.apk) as z:
         app = z.read('lib/' + a.abi + '/libapp.so')
         assert b'KAZUMI_TV_PERF' not in app, 'Diagnostic probe marker present'
+        for marker in (b'RECOVERY_QA ', b'FEATURE_QA ', b'LIFECYCLE_QA ',
+                       b'HEALTH_NAV_QA ', b'NAV_QA focus ', b'PHONE_NAV_QA '):
+            assert marker not in app, 'Internal QA entry marker present: ' + marker.decode()
         mpv = z.read('lib/' + a.abi + '/libmpv.so')
     receipt = dict(source_sha=a.source_sha, apk=a.apk.name, sha256=hashlib.sha256(a.apk.read_bytes()).hexdigest(),
                    bytes=a.apk.stat().st_size, application_id=a.application_id, version_code=expected_code,
                    version_name=a.version_name, abi=a.abi, certificate_sha256=certs[0],
                    libmpv_sha256=hashlib.sha256(mpv).hexdigest(), probe_marker_absent=True,
-                   installed=False, published=False)
+                   qa_entry_markers_absent=True, installed=False, published=False)
     a.output.parent.mkdir(parents=True, exist_ok=True)
     a.output.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(receipt))

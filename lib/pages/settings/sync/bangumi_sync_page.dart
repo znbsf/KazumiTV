@@ -327,35 +327,37 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
           children: [
             const SizedBox(height: 12),
             TvTextEntry(
+                allowPhoneKeyboard: false,
                 child: TextField(
-              controller: _tokenController,
-              enabled: !_busy,
-              obscureText: !_passwordVisible,
-              autocorrect: false,
-              enableSuggestions: false,
-              onChanged: (_) => setState(() {
-                _tokenError = null;
-                _tokenStatus = null;
-              }),
-              onSubmitted: (_) => _saveToken(),
-              decoration: InputDecoration(
-                labelText: 'Access Token',
-                errorText: _tokenError,
-                errorMaxLines: 5,
-                helperText:
-                    _action == _BangumiAction.verify ? '正在验证…' : _tokenStatus,
-                helperMaxLines: 3,
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  tooltip: _passwordVisible ? '隐藏授权码' : '显示授权码',
-                  onPressed: () =>
-                      setState(() => _passwordVisible = !_passwordVisible),
-                  icon: Icon(_passwordVisible
-                      ? Icons.visibility_off_rounded
-                      : Icons.visibility_rounded),
-                ),
-              ),
-            )),
+                  controller: _tokenController,
+                  enabled: !_busy,
+                  obscureText: !_passwordVisible,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  onChanged: (_) => setState(() {
+                    _tokenError = null;
+                    _tokenStatus = null;
+                  }),
+                  onSubmitted: (_) => _saveToken(),
+                  decoration: InputDecoration(
+                    labelText: 'Access Token',
+                    errorText: _tokenError,
+                    errorMaxLines: 5,
+                    helperText: _action == _BangumiAction.verify
+                        ? '正在验证…'
+                        : _tokenStatus,
+                    helperMaxLines: 3,
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      tooltip: _passwordVisible ? '隐藏授权码' : '显示授权码',
+                      onPressed: () =>
+                          setState(() => _passwordVisible = !_passwordVisible),
+                      icon: Icon(_passwordVisible
+                          ? Icons.visibility_off_rounded
+                          : Icons.visibility_rounded),
+                    ),
+                  ),
+                )),
             const SizedBox(height: 16),
             Wrap(
               alignment: WrapAlignment.end,

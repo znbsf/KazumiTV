@@ -135,7 +135,7 @@ class AutoUpdater {
       final remoteVersion = data['tag_name'] as String;
       final currentVersion = ApiEndpoints.version;
 
-      if (needUpdate(currentVersion, remoteVersion)) {
+      if (needStableUpdate(currentVersion, remoteVersion)) {
         final availableTypes = <InstallationType>[];
 
         return UpdateInfo(
