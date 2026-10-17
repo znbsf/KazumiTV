@@ -1,3 +1,5 @@
+import 'focus_visual_fixture.dart';
+import 'first_search_fixture.dart';
 // Debug-only emulator fixture. Never imported by production main.dart.
 import 'dart:async';
 import 'dart:io';
@@ -153,6 +155,14 @@ class _PhoneKeyboardQaState extends State<_PhoneKeyboardQa> {
                       ]);
                 }),
             const SizedBox(height: 20),
+            Row(children: [
+              FilledButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FocusVisualFixture())), child: const Text('Focus visual fixture')),
+              const SizedBox(width: 16),
+              FilledButton(onPressed: () async {
+                await GStorage.putSetting(SettingsKeys.sourceHealthRecords, '[]');
+                if (context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => buildFirstSearchFixture()));
+              }, child: const Text('First search fixture')),
+            ]),
             for (var i = 0; i < _controllers.length; i++) _field(i),
           ]),
         ),

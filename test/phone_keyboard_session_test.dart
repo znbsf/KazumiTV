@@ -18,6 +18,33 @@ void main() {
         onText: (text) => edits.add('$label:$text'),
         onConfirm: () => confirms++,
       );
+  test('only a valid state handshake connects once; page fetch does not',
+      () async {
+    var connected = 0;
+    final local = PhoneKeyboardSession(onConnected: () => connected++);
+    final endpoint = await local.start(address: InternetAddress.loopbackIPv4);
+    final http = HttpClient();
+    try {
+      for (final path in [endpoint.path, '/invalid/state']) {
+        final response =
+            await (await http.getUrl(endpoint.replace(path: path))).close();
+        await response.drain<void>();
+        expect(connected, 0);
+      }
+      for (var i = 0; i < 2; i++) {
+        final response = await (await http
+                .getUrl(endpoint.replace(path: '${endpoint.path}/state')))
+            .close();
+        await response.drain<void>();
+      }
+      expect(connected, 1);
+      expect(local.clientConnected, isTrue);
+      expect(local.isClosed, isFalse);
+    } finally {
+      http.close(force: true);
+      await local.close();
+    }
+  });
   setUp(() async {
     client = HttpClient();
     edits = [];

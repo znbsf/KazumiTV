@@ -19,14 +19,34 @@ class PhoneKeyboardDialog extends StatefulWidget {
 }
 
 class _PhoneKeyboardDialogState extends State<PhoneKeyboardDialog> {
+  bool _closing = false;
+  bool _waitingForConnection = false;
+  void _connectionChanged() {
+    if (!_waitingForConnection ||
+        _closing ||
+        PhoneKeyboard.instance.session?.clientConnected != true) return;
+    _closing = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop();
+      } else {
+        _closing = false;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     PhoneKeyboard.instance.enterControlDialog();
+    _waitingForConnection =
+        PhoneKeyboard.instance.session?.clientConnected != true;
+    PhoneKeyboard.instance.addListener(_connectionChanged);
   }
 
   @override
   void dispose() {
+    PhoneKeyboard.instance.removeListener(_connectionChanged);
     PhoneKeyboard.instance.leaveControlDialog();
     super.dispose();
   }
@@ -72,8 +92,12 @@ class _PhoneKeyboardDialogState extends State<PhoneKeyboardDialog> {
                   child: const Text('返回编辑')),
               if (url == null)
                 FilledButton(
-                    onPressed:
-                        keyboard.starting ? null : () => keyboard.start(),
+                    onPressed: keyboard.starting
+                        ? null
+                        : () {
+                            _waitingForConnection = true;
+                            keyboard.start();
+                          },
                     child: const Text('开启临时连接')),
               if (url != null)
                 FilledButton(

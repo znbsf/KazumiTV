@@ -48,11 +48,14 @@ class _TvPlayerActionState extends State<TvPlayerAction> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
+    final scheme = Theme.of(context).colorScheme;
     final color = !enabled
         ? Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: .5)
-        : _focused || widget.selected
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.onSurface;
+        : _focused
+            ? scheme.onPrimary
+            : widget.selected
+                ? scheme.onSecondaryContainer
+                : scheme.onSurface;
     final iconOnly = widget.iconBuilder != null;
     final action = Semantics(
       label: iconOnly ? widget.label : null,
@@ -82,8 +85,21 @@ class _TvPlayerActionState extends State<TvPlayerAction> {
           return KeyEventResult.ignored;
         },
         child: Material(
-          color: Theme.of(context).colorScheme.surface.withValues(alpha: .94),
-          borderRadius: BorderRadius.circular(16),
+          color: enabled && _focused
+              ? scheme.primary
+              : enabled && widget.selected
+                  ? scheme.secondaryContainer
+                  : scheme.surface.withValues(alpha: .94),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+                color: enabled && _focused
+                    ? scheme.onSurface
+                    : enabled && widget.selected
+                        ? scheme.secondary
+                        : Colors.transparent,
+                width: enabled && _focused ? 3 : 1),
+          ),
           child: InkWell(
             onTap: widget.onPressed,
             borderRadius: BorderRadius.circular(16),

@@ -6,6 +6,8 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/history/history_module.dart';
+import 'package:kazumi/modules/roads/road_module.dart';
+import 'package:kazumi/services/plugin/rule_engine_models.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/pages/collect/collect_controller.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
@@ -22,6 +24,17 @@ import 'package:kazumi/services/source_health/source_health_preferences.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'source_health_test.dart' show FakeRule;
+
+class _SearchRule extends FakeRule {
+  _SearchRule(super.label);
+  int roadCalls = 0;
+  @override
+  Future<List<Road>> queryChapterRoads(String source,
+      {RuleCancelToken? cancelToken}) {
+    roadCalls++;
+    return super.queryChapterRoads(source, cancelToken: cancelToken);
+  }
+}
 
 class _Paths extends PathProviderPlatform {
   _Paths(this.path);
@@ -61,9 +74,9 @@ void main() {
     await Hive.close();
     await dir.delete(recursive: true);
   });
-  for (final mode in ['none', 'saved', 'failed', 'preferenceOnly']) {
+  for (final mode in ['none', 'disabled', 'saved', 'failed', 'preferenceOnly']) {
     testWidgets(
-        'start watching $mode uses only saved success and never health page',
+        'start watching $mode retains ordinary search without health probes',
         (tester) async {
       TvMode.setEnabledForTesting(true);
       addTearDown(() => TvMode.setEnabledForTesting(false));
@@ -71,8 +84,8 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      final saved = FakeRule('Saved');
-      final untested = FakeRule('Untested');
+      final saved = _SearchRule('Saved');
+      final untested = _SearchRule('Untested');
       if (mode == 'failed') {
         saved.search =
             () async => PluginSearchResponse(pluginName: saved.name, data: []);
@@ -97,7 +110,7 @@ void main() {
           votesCount: List.filled(10, 1),
           info: '');
       await tester.runAsync(() async {
-        await GStorage.putSetting(SettingsKeys.firstSourceAutoSelect, true);
+        await GStorage.putSetting(SettingsKeys.firstSourceAutoSelect, mode != 'disabled');
         await GStorage.putSetting(SettingsKeys.sourceHealthGlobal, true);
         await GStorage.putSetting(SettingsKeys.sourceHealthPreferences, '{}');
         await GStorage.putSetting(
@@ -143,22 +156,25 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.select);
       await tester.pumpAndSettle();
       expect(find.byType(SourceHealthPage), findsNothing);
-      expect(untested.calls, 0);
       if (mode == 'saved') {
         expect(opened?.plugin, same(saved));
         expect(opened?.roads, isNotEmpty);
         expect(saved.calls, 1);
+        expect(untested.calls, 0);
         expect(find.byType(SourceSheet), findsNothing);
       } else {
         expect(opened, isNull);
         expect(find.byType(SourceSheet), findsOneWidget);
-        expect(saved.calls, mode == 'failed' ? 1 : 0);
-        await tester.tap(find.text('Untested').first);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('搜索 Untested'));
-        await tester.pumpAndSettle();
+        expect(tester.widget<SourceSheet>(find.byType(SourceSheet)).autoSearchOnOpen,
+            isTrue);
+        expect(saved.calls, mode == 'failed' ? 2 : 1);
         expect(untested.calls, 1);
-        expect(saved.calls, mode == 'failed' ? 1 : 0);
+        expect(info.pluginSearchStatus[untested.name], PluginSearchStatus.success);
+        expect(info.pluginSearchResponseList.any((r) => r.pluginName == untested.name),
+            isTrue);
+        // Ordinary title search must not resolve or play every source.
+        expect(untested.roadCalls, 0);
+        expect(saved.roadCalls, 0);
       }
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();

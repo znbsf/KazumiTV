@@ -1,4 +1,3 @@
-import 'package:kazumi/services/platform/app_remote.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -45,13 +44,10 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   /// The shell sits at the bottom of the root stack and stays mounted while
   /// other pages cover it, so it publishes that state for its subtree.
   bool _isCovered = false;
-  AppRemoteLease? _appRemoteLease;
 
   @override
   void initState() {
     super.initState();
-    _appRemoteLease = AppRemote.instance
-        .register(label: '首页编号选卡', priority: 5, commands: _remoteDigits);
     FocusManager.instance.addListener(_rememberTvContentFocus);
     _pendingInitialHomeFocus = TvMode.enabled && _selectedIndex == 0;
     if (_pendingInitialHomeFocus) {
@@ -101,7 +97,6 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
   @override
   void dispose() {
-    _appRemoteLease?.release();
     _finishInitialHomeFocus();
     FocusManager.instance.removeListener(_rememberTvContentFocus);
     rootRouteObserver.unsubscribe(this);
@@ -300,29 +295,6 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
     _lastExitPromptAt = null;
     SystemNavigator.pop();
-  }
-
-  Map<String, AppRemoteCommand> _remoteDigits() {
-    final primary = FocusManager.instance.primaryFocus?.context;
-    if (!mounted ||
-        !TvMode.enabled ||
-        _isCovered ||
-        _selectedIndex != 0 ||
-        ModalRoute.of(context)?.isCurrent != true ||
-        primary?.widget is EditableText ||
-        primary?.findAncestorWidgetOfExactType<EditableText>() != null) {
-      return {};
-    }
-    return {
-      for (var i = 0; i <= 9; i++)
-        'digit$i': AppRemoteCommand(
-            label: '$i',
-            invoke: () {
-              if (_remoteDigits().isEmpty) return false;
-              tvChannelInputController.addDigit(i);
-              return true;
-            })
-    };
   }
 
   KeyEventResult _handleTvNumberKey(FocusNode node, KeyEvent event) {

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:kazumi/services/platform/app_remote.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,6 +159,28 @@ void main() {
   });
 
   for (final destination in [1, 2, 3, 4]) {
+    testWidgets(
+        'phone LCN does not target home cards; physical home digits retain behavior',
+        (tester) async {
+      await _mount(tester);
+      final remote = AppRemote.instance;
+      final lease = remote.attachShell();
+      addTearDown(lease.release);
+      final offered =
+          (remote.state['keys'] as List).map((e) => (e as Map)['id'] as String);
+      expect(offered.where((id) => id.startsWith('digit')), isEmpty);
+      expect(
+          await remote.dispatch('digit2',
+              revision: remote.state['revision'] as int),
+          isFalse);
+      expect(tvChannelInputController.value, isNull);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+      await tester.pump();
+      expect(tvChannelInputController.value?.digit, 2);
+      tvChannelInputController.cancel();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('shell Back restores originating function $destination',
         (tester) async {
       await _mount(tester);

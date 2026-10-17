@@ -66,6 +66,10 @@ Future<void> main() async {
   await GStorage.putSetting(SettingsKeys.androidVideoRenderer,
       config['output'] ?? 'mediacodec_embed');
   await GStorage.putSetting(SettingsKeys.autoPlay, config['playing'] == true);
+  await GStorage.putSetting(
+      SettingsKeys.hAenable, config['hardwareAcceleration'] != false);
+  await GStorage.putSetting(
+      SettingsKeys.hardwareDecoder, config['hardwareDecoder'] ?? 'auto-safe');
   await GStorage.putSetting(SettingsKeys.defaultPlaySpeed, 1.25);
   await GStorage.putSetting(SettingsKeys.playerLogLevel, 3);
   await GStorage.putSetting(SettingsKeys.showPlayerError, false);

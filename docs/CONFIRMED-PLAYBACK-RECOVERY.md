@@ -1,5 +1,39 @@
 # 确认后尝试软件兼容播放（草稿）
 
+## 2026-10-18 QA6 用户现场：Surface 初始化互锁修复候选
+
+现场仅离线读取负责人保存的 `qa6-user-regression-app.log/media.txt/screen.png`，本分工未操作设备。23:37:20 和 23:39:56 两次解析已完成，创建 SurfaceTexture 后没有 SetSurfaceSize/Resize，分别约6.8秒和1.2秒出现 `mpv_no_software_fallback`，紧接输出释放；不是30秒首帧超时。ACodec警告属于其他时间段，不能归为这两次失败根因，也不能由此断言设备损坏或网络问题。
+
+对比正式版 `70c3769`、固定上游 media-kit `994465d9` 与 QA4/QA6：默认 direct MediaCodec 和 `androidAttachSurfaceAfterVideoParameters:false` 保持；但上游实际没有消费这个参数，直到解码后的 videoParams 才请求 Surface 尺寸并发布 wid。兼容恢复新增 `hwdec-software-fallback=no` 后，未附着 Surface 的初始化无法再依靠软件解码先产生尺寸。这是与现场吻合的源码互锁路径；尚缺本次原生对照，不能把推断写成已验证的视频恢复。
+
+修复候选兑现显式 false：先请求1×1占位 Surface，等实际回调及 wid/vo/vid 属性安装完成，才放行 VideoController 初始化和 open；初始阶段不 seek（seek 本身等待 VideoController，会造成新的互锁）。保留既有属性顺序、direct 默认、禁止隐式软解、手动一次恢复、旧 owner 失效和真实 consumed-frame 首帧判据；占位尺寸不代表首帧。等待有10秒上限，取消/属性错误终止初始化。后续真实尺寸仍更新 Surface。
+
+本地聚焦19项测试通过（Surface挂载门控、输出所有权、确认恢复、当前输出失败）；实际Android controller/helper/test静态检查0 error / 0 warning，2项既有文件头info。测试验证请求接受不等于属性安装、安装不等于首帧、退出取消、错误和超时；不替代原生Surface联调。
+
+后续边界复查发现：若原生 SetSurfaceSize 请求本身未返回，仅给 wid 回调计时会漏掉请求的等待，cancel 也会被 Future.wait 拖住。先补两个反例均失败，再把整个请求与安装等待纳入同一10秒期限，并独立竞争取消信号。最终5个文件 **32项通过**，包括既有 direct、GPU/GPU-next + mediacodec-copy、手动 no 的配置保持测试；helper和测试静态检查无问题。生产路径均显式预挂，未改renderer或decoder选择。负责人先前模拟器direct首帧和位置推进结果对应此取消边界补丁之前；最终fixture需带上本补丁，不能把之前的全量/设备结果改写成最终版本验收。
+
+边界：media-kit NativePlayer.dispose 本身先等待 VideoController 初始化，故极端平台请求完全不返回时，应用层退出仍可能等待本10秒期限后才执行原生输出 dispose；helper 的取消即时完成测试不能当作完整原生退出即时完成的证据。迟到平台响应不改变新门控，既有 owner/token 隔离继续约束旧输出。
+
+### 20544 GPU 紫屏反例与同 Surface 尺寸更新
+
+负责人20544模拟器实际截图中 GPU + mediacodec-copy 和 GPU + no 均整屏紫色，虽有首帧通知和位置推进仍判失败；此前20543 direct色条结果不能代替GPU验收。`qa6-regression-gpu-software.log` 中1×1和640×360两次Resize的wid同为14378。源码确认callback仅赋wid.value，ValueNotifier对同值不通知，导致mpv `android-surface-size` 保持1×1，而native缓冲区和Flutter rect已变640×360。这是本次预挂引入的实质回归，不能归因模拟器，也不能把consumed-frame单信号当正确画面证明。
+
+修复改为按(wid,width,height)整体变化排队更新mpv，独立于Flutter rect；完全重复事件不重配。回调不await重入锁，继续受输出owner/token门控，退休队列不访问mpv。新增同指针尺寸更新及退休队列测试，本轮23项聚焦通过。后续20545须重测direct/copy-GPU/手动软解真实截图和连续推进；本条不提前声明紫屏已修复验收。
+
+### 20545 后收敛：仅 direct 预挂，GPU 保持原路径
+
+20545负责人观察 GPU + no 实际色条通过，但 GPU + mediacodec-copy 出现黑屏与UI/状态timer停止；日志在16:13:24.058同wid的640×360 Resize后无进一步Dart timer，并出现新一轮CCodec初始化。新增同wid刷新执行了vo=null→size→wid→vo=gpu→seek，扩大了活跃GPU重建行为。缺少原生栈，不能断言具体属性调用死锁。既有 `SOURCE-HEALTH-IMPLEMENTATION-20261017.md` 仅记录GPU硬解无响应及配置差异，也不能作为模拟器根因证明。
+
+按最小范围收敛：仅 `mediacodec_embed` 且显式 `androidAttachSurfaceAfterVideoParameters:false` 预挂，并允许同wid尺寸刷新；GPU/GPU-next（含copy和手动软解）恢复原来尺寸事件后首次挂载、仅wid变化重配。未修改硬解选项、全局async或首帧判据。补模式边界测试；20546需与同素材/配置旧逻辑作实际画面对照，20544紫屏、20545copy无响应继续保留失败身份。
+
+### 最终20548候选收敛（取代上段同wid刷新方案）
+
+20546 direct 在16:17:56.027仍playing=true/17000ms，16:17:56.034实际尺寸Resize后状态timer停止；负责人20547使用旧controller作同环境同素材copy对照也无响应，故copy问题不能仅归因本轮预挂，也不能在无线程栈时断言模拟器根因。按负责人决定停止重复copy探测。
+
+最终仅保留direct显式false预挂及有界门控，恢复原wid.addListener/removeListener触发机制，不给同wid尺寸事件新增vo重建或seek。删除本轮未提交的surface_state helper及对应测试；预挂模式判定和测试移入surface_attachment文件。GPU/copy/software仍走原尺寸后首次挂载。首帧、owner/token隔离和既有释放修复保持；此前20543 direct色条是该最小方向的已有证据，20548仍需最终direct两次、software一次实际画面验证，不将源码收敛当通过。
+
+本次需要原生验证：首次 direct 打开在解码前已有非零 wid；正常首帧、尺寸更新后连续播放；退出时挂载等待取消；旧输出迟到回调不影响新会话；无真实视频帧不能通过首帧等待。模拟器由负责人执行，Android9本轮不安装新包，真实用户媒体回归仍待后续允许的验收。
+
 ## 2026-10-17 新发现：首帧信号语义（进行中）
 
 源健康集成审查确认固定 media-kit `994465d9` 的 Android `android_video_controller/real.dart` 在视频尺寸事件后即完成 `waitUntilFirstFrameRenderedCompleter`，该 Future 单独不能证明真实纹理帧已消费。Java 输出端未实现相应 first-frame notify。旧模拟器/电视截图仍是其原始可见画面证据，但仅凭该 Future 的自动首帧判断需修正，不能把旧907测试或尺寸通知当新健康探测验收。当前正准备以实际 SurfaceTexture 帧消费回调替代；未构建/原生验证前不宣称解决。
@@ -82,3 +116,7 @@ API36 的原组件入口已验证 Back 只取消、焦点回原按钮；快速�
 - `A/external-emulator-av2.mkv` 离线分析确认外部音频A约440.19Hz、外部字幕B推进；录制内22组脉冲音频晚159–224ms、中位205.5ms。这是模拟器内部录制，未校准采集链路；物理扬声器、自然影片口型与校准后的AV同步仍缺证据。第一次静音录制为失败样本，不计成功。详见 `A/external-av-analysis.json/.md`。
 
 delay12最终证据：`A/media-requests.jsonl` 12:03:12.914记录sample请求mode=delay12；旧控制器471688714于12:03:14.728离开（约1.8秒，`A/recovery-delay-inflight-exit`），证明请求在途时退出。新控制器3555623于12:03:28.093进入，已晚于旧请求预计返回；12:03:37.418真实firstFrameNotify，12:03:39恢复17秒暂停、blocked=false/loading=false（`A/recovery-delay-final`）。只声明“在途请求退出+随后新会话恢复”，**不声明旧响应与新会话并发重叠的原生实证**；并发回调隔离仍由单元测试覆盖。首轮请求未建立即退出只证明立即退出，未用作该结论。既有2026-10-16延迟案例保留历史范围。当前不新增合并、正式发布或全部验收完成声明。
+
+## 20548 最终最小候选原生结果（2026-10-17 UTC）
+
+仅direct预挂，原wid listener机制保持。最终1060全量测试通过。20548 direct实际色条、持续推进和rapid replace [false,true]通过；software实际色条及推进通过。20546copy与20547改动前controller严格基线均黑屏/状态timer停止，具体原生阻塞点未证实；这不是copy通过记录。20544纯色和20545/20546新增同wid重建失败保留，相关新增重建代码已经撤回。最终APK哈希与完整验收边界见PROJECT-STATUS顶部。本轮未重装或操控电视，Android9原视频与真实AV仍待验收。

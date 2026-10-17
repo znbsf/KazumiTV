@@ -15,6 +15,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/src/utils/query_decoders.dart';
 import 'first_frame_signal.dart';
 import 'output_lifetime.dart';
+import 'surface_attachment.dart';
 import 'package:media_kit_video/src/video_controller/platform_video_controller.dart';
 
 /// {@template android_video_controller}
@@ -43,6 +44,11 @@ class AndroidVideoController extends PlatformVideoController {
 
   /// [Lock] used to synchronize [onLoadHooks], [onUnloadHooks] & [subscription].
   final lock = Lock();
+  final _initialSurface = AndroidSurfaceAttachment();
+  bool get _preattachSurface => preattachAndroidSurface(
+      output: configuration.vo,
+      attachAfterVideoParameters:
+          configuration.androidAttachSurfaceAfterVideoParameters);
 
   NativePlayer get platform => player.platform as NativePlayer;
   late final _lifetime =
@@ -62,33 +68,45 @@ class AndroidVideoController extends PlatformVideoController {
 
   /// Listener for updating the --wid property.
   Future<void> widListener() {
-    return lock.synchronized(() => _lifetime.run(() async {
-          final width = rect.value?.width.toInt() ?? 1;
-          final height = rect.value?.height.toInt() ?? 1;
-          final androidSurfaceSizeValue = [width, height].join('x');
-          final widValue = wid.value?.toString() ?? '0';
-          // When --wid is 0, vo=null is required to avoid SIGSEGV.
-          final voValue = widValue == '0' ? 'null' : configuration.vo!;
-          final vidValue = widValue == '0' ? 'no' : 'auto';
-          // It is important to re-initialize --vo after --android-surface-size.
-          await setProperty('vo', 'null');
-          await setProperties(
-            {
-              // ORDER IS IMPORTANT.
-              'android-surface-size': androidSurfaceSizeValue,
-              'wid': widValue,
-              'vo': voValue,
-              // It is important to re-initialize --vid in-case of --vo=mediacodec_embed.
-              // Not doing so causes error "Could not open codec." & video never gets rendered.
-              if (configuration.vo == 'mediacodec_embed') 'vid': vidValue,
-            },
-          );
-          // Instead of seeking to the start (Duration.zero), seek to the current playback position
-          // without jumping the user to the start of the media.
-          if (!_lifetime.active || widValue == '0') return;
-          final currentPosition = player.state.position;
-          await player.seek(currentPosition);
-        }));
+    return lock
+        .synchronized(() => _lifetime.run(() async {
+              final width = rect.value?.width.toInt() ?? 1;
+              final height = rect.value?.height.toInt() ?? 1;
+              final androidSurfaceSizeValue = [width, height].join('x');
+              final widValue = wid.value?.toString() ?? '0';
+              // When --wid is 0, vo=null is required to avoid SIGSEGV.
+              final voValue = widValue == '0' ? 'null' : configuration.vo!;
+              final vidValue = widValue == '0' ? 'no' : 'auto';
+              // It is important to re-initialize --vo after --android-surface-size.
+              await setProperty('vo', 'null');
+              await setProperties(
+                {
+                  // ORDER IS IMPORTANT.
+                  'android-surface-size': androidSurfaceSizeValue,
+                  'wid': widValue,
+                  'vo': voValue,
+                  // It is important to re-initialize --vid in-case of --vo=mediacodec_embed.
+                  // Not doing so causes error "Could not open codec." & video never gets rendered.
+                  if (configuration.vo == 'mediacodec_embed') 'vid': vidValue,
+                },
+              );
+              // Initial attachment must finish before open is unblocked. Seeking
+              // here would wait for VideoController initialization itself.
+              final initializing =
+                  !platform.videoControllerCompleter.isCompleted;
+              if (_lifetime.active && widValue != '0')
+                _initialSurface.markInstalled();
+              if (initializing) return;
+              // Instead of seeking to the start (Duration.zero), seek to the current playback position
+              // without jumping the user to the start of the media.
+              if (!_lifetime.active || widValue == '0') return;
+              final currentPosition = player.state.position;
+              await player.seek(currentPosition);
+            }))
+        .catchError((Object error, StackTrace stack) {
+      if (_initialSurface.fail(error, stack)) return;
+      Error.throwWithStackTrace(error, stack);
+    });
   }
 
   /// [StreamSubscription] for listening to video [Rect].
@@ -225,6 +243,20 @@ class AndroidVideoController extends PlatformVideoController {
       },
     );
 
+    // MediaCodec needs an attached Surface to initialize. Waiting for decoded
+    // dimensions first can require software fallback merely to bootstrap it.
+    // A placeholder Surface is not first-frame evidence; the native consumed
+    // frame signal remains independent.
+    if (controller._preattachSurface) {
+      await controller._initialSurface.attach(
+        () => _channel.invokeMethod<void>(
+          'VideoOutputManager.SetSurfaceSize',
+          {'handle': handle.toString(), 'width': '1', 'height': '1'},
+        ),
+        isActive: () => controller._lifetime.active,
+      );
+    }
+
     // Return the [PlatformVideoController].
     return controller;
   }
@@ -248,6 +280,7 @@ class AndroidVideoController extends PlatformVideoController {
   /// Disposes the instance. Releases allocated resources back to the system.
   Future<void> _dispose() async {
     _lifetime.close();
+    _initialSurface.cancel();
     wid.removeListener(widListener);
     _firstFrame.dispose();
     super.dispose();

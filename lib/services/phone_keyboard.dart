@@ -56,6 +56,7 @@ class PhoneKeyboard extends ChangeNotifier with WidgetsBindingObserver {
         dispatchRemote: (id, {required revision}) => _controlDialogs > 0
             ? Future.value(false)
             : AppRemote.instance.dispatch(id, revision: revision),
+        onConnected: notifyListeners,
         onClosed: () {
           error = '连接已断开或闲置过期，请重新开启';
           notifyListeners();

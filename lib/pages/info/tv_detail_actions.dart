@@ -109,21 +109,10 @@ class _TvDetailActionsState extends State<TvDetailActions> {
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      side: const WidgetStatePropertyAll(BorderSide.none),
-      backgroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.focused)
-            ? Theme.of(context).colorScheme.primaryContainer
-            : Colors.transparent,
-      ),
-      foregroundColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.focused)
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.onSurface,
-      ),
       padding: const WidgetStatePropertyAll(
         EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
-    );
+    ).merge(TvVisuals.focusButtonStyle(Theme.of(context).colorScheme));
     return Theme(
       data: Theme.of(context).copyWith(
         filledButtonTheme: FilledButtonThemeData(style: actionStyle),
