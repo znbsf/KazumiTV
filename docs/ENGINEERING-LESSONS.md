@@ -68,3 +68,33 @@
 - 首帧等待期间保留底层Texture实际挂载/绘制及上方加载取消入口；避免Offstage/不挂载或完全不透明遮挡导致无法呈现。此实现使用0.99黑遮罩，测试检查真实Video/Texture/TextureLayer；只替代原生元数据的widget测试不能证明原生首帧。
 - 手工Observable的setter必须自己进入action，getter保持可追踪。严格MobX回归要调用生产发布/异步替换/stop清理路径，不用测试外层runInAction包住业务写入来掩盖调用错误。
 - 原生seek/轨道命令返回先于类型化事件更新。QA只有轨道匹配不够：位置、倍速、暂停及未完成状态达到目标并稳定后才报PASS；旧position=0的过早PASS保留为无效位置证据。内部音视频录制可验证音频存在和记录内偏移，不代替物理听感或校准同步。
+
+
+## 2026-10-17 更新检查版本前缀缺陷（核查与修复候选）
+
+- 本次 integration 的 updater/policy/version 工具相对本地 `origin/main` 无差异。`ProjectUpdatePolicy.canCheck` 仅允许 release、TV、纯 `x.y.z`，故 `0.4.3-qa4=false`；这只是版本门禁，没有按包名识别QA。`acceptsRelease` 接受可选 `v` 前缀，但随后 `needUpdate` 直接 `int.parse` 每段：`0.4.3→0.4.4=true`，`→v0.4.4` 与 `→v0.4.3` 均 FormatException，见[复现日志](../../../artifacts/four-stream-20261017/update-policy-repro.log)。负责人核对当前发布tag为 `v0.4.3`，因此正式检查可遇到此不一致；不能把异常当“已是最新”。
+- 当前正式路径仅GET `znbsf/KazumiTV/releases/latest`，返回更新信息时assets/安装类型为空，仅查看详情，空assets拦住安装。旧 `legacyAndroid` 匹配仅要求文件名含android且以.apk结尾，不校验ABI；虽然存在OpenFilex路径，不能据此声称正式流程已支持自动安装，也不能为修版本检查而放开该屏障。
+- QA4 CI为临时debug签名，无持久签名配置；正式tv.gradle的tvSigned使用长期证书。QA门禁、正式/QA包身份、ABI和签名须分别核对，不能以版本号或候选APK可安装替代升级兼容证据。
+- 最小安全修复建议：在严格验证release tag后统一去除可选前导v，再作无异常的数值比较；非法版本应明确检查失败。补无v/v、有更新/同版/旧版/非法tag及QA拒绝的测试，保留空assets与手动查看详情。未来如设计安装功能，须先建立受信包名、ABI、签名与哈希清单，并单独验收保数据升级；本次只记录，未改生产、未发issue。
+### 后续已授权修复
+
+- 旧正式策略允许 `v0.4.3` 标签，但通用 `needUpdate` 对首段直接int.parse，导致检查抛FormatException；此前[复现](../../../artifacts/four-stream-20261017/update-policy-repro.log)中的异常不能当作“已是最新”。
+- 应用稳定更新现统一使用 `normalizeStableVersion` / `needStableUpdate`：仅接受三段规范数字、远端可选小写v；拒绝空白、前导零、额外段、QA/prerelease/build后缀，BigInt比较避免数字溢出。非法输入明确检查失败。规则自身两段/多段版本继续使用原比较函数，避免扩大规则兼容性变更。
+- release+TV+纯稳定本地版本门禁、draft/prerelease及发布URL身份检查保留；仍仅读取本项目latest，assets与安装类型保持为空、只查看详情。未新增下载/安装渠道、权限、包名或签名迁移，也未修旧legacyAndroid的ABI识别；不将版本检查修复当作自动安装能力。
+- 验证：`flutter test --no-pub test/stable_version_test.dart test/project_update_policy_test.dart` **9项通过**，覆盖有/无v、新/旧/同版、非法tag、QA/prerelease拒绝、超大数字及规则旧行为。未构建/设备测试、未推送发布；集成负责人按合并后head继续核验。
+
+## 2026-10-17 规则仓库长列表遥控焦点
+
+- 复现：TV 模式下，首次引导「添加规则」及规则仓库共用懒加载目录；首末规则可安装，中间为已安装规则。连续 Down 停在首行，无法到达尚未构建的末行。短列表可到末行，但安装完成后焦点退回首行。
+- 根因：已安装状态把唯一可聚焦按钮替换成静态 Row，长段已安装项没有焦点节点，方向遍历无法逐行触发滚动并构建后续项目；安装中的禁用和安装后的替换也会丢失焦点。不是同意协议或按键注入失败。
+- 最小修复：共用 PluginCatalogView 在 TV 保留相同按钮焦点节点，已安装/忙碌时 OK 无操作；保留 SliverList.builder 懒加载及非 TV 原行为，不改全局方向键策略。
+- 证据：根 artifacts/four-stream-20261017/rules-focus-before.log（4 个长列表失败）、rules-focus-short-control-before.log（2 个安装后焦点失败）；rules-focus-regression.log（生产 TvLoopTraversalPolicy 下 3 文件 13 项通过）、rules-focus-analyze.log（0 error / 0 warning / 0 info）。新增 6 场景覆盖两个入口、2/24/60 行、540/720 高度、首末互达、安装后焦点、重复 OK 不重复下载、固定底部操作及返回入口恢复。设备验收待集成负责人执行，widget 通过不等于交付完成。
+- 拟新 issue 标题：首次引导和规则仓库长列表无法用遥控器越过已安装规则。摘要：中间已安装规则无可聚焦操作，导致懒加载列表末尾不可达；安装后按钮替换又使焦点跳回首项。需保持稳定焦点、首末可达和底部操作返回，并补电视验收。尚未发布 issue；不关联个人电视 #2，源健康列表另归 #19。
+## 2026-10-17 输出释放竞态与解码错误分类
+
+- `tv-fourqa-decoder-readonly.log` 的 20:49:23 栈定位到 Android `widListener` 在输出释放后执行排队的 seek。取消监听不能取消已排队 Future；必须先同步撤销输出 owner，再取消订阅，每次 await 返回重新检查，且 native 锁晚到的 disposed AssertionError 只能在该 owner 已退休时作为取消处理。活动 owner 或其他异常继续上报，不粗暴吞错。
+- pinned mpv `32a164cc017acab50389f2194f720ccfd0b01a28/video/decode/vd_lavc.c` 的 `select_and_set_hwdec` 可在没有匹配硬件方法时报告禁用软件回退；这个信号单独不证明硬件 decoder 曾初始化失败。`force_fallback` 的明确硬件方法失败才进入手动恢复确认，完整方法名由 FFmpeg codec name 和 method 拼接，例如 `h264_mediacodec-mediacodec`。这仍不能诊断硬件损坏或排除坏源。
+- TV 内存日志最低 verbose 用于捕获初始化失败上下文；常规诊断只写 session/output/category/固定 signal，不保存 URL 或原始错误。无匹配硬件、首帧超时、请求/格式错误和已释放会话分别处理；均不能冒充硬件 decoder 错误。默认 decoder 和手动一次恢复策略保持。
+- 本轮 playback-lifecycle 基线 31769f00：29 项定向回归通过，包含队列取消、native disposed 精确边界、错误分类负向、首帧结果四态、外部轨道恢复、真实 Texture 挂载、遥控确认焦点和原生首帧 token。analyze 无 error/warning（仅风格 info）。这不是 Android native 实机验收；需集成后验证快速退出/重进、慢源30秒提示、真实硬解错误与正常首帧，构建和设备由集成负责人统一。
+
+- 追加 review 修复：只有 owner 已退休才可静默取消 disposed。当前 owner 的 disposed 或 VideoController 初始化 Future completeError 必须走单次输出失败处理器，abort 首帧等待并显示重试/换源；不能依赖另一个 stream.error 才退出等待。mapper 不拥有会话上下文，不能自行吞 releasedSession。处理器覆盖 current/retired、无 error stream 的初始化失败、晚到失败和正常帧；输出终止后不允许晚到 decoder 日志触发恢复确认。

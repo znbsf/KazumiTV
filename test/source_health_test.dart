@@ -131,7 +131,7 @@ void main() {
     },
   );
   test(
-    'records expire on time, rule or environment changes and future timestamps',
+    'record compatibility retains age but rejects changed rule/environment and future time',
     () {
       final p = FakeRule('a');
       final r = record(p);
@@ -142,7 +142,7 @@ void main() {
           'env',
           now.add(const Duration(hours: 24)),
         ),
-        isFalse,
+        isTrue,
       );
       expect(r.current(ruleFingerprint(p), 'new-device', now), isFalse);
       p.searchURL = '/changed';
@@ -168,10 +168,10 @@ void main() {
     expect(decoded.first.subject, 22);
     expect(encoded, isNot(contains(p.baseUrl)));
     expect(HealthRecordCodec.decode('{bad'), isEmpty);
-    expect(HealthRecordCodec.decode('{"version":2,"records":[]}'), isEmpty);
+    expect(HealthRecordCodec.decode('{"version":99,"records":[]}'), isEmpty);
   });
   test(
-    'ranking uses cross-title success as a hint but ignores expired records',
+    'ranking retains old cross-title success as a lower-priority hint',
     () {
       final a = FakeRule('a'), b = FakeRule('b');
       expect(
@@ -190,7 +190,7 @@ void main() {
           'env',
           now.add(const Duration(days: 2)),
         ).first,
-        same(a),
+        same(b),
       );
     },
   );

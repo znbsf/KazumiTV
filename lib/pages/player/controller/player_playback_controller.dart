@@ -1,6 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api
 
 import 'dart:async';
+import 'package:kazumi/services/player/current_output_failure.dart';
 import 'package:kazumi/pages/player/controller/playback_recovery_snapshot.dart';
 import 'package:kazumi/services/player/confirmed_playback_recovery.dart';
 import 'dart:io';
@@ -71,6 +72,7 @@ final class _OwnedPlayer {
   void abortRecoveryWait() {
     if (!recoveryAborted.isCompleted) recoveryAborted.complete();
   }
+
   bool ready = false;
   bool released = false;
   final List<StreamSubscription<dynamic>> subscriptions = [];
@@ -402,8 +404,8 @@ abstract class _PlayerPlaybackController with Store {
           bufferSize: cachePolicy.bufferSize,
           osc: false,
           logLevel: MPVLogLevel.values[
-              TvMode.enabled && debug.playerLogLevel < 1
-                  ? 1
+              TvMode.enabled && debug.playerLogLevel < 3
+                  ? 3
                   : debug.playerLogLevel],
           adBlocker: adBlockerEnabled,
         ),
@@ -525,6 +527,7 @@ abstract class _PlayerPlaybackController with Store {
         hardwareDecoder = 'no';
         superResolutionMode = SuperResolutionMode.off;
       }
+      var outputTerminalFailure = false;
       if (videoRenderer == 'mediacodec_embed') {
         hAenable = true;
         hardwareDecoder = 'mediacodec';
@@ -535,8 +538,23 @@ abstract class _PlayerPlaybackController with Store {
             return await _discardIfNotCurrent(candidate);
           candidate.subscriptions.add(player.stream.log.listen((event) {
             if (isCurrentPlayer(player) &&
+                event.prefix == 'vd' &&
+                event.text.trim() ==
+                    'Software decoding fallback is disabled.') {
+              KazumiLogger().w(
+                  'PlaybackDiagnostic session=${identityHashCode(candidate)} output=mediacodec_embed category=hardwareUnavailable signal=mpv_no_software_fallback');
+              if (!recoveryBlocksCompletion) {
+                recoveryBlocksCompletion = true;
+                completed = false;
+                onPlaybackError?.call('当前视频没有可用的硬件解码路径，可重试或更换视频源');
+              }
+            }
+            if (isCurrentPlayer(player) &&
+                !outputTerminalFailure &&
                 isDirectDecoderFailure(
                     prefix: event.prefix, text: event.text)) {
+              KazumiLogger().w(
+                  'PlaybackDiagnostic session=${identityHashCode(candidate)} output=mediacodec_embed category=hardwareDecoder signal=mpv_hardware_method_failed');
               recoveryBlocksCompletion = true;
               completed = false;
               onDirectDecoderFailure(PlaybackRecoverySnapshot(player.state,
@@ -561,37 +579,70 @@ abstract class _PlayerPlaybackController with Store {
         return await _discardIfNotCurrent(candidate);
       }
 
-      bool showPlayerError = GStorage.getSetting(SettingsKeys.showPlayerError);
-      candidate.subscriptions.add(player.stream.error.listen((event) {
-        if (isCurrentPlayer(player) && recoverySnapshot != null) {
+      final outputFailure = CurrentOutputFailureHandler(
+        isCurrent: () => isCurrentPlayer(player),
+        abort: () {
+          outputTerminalFailure = true;
           candidate.hasNativeError = true;
           candidate.abortRecoveryWait();
           recoveryBlocksCompletion = true;
           completed = false;
-        }
-        if (isCurrentPlayer(player) &&
-            (recoverySnapshot != null || !recoveryBlocksCompletion)) {
-          final actionableMessage = PlayerErrorMapper.toActionableMessage(
-            event,
-            isBuffering: playerBuffering,
-            softwareRecovery: recoverySnapshot != null,
-          );
-          if (actionableMessage != null) {
-            if (onPlaybackError != null) {
-              onPlaybackError(actionableMessage);
-            } else {
-              KazumiDialog.showToast(
-                  message: actionableMessage, showActionButton: true);
-            }
-          } else if (showPlayerError) {
-            KazumiDialog.showToast(
-                message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
-                duration: const Duration(seconds: 5),
-                showActionButton: true);
+        },
+        report: (failure) {
+          final message = switch (failure) {
+            CurrentOutputFailure.releasedSession => '当前播放器会话已失效，请重试当前集或更换视频源',
+            CurrentOutputFailure.initialization => '视频输出初始化失败，请重试当前集或更换视频源',
+            CurrentOutputFailure.firstFrameTimeout => '等待画面超时，可重试当前集或更换视频源',
+          };
+          KazumiLogger().w(
+              'PlaybackDiagnostic session=${identityHashCode(candidate)} output=$videoRenderer category=${failure.name} signal=current_output_failure');
+          if (onPlaybackError != null) {
+            onPlaybackError(message);
+          } else {
+            KazumiDialog.showToast(message: message, showActionButton: true);
           }
-        }
-        KazumiLogger().e('PlayerController: Player intent error ${videoUrl()}',
-            error: event);
+        },
+      );
+      bool showPlayerError = GStorage.getSetting(SettingsKeys.showPlayerError);
+      candidate.subscriptions.add(player.stream.error.listen((event) {
+        PlayerErrorMapper.dispatchCurrentError(event,
+            isCurrent: () => isCurrentPlayer(player),
+            record: (category) => KazumiLogger().w(
+                'PlaybackDiagnostic session=${identityHashCode(candidate)} output=$videoRenderer category=${category.name} signal=native_error'),
+            handle: (category) {
+              if (category == PlaybackFailureCategory.releasedSession) {
+                outputFailure.fail(CurrentOutputFailure.releasedSession);
+                return;
+              }
+              candidate.hasNativeError = true;
+              if (isCurrentPlayer(player) && recoverySnapshot != null) {
+                candidate.hasNativeError = true;
+                candidate.abortRecoveryWait();
+                recoveryBlocksCompletion = true;
+                completed = false;
+              }
+              if (isCurrentPlayer(player) &&
+                  (recoverySnapshot != null || !recoveryBlocksCompletion)) {
+                final actionableMessage = PlayerErrorMapper.toActionableMessage(
+                  event,
+                  isBuffering: playerBuffering,
+                  softwareRecovery: recoverySnapshot != null,
+                );
+                if (actionableMessage != null) {
+                  if (onPlaybackError != null) {
+                    onPlaybackError(actionableMessage);
+                  } else {
+                    KazumiDialog.showToast(
+                        message: actionableMessage, showActionButton: true);
+                  }
+                } else if (showPlayerError) {
+                  KazumiDialog.showToast(
+                      message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
+                      duration: const Duration(seconds: 5),
+                      showActionButton: true);
+                }
+              }
+            });
       }));
 
       if (superResolutionMode != SuperResolutionMode.off) {
@@ -608,6 +659,17 @@ abstract class _PlayerPlaybackController with Store {
         }
       }
 
+      final initialOutput = videoController;
+      if (TvMode.enabled && recoverySnapshot == null && initialOutput != null) {
+        unawaited(observeFirstFrame(
+          firstFrame: initialOutput.waitUntilFirstFrameRendered,
+          cancelled: candidate.recoveryAborted.future,
+        ).then((outcome) {
+          outputFailure.observe(outcome,
+              alreadyHandled:
+                  candidate.hasNativeError || recoveryBlocksCompletion);
+        }));
+      }
       candidate.intendedPlaying = recoverySnapshot?.playing ?? autoPlay;
       await player.open(
         Media(videoUrl(),

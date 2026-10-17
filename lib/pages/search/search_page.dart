@@ -1,4 +1,4 @@
-import 'package:kazumi/pages/search/qr_search_dialog.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
 import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:math' as math;
 
@@ -160,11 +160,10 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _qrSearch() async {
-    final value = await showDialog<String>(
-        context: context, builder: (_) => const QrSearchDialog());
+    await showDialog<void>(
+        context: context, builder: (_) => const PhoneKeyboardDialog());
     if (!mounted) return;
     _qrFocus.requestFocus();
-    if (value != null) await _submit(value);
   }
 
   Widget _searchField() {

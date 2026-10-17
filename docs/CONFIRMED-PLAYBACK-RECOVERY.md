@@ -63,6 +63,16 @@ API36 的原组件入口已验证 Back 只取消、焦点回原按钮；快速�
 
 ## 2026-10-17 最新验收（集成负责人设备执行，离线核对）
 
+### 用户反馈整改后的补证据（13:38–13:41 UTC）
+
+最新生产修复 `b44276ed` 全量1017项通过；只改QA初始化的后续 `82277968` 定向实际构造测试另通过1项。播放QA20528（源码含上述提交）安装回读SHA256 `c3b53fe02ea616de7ce7a8595d999bdae3c9fafa92cb96203325badd4aecafd8`。20527曾因QA重赋late final danmaku红屏，已修为QA专属getter并加入真实Controller构造测试；这是失败样本，不计播放验收，也未改变生产初始化。
+
+- 首帧上限：本机服务立即给合法头、每秒flush一个真实媒体字节；13:38:34.884请求，13:39:04.563安全诊断 `firstFrameTimeout`，错误页明确等待画面超时，pending=false，无软解确认或循环重试。证据A/lifecycle-final-drip-result与media-requests.jsonl。此前delay40在约5.5秒失败只能对应底层网络超时可能性，不算本项通过。
+- 原生重叠：13:40:10.241旧sample请求delay12，旧播放器13:40:11.390释放；新H264请求13:40:11.798，新控制器878472694于13:40:11.836进入，13:40:12.238真实首帧。旧响应预计13:40:22.241返回后，新会话继续至11291ms正常EOF，13:40:42仍blocked=false/nativeError=false/pending=false。无Unhandled Exception。证据A/rapid-overlap-events.json、lifecycle-rapid-overlap与lifecycle-rapid-after-old-return；此项补足下方旧记录明确未覆盖的原生时间重叠，不扩大为所有原生竞态证明。
+- 完整生产main20529（非fixture）安装回读SHA256 `7ae97cc1d31ba249df2751767b1d5f9913a8d0468a62efa40b36bf8a73395a29`，正常启动使用约定首屏（A/main-final-smoke）。未代同意或绕过既有审批限制，后续生产引导/首页人工验收未完成。未操作用户电视。
+
+实际硬件方法故障的正例、Android9外部轨道恢复与物理扬声器/校准声画仍是现场边界；明确方法日志分类有自动正负例，不能当成真实硬件故障验收。正常下载包仍为lib/main，不含本地故障fixture。
+
 全量 **955项测试通过**，测试head `606593f1`，本播放生产修复为 `7595a9ad`。完整页面模拟器20514与Android9 ARMv7电视20515使用独立recoveryqa身份，不等同正式版发布/合入。私人证据根目录为 `artifacts/four-stream-20261017`，下文简称A；原始设备日志不提交。
 
 - 模拟器20514完整VideoPage：`A/recovery-emu-action-restored.log` 中11:54:00.779真实firstFrameNotify，随后恢复17秒暂停，blocked=false、loading=false、pending=false、decoder=no，焦点回当前剧集。与此前20511仅Resize、20512MobX异常分别保留。

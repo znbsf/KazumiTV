@@ -42,10 +42,12 @@ class SourceSheet extends StatefulWidget {
   const SourceSheet(
       {super.key,
       required this.infoController,
+      this.autoSearchOnOpen = true,
       this.switchOrigin,
       this.createVideoSourceService});
 
   final InfoController infoController;
+  final bool autoSearchOnOpen;
   final SourceSwitchOrigin? switchOrigin;
   final IVideoSourceService Function()? createVideoSourceService;
 
@@ -77,7 +79,12 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
       onVerified: _showVerifiedResult,
       onCancelled: (plugin) => _retry(plugin.name),
     );
-    _searchService.queryAllSource(_keyword);
+    if (widget.autoSearchOnOpen) {
+      _searchService.queryAllSource(_keyword);
+    } else {
+      widget.infoController.pluginSearchResponseList.clear();
+      widget.infoController.pluginSearchStatus.clear();
+    }
   }
 
   @override
@@ -273,6 +280,9 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
               plugin.name: _SourceSearchGroup(
                 name: plugin.name,
                 keyword: _keywordFor(plugin.name),
+                unsearched: !widget.autoSearchOnOpen &&
+                    !widget.infoController.pluginSearchStatus
+                        .containsKey(plugin.name),
                 status: widget.infoController.pluginSearchStatus[plugin.name] ??
                     PluginSearchStatus.pending,
                 results: <SearchItem>[],

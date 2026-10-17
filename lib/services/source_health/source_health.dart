@@ -29,16 +29,44 @@ class HealthRecord {
     required this.reason,
     this.ruleVersion = '',
     this.episode = '',
+    this.lastSuccess,
   });
   final int subject;
   final String rule, fingerprint, environment, reason, ruleVersion, episode;
   final DateTime checkedAt;
   final HealthStage stage;
+
+  /// Previous confirmed frame in this exact subject/rule/environment group.
+  /// Latest attempts never erase successful evidence; nested history is bounded.
+  final HealthRecord? lastSuccess;
+  HealthRecord? get success =>
+      stage == HealthStage.firstFrame ? this : lastSuccess;
+  bool compatible(String fingerprint, DateTime now) =>
+      this.fingerprint == fingerprint && !checkedAt.isAfter(now);
+  int freshnessBand(DateTime now) {
+    final age = now.difference(checkedAt);
+    if (age.isNegative) return 3;
+    if (age < const Duration(hours: 24)) return 0;
+    if (age < const Duration(days: 7)) return 1;
+    return 2;
+  }
+
+  HealthRecord withSuccess(HealthRecord? previous) => HealthRecord(
+        subject: subject,
+        rule: rule,
+        fingerprint: fingerprint,
+        environment: environment,
+        checkedAt: checkedAt,
+        stage: stage,
+        reason: reason,
+        ruleVersion: ruleVersion,
+        episode: episode,
+        lastSuccess: previous,
+      );
   bool current(String fingerprint, String environment, DateTime now) =>
       this.fingerprint == fingerprint &&
       this.environment == environment &&
-      !checkedAt.isAfter(now) &&
-      now.difference(checkedAt) < const Duration(hours: 24);
+      !checkedAt.isAfter(now);
   Map<String, Object> toJson() => {
         'subject': subject,
         'rule': rule,
@@ -239,7 +267,8 @@ class SourceHealthService {
         stage = HealthStage.searchHit;
         reason = 'chapters_failed';
       } catch (_) {
-        reason = 'request_or_playback_failed';
+        reason =
+            stage == HealthStage.chapters ? 'player_failed' : 'request_failed';
       } finally {
         if (!await child.close()) run.cancel();
       }
@@ -263,23 +292,96 @@ class SourceHealthService {
     }
   }
 
+  /// Starts no probe and creates no player. Only recorded successful rules may
+  /// be reused; a manual preference orders eligible rules, never fabricates
+  /// success. Failure returns to manual selection without trying another rule.
+  Future<HealthCandidate?> reuseRecorded({
+    required List<Plugin> plugins,
+    required List<HealthRecord> records,
+    required int subject,
+    required String keyword,
+    required Iterable<String> names,
+    required String environment,
+    required HealthRun run,
+    bool useGlobal = true,
+    Plugin? preferred,
+  }) async {
+    final now = clock();
+    final eligible = plugins
+        .where((p) => records.any((r) =>
+            r.rule == p.name &&
+            (useGlobal || r.subject == subject) &&
+            r.success != null &&
+            r.success!.compatible(ruleFingerprint(p), now)))
+        .toList();
+    if (eligible.isEmpty || run.cancelled) return null;
+    final ranked = rank(eligible, records, subject, environment, now,
+        useGlobal: useGlobal);
+    final selected = preferred != null && eligible.contains(preferred)
+        ? preferred
+        : ranked.first;
+    try {
+      return await run.wait(inspect(selected, keyword, names, run), perRule);
+    } catch (_) {
+      return null;
+    } finally {
+      run.cancel();
+    }
+  }
+
   /// Ranking is only a hint. inspect() MUST re-query and re-match the subject.
   static List<Plugin> rank(
     List<Plugin> plugins,
     List<HealthRecord> records,
     int subject,
     String environment,
-    DateTime now,
-  ) {
+    DateTime now, {
+    bool useGlobal = true,
+  }) {
     int score(Plugin p) {
-      final valid = records.where(
-        (r) =>
-            r.rule == p.name &&
-            r.stage == HealthStage.firstFrame &&
-            r.current(ruleFingerprint(p), environment, now),
-      );
-      if (valid.any((r) => r.subject == subject)) return 0;
-      return valid.isNotEmpty ? 1 : 2;
+      var best = 100; // Unmeasured candidates remain eligible.
+      var penalty = 0;
+      final fingerprint = ruleFingerprint(p);
+      for (final r in records) {
+        if (r.rule != p.name ||
+            !r.compatible(fingerprint, now) ||
+            (!useGlobal && r.subject != subject)) {
+          continue;
+        }
+        final success = r.success;
+        if (success != null && success.compatible(ruleFingerprint(p), now)) {
+          // Changed playback environments retain only weak site evidence.
+          final value = success.environment == environment
+              ? success.freshnessBand(now) * 20 +
+                  (r.subject == subject ? 0 : 10)
+              : 75;
+          if (value < best) best = value;
+        } else if (r.stage == HealthStage.chapters ||
+            r.stage == HealthStage.resolved) {
+          if (80 < best) best = 80;
+        }
+        if (r.freshnessBand(now) == 0 && r.stage != HealthStage.firstFrame) {
+          final targetOnly = r.stage == HealthStage.noMatch ||
+              r.reason == 'no_unique_title_match';
+          final failure = targetOnly ||
+              r.stage == HealthStage.error ||
+              r.stage == HealthStage.timeout ||
+              r.stage == HealthStage.captcha ||
+              r.reason == 'chapters_failed' ||
+              r.stage == HealthStage.resolved;
+          if (failure && r.subject == subject && r.environment == environment) {
+            penalty = 130;
+          } else if (failure &&
+              !targetOnly &&
+              r.environment == environment &&
+              r.reason != 'decoder_or_output_error' &&
+              r.reason != 'media_format_error') {
+            // A different title's failure is only a weak hint, never a ban.
+            if (penalty < 30) penalty = 30;
+          }
+        }
+      }
+      return best + penalty;
     }
 
     final indexed = plugins.asMap().entries.toList();
@@ -291,30 +393,78 @@ class SourceHealthService {
   }
 }
 
-/// Versioned, bounded local metadata only. Invalid documents recover empty.
+/// Schema 2 retains latest attempt and last success per exact evidence group.
+/// Version 1 cannot restore successes already overwritten by older releases.
 class HealthRecordCodec {
+  static bool _sameGroup(HealthRecord a, HealthRecord b) =>
+      a.subject == b.subject &&
+      a.rule == b.rule &&
+      a.fingerprint == b.fingerprint &&
+      a.environment == b.environment;
+
+  static List<HealthRecord> merge(
+      List<HealthRecord> records, HealthRecord incoming) {
+    final result = List<HealthRecord>.of(records);
+    final index = result.indexWhere((r) => _sameGroup(r, incoming));
+    var latest = incoming;
+    if (index >= 0) {
+      final old = result.removeAt(index);
+      latest = incoming.checkedAt.isBefore(old.checkedAt) ? old : incoming;
+      final successes = [old.success, incoming.success]
+          .whereType<HealthRecord>()
+          .toList()
+        ..sort((a, b) => b.checkedAt.compareTo(a.checkedAt));
+      latest = latest.withSuccess(
+          successes.isEmpty ? null : successes.first.withSuccess(null));
+    }
+    result.add(latest);
+    return result.length <= 128 ? result : result.sublist(result.length - 128);
+  }
+
   static List<HealthRecord> decode(String raw) {
     try {
       final j = jsonDecode(raw) as Map<String, dynamic>;
-      if (j['version'] != 1) return [];
-      return (j['records'] as List)
-          .take(128)
-          .map((e) => HealthRecord.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
+      final version = j['version'];
+      if (version != 1 && version != 2) return [];
+      var records = <HealthRecord>[];
+      for (final entry in (j['records'] as List).take(128)) {
+        final map = Map<String, dynamic>.from(entry);
+        var record = HealthRecord.fromJson(version == 1
+            ? map
+            : Map<String, dynamic>.from(map['latestAttempt']));
+        if (version == 2 && map['lastSuccess'] != null) {
+          final success = HealthRecord.fromJson(
+              Map<String, dynamic>.from(map['lastSuccess']));
+          if (!_sameGroup(record, success) ||
+              success.stage != HealthStage.firstFrame ||
+              success.checkedAt.isAfter(record.checkedAt)) {
+            throw const FormatException('invalid success');
+          }
+          record = record.withSuccess(success);
+        }
+        records = merge(records, record);
+      }
+      return records;
     } catch (_) {
       return [];
     }
   }
 
-  static String encode(List<HealthRecord> records) => jsonEncode({
-        'version': 1,
-        'records': records.reversed
-            .take(128)
-            .toList()
-            .reversed
-            .map((r) => r.toJson())
-            .toList(),
-      });
+  static String encode(List<HealthRecord> records) {
+    var bounded = <HealthRecord>[];
+    for (final r in records) {
+      bounded = merge(bounded, r);
+    }
+    return jsonEncode({
+      'version': 2,
+      'records': bounded
+          .map((r) => {
+                'latestAttempt': r.toJson(),
+                if (r.success != null) 'lastSuccess': r.success!.toJson(),
+              })
+          .toList(),
+    });
+  }
 }
 
 class HealthPlaybackFailure implements Exception {

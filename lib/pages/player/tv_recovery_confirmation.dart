@@ -24,7 +24,7 @@ class TvRecoveryConfirmation extends StatelessWidget {
         child: AlertDialog(
           title: const Text('尝试软件兼容播放？'),
           content: const Text(
-              '当前硬件解码失败。确认后将重新打开本集并恢复播放位置、暂停状态、倍速及音轨/字幕选择。软件解码可能卡顿；仅尝试一次，不修改默认设置。'),
+              '硬件解码路径报告错误，可能与当前视频源兼容性有关。确认后将重新打开本集并恢复播放位置、暂停状态、倍速及音轨/字幕选择。软件解码可能卡顿；仅尝试一次，不修改默认设置。'),
           actions: [
             TextButton(
                 autofocus: true, onPressed: onCancel, child: const Text('取消')),

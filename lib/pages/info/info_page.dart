@@ -1,5 +1,7 @@
 import 'package:kazumi/pages/info/source_health_page.dart';
 import 'package:kazumi/services/source_health/source_health.dart';
+import 'package:kazumi/services/source_health/source_health_preferences.dart';
+import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'dart:io';
@@ -79,6 +81,7 @@ class _InfoPageState extends State<InfoPage>
   bool staffIsEmpty = false;
   bool _showBangumiInfoSkeleton = false;
   bool _startingPlayback = false;
+  HealthRun? _recordedSourceRun;
   final _detailScrollController = ScrollController();
   final _tvPlayFocus = FocusNode(debugLabel: 'TV detail play');
   final _tvBackFocus = FocusNode(debugLabel: 'TV detail back');
@@ -125,13 +128,13 @@ class _InfoPageState extends State<InfoPage>
     return KeyEventResult.ignored;
   }
 
-  Future<HealthCandidate?> _sourceHealth({bool autoSelect = false}) async {
+  Future<HealthCandidate?> _sourceHealth() async {
     final result = await Navigator.of(context).push<HealthCandidate>(
-      MaterialPageRoute(builder: (_) => SourceHealthPage(
-        subject: infoController.bangumiItem,
-        plugins: List.of(inject<PluginsController>().pluginList),
-        autoSelect: autoSelect,
-      )),
+      MaterialPageRoute(
+          builder: (_) => SourceHealthPage(
+                subject: infoController.bangumiItem,
+                plugins: List.of(inject<PluginsController>().pluginList),
+              )),
     );
     if (mounted) _tvPlayFocus.requestFocus();
     return result;
@@ -164,17 +167,53 @@ class _InfoPageState extends State<InfoPage>
           if (!mounted || cancelToken.isCancelled || opened) return;
           KazumiDialog.showToast(message: '上次的播放源不可用，请重新选源');
         } else if (GStorage.getSetting(SettingsKeys.firstSourceAutoSelect)) {
-          final candidate = await _sourceHealth(autoSelect: true);
+          final plugins = List.of(inject<PluginsController>().pluginList);
+          final item = infoController.bangumiItem;
+          final records = HealthRecordCodec.decode(
+              GStorage.getSetting(SettingsKeys.sourceHealthRecords));
+          HealthCandidate? candidate;
+          if (records.any((record) => record.success != null)) {
+            final run = HealthRun();
+            var cancelledByUser = false;
+            _recordedSourceRun = run;
+            await dialogs.run((task) async {
+              candidate = await task.loading<HealthCandidate?>(
+                message: '正在打开已验证来源',
+                onCancel: () {
+                  cancelledByUser = true;
+                  run.cancel();
+                },
+                action: () => SourceHealthService().reuseRecorded(
+                  plugins: plugins,
+                  records: records,
+                  subject: item.id,
+                  keyword: item.nameCn.isEmpty ? item.name : item.nameCn,
+                  names: [item.name, item.nameCn, ...item.alias],
+                  environment:
+                      '${ApiEndpoints.version}|${Platform.operatingSystem}|${Platform.operatingSystemVersion}|'
+                      '${GStorage.getSetting(SettingsKeys.androidVideoRenderer)}|${GStorage.getSetting(SettingsKeys.hardwareDecoder)}|${GStorage.getSetting(SettingsKeys.hAenable)}',
+                  run: run,
+                  useGlobal:
+                      GStorage.getSetting(SettingsKeys.sourceHealthGlobal),
+                  preferred:
+                      SourceHealthPreferences.preferred(item.id, plugins),
+                ),
+              );
+            }, errorMessage: '已验证来源暂不可用，请手动选择');
+            _recordedSourceRun = null;
+            if (cancelledByUser) return;
+          }
           if (!mounted) return;
           if (candidate != null) {
-            context.pushNamed('/video/', arguments: OnlineVideoPlaybackArgs(
-              bangumiItem: infoController.bangumiItem,
-              plugin: candidate.plugin,
-              title: candidate.item.name,
-              src: candidate.item.src,
-              roads: candidate.roads,
-              allowHistoryResume: false,
-            ));
+            context.pushNamed('/video/',
+                arguments: OnlineVideoPlaybackArgs(
+                  bangumiItem: infoController.bangumiItem,
+                  plugin: candidate!.plugin,
+                  title: candidate!.item.name,
+                  src: candidate!.item.src,
+                  roads: candidate!.roads,
+                  allowHistoryResume: false,
+                ));
             return;
           }
         }
@@ -182,7 +221,8 @@ class _InfoPageState extends State<InfoPage>
       if (!mounted) return;
       await showAdaptiveBottomSheet<void>(
         context: context,
-        builder: (_) => SourceSheet(infoController: infoController),
+        builder: (_) => SourceSheet(
+            infoController: infoController, autoSearchOnOpen: reselectSource),
       );
     } finally {
       _startingPlayback = false;
@@ -336,8 +376,8 @@ class _InfoPageState extends State<InfoPage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           tvArtworkController.select(widget.inputBangumiItem,
-              imageUrl:
-                  NetworkImgLayer.tvDetailCoverUrl(widget.inputBangumiItem.images));
+              imageUrl: NetworkImgLayer.tvDetailCoverUrl(
+                  widget.inputBangumiItem.images));
         }
       });
     }
@@ -401,6 +441,7 @@ class _InfoPageState extends State<InfoPage>
 
   @override
   void dispose() {
+    _recordedSourceRun?.cancel();
     _detailScrollController.dispose();
     _tvPlayFocus.dispose();
     _tvBackFocus.dispose();

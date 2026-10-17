@@ -40,7 +40,9 @@ void main() {
       () {
     expect(
         isDirectDecoderFailure(
-            prefix: 'vd', text: 'Software decoding fallback is disabled.\n'),
+            prefix: 'vd',
+            text:
+                'Attempting next decoding method after failure of h264_mediacodec-mediacodec.\n'),
         isTrue);
     for (final prefix in ['ffmpeg', 'demux', '']) {
       expect(
@@ -49,6 +51,13 @@ void main() {
           isFalse);
     }
     for (final text in [
+      'Software decoding fallback is disabled.',
+      'Could not open codec.',
+      'Could not set codec parameters.',
+      'Attempting next decoding method after failure of h264_mediacodec-mediacodec-copy.',
+      '[Player] has been disposed',
+      'TimeoutException',
+      'No audio',
       'HTTP 403',
       'EOF',
       'buffering',

@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:kazumi/utils/date_time.dart' show formatDateTime;
+import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/plugins/plugins.dart';
@@ -51,6 +53,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
   HealthCandidate? _selected;
   List<HealthRecord> _stored = [];
   bool _autoEnabled = true;
+  bool _globalEnabled = true;
   @override
   void initState() {
     super.initState();
@@ -61,6 +64,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
       GStorage.getSetting(SettingsKeys.sourceHealthRecords),
     );
     _autoEnabled = GStorage.getSetting(SettingsKeys.firstSourceAutoSelect);
+    _globalEnabled = GStorage.getSetting(SettingsKeys.sourceHealthGlobal);
     if (widget.autoSelect) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _start());
     }
@@ -74,10 +78,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
   }
 
   Future<void> _save(HealthRecord record) async {
-    _stored.removeWhere(
-      (r) => r.subject == record.subject && r.rule == record.rule,
-    );
-    _stored.add(record);
+    _stored = HealthRecordCodec.merge(_stored, record);
     await GStorage.putSetting(
       SettingsKeys.sourceHealthRecords,
       HealthRecordCodec.encode(_stored),
@@ -91,6 +92,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
     Player? player;
     StreamSubscription<String>? errors;
     final playbackError = Completer<String>();
+    var resolving = true;
     Future<void>? cleanup;
     Future<void> release() => cleanup ??= () async {
           resolver.cancel();
@@ -112,6 +114,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
         timeout: const Duration(seconds: 12),
       );
       if (child.cancelled || !mounted) throw const HealthCancelled();
+      resolving = false;
       final androidConfiguration = Platform.isAndroid
           ? resolveAndroidVideoConfiguration(
               configuredOutput: GStorage.getSetting(
@@ -119,7 +122,8 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
               ),
               isTv: TvMode.enabled,
               hardwareAcceleration: GStorage.getSetting(SettingsKeys.hAenable),
-              hardwareDecoder: GStorage.getSetting(SettingsKeys.hardwareDecoder),
+              hardwareDecoder:
+                  GStorage.getSetting(SettingsKeys.hardwareDecoder),
               androidSdkVersion:
                   await PlatformEnvironmentService.getAndroidSdkVersion(),
               isEmulator: await PlatformEnvironmentService.isAndroidEmulator(),
@@ -143,8 +147,9 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
         configuration: VideoControllerConfiguration(
           vo: androidConfiguration?.output,
           enableAndroidSurfaceProducer: false,
-          enableHardwareAcceleration: androidConfiguration?.hardwareAcceleration ??
-              GStorage.getSetting(SettingsKeys.hAenable),
+          enableHardwareAcceleration:
+              androidConfiguration?.hardwareAcceleration ??
+                  GStorage.getSetting(SettingsKeys.hAenable),
           hwdec: androidConfiguration?.effectiveHardwareDecoder ??
               (GStorage.getSetting(SettingsKeys.hAenable)
                   ? GStorage.getSetting(SettingsKeys.hardwareDecoder)
@@ -184,6 +189,16 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
       }
       if (child.cancelled) throw const HealthCancelled();
       return HealthStage.firstFrame;
+    } on HealthCancelled {
+      rethrow;
+    } on CaptchaRequiredException {
+      rethrow;
+    } on HealthPlaybackFailure {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
+    } catch (_) {
+      throw HealthPlaybackFailure(resolving ? 'parse_failed' : 'player_failed');
     } finally {
       await release();
       _active = null;
@@ -220,6 +235,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
               item.id,
               _environment,
               DateTime.now(),
+              useGlobal: _globalEnabled,
             );
       final writes = <Future<void>>[];
       await SourceHealthService(
@@ -295,15 +311,44 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
   }
 
   String _freshness(HealthRecord record) {
-    for (final plugin in widget.plugins) {
-      if (plugin.name == record.rule &&
-          record.current(
-              ruleFingerprint(plugin), _environment, DateTime.now())) {
-        return '有效';
-      }
+    final matching = widget.plugins.where((p) => p.name == record.rule);
+    if (matching.isEmpty) return '规则未加载，仅保留历史';
+    if (ruleFingerprint(matching.first) != record.fingerprint) {
+      return '规则已变化，仅保留旧版本历史';
     }
-    return '已失效，请重新检测';
+    if (record.checkedAt.isAfter(DateTime.now())) return '记录时间异常，需复验';
+    if (record.environment != _environment) return '播放环境已变化，仅作站点历史参考';
+    return switch (record.freshnessBand(DateTime.now())) {
+      0 => '近期记录，播放仍需确认',
+      1 => '较旧记录，待复验',
+      _ => '历史记录，待复验',
+    };
   }
+
+  List<HealthRecord> get _visibleRecords {
+    var records = List<HealthRecord>.of(_stored);
+    for (final r in _results) {
+      records = HealthRecordCodec.merge(records, r);
+    }
+    return records
+        .where((r) => _globalEnabled || r.subject == widget.subject.id)
+        .toList();
+  }
+
+  String _recordTime(DateTime value) {
+    final local = value.toLocal();
+    return '${formatDateTime(local)} '
+        '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _recordSummary(HealthRecord r) => '${_recordTime(r.checkedAt)}'
+      '${r.episode.trim().isEmpty ? '' : ' · 第 ${r.episode} 集'}'
+      ' · ${_freshness(r).replaceAll('，仅保留历史', '').replaceAll('，仅保留旧版本历史', '').replaceAll('，仅作站点历史参考', '').replaceAll('，播放仍需确认', '')}';
+
+  String _recordText(HealthRecord r) => '${_recordTime(r.checkedAt)}'
+      '${r.episode.trim().isEmpty ? '' : ' · 第 ${r.episode} 集'}'
+      ' · 规则 ${r.ruleVersion} · ${_freshness(r)} · ${_reason(r.reason)}';
 
   String _reason(String code) => switch (code) {
         'decoder_or_output_error' => '解码或画面输出失败',
@@ -315,6 +360,10 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
         'time_budget_exhausted' => '已达到时间上限',
         'frame_observed' => '已确认首帧',
         'frame_not_observed' => '未确认首帧',
+        'no_search_results' => '本番剧未命中，不代表其他番剧不可用',
+        'request_failed' => '站点请求失败',
+        'parse_failed' => '媒体解析失败',
+        'player_failed' => '播放器验证失败',
         _ => '仅供本次检测参考',
       };
 
@@ -335,85 +384,177 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
           if (!didPop) _exit();
         },
         child: Scaffold(
-          appBar: AppBar(title: Text(widget.autoSelect ? '首次自动选源' : '源健康检测')),
-          body: ListView(
-            padding: const EdgeInsets.all(24),
-            children: [
-              Text(
-                widget.subject.nameCn.isEmpty
-                    ? widget.subject.name
-                    : widget.subject.nameCn,
-                style: TvVisuals.control,
-              ),
-              const Text('检测首帧不代表后续完整播放成功，正式播放仍可能因网络变化失败，可手动换源。'),
-              const Text(
-                '串行检测已加载规则，最多 12 个 / 3 分钟。首次选源最多 3 个 / 75 秒。结果 24 小时有效，规则或播放环境变化后失效。单部成功不代表全站可用。',
-              ),
-              if (!widget.autoSelect)
-                SwitchListTile(
-                  title: const Text('首次播放自动选源'),
-                  subtitle: const Text('仅无本剧历史时尝试；始终可以手动选源'),
-                  value: _autoEnabled,
-                  onChanged: (v) async {
-                    await GStorage.putSetting(
-                      SettingsKeys.firstSourceAutoSelect,
-                      v,
-                    );
-                    if (mounted) setState(() => _autoEnabled = v);
-                  },
-                ),
-              Text(_message),
-              if (_running) const LinearProgressIndicator(),
-              Wrap(
-                spacing: 16,
+          appBar: AppBar(title: Text(widget.autoSelect ? '显式有限检测' : '源健康检测')),
+          body: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!widget.autoSelect && !_run.cancelled)
-                    FilledButton(
-                      autofocus: true,
-                      onPressed: _running ? null : _start,
-                      child: const Text('开始检测'),
-                    ),
-                  OutlinedButton(
-                    autofocus: widget.autoSelect,
-                    onPressed: _exit,
-                    child: Text(_running ? '取消并返回' : '返回手动选源'),
+                  Text(
+                    widget.subject.nameCn.isEmpty
+                        ? widget.subject.name
+                        : widget.subject.nameCn,
+                    style: TvVisuals.control,
                   ),
-                  if (!_running)
-                    OutlinedButton(
-                      onPressed: () async {
+                  const Text('检测首帧不代表后续完整播放成功，正式播放仍可能因网络变化失败，可手动换源。'),
+                  const Text(
+                    '显式检测最多 12 个 / 3 分钟。历史成功保留，随时间降低优先级；规则变化后旧证据仅供查看。开始观看只复用成功记录，无记录或失败时手动选源，不自动检测。单部成功不代表全站可用。',
+                  ),
+                  if (!widget.autoSelect)
+                    SwitchListTile(
+                      title: const Text('使用成功记录开始观看'),
+                      subtitle: const Text('只尝试一个有成功记录的源；无记录或失败时手动选择'),
+                      value: _autoEnabled,
+                      onChanged: (v) async {
                         await GStorage.putSetting(
-                          SettingsKeys.sourceHealthRecords,
-                          '',
+                          SettingsKeys.firstSourceAutoSelect,
+                          v,
                         );
-                        if (mounted) {
-                          setState(() {
-                            _stored.clear();
-                            _results.clear();
-                          });
-                        }
+                        if (mounted) setState(() => _autoEnabled = v);
                       },
-                      child: const Text('清除健康记录'),
+                    ),
+                  if (!widget.autoSelect)
+                    SwitchListTile(
+                      key: const ValueKey('health-global'),
+                      title: const Text('将成功记录用于所有番剧'),
+                      subtitle: const Text('其他番剧优先尝试记录源，仍重新匹配自己的资源；单剧手选优先'),
+                      value: _globalEnabled,
+                      onChanged: _running
+                          ? null
+                          : (value) async {
+                              await GStorage.putSetting(
+                                  SettingsKeys.sourceHealthGlobal, value);
+                              if (mounted) {
+                                setState(() => _globalEnabled = value);
+                              }
+                            },
+                    ),
+                  Text(_message),
+                  if (_running) const LinearProgressIndicator(),
+                  Wrap(
+                    spacing: 16,
+                    children: [
+                      if (!widget.autoSelect && !_run.cancelled)
+                        FilledButton(
+                          autofocus: true,
+                          onPressed: _running ? null : _start,
+                          child: const Text('开始检测'),
+                        ),
+                      OutlinedButton(
+                        autofocus: widget.autoSelect,
+                        onPressed: _exit,
+                        child: Text(_running ? '取消并返回' : '返回手动选源'),
+                      ),
+                      if (!_running)
+                        OutlinedButton(
+                          onPressed: () async {
+                            await GStorage.putSetting(
+                              SettingsKeys.sourceHealthRecords,
+                              '',
+                            );
+                            if (mounted) {
+                              setState(() {
+                                _stored.clear();
+                                _results.clear();
+                              });
+                            }
+                          },
+                          child: const Text('清除健康记录'),
+                        ),
+                    ],
+                  ),
+                  if (_video != null)
+                    SizedBox(
+                      height: 180,
+                      child:
+                          Video(controller: _video!, controls: NoVideoControls),
+                    ),
+                  if (_visibleRecords.isEmpty) const Text('暂无检测记录'),
+                  for (final r in _visibleRecords)
+                    _HealthRecordTile(
+                      key: ValueKey(
+                          '${r.subject}|${r.rule}|${r.fingerprint}|${r.environment}'),
+                      record: r,
+                      title: '${r.rule}：${_label(r.stage)}',
+                      subtitle: _recordSummary(r),
+                      detail:
+                          '番剧 ID：${r.subject}\n最近尝试：${_label(r.stage)}\n${_recordText(r)}'
+                          '${r.success == null ? '' : '\n\n历史成功：${_recordText(r.success!)}'}',
                     ),
                 ],
-              ),
-              if (_video != null)
-                SizedBox(
-                  height: 180,
-                  child: Video(controller: _video!, controls: NoVideoControls),
-                ),
-              for (final r in (_results.isEmpty
-                  ? _stored.where((r) => r.subject == widget.subject.id)
-                  : _results))
-                ListTile(
-                  title: Text('${r.rule}：${_label(r.stage)}'),
-                  subtitle: Text(
-                    '${r.checkedAt.toLocal()}'
-                    '${r.episode.trim().isEmpty ? '' : ' · 第 ${r.episode} 集'}'
-                    ' · 规则 ${r.ruleVersion} · ${_freshness(r)} · ${_reason(r.reason)}',
-                  ),
-                ),
-            ],
-          ),
+              )),
+        ),
+      );
+}
+
+class _HealthRecordTile extends StatefulWidget {
+  const _HealthRecordTile(
+      {super.key,
+      required this.record,
+      required this.title,
+      required this.subtitle,
+      required this.detail});
+  final HealthRecord record;
+  final String title, subtitle, detail;
+  @override
+  State<_HealthRecordTile> createState() => _HealthRecordTileState();
+}
+
+class _HealthRecordTileState extends State<_HealthRecordTile> {
+  late final FocusNode _focus =
+      FocusNode(debugLabel: 'health-record-${widget.record.rule}');
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _details() async {
+    await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: Text(widget.title),
+              content: SingleChildScrollView(child: Text(widget.detail)),
+              actions: [
+                TextButton(
+                    autofocus: true,
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('返回记录'))
+              ],
+            ));
+    if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+      _focus.requestFocus();
+    }
+  }
+
+  void _focusChanged(bool focused) {
+    if (!focused) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_focus.hasFocus) return;
+      // Include the outer margin so the focus outline is not flush with the
+      // viewport edge when the last record scrolls into view.
+      Scrollable.ensureVisible(context,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: TvFocusableSurface(
+          enabled: true,
+          focusNode: _focus,
+          focusScale: 1,
+          ensureVisibleOnFocus: false,
+          onFocusChange: _focusChanged,
+          onPressed: _details,
+          child: ListTile(
+              onTap: _details,
+              title: Text(widget.title),
+              subtitle: Text(widget.subtitle),
+              trailing: const Icon(Icons.chevron_right)),
         ),
       );
 }

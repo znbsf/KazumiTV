@@ -14,6 +14,7 @@ import 'package:media_kit/media_kit.dart';
 
 import 'package:media_kit_video/src/utils/query_decoders.dart';
 import 'first_frame_signal.dart';
+import 'output_lifetime.dart';
 import 'package:media_kit_video/src/video_controller/platform_video_controller.dart';
 
 /// {@template android_video_controller}
@@ -44,45 +45,50 @@ class AndroidVideoController extends PlatformVideoController {
   final lock = Lock();
 
   NativePlayer get platform => player.platform as NativePlayer;
+  late final _lifetime =
+      AndroidOutputLifetime(playerDisposed: () => platform.disposed);
 
   Future<void> setProperty(String key, String value) async {
-    await platform.setProperty(key, value, waitForInitialization: false);
+    await _lifetime.run(
+        () => platform.setProperty(key, value, waitForInitialization: false));
   }
 
   Future<void> setProperties(Map<String, String> properties) async {
     for (final entry in properties.entries) {
+      if (!_lifetime.active) return;
       await setProperty(entry.key, entry.value);
     }
   }
 
   /// Listener for updating the --wid property.
   Future<void> widListener() {
-    return lock.synchronized(() async {
-      final width = rect.value?.width.toInt() ?? 1;
-      final height = rect.value?.height.toInt() ?? 1;
-      final androidSurfaceSizeValue = [width, height].join('x');
-      final widValue = wid.value?.toString() ?? '0';
-      // When --wid is 0, vo=null is required to avoid SIGSEGV.
-      final voValue = widValue == '0' ? 'null' : configuration.vo!;
-      final vidValue = widValue == '0' ? 'no' : 'auto';
-      // It is important to re-initialize --vo after --android-surface-size.
-      await setProperty('vo', 'null');
-      await setProperties(
-        {
-          // ORDER IS IMPORTANT.
-          'android-surface-size': androidSurfaceSizeValue,
-          'wid': widValue,
-          'vo': voValue,
-          // It is important to re-initialize --vid in-case of --vo=mediacodec_embed.
-          // Not doing so causes error "Could not open codec." & video never gets rendered.
-          if (configuration.vo == 'mediacodec_embed') 'vid': vidValue,
-        },
-      );
-      // Instead of seeking to the start (Duration.zero), seek to the current playback position
-      // without jumping the user to the start of the media.
-      final currentPosition = player.state.position;
-      await player.seek(currentPosition);
-    });
+    return lock.synchronized(() => _lifetime.run(() async {
+          final width = rect.value?.width.toInt() ?? 1;
+          final height = rect.value?.height.toInt() ?? 1;
+          final androidSurfaceSizeValue = [width, height].join('x');
+          final widValue = wid.value?.toString() ?? '0';
+          // When --wid is 0, vo=null is required to avoid SIGSEGV.
+          final voValue = widValue == '0' ? 'null' : configuration.vo!;
+          final vidValue = widValue == '0' ? 'no' : 'auto';
+          // It is important to re-initialize --vo after --android-surface-size.
+          await setProperty('vo', 'null');
+          await setProperties(
+            {
+              // ORDER IS IMPORTANT.
+              'android-surface-size': androidSurfaceSizeValue,
+              'wid': widValue,
+              'vo': voValue,
+              // It is important to re-initialize --vid in-case of --vo=mediacodec_embed.
+              // Not doing so causes error "Could not open codec." & video never gets rendered.
+              if (configuration.vo == 'mediacodec_embed') 'vid': vidValue,
+            },
+          );
+          // Instead of seeking to the start (Duration.zero), seek to the current playback position
+          // without jumping the user to the start of the media.
+          if (!_lifetime.active || widValue == '0') return;
+          final currentPosition = player.state.position;
+          await player.seek(currentPosition);
+        }));
   }
 
   /// [StreamSubscription] for listening to video [Rect].
@@ -95,46 +101,48 @@ class AndroidVideoController extends PlatformVideoController {
   ) {
     wid.addListener(widListener);
     videoParamsSubscription = player.stream.videoParams.listen(
-      (event) => lock.synchronized(() async {
-        final int width;
-        final int height;
-        if (event.rotate == 0 || event.rotate == 180) {
-          width = event.dw ?? 0;
-          height = event.dh ?? 0;
-        } else {
-          // width & height are swapped for 90 or 270 degrees rotation.
-          width = event.dh ?? 0;
-          height = event.dw ?? 0;
-        }
+      (event) => lock.synchronized(() => _lifetime.run(() async {
+            final int width;
+            final int height;
+            if (event.rotate == 0 || event.rotate == 180) {
+              width = event.dw ?? 0;
+              height = event.dh ?? 0;
+            } else {
+              // width & height are swapped for 90 or 270 degrees rotation.
+              width = event.dh ?? 0;
+              height = event.dw ?? 0;
+            }
 
-        final isZero = width == 0 || height == 0;
-        final isSame = width == rect.value?.width.toInt() &&
-            height == rect.value?.height.toInt();
-        if (isZero || isSame) {
-          return;
-        }
+            final isZero = width == 0 || height == 0;
+            final isSame = width == rect.value?.width.toInt() &&
+                height == rect.value?.height.toInt();
+            if (isZero || isSame) {
+              return;
+            }
 
-        final handle = await player.handle;
+            final handle = await player.handle;
+            if (!_lifetime.active) return;
 
-        await _channel.invokeMethod(
-          'VideoOutputManager.SetSurfaceSize',
-          {
-            'handle': handle.toString(),
-            'width': width.toString(),
-            'height': height.toString(),
-          },
-        );
+            await _channel.invokeMethod(
+              'VideoOutputManager.SetSurfaceSize',
+              {
+                'handle': handle.toString(),
+                'width': width.toString(),
+                'height': height.toString(),
+              },
+            );
 
-        rect.value = Rect.fromLTWH(
-          0.0,
-          0.0,
-          width.toDouble(),
-          height.toDouble(),
-        );
+            if (!_lifetime.active) return;
+            rect.value = Rect.fromLTWH(
+              0.0,
+              0.0,
+              width.toDouble(),
+              height.toDouble(),
+            );
 
-        // Dimensions only make a texture ready. Native consumption is the
-        // independent first-frame signal (SurfaceTexture path only).
-      }),
+            // Dimensions only make a texture ready. Native consumption is the
+            // independent first-frame signal (SurfaceTexture path only).
+          })),
     );
   }
 
@@ -239,13 +247,14 @@ class AndroidVideoController extends PlatformVideoController {
 
   /// Disposes the instance. Releases allocated resources back to the system.
   Future<void> _dispose() async {
+    _lifetime.close();
+    wid.removeListener(widListener);
     _firstFrame.dispose();
     super.dispose();
     wid.dispose();
-    wid.removeListener(widListener);
     await videoParamsSubscription?.cancel();
     final handle = await player.handle;
-    _controllers.remove(handle);
+    if (identical(_controllers[handle], this)) _controllers.remove(handle);
     await _channel.invokeMethod(
       'VideoOutputManager.Dispose',
       {
@@ -272,7 +281,9 @@ class AndroidVideoController extends PlatformVideoController {
                     final int handle = call.arguments['handle'];
                     final controller = _controllers[handle];
                     if (controller == null ||
-                        controller._firstFrame.token != call.arguments['outputToken']) {
+                        !controller._lifetime.active ||
+                        controller._firstFrame.token !=
+                            call.arguments['outputToken']) {
                       break;
                     }
                     final Rect rect = Rect.fromLTWH(
@@ -291,7 +302,9 @@ class AndroidVideoController extends PlatformVideoController {
                 case 'VideoOutput.WaitUntilFirstFrameRenderedNotify':
                   {
                     final int handle = call.arguments['handle'];
-                    _controllers[handle]?._firstFrame.notify(call.arguments['outputToken']);
+                    _controllers[handle]
+                        ?._firstFrame
+                        .notify(call.arguments['outputToken']);
                     break;
                   }
                 default:

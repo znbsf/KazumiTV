@@ -14,10 +14,15 @@ Future<bool> waitForRecoveryFrame({
   return rendered && isCurrent();
 }
 
+/// Pinned mpv force_fallback identifies the failed hardware method. This is
+/// not a diagnosis of defective hardware or proof that source data is valid.
+/// Fallback-disabled alone can also mean no matching hardware method exists.
 /// Explicit failure evidence from the pinned mpv decoder, never URL/error-text
 /// heuristics or buffering/completion alone.
 bool isDirectDecoderFailure({required String prefix, required String text}) =>
-    prefix == 'vd' && text.trim() == 'Software decoding fallback is disabled.';
+    prefix == 'vd' &&
+    RegExp(r'^Attempting next decoding method after failure of (h264|hevc|mpeg4|mpeg2video|vp8|vp9|av1)_mediacodec-mediacodec\.$')
+        .hasMatch(text.trim());
 
 enum RecoveryPhase {
   watching,
@@ -86,3 +91,16 @@ class ConfirmedPlaybackRecovery {
     applyResult(succeeded);
   }
 }
+
+enum FirstFrameOutcome { rendered, timedOut, cancelled, failed }
+
+Future<FirstFrameOutcome> observeFirstFrame({
+  required Future<void> firstFrame,
+  required Future<void> cancelled,
+  Duration timeout = const Duration(seconds: 30),
+}) =>
+    Future.any<FirstFrameOutcome>([
+      firstFrame.then((_) => FirstFrameOutcome.rendered,
+          onError: (Object _) => FirstFrameOutcome.failed),
+      cancelled.then((_) => FirstFrameOutcome.cancelled),
+    ]).timeout(timeout, onTimeout: () => FirstFrameOutcome.timedOut);

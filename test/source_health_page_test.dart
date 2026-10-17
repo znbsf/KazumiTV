@@ -105,7 +105,7 @@ void main() {
         rule: rule,
         fingerprint: 'fingerprint',
         environment: 'env',
-        checkedAt: DateTime.utc(2026, 10, 17),
+        checkedAt: DateTime(2026, 10, 17, 9, 5, 42, 123, 456),
         stage: episode.isEmpty ? HealthStage.noMatch : HealthStage.firstFrame,
         reason: 'no_search_results',
         episode: episode,
@@ -124,6 +124,19 @@ void main() {
         isNot(contains('第')));
     expect((tester.widget<ListTile>(ready).subtitle as Text).data,
         contains('第 1 集'));
+    final subtitle = (tester.widget<ListTile>(ready).subtitle as Text).data!;
+    expect(subtitle, startsWith('2026-10-17 09:05'));
+    expect(subtitle, isNot(contains('42.123456')));
+    expect(subtitle, isNot(contains('规则 1')));
+    await tester.ensureVisible(ready);
+    await tester.tap(ready);
+    await tester.pumpAndSettle();
+    final detail = tester.widget<Text>(find.textContaining('番剧 ID：')).data!;
+    expect(detail, contains('2026-10-17 09:05'));
+    expect(detail, contains('规则 1'));
+    expect(detail, isNot(contains('42.123456')));
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
     await tester.runAsync(
         () => GStorage.putSetting(SettingsKeys.sourceHealthRecords, ''));
   });
@@ -216,5 +229,124 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+  testWidgets('global sharing switch persists and history detail retains prior success', (tester) async {
+    final p = FakeRule('shared');
+    final success = HealthRecord(subject: 2, rule: p.name, fingerprint: ruleFingerprint(p),
+      environment: 'env', checkedAt: DateTime.now().subtract(const Duration(days: 2)),
+      stage: HealthStage.firstFrame, reason: 'frame_observed', episode: '1');
+    final failure = HealthRecord(subject: 2, rule: p.name, fingerprint: ruleFingerprint(p),
+      environment: 'env', checkedAt: DateTime.now(), stage: HealthStage.error,
+      reason: 'parse_failed');
+    await tester.runAsync(() async {
+      await GStorage.putSetting(SettingsKeys.sourceHealthGlobal, true);
+      await GStorage.putSetting(SettingsKeys.sourceHealthRecords,
+        HealthRecordCodec.encode(HealthRecordCodec.merge([success], failure)));
+    });
+    await tester.pumpWidget(MaterialApp(home: SourceHealthPage(subject: _item(), plugins: [p])));
+    await tester.pumpAndSettle();
+    final row = find.text('shared：请求或播放失败');
+    await tester.ensureVisible(row);
+    await tester.pumpAndSettle();
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('历史成功：'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('24 小时有效'), findsNothing);
+    expect(find.textContaining('不自动检测'), findsOneWidget);
+    final toggle = find.byKey(const ValueKey('health-global'));
+    await tester.ensureVisible(toggle);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      await tester.tap(toggle);
+      // Hive completes on real IO, outside the widget fake clock.
+      await Hive.box<dynamic>('setting').flush();
+    });
+    await tester.pumpAndSettle();
+    expect(GStorage.getSetting(SettingsKeys.sourceHealthGlobal), isFalse);
+    expect(row, findsNothing);
+    expect(find.text('暂无检测记录'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpWidget(MaterialApp(home: SourceHealthPage(subject: _item(), plugins: [p])));
+    await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+    await tester.runAsync(() => GStorage.putSetting(SettingsKeys.sourceHealthGlobal, true));
+  });
+
+  for (final height in [360.0, 720.0]) {
+    for (final count in [0, 1, 128]) {
+      testWidgets(
+          'remote record traversal $count rows at height $height and detail restores focus',
+          (tester) async {
+        tester.view.physicalSize = Size(1280, height);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final records = List.generate(
+            count,
+            (i) => HealthRecord(
+                subject: 1,
+                rule: 'rule-$i',
+                fingerprint: 'old-$i',
+                environment: 'env',
+                checkedAt: DateTime.now().subtract(Duration(days: i)),
+                stage: i.isEven ? HealthStage.firstFrame : HealthStage.noMatch,
+                reason: i.isEven ? 'frame_observed' : 'no_search_results',
+                episode: '1'));
+        await tester.runAsync(() async {
+          await GStorage.putSetting(SettingsKeys.sourceHealthGlobal, true);
+          await GStorage.putSetting(SettingsKeys.sourceHealthRecords,
+              HealthRecordCodec.encode(records));
+        });
+        await tester.pumpWidget(MaterialApp(
+            home: SourceHealthPage(subject: _item(), plugins: const [])));
+        await tester.pumpAndSettle();
+        if (count == 0) {
+          expect(find.text('暂无检测记录'), findsOneWidget);
+          for (var i = 0; i < 5; i++) {
+            await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+            await tester.pumpAndSettle();
+          }
+          expect(tester.takeException(), isNull);
+          return;
+        }
+        for (var i = 0;
+            i < 8 &&
+                FocusManager.instance.primaryFocus?.debugLabel !=
+                    'health-record-rule-0';
+            i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+          await tester.pumpAndSettle();
+        }
+        expect(FocusManager.instance.primaryFocus?.debugLabel,
+            'health-record-rule-0');
+        for (var i = 1; i < count; i++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+          await tester.pumpAndSettle();
+          expect(FocusManager.instance.primaryFocus?.debugLabel,
+              'health-record-rule-$i');
+        }
+        final last = FocusManager.instance.primaryFocus!;
+        expect(last.rect.top, greaterThanOrEqualTo(0));
+        expect(last.rect.bottom, lessThanOrEqualTo(height - 7));
+        await tester.sendKeyEvent(LogicalKeyboardKey.select);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(FocusManager.instance.primaryFocus, same(last));
+        for (var i = count - 2; i >= 0; i--) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pumpAndSettle();
+          expect(FocusManager.instance.primaryFocus?.debugLabel,
+              'health-record-rule-$i');
+        }
+        expect(FocusManager.instance.primaryFocus!.rect.top,
+            greaterThanOrEqualTo(0));
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 }

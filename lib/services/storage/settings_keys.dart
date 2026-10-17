@@ -61,6 +61,9 @@ class SettingsKeys {
     '',
     group: SettingGroup.misc,
   );
+  static const sourceHealthGlobal = SettingKey<bool>(
+    'sourceHealthGlobal', true, group: SettingGroup.player,
+  );
   static const firstSourceAutoSelect = SettingKey<bool>(
     'firstSourceAutoSelect',
     true,
@@ -592,6 +595,7 @@ class SettingsKeys {
 
   static final List<SettingKey<Object?>> all = [
     sourceHealthRecords,
+    sourceHealthGlobal,
     sourceHealthPreferences,
     firstSourceAutoSelect,
     showNumericShortcutBadges,

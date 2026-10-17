@@ -127,6 +127,7 @@ class _WebDavServerPageState extends State<WebDavServerPage> {
                       ),
                       TvTextFormEntry(
                         controller: _password,
+                        allowPhoneKeyboard: false,
                         enabled: !_busy,
                         obscureText: !_passwordVisible,
                         autocorrect: false,

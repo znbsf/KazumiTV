@@ -1,3 +1,5 @@
+import 'package:kazumi/utils/version.dart';
+
 /// Only stable TV builds query the stable project release feed. Checking a
 /// version is not authorization to install an APK: package, ABI and signing
 /// identity have no trusted update manifest yet, so updates remain manual.
@@ -6,14 +8,16 @@ class ProjectUpdatePolicy {
           {required bool releaseMode,
           required bool tv,
           required String version}) =>
-      releaseMode && tv && RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version);
+      releaseMode &&
+      tv &&
+      normalizeStableVersion(version, allowVPrefix: false) != null;
 
   static bool acceptsRelease(Map<String, dynamic> release) {
     final uri = Uri.tryParse(release['html_url']?.toString() ?? '');
     final tag = release['tag_name']?.toString() ?? '';
     return release['draft'] == false &&
         release['prerelease'] == false &&
-        RegExp(r'^v?\d+\.\d+\.\d+$').hasMatch(tag) &&
+        normalizeStableVersion(tag) != null &&
         uri?.scheme == 'https' &&
         uri?.host == 'github.com' &&
         uri?.userInfo == '' &&
