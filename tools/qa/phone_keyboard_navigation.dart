@@ -1,3 +1,5 @@
+import 'focus_visual_fixture.dart';
+import 'first_search_fixture.dart';
 // Debug-only emulator fixture. Never imported by production main.dart.
 import 'dart:async';
 import 'dart:io';
@@ -61,6 +63,8 @@ class _PhoneKeyboardQaState extends State<_PhoneKeyboardQa> {
   @override
   void initState() {
     super.initState();
+    _controllers[0].text = '本机已有普通文本';
+    _controllers[1].text = 'https://example.invalid/qa-rule';
     for (var i = 0; i < _focus.length; i++) {
       _focus[i].addListener(() {
         if (_focus[i].hasFocus) _log(i);
@@ -151,6 +155,14 @@ class _PhoneKeyboardQaState extends State<_PhoneKeyboardQa> {
                       ]);
                 }),
             const SizedBox(height: 20),
+            Row(children: [
+              FilledButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FocusVisualFixture())), child: const Text('Focus visual fixture')),
+              const SizedBox(width: 16),
+              FilledButton(onPressed: () async {
+                await GStorage.putSetting(SettingsKeys.sourceHealthRecords, '[]');
+                if (context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => buildFirstSearchFixture()));
+              }, child: const Text('First search fixture')),
+            ]),
             for (var i = 0; i < _controllers.length; i++) _field(i),
           ]),
         ),

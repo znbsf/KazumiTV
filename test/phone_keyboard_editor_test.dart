@@ -16,6 +16,49 @@ void main() {
   tearDown(() => TvMode.setEnabledForTesting(false));
 
   testWidgets(
+      'phone handshake closes QR dialog and retains session and editor target',
+      (tester) async {
+    final controller = TextEditingController(text: 'original');
+    final focus = FocusNode();
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: TvTextEntry(
+                title: 'Search',
+                child: TextField(controller: controller, focusNode: focus)))));
+    focus.requestFocus();
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    final keyboard = PhoneKeyboard.instance;
+    await tester
+        .runAsync(() => keyboard.start(address: InternetAddress.loopbackIPv4));
+    final target = keyboard.session!.state['target'];
+    final context = tester.element(find.byKey(const Key('tv-text-editor')));
+    showDialog<void>(
+        context: context, builder: (_) => const PhoneKeyboardDialog());
+    await tester.pumpAndSettle();
+    expect(find.byType(PhoneKeyboardDialog), findsOneWidget);
+    final client =
+        HttpOverrides.runWithHttpOverrides(() => HttpClient(), _RealHttp());
+    await tester.runAsync(() async {
+      final uri = keyboard.uri!;
+      final response =
+          await (await client.getUrl(uri.replace(path: '${uri.path}/state')))
+              .close();
+      await response.drain<void>();
+    });
+    await tester.pumpAndSettle();
+    expect(find.byType(PhoneKeyboardDialog), findsNothing);
+    expect(keyboard.session!.isClosed, isFalse);
+    expect(keyboard.session!.state['target'], target);
+    expect(find.byKey(const Key('tv-text-editor')), findsOneWidget);
+    client.close(force: true);
+    await tester.runAsync(keyboard.disconnect);
+    await tester.pumpWidget(const SizedBox());
+    controller.dispose();
+    focus.dispose();
+  });
+  testWidgets(
       'only explicit editors accept multiple edits; confirm never submits an action',
       (tester) async {
     final a = TextEditingController(text: 'https://private/?token=secret');
@@ -107,9 +150,24 @@ void main() {
         reason: 'Covered editor is not an active target');
     expect(find.text(uri.toString()), findsOneWidget);
     expect(find.text('断开连接'), findsOneWidget);
+    expect((keyboard.session!.state['remote'] as Map)['keys'], isEmpty);
+    expect(
+        await send({
+          'requestId': 'remote-consent',
+          'action': 'remote',
+          'key': 'ok',
+          'remoteRevision': -1,
+          'remoteSequence': 1
+        }),
+        409);
+    expect(keyboard.readTextAllowed, isFalse);
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    expect(keyboard.readTextAllowed, isTrue);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(keyboard.session!.state['target'], isNotNull);
+    expect((keyboard.session!.state['target'] as Map)['text'], 'second');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(keyboard.session!.state['target'], isNull);
@@ -127,6 +185,7 @@ void main() {
       await keyboard.disconnect();
     });
     expect(keyboard.uri, isNull);
+    expect(keyboard.readTextAllowed, isFalse);
     client.close(force: true);
     await tester.pumpWidget(const SizedBox());
     a.dispose();

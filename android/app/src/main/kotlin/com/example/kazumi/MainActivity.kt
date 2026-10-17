@@ -264,6 +264,9 @@ class MainActivity: AudioServiceActivity() {
                 result.notImplemented()
             }
         }
+        // A warmed audio_service engine may already have mounted the Dart shell.
+        // Let its current owner reassert navigation after this handler exists.
+        tvNavigationChannel?.invokeMethod("ready", null)
     }
 
     override fun cleanUpFlutterEngine(@NonNull flutterEngine: FlutterEngine) {

@@ -222,7 +222,7 @@ class _InfoPageState extends State<InfoPage>
       await showAdaptiveBottomSheet<void>(
         context: context,
         builder: (_) => SourceSheet(
-            infoController: infoController, autoSearchOnOpen: reselectSource),
+            infoController: infoController),
       );
     } finally {
       _startingPlayback = false;

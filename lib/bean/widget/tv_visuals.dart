@@ -30,6 +30,40 @@ abstract final class TvVisuals {
     fontWeight: FontWeight.w500,
   );
 
+  /// Opaque, paired colors: focus must never look like disabled ink.
+  /// Null for normal/disabled delegates to each Material button's defaults.
+  static ButtonStyle focusButtonStyle(ColorScheme colors) => ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return null;
+          if (states.contains(WidgetState.focused)) return colors.primary;
+          if (states.contains(WidgetState.selected))
+            return colors.secondaryContainer;
+          return null;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return null;
+          if (states.contains(WidgetState.focused)) return colors.onPrimary;
+          if (states.contains(WidgetState.selected))
+            return colors.onSecondaryContainer;
+          return null;
+        }),
+        side: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return null;
+          return states.contains(WidgetState.focused)
+              ? BorderSide(color: colors.onSurface, width: 3)
+              : null;
+        }),
+        overlayColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) return null;
+          if (states.contains(WidgetState.focused)) {
+            return states.contains(WidgetState.pressed)
+                ? colors.onPrimary.withValues(alpha: .12)
+                : Colors.transparent;
+          }
+          return null;
+        }),
+      );
+
   static ThemeData theme(ThemeData inherited, {bool oled = false}) {
     final useOled = oled && inherited.brightness == Brightness.dark;
     final scheme = useOled
@@ -42,6 +76,26 @@ abstract final class TvVisuals {
           ? (useOled ? Colors.black : inherited.scaffoldBackgroundColor)
           : Colors.transparent,
       canvasColor: scheme.surface,
+      filledButtonTheme: FilledButtonThemeData(
+          style: inherited.filledButtonTheme.style
+                  ?.merge(focusButtonStyle(scheme)) ??
+              focusButtonStyle(scheme)),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+          style: inherited.outlinedButtonTheme.style
+                  ?.merge(focusButtonStyle(scheme)) ??
+              focusButtonStyle(scheme)),
+      textButtonTheme: TextButtonThemeData(
+          style: inherited.textButtonTheme.style
+                  ?.merge(focusButtonStyle(scheme)) ??
+              focusButtonStyle(scheme)),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+          style: inherited.elevatedButtonTheme.style
+                  ?.merge(focusButtonStyle(scheme)) ??
+              focusButtonStyle(scheme)),
+      iconButtonTheme: IconButtonThemeData(
+          style: inherited.iconButtonTheme.style
+                  ?.merge(focusButtonStyle(scheme)) ??
+              focusButtonStyle(scheme)),
       focusColor: scheme.primary.withValues(alpha: .24),
       hoverColor: scheme.primary.withValues(alpha: .12),
       textTheme: base.copyWith(

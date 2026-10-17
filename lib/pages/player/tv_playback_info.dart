@@ -1,3 +1,5 @@
+import 'package:kazumi/services/platform/app_remote.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
@@ -98,9 +100,25 @@ class TvPlaybackInfoPresenter {
         barrierDismissible: true,
         settings: const RouteSettings(name: 'playback-info'));
     _route = route;
+    final remoteLease = AppRemote.instance.register(
+        label: '播放信息',
+        priority: 20,
+        commands: () => TvMode.enabled && route.isCurrent && !_closing
+            ? {
+                for (final key in ['info', 'blue'])
+                  key: AppRemoteCommand(
+                      label: '关闭播放信息',
+                      invoke: () {
+                        if (!route.isCurrent || _closing) return false;
+                        close();
+                        return true;
+                      })
+              }
+            : {});
     try {
       await navigator.push(route);
     } finally {
+      remoteLease.release();
       if (identical(_route, route)) {
         _route = null;
         _closing = false;

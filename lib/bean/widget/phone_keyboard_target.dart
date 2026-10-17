@@ -33,6 +33,25 @@ class _PhoneKeyboardEditorTargetState extends State<PhoneKeyboardEditorTarget> {
         label: widget.label,
         maxLength: widget.maxLength,
         isActive: () => mounted && ModalRoute.of(context)?.isCurrent == true,
+        readValue: () {
+          final value = widget.controller.value;
+          final selection = value.selection.isValid
+              ? value.selection
+              : TextSelection.collapsed(offset: value.text.length);
+          return {
+            'text': value.text,
+            'selection': {
+              'baseOffset': selection.baseOffset,
+              'extentOffset': selection.extentOffset,
+            }
+          };
+        },
+        onSelection: (base, extent) {
+          final length = widget.controller.text.length;
+          widget.controller.selection = TextSelection(
+              baseOffset: base.clamp(0, length),
+              extentOffset: extent.clamp(0, length));
+        },
         onText: (text) {
           var value = TextEditingValue(
               text: text,

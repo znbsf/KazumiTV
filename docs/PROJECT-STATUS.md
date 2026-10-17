@@ -1,5 +1,94 @@
 # KazumiTV 当前状态
 
+## 2026-10-17 UTC QA6 回归修复：本地候选，未更新电视
+
+播放修复本地提交1037a14e。收尾已核实本任务模拟器70760及子进程38520/60572退出，模拟器不再列于adb devices；无dart/flutter/emulator/qemu测试进程，forward列表为空。共享ADB及其他已连接设备未停止。
+
+本轮用户确认源列表已修复，仅该项记为用户验收。普通首次“开始观看”自动标题搜索已恢复（0f12e5e9），不自动启动全源健康探测。焦点/选中/禁用样式修复为93af23bf；临时手机遥控稳定DOM、完整按键区及连接自动收起为dfd60183。手机数字键是LCN：稳定版无频道模式，明确禁用并说明；实体首页数字行为保留。独立preview HEAD135c202b只读检查，已有三位LCN逻辑；其native_clock_probe.dart用户改动未触碰，未混入频道/EPG代码。
+
+最终播放候选仅direct预挂Surface，10秒上限、取消与owner隔离保持；GPU/copy/software沿原尺寸后挂载和wid变化逻辑。撤回本轮同wid活跃输出重建。20548独立模拟器包SHA256 c5fd03fce69cb06333176edce3286dc295c88e61cd8c3e4d3d3f41e5c468aacc，安装回读一致。最终全量1060项通过；聚焦33项通过；全量静态0 error/0 warning/175 info，diff检查通过。
+
+验收证据均在本地artifacts/four-stream-20261017（下称A），原始私人日志不上传：
+
+- 首次搜索：qa6-regression-first-search-tap，两个本地规则各一次普通搜索、无未授权解析。夹具实际点按与widget遥控覆盖，不能声称完整实站遥控流程已验收。
+- 手机：qa6-regression-phone-autoclose及phone-input，真实HTTP握手收起QR，后续输入即时回显；未提交业务搜索。28 HTTP/widget、14 Node场景及4真实首页视口LCN约束通过；remote-regression-evidence.json记录320px Edge检查。
+- 焦点：qa6-regression-focus-light/dark/oled/player截图已查看；浅色、深色、OLED的正常/聚焦/选中/禁用可区分。设备输入含点按/滑动，纯遥控完整路径仍需电视验收。
+- 最终direct：qa6-20548-direct-playing与rapid-replace，实际动态色条；进度推进至37375ms，快速替换results=[false,true]，新会话真实帧后17000→19250ms。最早qa6-20548-direct仍Ready是输入早于UI就绪，未计播放失败或成功。
+- 最终软件：qa6-20548-software，实际色条及真实帧，进度推进。合成H264无音轨，不证明AV同步或原用户视频恢复。
+- 未通过copy：20546与严格改动前controller基线20547，在同一模拟器/样片/gpu+mediacodec-copy下均黑屏且状态timer停止；20547其余夹具相同，仅real.dart取dfd60183，构建后逐字节还原。不能归为本次预挂独有，也不能无原生栈认定模拟器根因。证据qa6-20546-copy与qa6-20547-copy。建议单独issue：API36 goldfish H264 copy初始化阻塞；复现和线程栈调查另行收敛，不继续盲试组合。
+
+待验收：Android9原视频首次direct、失败后确认恢复、外部音轨/字幕及真实声画；copy原生阻塞；实际手机LAN与电视完整遥控路径。LCN接入应在独立preview接现有频道keypad及生命周期provider，稳定版不扩展。电视本轮只有开始时只读日志/截图，没有按键、重装或退出用户视频。未推送、未合并、未发布。
+
+
+## 2026-10-17 QA6 电视安装与旧测试包清理
+
+用户明确授权安装并清理旧测试包后，连接并核对 MiTV-ASTP0 / mulan / Android 9，设备 192.168.123.217:5555，用户0。安装 QA6（remoteqa，0.4.3-qa6 / 205401）成功；回读已安装 APK 的 SHA-256 与交付件完全一致：a5b505391b6f3f35c741576cbcc2d8e533390cfedeb10a0aa862ca4a7e0ba991。
+
+安装前备份五个已有 Kazumi APK 并记录版本、签名。旧 QA4（fourqa）、功能 QA（featureqa）、Candidate（candidate）、恢复 QA（recoveryqa）均使用带版本守卫的 `pm uninstall -k --user 0` 成功移除；保留数据和缓存，备份 APK 可用于同签名恢复。未读取或逐项验证私有数据内容。未发现已安装 QA5。正式版 0.4.3 / 203931 未修改。清理后的已安装包及 LEANBACK 入口仅剩正式版与 QA6。
+
+QA6 启动成功。首次截图是协议页，未代用户同意；随后界面自行变化到首页。桌面验收已进入原生小米桌面应用页，继续检查时界面又变为 QA6 详情页，可能存在现场同时操作，故停止所有输入并请求协调。完整桌面图标视觉复查尚未完成，不能声称旧图标已逐项消失。未清桌面数据、未改默认桌面、网络或无障碍设置。
+
+证据目录：`C:/Users/hentai/Documents/Kazumi/artifacts/four-stream-20261017/tv-qa6-install/`，包含 inventory-before.json、install-result.json、cleanup-results.json、installed-after.txt 与备份 APK。截图在上一级 tv-qa6-first-launch、tv-qa6-desktop、tv-qa6-apps、tv-qa6-app-grid 系列。最后一张实际为 QA6 详情页，不是桌面完整网格。
+
+剩余：等待现场协调后仅做桌面完整图标复查。真实局域网手机输入、完整播放与声画验收不因安装成功而视为通过。无当前工具或审批拒绝；未合并或发布正式版。
+
+
+## QA6 实包交付核验
+
+[CI run 39041658635](https://github.com/znbsf/KazumiTV/actions/runs/39041658635) 检查与三个ABI均成功；[ARMv7下载](https://github.com/znbsf/KazumiTV/actions/runs/39041658635/artifacts/12104363952)。PR head `ac9497d94948dc13604d1b5f35490d08f951707e`，CI merge `9ca3d2a7e1e5f493a7c7a4f653a7bce8acb00722`，二者源码树一致。
+
+- `KazumiTV-QA6` / `com.znbsf.kazumi.fluttertv.remoteqa` / `0.4.3-qa6 / 205401`，完整应用入口。
+- APK SHA-256：`a5b505391b6f3f35c741576cbcc2d8e533390cfedeb10a0aa862ca4a7e0ba991`；大小 29316751 字节。
+- 证书 SHA-256：`e0832a5b69b82792c8c8d0a32b9b591a21eb41bb257024188e592a60d33f4e9c`。签名不同于QA5，且包名独立；未覆盖QA4/QA5。若设备已有同包名且签名不同，不能直接覆盖、卸载或清数据。
+- 已重新核验下载字节与CI receipt、manifest/TV launcher/ABI、签名、mpv和测试入口排除。现已安装用户电视并回读验证，详见上方安装记录；未合并或正式发布。
+
+
+## 2026-10-17 QA6 remote review published, artifact pending
+
+Under explicit user approval, independent draft PR #22 targets PR #20 branch feat/four-stream-review-20261017. Remote head ac9497d94948dc13604d1b5f35490d08f951707e and CI merge 9ca3d2a7e1e5f493a7c7a4f653a7bce8acb00722 share tree 7f22652c7d3b6c95df34389255509bb6d95e41d6. CI run 39041658635 is in progress. QA6 uses remoteqa / 0.4.3-qa6 / ARMv7 205401, preserving QA4/QA5. Actual artifact verification remains pending; see ../../../artifacts/four-stream-20261017/qa6-progress.json. No TV operation, persistent pairing, merge or release.
+
+
+## 2026-10-17 遥控增强自动验收收口（独立本地分支）
+
+最终生产/测试源码 `7e0756cb3a37b2750ae78b853c583f83eb9fd2f7`：全量1044项通过，Node13项通过，analyze 0 error / 0 warning / 171 info。最终隔离 featureqa x86_64 20533 APK SHA-256 `24e880836a35334d0aa63744ca73ae6bda1bdc64b552571ce7920cc660abfb92`，安装回读一致；测试、构建与源码对应，后续仅本文档记录。
+
+- 真实Edge viewport 320×640：clientWidth/scrollWidth均305（桌面滚动条占15px），无横向溢出；DPAD约85.66×50，返回273×50，其他按钮最小60×50。320×320压缩视口下编辑框273×156可滚动到达，输入和确认成功，电视显示“窄屏输入测试”，业务/提交计数均0。此项为压缩视口模拟，不冒充真实手机软键盘/IME。
+- 真实新旧会话：旧页面断开后禁用，重新开启得到新端口/随机token，新页面连接且默认不读原文，旧页面保持断开。Dart覆盖旧token的文本/遥控404、跨字段/ABA旧confirm和selection409无回调、重连读取授权默认关闭；Node覆盖旧页面不换token、新页面新target与无selection。
+- 播放器真实PlayerKeyboardShortcuts分发链验证Info/Menu/red/green/yellow/blue/playPause七动作、一次效果和同revision重放拒绝；缺失action、shouldHandleAction禁用、isBlocked、EditableText及覆盖路由隐藏，返回恢复。属于widget实际回调验证，未将其冒充浏览器→实际解码器端到端播放。
+- 新发现既有冷启动缺口：20532在audio_service先启动Dart而MainActivity通道尚未注册时抛出setActive MissingPlugin。20533复用OwnedMethodChannel所有权，捕获尚未注册并由native ready重申当前active；不轮询、不仅吞错。两项回归验证缺失→ready恢复及dispose后不激活。20533无快照冷启动未再出现Unhandled/MissingPlugin，实体Back关闭连接弹窗并恢复手机键盘按钮焦点。原失败日志保留为remote-followup-initial.log。
+- PR #20正文在用户明确授权后单次重试成功，回读仍为draft/head 5e479e68；QA5已交付与本增强未包含边界准确。此增强未推送，未长期配对，未操作电视。
+
+证据目录：`../../../artifacts/four-stream-20261017/` 的 remote-followup-full.log、remote-followup-analyze.log、narrow-confirmed.png/xml、remote-handshake-cold-start/dialog/back.png/xml/log 与 phone-remote-delivery.json。
+
+剩余用户验收：物理手机二维码/Wi-Fi/中文IME和真实软键盘缩放；Android9电视上的实际播放器各额外动作、网络/外部轨道和声画。增强推送/PR或测试包远端交付未获授权；不得据此更改QA5、合并或正式发布。
+
+
+## 2026-10-17 独立临时遥控与普通原文编辑（本地，未进入 QA5）
+
+分支 `feat/temporary-app-remote-20261017` 从集成 `c18a827c` 建立。新增应用语义遥控服务和页面动态能力；仅支持实际页面操作，不注入系统按键，不提供 HOME、电源、系统音量或 CH 映射。一次一条命令，修订与序列防重放，限流、超时锁和旧上下文隔离。详情开始观看立即调度，避免选源弹层未关闭时锁住后续遥控。
+
+默认不读取已有文本。电视连接弹窗只能本地操作；用户会话授权后，普通编辑框可同步原文与选择区，断开撤销；敏感字段始终排除。仍使用短时局域网会话，无常驻服务/第三方中转/长期配对。
+
+- 全量 1037 项通过（最终布局调整及详情修复后补定向 25 项通过）；最终 analyze 0 error / 0 warning / 171 info；Node 页面 12 项通过。
+- 最终模拟器包 `phone_keyboard_navigation-android-x64-20532.apk`，SHA-256 `6aa9a08d99796affb32e15e8708c384787c80254edf51b1945e8d39f8906615f`，安装回读哈希一致。API36 / x86_64 / featureqa，仅合成字段。
+- Edge→模拟器回环实测：下/上移动焦点、确认打开输入框、返回关闭弹窗；连接设置时手机无遥控键；本地授权后显示“本机已有普通文本”，追加中文并替换选择区到“本机已有普通文本追验”，电视同步一致；手机确认后搜索执行/提交均 0；切换 URL 显示独立合成原文；敏感字段编辑禁用；本地断开显示“连接已断开或闲置过期”。
+- [编辑证据](../../../artifacts/four-stream-20261017/remote-final-edited.png)、[确认后计数](../../../artifacts/four-stream-20261017/remote-final-confirmed.png)、[断开](../../../artifacts/four-stream-20261017/remote-final-disconnected.png)。物理返回/方向键清理测试中敏感测试字段提交计数后为1，不能将后续清理截屏当作手机确认零提交证据；业务执行均0。
+- 桌面浏览器已目视十字 DPAD；320px 只有CSS/合成测试，真实窄屏和物理手机 IME、播放器额外按钮仍待人工验收。没有操作电视或持久权限变更。未推送此增强分支。
+
+
+## 2026-10-17 QA5 已交付核验（修复分支）
+
+用户明确授权后，已将 `5e479e68d381c10cea217133df33403db5d9c746` 推至草稿 PR #20，并创建规则列表导航 issue #21。CI run `39038332936` 的 checks 与三个 ABI 构建均成功。ARMv7 下载、哈希、签名、包名、版本、TV manifest、mpv 与 QA marker 排除均由本机重新核验。
+
+- [ARMv7 下载](https://github.com/znbsf/KazumiTV/actions/runs/39038332936/artifacts/12103631716)：`KazumiTV-QA5`，`com.znbsf.kazumi.fluttertv.fiveqa`，`0.4.3-qa5 / 205301`。
+- SHA-256：`5088942ed08baf9032c558ee2c8db00f80c8a522d518f01dc39883fa7c3599c5`。
+- CI merge `f6f07c9341cfca3c523f019e2521c860e645bfea` 父提交包含上述 review head，二者 tree 均为 `165fbbb0cb9f9e71f849744148b43b82ac97758c`。
+- [本机交付凭据](../../../artifacts/four-stream-20261017/qa5-delivery.json)。未安装用户电视，未合并或正式发布。
+- 六组修复：开始观看零健康探测/单成功源；成功历史与健康列表导航；规则长列表焦点；应用级连续手机替换输入；硬解错误分类和旧会话释放；v 前缀更新比较。
+- 首次协议由用户操作；真实手机扫码/LAN/IME、硬件失败正例与最终声画仍待人工验收。新临时遥控及原文编辑只在独立 `feat/temporary-app-remote-20261017`，不包含在 QA5。
+- PR #20 正文更新被自动审批拒绝：授权只涵盖 push、issue 和 CI。未执行、未重试，待明确授权；此项不影响已验证 APK 下载。
+
+
 ## 2026-10-17 用户实测反馈整改（进行中，替代旧验收结论）
 
 用户要求整体整改并优先模拟器 UI/遥控验收。PR #20 保持草稿；电视正在由用户使用，禁止远程输入、重启、改设置或覆盖安装。旧 QA4 205201 尚不包含本节修复，旧“一次性扫码搜索完成”和“开始观看自动探测”不再是目标行为。
@@ -142,3 +231,35 @@ ARM64/x86_64正式包只完成构建、签名和产物校验，未作实机验�
 - [历史归档](history/README.md)
 
 本次0.4.2授权仅覆盖本次纯修复发布；不恢复旧任务权限，也不自动授权未来版本、新功能或新设备操作。
+
+### 安装清理后的只读复核
+
+再次只读查询确认：当前前台为 `com.znbsf.kazumi.fluttertv.remoteqa/com.example.kazumi.MainActivity`（QA6），不在桌面，因此未截图、未切换、未刷新，未发送任何按键，也未启动新测试。
+
+用户0的 MAIN / LEANBACK_LAUNCHER 查询中，Kazumi 仅有以下两个入口：
+- `com.znbsf.kazumi.fluttertv/com.example.kazumi.MainActivity`（正式版）
+- `com.znbsf.kazumi.fluttertv.remoteqa/com.example.kazumi.MainActivity`（QA6）
+
+`pm list packages kazumi` 同样仅返回上述两个包。旧四包 fourqa、featureqa、candidate、recoveryqa 不再有已安装的电视桌面启动入口。本次安装清理收尾仅缺桌面缓存图标的视觉核对；不需要为此打断当前电视使用。
+
+## QA6 用户现场回归整改（进行中）
+
+用户反馈：源列表本轮通过；首次开始观看失去原有自动搜索；部分此前可播视频失败；手机仅见DPAD、页面闪烁、连接后二维码未自动退出；按钮焦点颜色变淡。电视当前只读保存现场，不按键、不退出视频、不重装。
+
+- 现场证据：artifacts/four-stream-20261017/qa6-user-regression-{app.log,activity.txt,media.txt,screen.png}。截图时在搜索页面，媒体会话 inactive；历史日志两次 mpv_no_software_fallback 信号，不能把其他站点超时归为 codec 故障。
+- 已确认首次搜索回归由 061855ca 把 SourceSheet.autoSearchOnOpen 绑定 reselectSource 引入；正式版70c3769原有 queryAllSource 行为必须保留。恢复默认自动标题搜索，不恢复全源健康探测；5项入口widget回归通过（none/disabled/saved/failed/preferenceOnly），无记录及失败回退不做逐源集表解析。
+- 手机页面每800ms重建遥控DOM并切disabled是闪烁与焦点丢失的确定缺陷；未支持按键被隐藏、连接无弹窗退出回调，修复及浏览器验证进行中。
+- 播放器调查发现direct模式Surface尺寸初始化等待videoParams，而解码又需Surface；配置androidAttachSurfaceAfterVideoParameters=false未落实，新增禁用软件回退后可形成初始化互锁。现场失败前无Resize/SetSurfaceSize，属一致证据而非真机修复通过。修复/测试进行中。
+- 共用TV焦点样式及light/dark/OLED模拟器对照验证进行中。所有修改仍在phone-remote分支，按文件分工；设备和构建由集成负责人独占。未安装新电视包、未合并或发布。
+
+### 当前阶段核验更新
+
+搜索入口5项测试通过，模拟器触发开始观看后实际显示2来源/2结果，FIRST_SEARCH_QA每源calls=1且无UNEXPECTED_ROAD_RESOLUTION。手机HTTP/widget28项及Node13项通过，实际Edge320px分组可达且无横向溢出。焦点浅/深/OLED截图已观察，模拟器混合触摸输入；不冒称纯遥控全路径通过。全量1051通过、2处旧播放器焦点文字色断言失败，更新为onPrimary+背景/边框配对检查后该文件4/4通过。最终analyze退出0（175条info，0error/0warning）。
+
+模拟器UI构建20542 APK SHA256 e7aa5e1a6292bed19fa622b556c6748432bc6ef2847dffffb0d982ab02c9617c，播放器fixture20543 SHA256 4f8343ac7d1d327465f2cded5ede41aa675a97175ef9d90fc276b4c880a26a7c，安装回读一致。当前继续原生Surface与实际弹窗返回验收；无工具/审批阻塞。用户电视无按键/安装操作。
+
+### LCN 语义澄清与模式补测
+
+用户明确数字键指LCN。撤回“手机数字导航首页”中间判断，QA6稳定分支没有频道模式；手机数字区保留LCN语义并说明需频道模式，去掉手机首页数字provider，物理首页数字原逻辑不变。真实首页4视口手机/物理隔离测试、14 Node和Edge LCN提示通过。独立preview只读核对HEAD135c202b，有用户未提交native_clock_probe.dart，未修改。既有入口 virtual_tv_page.dart:_keypad/_remoteKey → tv_channel_keypad.dart；最多三位、确认、删除、取消、同号匹配当前类别优先；所读键盘实现未发现超时自动确认，不自行创造规则。实际LCN适配应留在独立preview，QA6不宣称切台或合入频道功能。
+
+最终Surface门控增加整段原生请求deadline和取消竞争（新增反例先失败后通过）；32聚焦通过。20544 APK 4cd2968f4404b405c1a95d4c70c214e9b1d2d28b91b69cedf8c944bf9acd43d2模拟器补测发现GPUcopy及GPU/no虽有首帧通知和进度，但截图整屏纯紫，视觉验收失败。正在核查1x1升级真实尺寸时mpv android-surface-size同步，不能当模拟器已知限制或放行。证据qa6-regression-gpu-copy[-later].png/log、qa6-regression-gpu-software.png/log。

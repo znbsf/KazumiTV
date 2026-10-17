@@ -77,7 +77,10 @@ void main() {
         text.style?.color,
         Theme.of(tester.element(find.byType(TvPlayerAction).first))
             .colorScheme
-            .primary);
+            .onPrimary);
+    final focusedAction = find.ancestor(
+        of: find.text('操作 11'), matching: find.byType(TvPlayerAction));
+    expectFocusedSurface(tester, focusedAction);
     expect(text.style?.fontSize, 14);
     expect(tester.takeException(), isNull);
   });
@@ -140,7 +143,8 @@ void main() {
         icon.color,
         Theme.of(tester.element(find.byType(TvPlayerAction).first))
             .colorScheme
-            .primary);
+            .onPrimary);
+    expectFocusedSurface(tester, find.byType(TvPlayerAction));
     expect(tester.getSize(find.byType(TvPlayerAction)), const Size(38, 38));
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.tap(find.byIcon(Icons.skip_next_rounded));
@@ -148,4 +152,15 @@ void main() {
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
+}
+
+// Validate the foreground against the actual focused Material, not just a token.
+void expectFocusedSurface(WidgetTester tester, Finder action) {
+  final colors = Theme.of(tester.element(action)).colorScheme;
+  final material = tester.widget<Material>(
+      find.descendant(of: action, matching: find.byType(Material)));
+  expect(material.color, colors.primary);
+  final shape = material.shape! as RoundedRectangleBorder;
+  expect(shape.side.color, colors.onSurface);
+  expect(shape.side.width, 3);
 }
