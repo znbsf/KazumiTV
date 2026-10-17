@@ -107,9 +107,24 @@ void main() {
         reason: 'Covered editor is not an active target');
     expect(find.text(uri.toString()), findsOneWidget);
     expect(find.text('断开连接'), findsOneWidget);
+    expect((keyboard.session!.state['remote'] as Map)['keys'], isEmpty);
+    expect(
+        await send({
+          'requestId': 'remote-consent',
+          'action': 'remote',
+          'key': 'ok',
+          'remoteRevision': -1,
+          'remoteSequence': 1
+        }),
+        409);
+    expect(keyboard.readTextAllowed, isFalse);
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    expect(keyboard.readTextAllowed, isTrue);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(keyboard.session!.state['target'], isNotNull);
+    expect((keyboard.session!.state['target'] as Map)['text'], 'second');
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(keyboard.session!.state['target'], isNull);
@@ -127,6 +142,7 @@ void main() {
       await keyboard.disconnect();
     });
     expect(keyboard.uri, isNull);
+    expect(keyboard.readTextAllowed, isFalse);
     client.close(force: true);
     await tester.pumpWidget(const SizedBox());
     a.dispose();

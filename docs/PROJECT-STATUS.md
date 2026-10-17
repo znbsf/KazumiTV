@@ -1,5 +1,46 @@
 # KazumiTV 当前状态
 
+## 2026-10-17 遥控增强自动验收收口（独立本地分支）
+
+最终生产/测试源码 `7e0756cb3a37b2750ae78b853c583f83eb9fd2f7`：全量1044项通过，Node13项通过，analyze 0 error / 0 warning / 171 info。最终隔离 featureqa x86_64 20533 APK SHA-256 `24e880836a35334d0aa63744ca73ae6bda1bdc64b552571ce7920cc660abfb92`，安装回读一致；测试、构建与源码对应，后续仅本文档记录。
+
+- 真实Edge viewport 320×640：clientWidth/scrollWidth均305（桌面滚动条占15px），无横向溢出；DPAD约85.66×50，返回273×50，其他按钮最小60×50。320×320压缩视口下编辑框273×156可滚动到达，输入和确认成功，电视显示“窄屏输入测试”，业务/提交计数均0。此项为压缩视口模拟，不冒充真实手机软键盘/IME。
+- 真实新旧会话：旧页面断开后禁用，重新开启得到新端口/随机token，新页面连接且默认不读原文，旧页面保持断开。Dart覆盖旧token的文本/遥控404、跨字段/ABA旧confirm和selection409无回调、重连读取授权默认关闭；Node覆盖旧页面不换token、新页面新target与无selection。
+- 播放器真实PlayerKeyboardShortcuts分发链验证Info/Menu/red/green/yellow/blue/playPause七动作、一次效果和同revision重放拒绝；缺失action、shouldHandleAction禁用、isBlocked、EditableText及覆盖路由隐藏，返回恢复。属于widget实际回调验证，未将其冒充浏览器→实际解码器端到端播放。
+- 新发现既有冷启动缺口：20532在audio_service先启动Dart而MainActivity通道尚未注册时抛出setActive MissingPlugin。20533复用OwnedMethodChannel所有权，捕获尚未注册并由native ready重申当前active；不轮询、不仅吞错。两项回归验证缺失→ready恢复及dispose后不激活。20533无快照冷启动未再出现Unhandled/MissingPlugin，实体Back关闭连接弹窗并恢复手机键盘按钮焦点。原失败日志保留为remote-followup-initial.log。
+- PR #20正文在用户明确授权后单次重试成功，回读仍为draft/head 5e479e68；QA5已交付与本增强未包含边界准确。此增强未推送，未长期配对，未操作电视。
+
+证据目录：`../../../artifacts/four-stream-20261017/` 的 remote-followup-full.log、remote-followup-analyze.log、narrow-confirmed.png/xml、remote-handshake-cold-start/dialog/back.png/xml/log 与 phone-remote-delivery.json。
+
+剩余用户验收：物理手机二维码/Wi-Fi/中文IME和真实软键盘缩放；Android9电视上的实际播放器各额外动作、网络/外部轨道和声画。增强推送/PR或测试包远端交付未获授权；不得据此更改QA5、合并或正式发布。
+
+
+## 2026-10-17 独立临时遥控与普通原文编辑（本地，未进入 QA5）
+
+分支 `feat/temporary-app-remote-20261017` 从集成 `c18a827c` 建立。新增应用语义遥控服务和页面动态能力；仅支持实际页面操作，不注入系统按键，不提供 HOME、电源、系统音量或 CH 映射。一次一条命令，修订与序列防重放，限流、超时锁和旧上下文隔离。详情开始观看立即调度，避免选源弹层未关闭时锁住后续遥控。
+
+默认不读取已有文本。电视连接弹窗只能本地操作；用户会话授权后，普通编辑框可同步原文与选择区，断开撤销；敏感字段始终排除。仍使用短时局域网会话，无常驻服务/第三方中转/长期配对。
+
+- 全量 1037 项通过（最终布局调整及详情修复后补定向 25 项通过）；最终 analyze 0 error / 0 warning / 171 info；Node 页面 12 项通过。
+- 最终模拟器包 `phone_keyboard_navigation-android-x64-20532.apk`，SHA-256 `6aa9a08d99796affb32e15e8708c384787c80254edf51b1945e8d39f8906615f`，安装回读哈希一致。API36 / x86_64 / featureqa，仅合成字段。
+- Edge→模拟器回环实测：下/上移动焦点、确认打开输入框、返回关闭弹窗；连接设置时手机无遥控键；本地授权后显示“本机已有普通文本”，追加中文并替换选择区到“本机已有普通文本追验”，电视同步一致；手机确认后搜索执行/提交均 0；切换 URL 显示独立合成原文；敏感字段编辑禁用；本地断开显示“连接已断开或闲置过期”。
+- [编辑证据](../../../artifacts/four-stream-20261017/remote-final-edited.png)、[确认后计数](../../../artifacts/four-stream-20261017/remote-final-confirmed.png)、[断开](../../../artifacts/four-stream-20261017/remote-final-disconnected.png)。物理返回/方向键清理测试中敏感测试字段提交计数后为1，不能将后续清理截屏当作手机确认零提交证据；业务执行均0。
+- 桌面浏览器已目视十字 DPAD；320px 只有CSS/合成测试，真实窄屏和物理手机 IME、播放器额外按钮仍待人工验收。没有操作电视或持久权限变更。未推送此增强分支。
+
+
+## 2026-10-17 QA5 已交付核验（修复分支）
+
+用户明确授权后，已将 `5e479e68d381c10cea217133df33403db5d9c746` 推至草稿 PR #20，并创建规则列表导航 issue #21。CI run `39038332936` 的 checks 与三个 ABI 构建均成功。ARMv7 下载、哈希、签名、包名、版本、TV manifest、mpv 与 QA marker 排除均由本机重新核验。
+
+- [ARMv7 下载](https://github.com/znbsf/KazumiTV/actions/runs/39038332936/artifacts/12103631716)：`KazumiTV-QA5`，`com.znbsf.kazumi.fluttertv.fiveqa`，`0.4.3-qa5 / 205301`。
+- SHA-256：`5088942ed08baf9032c558ee2c8db00f80c8a522d518f01dc39883fa7c3599c5`。
+- CI merge `f6f07c9341cfca3c523f019e2521c860e645bfea` 父提交包含上述 review head，二者 tree 均为 `165fbbb0cb9f9e71f849744148b43b82ac97758c`。
+- [本机交付凭据](../../../artifacts/four-stream-20261017/qa5-delivery.json)。未安装用户电视，未合并或正式发布。
+- 六组修复：开始观看零健康探测/单成功源；成功历史与健康列表导航；规则长列表焦点；应用级连续手机替换输入；硬解错误分类和旧会话释放；v 前缀更新比较。
+- 首次协议由用户操作；真实手机扫码/LAN/IME、硬件失败正例与最终声画仍待人工验收。新临时遥控及原文编辑只在独立 `feat/temporary-app-remote-20261017`，不包含在 QA5。
+- PR #20 正文更新被自动审批拒绝：授权只涵盖 push、issue 和 CI。未执行、未重试，待明确授权；此项不影响已验证 APK 下载。
+
+
 ## 2026-10-17 用户实测反馈整改（进行中，替代旧验收结论）
 
 用户要求整体整改并优先模拟器 UI/遥控验收。PR #20 保持草稿；电视正在由用户使用，禁止远程输入、重启、改设置或覆盖安装。旧 QA4 205201 尚不包含本节修复，旧“一次性扫码搜索完成”和“开始观看自动探测”不再是目标行为。

@@ -1,7 +1,7 @@
 name: TV checks and candidate APKs
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/four-stream-review-20261017]
   push:
     branches: [main, codex/flutter-tv-main-ui-fusion-20261002, integration/flutter-tv-main]
   workflow_dispatch:
@@ -72,10 +72,10 @@ jobs:
         run: >-
           flutter build apk --release --pub --flavor tv
           --android-project-arg=kazumiTv=true
-          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.fiveqa
-          --android-project-arg=kazumiTvLabel=KazumiTV-QA5
+          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.remoteqa
+          --android-project-arg=kazumiTvLabel=KazumiTV-QA6
           --target-platform ${{ matrix.target }} --split-per-abi
-          --build-name=0.4.3-qa5 --build-number=20530
+          --build-name=0.4.3-qa6 --build-number=20540
           --dart-define=KAZUMI_TV_PERF=false --dart-define=KAZUMI_TV_FIXED_SURFACES=true
       - name: Lockfile must remain unchanged after plugin regeneration
         run: git diff --exit-code -- pubspec.lock
@@ -85,12 +85,12 @@ jobs:
           python tools/verify_tv_artifact.py "build/app/outputs/flutter-apk/app-$ABI-tv-release.apk" \
             --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
-            --application-id com.znbsf.kazumi.fluttertv.fiveqa --abi "$ABI" \
-            --build-number 20530 --version-name 0.4.3-qa5 --source-sha "$GITHUB_SHA" \
+            --application-id com.znbsf.kazumi.fluttertv.remoteqa --abi "$ABI" \
+            --build-number 20540 --version-name 0.4.3-qa6 --source-sha "$GITHUB_SHA" \
             --output "build/tv-receipts/$ABI.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: tv-four-feature-qa-${{ matrix.abi }}-${{ github.sha }}
+          name: tv-remote-qa-${{ matrix.abi }}-${{ github.sha }}
           if-no-files-found: error
           retention-days: 14
           path: |

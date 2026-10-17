@@ -57,6 +57,452 @@ void main() {
   }
 
   test(
+    'read permission defaults off and revocation isolates old generation',
+    () async {
+      session.setTarget(
+        PhoneKeyboardTarget(
+          label: 'ordinary',
+          onText: edits.add,
+          onConfirm: () {},
+          readValue: () => {
+            'text': 'private draft',
+            'selection': {'baseOffset': 0, 'extentOffset': 7},
+          },
+        ),
+      );
+      expect(session.state['readTextAllowed'], false);
+      expect(jsonEncode(session.state), isNot(contains('private draft')));
+      session.setReadTextAllowed(true);
+      expect(session.state['readTextAllowed'], true);
+      expect((session.state['target'] as Map)['text'], 'private draft');
+      final authorized = payload('before-revoke');
+      session.setReadTextAllowed(false);
+      expect(jsonEncode(session.state), isNot(contains('private draft')));
+      expect(await post(authorized), 409);
+      expect(edits, isEmpty);
+      await session.close();
+      expect(session.state['target'], isNull);
+      expect(session.state['readTextAllowed'], false);
+    },
+  );
+
+  test(
+    'selection requires permission and validates offsets without text mutation',
+    () async {
+      final selected = <List<int>>[];
+      session.setTarget(
+        PhoneKeyboardTarget(
+          label: 'ordinary',
+          onText: edits.add,
+          onConfirm: () {},
+          readValue: () => {
+            'text': 'abcd',
+            'selection': {'baseOffset': 0, 'extentOffset': 0},
+          },
+          onSelection: (a, b) => selected.add([a, b]),
+        ),
+      );
+      Map<String, Object?> selection(String id, Object a, Object b) => {
+            ...payload(id, action: 'selection'),
+            'selection': {'baseOffset': a, 'extentOffset': b},
+          };
+      expect(await post(selection('unauthorized', 0, 2)), isNot(200));
+      session.setReadTextAllowed(true);
+      for (final pair in [
+        [-1, 2],
+        [0, 5],
+        ['0', 2],
+        [0.5, 2],
+      ]) {
+        expect(await post(selection('bad-$pair', pair[0], pair[1])), 400);
+      }
+      expect(selected, isEmpty);
+      expect(await post(selection('valid', 3, 1)), 200);
+      expect(selected, [
+        [3, 1],
+      ]);
+      expect(edits, isEmpty);
+    },
+  );
+
+  test(
+    'authorized reading hides inactive target and reopening starts untrusted',
+    () async {
+      var active = true;
+      session.setTarget(
+        PhoneKeyboardTarget(
+          label: 'ordinary',
+          onText: edits.add,
+          onConfirm: () {},
+          isActive: () => active,
+          readValue: () => {
+            'text': 'secret',
+            'selection': {'baseOffset': 0, 'extentOffset': 0},
+          },
+        ),
+      );
+      session.setReadTextAllowed(true);
+      expect((session.state['target'] as Map)['text'], 'secret');
+      active = false;
+      expect(session.state['target'], isNull);
+      expect(jsonEncode(session.state), isNot(contains('secret')));
+      await session.close();
+      session = PhoneKeyboardSession();
+      uri = await session.start(address: InternetAddress.loopbackIPv4);
+      session.setTarget(PhoneKeyboardTarget(
+          label: 'new ordinary',
+          onText: edits.add,
+          onConfirm: () {},
+          readValue: () => {
+                'text': 'new private text',
+                'selection': {'baseOffset': 0, 'extentOffset': 1}
+              }));
+      expect(session.state['readTextAllowed'], false);
+      expect((session.state['target'] as Map).containsKey('text'), isFalse);
+      expect(
+          (session.state['target'] as Map).containsKey('selection'), isFalse);
+    },
+  );
+
+  test('cross-field stale confirm and selection cannot affect either field',
+      () async {
+    var selected = 0;
+    final a = PhoneKeyboardTarget(
+        label: 'a',
+        onText: edits.add,
+        onConfirm: () => confirms++,
+        readValue: () => {'text': 'abc'},
+        onSelection: (_, __) => selected++);
+    session.setTarget(a);
+    session.setReadTextAllowed(true);
+    final oldConfirm = payload('old-confirm', action: 'confirm');
+    final oldSelection = {
+      ...payload('old-selection', action: 'selection'),
+      'selection': {'baseOffset': 0, 'extentOffset': 2}
+    };
+    session.setTarget(target('b'));
+    expect(await post(oldConfirm), 409);
+    expect(await post(oldSelection), 409);
+    session.setTarget(a);
+    expect(await post(oldConfirm), 409);
+    expect(await post(oldSelection), 409);
+    expect(confirms, 0);
+    expect(selected, 0);
+    expect(edits, isEmpty);
+  });
+
+  test('explicit disconnect rejects old token on a newly started listener',
+      () async {
+    session.setTarget(target('old'));
+    final oldToken = session.token;
+    final oldBody = payload('old-request');
+    await session.close();
+    var remoteCalls = 0;
+    session = PhoneKeyboardSession(
+        remoteState: () => {
+              'context': 'new',
+              'revision': 1,
+              'keys': [
+                {'id': 'down', 'label': 'down'}
+              ],
+            },
+        dispatchRemote: (_, {required revision}) async {
+          remoteCalls++;
+          return true;
+        });
+    uri = await session.start(address: InternetAddress.loopbackIPv4);
+    session.setTarget(target('new'));
+    expect(session.token, isNot(oldToken));
+    final request = await client.postUrl(uri.replace(path: '/$oldToken/input'));
+    request.add(utf8.encode(jsonEncode(oldBody)));
+    final response = await request.close();
+    expect(response.statusCode, 404);
+    await response.drain<void>();
+    final remote = await client.postUrl(uri.replace(path: '/$oldToken/input'));
+    remote.add(utf8.encode(jsonEncode({
+      'requestId': 'old-remote',
+      'action': 'remote',
+      'key': 'down',
+      'remoteRevision': 1,
+      'remoteSequence': 1
+    })));
+    final remoteResponse = await remote.close();
+    expect(remoteResponse.statusCode, 404);
+    await remoteResponse.drain<void>();
+    expect(remoteCalls, 0);
+    expect(await post(oldBody), 409);
+    expect(edits, isEmpty);
+  });
+
+  test(
+    'remote keys validate revision and receipts never execute twice',
+    () async {
+      await session.close();
+      final calls = <String>[];
+      session = PhoneKeyboardSession(
+        remoteState: () => {
+          'revision': 7,
+          'context': 'qa',
+          'keys': [
+            {'id': 'up', 'label': 'up'},
+            {'id': 'down', 'label': 'down'},
+          ],
+        },
+        dispatchRemote: (key, {required revision}) async {
+          calls.add('$key:$revision');
+          return true;
+        },
+      );
+      uri = await session.start(address: InternetAddress.loopbackIPv4);
+      Map<String, Object?> remote(String id, String key, int revision) => {
+            'requestId': id,
+            'action': 'remote',
+            'key': key,
+            'remoteRevision': revision,
+            'remoteSequence': (session.state['remoteSequence'] as int) + 1,
+          };
+      expect(await post(remote('bad-key', 'install', 7)), 409);
+      expect(await post(remote('old', 'down', 6)), 409);
+      final valid = remote('valid', 'down', 7);
+      expect(await post(valid), 200);
+      expect(await post(valid), 200);
+      expect(await post(remote('valid', 'up', 7)), 409);
+      expect(await post(remote('too-fast', 'up', 7)), 429);
+      expect(calls, ['down:7']);
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+      expect(await post(remote('next', 'up', 7)), 200);
+      expect(calls, ['down:7', 'up:7']);
+      final beforeControlDialog = remote('late-control', 'up', 7);
+      session.invalidateRemoteRequests();
+      session.invalidateRemoteRequests();
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+      expect(await post(beforeControlDialog), 409);
+      expect(calls.length, 2);
+    },
+  );
+
+  test(
+    'inflight remote command is serial and rejects parallel new command',
+    () async {
+      await session.close();
+      final entered = Completer<void>();
+      final finish = Completer<bool>();
+      var calls = 0;
+      session = PhoneKeyboardSession(
+        remoteState: () => {
+          'revision': 1,
+          'context': 'qa',
+          'keys': [
+            {'id': 'up', 'label': 'up'},
+            {'id': 'down', 'label': 'down'},
+          ],
+        },
+        dispatchRemote: (key, {required revision}) {
+          calls++;
+          if (!entered.isCompleted) entered.complete();
+          return finish.future;
+        },
+      );
+      uri = await session.start(address: InternetAddress.loopbackIPv4);
+      final first = {
+        'requestId': 'one',
+        'action': 'remote',
+        'key': 'down',
+        'remoteRevision': 1,
+        'remoteSequence': 1,
+      };
+      final pending = post(first);
+      await entered.future.timeout(const Duration(seconds: 2));
+      expect(
+          await post({...first, 'requestId': 'two', 'remoteSequence': 2}), 429);
+      final duplicate = post(first);
+      expect(calls, 1);
+      finish.complete(true);
+      expect(await pending, 200);
+      expect(await duplicate, 200);
+      expect(await post(first), 200);
+      expect(calls, 1);
+    },
+  );
+
+  test('timed out dispatch stays locked and replay never dispatches again',
+      () async {
+    await session.close();
+    final finish = Completer<bool>();
+    var calls = 0;
+    session = PhoneKeyboardSession(
+        remoteState: () => {
+              'context': 'qa',
+              'revision': 1,
+              'keys': [
+                {'id': 'down', 'label': 'down'}
+              ]
+            },
+        dispatchRemote: (key, {required revision}) {
+          calls++;
+          return finish.future;
+        });
+    uri = await session.start(address: InternetAddress.loopbackIPv4);
+    final data = {
+      'requestId': 'timeout',
+      'action': 'remote',
+      'key': 'down',
+      'remoteRevision': 1,
+      'remoteSequence': 1,
+    };
+    expect(await post(data), 504);
+    expect(await post(data), 504);
+    expect(
+        await post({...data, 'requestId': 'while-busy', 'remoteSequence': 2}),
+        429);
+    expect(calls, 1);
+    finish.complete(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(await post(data), 504);
+    expect(calls, 1);
+  });
+
+  test('clear and confirm reject selection before any callback', () async {
+    var textCalls = 0;
+    var selectionCalls = 0;
+    var confirmCalls = 0;
+    final active = PhoneKeyboardTarget(
+      label: 'ordinary',
+      onText: (_) => textCalls++,
+      onConfirm: () => confirmCalls++,
+      readValue: () => {'text': 'original'},
+      onSelection: (_, __) => selectionCalls++,
+    );
+    session.setTarget(active);
+    session.setReadTextAllowed(true);
+    final revision = active.revision;
+    for (final action in ['clear', 'confirm']) {
+      for (final selection in [
+        null,
+        {'baseOffset': 0, 'extentOffset': 1}
+      ]) {
+        expect(
+            await post({
+              ...payload('$action-${selection == null}', action: action),
+              'selection': selection,
+            }),
+            400);
+      }
+    }
+    expect(textCalls, 0);
+    expect(confirmCalls, 0);
+    expect(selectionCalls, 0);
+    expect(active.revision, revision);
+  });
+
+  test('input with selection is atomic and requires read authorization',
+      () async {
+    var current = 'old';
+    final selected = <List<int>>[];
+    session.setTarget(PhoneKeyboardTarget(
+        label: 'ordinary',
+        onText: (text) {
+          current = text;
+          edits.add(text);
+        },
+        onConfirm: () {},
+        readValue: () => {'text': current},
+        onSelection: (a, b) => selected.add([a, b])));
+    Map<String, Object?> input(String id, int end) => {
+          ...payload(id, text: 'abcdef'),
+          'selection': {'baseOffset': 1, 'extentOffset': end}
+        };
+    expect(await post(input('denied', 6)), 400);
+    expect(current, 'old');
+    session.setReadTextAllowed(true);
+    expect(await post(input('bad', 7)), 400);
+    expect(edits, isEmpty);
+    expect(await post(input('valid', 6)), 200);
+    expect(current, 'abcdef');
+    expect(selected, [
+      [1, 6]
+    ]);
+  });
+
+  test('remote sequence rejects replay after bounded receipts are evicted',
+      () async {
+    await session.close();
+    var calls = 0;
+    session = PhoneKeyboardSession(
+        remoteState: () => {
+              'context': 'same',
+              'revision': 1,
+              'keys': [
+                {'id': 'down', 'label': 'down'}
+              ],
+            },
+        dispatchRemote: (_, {required revision}) async {
+          calls++;
+          return true;
+        });
+    uri = await session.start(address: InternetAddress.loopbackIPv4);
+    final old = {
+      'requestId': 'old-remote',
+      'action': 'remote',
+      'key': 'down',
+      'remoteRevision': 1,
+      'remoteSequence': 1
+    };
+    expect(await post(old), 200);
+    session.setTarget(target('fill receipts'));
+    for (var i = 0; i < 128; i++) {
+      expect(await post(payload('fill-$i')), 200);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 140));
+    expect(await post(old), 409);
+    expect(calls, 1);
+  });
+
+  test('delayed remote body rechecks current remote revision', () async {
+    await session.close();
+    var revision = 1;
+    var calls = 0;
+    session = PhoneKeyboardSession(
+      remoteState: () => {
+        'revision': revision,
+        'context': 'qa',
+        'keys': [
+          {'id': 'up', 'label': 'up'},
+          {'id': 'down', 'label': 'down'},
+        ],
+      },
+      dispatchRemote: (key, {required revision}) async {
+        calls++;
+        return true;
+      },
+    );
+    uri = await session.start(address: InternetAddress.loopbackIPv4);
+    final bytes = utf8.encode(
+      jsonEncode({
+        'requestId': 'delayed-remote',
+        'action': 'remote',
+        'key': 'down',
+        'remoteRevision': 1,
+        'remoteSequence': 1,
+      }),
+    );
+    final socket = await Socket.connect(uri.host, uri.port);
+    socket.write(
+      'POST ${uri.path}/input HTTP/1.1\r\nHost: ${uri.host}\r\nContent-Length: ${bytes.length}\r\nConnection: close\r\n\r\n',
+    );
+    socket.add(bytes.sublist(0, 2));
+    await socket.flush();
+    final response = utf8.decoder.bind(socket).join();
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    revision = 2;
+    socket.add(bytes.sublist(2));
+    await socket.flush();
+    expect(await response.timeout(const Duration(seconds: 3)), contains('409'));
+    socket.destroy();
+    expect(calls, 0);
+  });
+
+  test(
       'multiple edits clear and confirm across fields do not expose field contents',
       () async {
     session.setTarget(target('search'));
@@ -146,11 +592,14 @@ void main() {
   );
   test('inactive editor hides target and rejects late requests', () async {
     var active = true;
-    session.setTarget(PhoneKeyboardTarget(
+    session.setTarget(
+      PhoneKeyboardTarget(
         label: 'a',
         isActive: () => active,
         onText: edits.add,
-        onConfirm: () => confirms++));
+        onConfirm: () => confirms++,
+      ),
+    );
     final old = payload('inactive');
     active = false;
     expect(session.state['target'], isNull);
@@ -171,7 +620,8 @@ void main() {
     session.setTarget(target('a'));
     final socket = await Socket.connect(uri.host, uri.port);
     socket.write(
-        'POST ${uri.path}/input HTTP/1.1\r\nHost: ${uri.host}\r\nContent-Length: 1000\r\n\r\n{');
+      'POST ${uri.path}/input HTTP/1.1\r\nHost: ${uri.host}\r\nContent-Length: 1000\r\n\r\n{',
+    );
     await socket.flush();
     socket.destroy();
     await Future<void>.delayed(const Duration(milliseconds: 30));
@@ -182,13 +632,18 @@ void main() {
     session.setTarget(target('a'));
     final socket = await Socket.connect(uri.host, uri.port);
     socket.write(
-        'POST ${uri.path}/input HTTP/1.1\r\nHost: ${uri.host}\r\nContent-Length: 10000\r\nConnection: close\r\n\r\n{');
+      'POST ${uri.path}/input HTTP/1.1\r\nHost: ${uri.host}\r\nContent-Length: 10000\r\nConnection: close\r\n\r\n{',
+    );
     final response = utf8.decoder.bind(socket).join();
     final timer = Timer.periodic(
-        const Duration(milliseconds: 100), (_) => socket.write(' '));
+      const Duration(milliseconds: 100),
+      (_) => socket.write(' '),
+    );
     try {
       expect(
-          await response.timeout(const Duration(seconds: 8)), contains('400'));
+        await response.timeout(const Duration(seconds: 8)),
+        contains('400'),
+      );
       expect(edits, isEmpty);
     } finally {
       timer.cancel();

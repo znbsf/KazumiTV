@@ -12,8 +12,25 @@ class PhoneKeyboardButton extends StatelessWidget {
           context: context, builder: (_) => const PhoneKeyboardDialog()));
 }
 
-class PhoneKeyboardDialog extends StatelessWidget {
+class PhoneKeyboardDialog extends StatefulWidget {
   const PhoneKeyboardDialog({super.key});
+  @override
+  State<PhoneKeyboardDialog> createState() => _PhoneKeyboardDialogState();
+}
+
+class _PhoneKeyboardDialogState extends State<PhoneKeyboardDialog> {
+  @override
+  void initState() {
+    super.initState();
+    PhoneKeyboard.instance.enterControlDialog();
+  }
+
+  @override
+  void dispose() {
+    PhoneKeyboard.instance.leaveControlDialog();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => ListenableBuilder(
       listenable: PhoneKeyboard.instance,
@@ -37,6 +54,13 @@ class PhoneKeyboardDialog extends StatelessWidget {
                     const SizedBox(height: 8),
                     SelectableText(url),
                     const Text('返回后连接继续；闲置 10 分钟或应用进入后台自动断开。'),
+                    SwitchListTile(
+                      title: const Text('允许已连接手机读取当前普通输入框文本'),
+                      subtitle: const Text(
+                          '仅本次连接；可能包含 URL 和其中的私人信息。密码与令牌字段始终排除，断开后自动关闭。'),
+                      value: keyboard.readTextAllowed,
+                      onChanged: keyboard.setReadTextAllowed,
+                    ),
                   ] else if (keyboard.error != null)
                     Text(keyboard.error!),
                   if (keyboard.starting) const CircularProgressIndicator(),

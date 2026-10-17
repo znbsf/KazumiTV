@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'package:kazumi/services/platform/owned_method_channel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/platform/tv_navigation.dart';
+import 'package:kazumi/services/platform/app_remote.dart';
 import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -20,14 +23,36 @@ class TvAppShell extends StatefulWidget {
 }
 
 class _TvAppShellState extends State<TvAppShell> {
+  AppRemoteLease? _remoteLease;
   static const _channel = MethodChannel('com.predidit.kazumi/tv_navigation');
+  static final _navigationOwners = OwnedMethodChannel(_channel,
+      onActiveChanged: (_) => unawaited(_syncNavigationActive()));
+  MethodChannelLease? _navigationLease;
+
+  static Future<void> _syncNavigationActive() async {
+    try {
+      await _channel.invokeMethod<void>(
+          'setActive', _navigationOwners.hasOwners);
+    } on MissingPluginException {
+      // audio_service can start Dart before MainActivity registers this channel.
+      // Native sends ready after registration; no polling or stale retry timer.
+    } on PlatformException catch (error, stack) {
+      FlutterError.reportError(FlutterErrorDetails(
+          exception: error, stack: stack, library: 'TV navigation handshake'));
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     FocusManager.instance.addEarlyKeyEventHandler(_handleConfirmRepeat);
     if (TvMode.enabled) {
-      _channel.setMethodCallHandler((call) async {
+      _remoteLease = AppRemote.instance.attachShell();
+      _navigationLease = _navigationOwners.claim((call) async {
+        if (call.method == 'ready') {
+          await _syncNavigationActive();
+          return;
+        }
         if (TvInputLifecycle.active)
           TvInputLifecycle.platformAction(call.method, 'dart_received');
         if (call.method == 'home') TvNavigation.goHome();
@@ -38,7 +63,6 @@ class _TvAppShellState extends State<TvAppShell> {
                 didPop: didPop);
         }
       });
-      _channel.invokeMethod<void>('setActive', true);
     }
   }
 
@@ -59,11 +83,9 @@ class _TvAppShellState extends State<TvAppShell> {
 
   @override
   void dispose() {
+    _remoteLease?.release();
     FocusManager.instance.removeEarlyKeyEventHandler(_handleConfirmRepeat);
-    if (TvMode.enabled) {
-      _channel.setMethodCallHandler(null);
-      _channel.invokeMethod<void>('setActive', false);
-    }
+    _navigationLease?.release();
     super.dispose();
   }
 

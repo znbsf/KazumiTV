@@ -61,6 +61,8 @@ class _PhoneKeyboardQaState extends State<_PhoneKeyboardQa> {
   @override
   void initState() {
     super.initState();
+    _controllers[0].text = '本机已有普通文本';
+    _controllers[1].text = 'https://example.invalid/qa-rule';
     for (var i = 0; i < _focus.length; i++) {
       _focus[i].addListener(() {
         if (_focus[i].hasFocus) _log(i);
