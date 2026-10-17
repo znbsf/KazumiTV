@@ -1,14 +1,14 @@
 # 四项功能人工验收（独立候选包）
 
-这个包用于验收，不能替代正式版。名称 **KazumiTV-CI**，包名 `com.znbsf.kazumi.fluttertv.candidate`，与正式版 `com.znbsf.kazumi.fluttertv` 隔离。首次进入是独立数据目录，不会继承正式版收藏、历史或规则；不要清除、卸载或覆盖正式版，也不需要迁移私人数据。
+这个包用于验收，不能替代正式版。名称 **KazumiTV-QA4**，包名 `com.znbsf.kazumi.fluttertv.fourqa`，与正式版 `com.znbsf.kazumi.fluttertv` 隔离。首次进入是独立数据目录，不会继承正式版收藏、历史或规则；不要清除、卸载或覆盖正式版，也不需要迁移私人数据。
 
 ## 下载与安装
 
-从本次集成草稿 PR 的 **TV checks and candidate APKs** 成功运行中下载 `tv-candidate-armeabi-v7a-<SHA>` 附件（GitHub 可能要求登录，保留14天）。解压后只安装 `app-armeabi-v7a-tv-release.apk`；已验电视为 Android 9 ARMv7，选这个包。手机只使用浏览器，不安装电视APK。其他架构的附件不需要下载。
+从本次集成草稿 PR 的 **TV checks and candidate APKs** 成功运行中下载 `tv-four-feature-qa-armeabi-v7a-<SHA>` 附件（GitHub 可能要求登录，保留14天）。解压后只安装 `app-armeabi-v7a-tv-release.apk`；已验电视为 Android 9 ARMv7，选这个包。手机只使用浏览器，不安装电视APK。其他架构的附件不需要下载。
 
 同一附件内 `armeabi-v7a.json` 是构建回执，记录精确源码 SHA、APK SHA256、包名和签名；以该回执及最终交付消息给出的校验值为准。这里的源码 SHA 可能是 GitHub PR 合并测试提交，与分支 head 不同，不能混用。
 
-可通过电视现有文件管理器/USB安装；若用已授权ADB，先确认电视身份再执行 `adb -s <已确认电视地址> install -r app-armeabi-v7a-tv-release.apk`。若提示签名不一致，停止并反馈，不卸载已有应用或清数据。此包使用CI测试签名，版本文字 `0.4.0-ci` 是既有CI标识，并非正式升级或降级。
+可通过电视现有文件管理器/USB安装；若用已授权ADB，先确认电视身份再执行 `adb -s <已确认电视地址> install -r app-armeabi-v7a-tv-release.apk`。若提示签名不一致，停止并反馈，不卸载已有应用或清数据。此包使用CI测试签名，版本文字 `0.4.3-qa4` 是本次验收标识，并非正式升级或降级。
 
 ## 约10分钟，按顺序确认
 

@@ -53,3 +53,24 @@
 下一步最小设备方案由集成负责人统一：使用现有应用真实选源入口或 QA-only 条目载入同一公开规则，明确选择上述 UBW 条目/第 1 集，只允许 1 个候选的 WebView 解析与首帧、35 秒预算，遇验证码立即停止并回手动，不重复尝试。不必为主机这三层重开模拟器；只有补应用解析/真实首帧时才需要设备。现有 feature_hub 的 `Target` / QA Playable 是合成 fixture，不能作为真实站点证据。若 Bangumi 简名与源完整标签不等，健康严格匹配应保守显示需要手动确认；可使用已明确同一作品的完整标签/别名，不修改生产匹配规则，不把 2006 条目当 UBW。
 
 以上只覆盖该规则、该作品、该时刻；不证明其他番剧、其他集数或全站可用。
+
+### 内部真实站点设备验收入口（API 36 模拟器单次通过）
+
+`tools/qa/real_source_health.dart` 仅允许 `com.znbsf.kazumi.fluttertv.featureqa` debug 身份，沿用 feature_hub 的存储、MediaKit、WebView 与 TV 初始化。固定嵌入上述公开 giriGiriLove 2.5 / API 9 原始规则，启动验证 SHA-256 `4d7b4a32c68fcbf27ac1b2dd719408dd960067e5c40599ba90a33c05e2a8e01b`，运行不下载规则。该入口为内部诊断，不是用户下载验收包。
+
+遥控器点击“执行一次真实源探测”后，用 QA 专用 subject 990019、完整作品名 `命运之夜 无限剑制 Fate/stay night [Unlimited Blade Works]` 执行一次现有 SourceHealthPage 自动候选流程。没有借用 2006 年作品元数据，也不把 host 的宽关键词 Fate 搜索当作 App 精确匹配成功。只有一个候选，使用现有每规则 35 秒限额与最多 4 秒释放等待；页面虽保留自动模式的 75 秒总体配置，单候选已被更小的预算约束。每次进程只允许进入一次，不自动重试；WebView 子资源请求由现有解析器处理，不能宣称设备端只有三条 HTTP 请求。
+
+日志 `REAL_HEALTH_QA_RECORD` 只输出结构化阶段、规则指纹、环境、失败分类，不打印媒体 URL。返回候选只表示 probe 首帧通过，没有启动正式播放。失败或验证码如实记录即停止；清理未确认仍遵守现有页面释放门控。新增入口静态检查 `dart analyze tools/qa/real_source_health.dart` 无问题；集成负责人随后完成下述 API 36 模拟器单次真实站点验收。
+
+#### 2026-10-17 12:14 UTC 单次真实站点结果
+
+集成负责人在 API 36 模拟器安装 featureqa 20516，APK SHA-256 为 `701bcbb0c848c845bcc0ae59305653d4f7113dc93a896813f6aee3bdc6b01670`。单次执行使用上述固定公开规则与完整 UBW 源标题，没有弱化严格匹配或替换搜索响应：
+
+- 12:14:27.018：`REAL_HEALTH_QA` 确认 giriGiriLove 2.5，原始规则 SHA 与上述固定值一致；应用规则指纹 `609ca74f28a476af82543461b68f6fba4c96544b9754da6cd14d835023db1c3a`。
+- 12:14:37.149：原生 `nativeWaitUntilFirstFrameRenderedNotify`，实际纹理消费后通知首帧。
+- 12:14:37.287：记录 QA subject `990019`、episode `1`、stage `firstFrame`、reason `frame_observed`，checkedAt `2026-10-17T12:14:37.285559Z`。
+- UI 返回“真实首帧候选已返回；未启动正式播放”，单次入口已禁用；未继续正式播放或自动重试。
+
+证据为集成验收产物目录中的 `real-health-result.log`、`real-health-result.png`、`real-health-result.xml`。原始日志只在本地保留，不公开其中可能包含的媒体 URL。
+
+**结论范围：** 此次通过验证的是上述完整 UBW 源标题、giriGiriLove 2.5 的第 1 集在该 API 36 模拟器上的真实搜索、严格匹配、章节、WebView 解析与实际首帧，以及候选返回。它不证明 Bangumi 标准标题或跨番匹配、其他站点/集数、Android 9 真实站点播放、正式播放二次解析或音频同步。Android 9 已有受控 fixture 证据，不能替代这些真实站点边界。

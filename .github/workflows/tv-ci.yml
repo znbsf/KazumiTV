@@ -72,10 +72,10 @@ jobs:
         run: >-
           flutter build apk --release --pub --flavor tv
           --android-project-arg=kazumiTv=true
-          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.candidate
-          --android-project-arg=kazumiTvLabel=KazumiTV-CI
+          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.fourqa
+          --android-project-arg=kazumiTvLabel=KazumiTV-QA4
           --target-platform ${{ matrix.target }} --split-per-abi
-          --build-name=0.4.0-ci --build-number=20325
+          --build-name=0.4.3-qa4 --build-number=20520
           --dart-define=KAZUMI_TV_PERF=false --dart-define=KAZUMI_TV_FIXED_SURFACES=true
       - name: Lockfile must remain unchanged after plugin regeneration
         run: git diff --exit-code -- pubspec.lock
@@ -85,12 +85,12 @@ jobs:
           python tools/verify_tv_artifact.py "build/app/outputs/flutter-apk/app-$ABI-tv-release.apk" \
             --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
-            --application-id com.znbsf.kazumi.fluttertv.candidate --abi "$ABI" \
-            --build-number 20325 --version-name 0.4.0-ci --source-sha "$GITHUB_SHA" \
+            --application-id com.znbsf.kazumi.fluttertv.fourqa --abi "$ABI" \
+            --build-number 20520 --version-name 0.4.3-qa4 --source-sha "$GITHUB_SHA" \
             --output "build/tv-receipts/$ABI.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: tv-candidate-${{ matrix.abi }}-${{ github.sha }}
+          name: tv-four-feature-qa-${{ matrix.abi }}-${{ github.sha }}
           if-no-files-found: error
           retention-days: 14
           path: |
