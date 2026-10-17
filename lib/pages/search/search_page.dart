@@ -1,3 +1,4 @@
+import 'package:kazumi/pages/search/qr_search_dialog.dart';
 import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:math' as math;
 
@@ -41,6 +42,7 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
+  final _qrFocus = FocusNode(debugLabel: 'QR search entry');
   final _scroll = ScrollController();
   // Preserve the input subtree when the header moves in or out of the scroll view.
   final _searchHeaderKey = GlobalKey();
@@ -82,6 +84,7 @@ class _SearchPageState extends State<SearchPage> {
     _emptyResultFocus.dispose();
     _input.dispose();
     _inputFocus.dispose();
+    _qrFocus.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -156,11 +159,24 @@ class _SearchPageState extends State<SearchPage> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
+  Future<void> _qrSearch() async {
+    final value = await showDialog<String>(
+        context: context, builder: (_) => const QrSearchDialog());
+    if (!mounted) return;
+    _qrFocus.requestFocus();
+    if (value != null) await _submit(value);
+  }
+
   Widget _searchField() {
     if (TvMode.enabled) {
       return Row(children: [
         Expanded(
             child: TvSearchEntry(controller: _input, onSubmitted: _submit)),
+        TextButton.icon(
+            focusNode: _qrFocus,
+            onPressed: _qrSearch,
+            icon: const Icon(Icons.qr_code),
+            label: const Text('手机输入')),
         IconButton(
             tooltip: '清空搜索',
             onPressed: _clearSearch,
@@ -470,9 +486,8 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
     final selected = _visibleResults.indexWhere((value) => value.id == item.id);
-    final target = selected >= 0
-        ? selected
-        : index.clamp(0, _visibleResults.length - 1);
+    final target =
+        selected >= 0 ? selected : index.clamp(0, _visibleResults.length - 1);
     final node = _resultFocusFor(_visibleResults[target].id);
     if (_scroll.hasClients && _resultRowExtent > 0) {
       final rowTop =
@@ -498,9 +513,8 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
     final latest = _visibleResults.indexWhere((value) => value.id == item.id);
-    final latestIndex = latest >= 0
-        ? latest
-        : index.clamp(0, _visibleResults.length - 1);
+    final latestIndex =
+        latest >= 0 ? latest : index.clamp(0, _visibleResults.length - 1);
     final current = _resultFocusFor(_visibleResults[latestIndex].id);
     if (_resultFocusAttached(current)) current.requestFocus();
   }

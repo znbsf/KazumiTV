@@ -51,6 +51,21 @@ class SettingKey<T> {
 // Add new settings here. SettingsKeys is the public typed registry used by
 // callers; new keys can use literal string names directly.
 class SettingsKeys {
+  static const sourceHealthPreferences = SettingKey<String>(
+    'sourceHealthPreferencesV1',
+    '',
+    group: SettingGroup.misc,
+  );
+  static const sourceHealthRecords = SettingKey<String>(
+    'sourceHealthRecordsV1',
+    '',
+    group: SettingGroup.misc,
+  );
+  static const firstSourceAutoSelect = SettingKey<bool>(
+    'firstSourceAutoSelect',
+    true,
+    group: SettingGroup.player,
+  );
   static const showNumericShortcutBadges = SettingKey<bool>(
       'showNumericShortcutBadges', true, group: SettingGroup.interface);
   static const hAenable = SettingKey<bool>(
@@ -576,6 +591,9 @@ class SettingsKeys {
   );
 
   static final List<SettingKey<Object?>> all = [
+    sourceHealthRecords,
+    sourceHealthPreferences,
+    firstSourceAutoSelect,
     showNumericShortcutBadges,
     hAenable,
     hardwareDecoder,

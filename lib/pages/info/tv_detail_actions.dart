@@ -10,6 +10,7 @@ class TvDetailActions extends StatefulWidget {
     required this.playFocus,
     required this.onPlay,
     this.onSelectSource,
+    this.onSourceHealth,
     required this.collectionBuilder,
     required this.onReview,
     required this.onUp,
@@ -19,6 +20,7 @@ class TvDetailActions extends StatefulWidget {
   final FocusNode playFocus;
   final VoidCallback onPlay;
   final VoidCallback? onSelectSource;
+  final VoidCallback? onSourceHealth;
   final Widget Function(FocusNode focusNode) collectionBuilder;
   final VoidCallback onReview;
   final VoidCallback onUp;
@@ -29,6 +31,7 @@ class TvDetailActions extends StatefulWidget {
 }
 
 class _TvDetailActionsState extends State<TvDetailActions> {
+  final _healthFocus = FocusNode(debugLabel: 'TV source health');
   final _sourceFocus = FocusNode(debugLabel: 'TV detail source');
   final _collectFocus = FocusNode(debugLabel: 'TV detail collect');
   final _reviewFocus = FocusNode(debugLabel: 'TV detail review');
@@ -36,6 +39,7 @@ class _TvDetailActionsState extends State<TvDetailActions> {
   List<FocusNode> get _nodes => [
         widget.playFocus,
         if (widget.onSelectSource != null) _sourceFocus,
+        if (widget.onSourceHealth != null) _healthFocus,
         _collectFocus,
         _reviewFocus
       ];
@@ -43,6 +47,7 @@ class _TvDetailActionsState extends State<TvDetailActions> {
   @override
   void dispose() {
     _sourceFocus.dispose();
+    _healthFocus.dispose();
     _collectFocus.dispose();
     _reviewFocus.dispose();
     super.dispose();
@@ -155,6 +160,19 @@ class _TvDetailActionsState extends State<TvDetailActions> {
                     onPressed: widget.onSelectSource,
                     icon: const Icon(Icons.swap_horiz_rounded),
                     label: const Text('重新选源'),
+                  ),
+                ),
+              ),
+            if (widget.onSourceHealth != null)
+              _highlight(
+                _healthFocus,
+                SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    focusNode: _healthFocus,
+                    onPressed: widget.onSourceHealth,
+                    icon: const Icon(Icons.health_and_safety_outlined),
+                    label: const Text('源健康'),
                   ),
                 ),
               ),

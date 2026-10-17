@@ -1,3 +1,7 @@
+import 'package:kazumi/pages/info/source_health_page.dart';
+import 'package:kazumi/services/source_health/source_health.dart';
+import 'package:kazumi/pages/video/video_playback_args.dart';
+import 'package:kazumi/plugins/plugins_controller.dart';
 import 'dart:io';
 import 'dart:ui';
 
@@ -121,6 +125,18 @@ class _InfoPageState extends State<InfoPage>
     return KeyEventResult.ignored;
   }
 
+  Future<HealthCandidate?> _sourceHealth({bool autoSelect = false}) async {
+    final result = await Navigator.of(context).push<HealthCandidate>(
+      MaterialPageRoute(builder: (_) => SourceHealthPage(
+        subject: infoController.bangumiItem,
+        plugins: List.of(inject<PluginsController>().pluginList),
+        autoSelect: autoSelect,
+      )),
+    );
+    if (mounted) _tvPlayFocus.requestFocus();
+    return result;
+  }
+
   Future<void> _startWatching({bool reselectSource = false}) async {
     if (_startingPlayback) return;
     _startingPlayback = true;
@@ -147,6 +163,20 @@ class _InfoPageState extends State<InfoPage>
           }, errorMessage: '打开历史记录失败，请稍后重试');
           if (!mounted || cancelToken.isCancelled || opened) return;
           KazumiDialog.showToast(message: '上次的播放源不可用，请重新选源');
+        } else if (GStorage.getSetting(SettingsKeys.firstSourceAutoSelect)) {
+          final candidate = await _sourceHealth(autoSelect: true);
+          if (!mounted) return;
+          if (candidate != null) {
+            context.pushNamed('/video/', arguments: OnlineVideoPlaybackArgs(
+              bangumiItem: infoController.bangumiItem,
+              plugin: candidate.plugin,
+              title: candidate.item.name,
+              src: candidate.item.src,
+              roads: candidate.roads,
+              allowHistoryResume: false,
+            ));
+            return;
+          }
         }
       }
       if (!mounted) return;
@@ -537,6 +567,7 @@ class _InfoPageState extends State<InfoPage>
                                   tvActions: TvMode.enabled
                                       ? TvDetailActions(
                                           playFocus: _tvPlayFocus,
+                                          onSourceHealth: () => _sourceHealth(),
                                           onPlay: _startWatching,
                                           onSelectSource: () => _startWatching(
                                               reselectSource: true),

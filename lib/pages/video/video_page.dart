@@ -13,6 +13,7 @@ import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/pages/player/player_item_surface.dart';
 import 'package:kazumi/bean/widget/media_error_widget.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/download/download_module.dart';
@@ -717,6 +718,16 @@ class _VideoPageState extends State<VideoPage>
     final bool playerLoading = playerController.playback.loading;
     return Stack(
       children: [
+        if (playerLoading &&
+            !_isClosing &&
+            videoPageController.errorMessage == null)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ExcludeFocus(
+                child: PlayerItemSurface(playerController: playerController),
+              ),
+            ),
+          ),
         Positioned.fill(
           child: Stack(
             children: [
@@ -725,7 +736,12 @@ class _VideoPageState extends State<VideoPage>
                       playerLoading ||
                       videoPageController.errorMessage != null))
                 Container(
-                  color: Colors.black,
+                  // Keep the underlying first-frame texture in the composed
+                  // scene rather than fully occluding it during recovery.
+                  color:
+                      playerLoading && videoPageController.errorMessage == null
+                          ? Colors.black.withValues(alpha: 0.99)
+                          : Colors.black,
                   child: Observer(
                     builder: (context) {
                       final errorMessage = videoPageController.errorMessage;
@@ -790,7 +806,7 @@ class _VideoPageState extends State<VideoPage>
                     (videoPageController.loading || playerLoading) &&
                     showDebugLog,
                 child: Container(
-                  color: Colors.black,
+                  color: Colors.black.withValues(alpha: 0.99),
                   child: Align(
                     alignment: Alignment.center,
                     child: ListView.builder(

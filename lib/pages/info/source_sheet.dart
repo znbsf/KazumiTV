@@ -1,3 +1,4 @@
+import 'package:kazumi/services/source_health/source_health_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -216,6 +217,8 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
         task.withContext((context) => Navigator.of(context).pop(prepared));
         return;
       }
+      await SourceHealthPreferences.remember(
+          widget.infoController.bangumiItem.id, plugin);
       task.withContext((context) => context.pushNamed(
             '/video/',
             arguments: OnlineVideoPlaybackArgs(

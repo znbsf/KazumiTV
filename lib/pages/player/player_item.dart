@@ -5,6 +5,8 @@ import 'package:kazumi/pages/player/player_shortcut_platform_actions.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 
 import 'dart:async';
+import 'package:kazumi/services/player/confirmed_playback_recovery.dart';
+import 'package:kazumi/pages/player/tv_recovery_confirmation.dart';
 import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
 import 'dart:io';
 
@@ -511,6 +513,57 @@ class _PlayerItemState extends State<PlayerItem>
   }
 
   final _playbackInfo = TvPlaybackInfoPresenter();
+  final _recoveryPrompt = TvPlaybackInfoPresenter();
+  RecoverySession? _shownRecovery;
+
+  void _checkRecoveryPrompt() {
+    if (_recoveryPrompt.isOpen) {
+      if (_shownRecovery != null &&
+          !playerController.recovery.owns(_shownRecovery!)) {
+        _recoveryPrompt.close();
+      }
+      return;
+    }
+    final session = playerController.pendingRecovery;
+    if (!mounted ||
+        session == null ||
+        identical(session, _shownRecovery) ||
+        ModalRoute.of(context)?.isCurrent != true) return;
+    _shownRecovery = session;
+    final hold = acquirePlayerPanelHold();
+    _handlePlayerMenuVisibilityChanged(true);
+    bool accepted = false;
+    unawaited(_recoveryPrompt
+        .show(
+      context,
+      fallbackFocus: widget.keyboardFocus,
+      builder: (_) => TvRecoveryConfirmation(
+        onCancel: _recoveryPrompt.close,
+        onConfirm: () {
+          accepted = true;
+          _recoveryPrompt.close();
+        },
+      ),
+    )
+        .whenComplete(() {
+      if (mounted) {
+        _handlePlayerMenuVisibilityChanged(false);
+        hold.release();
+      } else {
+        hold.releaseSilently();
+      }
+    }).then((_) async {
+      if (!mounted || !playerController.recovery.owns(session)) return;
+      if (!accepted) {
+        playerController.recovery.cancel(session);
+        return;
+      }
+      final succeeded = await playerController.recoverWithSoftware(session);
+      if (mounted && playerController.recovery.owns(session) && !succeeded) {
+        KazumiDialog.showToast(message: '软件兼容播放未能恢复，请手动换源或退出播放');
+      }
+    }));
+  }
 
   void _showPlaybackInfo() {
     if (!TvMode.enabled) {
@@ -1380,6 +1433,7 @@ class _PlayerItemState extends State<PlayerItem>
   Timer getPlayerTimer() {
     return Timer.periodic(const Duration(seconds: 1), (timer) {
       playerController.syncPlaybackState();
+      _checkRecoveryPrompt();
       unawaited(_updateAndroidPIPActions());
       _syncAudioServiceState();
       _emitDanmakusForCurrentPosition();
@@ -1729,6 +1783,7 @@ class _PlayerItemState extends State<PlayerItem>
   @override
   void dispose() {
     _playbackInfo.close();
+    _recoveryPrompt.close();
     _releaseProbeState?.call();
     // The route-scoped PlayerController owns playback disposal.
     _fullscreenListener();
