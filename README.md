@@ -3,7 +3,7 @@
 为 Android TV 和遥控器设计的动画浏览与播放应用。
 基于 **[Predidit/Kazumi](https://github.com/Predidit/Kazumi)**：延续上游的 Flutter/Dart 业务、规则与 media-kit 播放能力，结合本仓库原生 TV 版本的布局和交互工作，形成当前 Flutter TV 融合版。**本项目是独立衍生项目，不是上游官方 TV 版本。**
 
-[下载 0.4.3 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.3) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
+[下载 0.4.4 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.4) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
 
 维护入口：[当前项目状态](docs/PROJECT-STATUS.md) · [开发经验](docs/ENGINEERING-LESSONS.md)
 
@@ -15,9 +15,9 @@
 - **接着看**：收藏、历史记录和分集续播，保留日常追番入口。
 - **内置播放**：暂停、进度调整、选集、倍速，以及音轨、字幕和弹幕设置；实际可用能力取决于媒体与来源。
 
-## 0.4.4 新功能预览
+## 0.4.4 新功能
 
-以下功能已进入发布准备，正式下载仍为 **0.4.3**。完整变化见 [0.4.4 发布说明草稿](docs/RELEASE-0.4.4.md)。
+以下功能已随 **0.4.4** 发布。完整变化见 [0.4.4 发布说明](docs/RELEASE-0.4.4.md)。
 
 - **手机就是遥控器**：从首页打开配对入口，同一局域网扫码使用方向键、确认、返回、播放/暂停、快进退、上下集和选集，也可输入搜索文字。页面随电视应用使用浅色/深色风格，支持可关闭的按键震动。
 - **记住配对 7 天**：电视重新打开应用后可从收藏的网址重连；电视显示在线遥控端数量，可暂停全部连接或取消配对。电视 IP 改变可能需要重新扫码；配对有效期不代表后台保活或待机唤醒。
@@ -63,16 +63,16 @@
 
 | 安装包 | 适用系统 |
 |---|---|
-| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.3/KazumiTV-0.4.3-armeabi-v7a.apk) | 32 位 ARM Android |
-| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.3/KazumiTV-0.4.3-arm64-v8a.apk) | 64 位 ARM Android |
-| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.3/KazumiTV-0.4.3-x86_64.apk) | x86_64 Android / 模拟器 |
+| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.4/KazumiTV-0.4.4-armeabi-v7a.apk) | 32 位 ARM Android |
+| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.4/KazumiTV-0.4.4-arm64-v8a.apk) | 64 位 ARM Android |
+| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.4/KazumiTV-0.4.4-x86_64.apk) | x86_64 Android / 模拟器 |
 
 1. 下载并侧载 APK，在启动器打开 **KazumiTV**。
 2. 首次启动按引导准备规则与播放来源，再从作品详情选择来源和剧集。
 3. 方向键移动、确认选择、返回关闭面板或回到上页；播放进度可用左右键调整。
 
 包名为 `com.znbsf.kazumi.fluttertv`。从 **0.4.0 起固定使用正式发布证书**；已安装 `0.4.0-preview.1` 的用户需先卸载预览版再安装，预览版数据不会保留。后续正式版沿用同一证书。
-它与原生版、Legacy 和实验版并存；不自动迁移这些旧应用的收藏或历史，详见[数据说明](docs/TV_DATA_MIGRATION.md)。0.4.4 候选新增应用内更新：从本仓库 GitHub 正式 Release 自动选择系统支持的 APK，校验哈希、包名、版本与签名后，由你确认系统安装。0.4.3 首次升级仍需从 Release 手动下载安装；QA/preview 不参与正式更新。
+它与原生版、Legacy 和实验版并存；不自动迁移这些旧应用的收藏或历史，详见[数据说明](docs/TV_DATA_MIGRATION.md)。0.4.4 起支持应用内更新：从本仓库 GitHub 正式 Release 自动选择系统支持的 APK，校验哈希、包名、版本与签名后，由你确认系统安装。0.4.3 首次升级仍需从 Release 手动下载安装；QA/preview 不参与正式更新。
 
 ## 已知限制
 
