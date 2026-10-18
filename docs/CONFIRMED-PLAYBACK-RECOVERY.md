@@ -2,6 +2,12 @@
 
 ## 2026-10-18 QA6 用户现场：Surface 初始化互锁修复候选
 
+### 当前路由：先按现场输出路径判断，copy/GPU不阻塞本轮
+
+2026-10-18用户再次明确复用既有copy/GPU结论、明天自行验收电视。本轮仅回读既有qa6-user-regression-app.log：第484行session=574978520与第772行session=95887251均明确output=mediacodec_embed、hardwareUnavailable、mpv_no_software_fallback；对应创建后约6.8秒及1.2秒，无前置实际尺寸Resize。当前对应源码android_video_output.dart对mediacodec_embed固定hardwareAcceleration=true、hardwareDecoder=mediacodec，故可确定故障请求的是direct MediaCodec路径，不是mediacodec-copy/GPU；这些失败会话没有证明成功选中了某个具体OMX解码器。较早其他会话的OMX.amlogic.avc.decoder.awesome警告不得跨会话归因。
+
+此前20547模拟器copy基线失败仅保留历史环境证据；没有本次用户故障相关的新证据，不满足重开门槛，不再作为本轮交付阻塞，也不执行下方旧的拟议copy诊断。当前播放器保持1037a14e已验证的direct有界预挂修复，不增加新的播放器修改。原视频、外部轨道与真实声画由用户明天验收；本轮不连接/唤醒/安装/卸载电视，不重复模拟器播放。
+
 现场仅离线读取负责人保存的 `qa6-user-regression-app.log/media.txt/screen.png`，本分工未操作设备。23:37:20 和 23:39:56 两次解析已完成，创建 SurfaceTexture 后没有 SetSurfaceSize/Resize，分别约6.8秒和1.2秒出现 `mpv_no_software_fallback`，紧接输出释放；不是30秒首帧超时。ACodec警告属于其他时间段，不能归为这两次失败根因，也不能由此断言设备损坏或网络问题。
 
 对比正式版 `70c3769`、固定上游 media-kit `994465d9` 与 QA4/QA6：默认 direct MediaCodec 和 `androidAttachSurfaceAfterVideoParameters:false` 保持；但上游实际没有消费这个参数，直到解码后的 videoParams 才请求 Surface 尺寸并发布 wid。兼容恢复新增 `hwdec-software-fallback=no` 后，未附着 Surface 的初始化无法再依靠软件解码先产生尺寸。这是与现场吻合的源码互锁路径；尚缺本次原生对照，不能把推断写成已验证的视频恢复。
@@ -118,5 +124,7 @@ API36 的原组件入口已验证 Back 只取消、焦点回原按钮；快速�
 delay12最终证据：`A/media-requests.jsonl` 12:03:12.914记录sample请求mode=delay12；旧控制器471688714于12:03:14.728离开（约1.8秒，`A/recovery-delay-inflight-exit`），证明请求在途时退出。新控制器3555623于12:03:28.093进入，已晚于旧请求预计返回；12:03:37.418真实firstFrameNotify，12:03:39恢复17秒暂停、blocked=false/loading=false（`A/recovery-delay-final`）。只声明“在途请求退出+随后新会话恢复”，**不声明旧响应与新会话并发重叠的原生实证**；并发回调隔离仍由单元测试覆盖。首轮请求未建立即退出只证明立即退出，未用作该结论。既有2026-10-16延迟案例保留历史范围。当前不新增合并、正式发布或全部验收完成声明。
 
 ## 20548 最终最小候选原生结果（2026-10-17 UTC）
+
+后续只读定位：固定依赖公开NativePlayer.setProperty直接同步调用mpv_set_property_string，不受内部_setProperty的configuration.async分支控制。下一步仅允许同20547条件的一次临时诊断：记录输出锁、vo=null、android-surface-size、wid、vo=gpu、seek的BEGIN/END及session/序列/单调时间，不记录URL；timer停止超过5秒后对该模拟器QA进程最多一次有界debuggerd -b。缺END须结合线程栈，不能仅凭时序断言死锁；权限拒绝不提权改系统，最多30秒观察，恢复临时代码并停止QA进程。此诊断尚未执行，当前不再试跑组合。
 
 仅direct预挂，原wid listener机制保持。最终1060全量测试通过。20548 direct实际色条、持续推进和rapid replace [false,true]通过；software实际色条及推进通过。20546copy与20547改动前controller严格基线均黑屏/状态timer停止，具体原生阻塞点未证实；这不是copy通过记录。20544纯色和20545/20546新增同wid重建失败保留，相关新增重建代码已经撤回。最终APK哈希与完整验收边界见PROJECT-STATUS顶部。本轮未重装或操控电视，Android9原视频与真实AV仍待验收。

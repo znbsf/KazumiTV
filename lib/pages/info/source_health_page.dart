@@ -384,7 +384,9 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
           if (!didPop) _exit();
         },
         child: Scaffold(
-          appBar: AppBar(title: Text(widget.autoSelect ? '显式有限检测' : '源健康检测')),
+          appBar: AppBar(
+              title:
+                  Text(widget.autoSelect ? '显式有限检测 · 实验功能' : '源健康检测 · 实验功能')),
           body: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -417,7 +419,8 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
                     SwitchListTile(
                       key: const ValueKey('health-global'),
                       title: const Text('将成功记录用于所有番剧'),
-                      subtitle: const Text('其他番剧优先尝试记录源，仍重新匹配自己的资源；单剧手选优先'),
+                      subtitle: const Text(
+                          '需同时开启“使用成功记录开始观看”。新番首次观看尝试一个成功源，重新搜索匹配；有历史先续播，未命中或失败回手动选源。'),
                       value: _globalEnabled,
                       onChanged: _running
                           ? null

@@ -41,6 +41,7 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/widget/tv_player_side_panel.dart';
+import 'package:kazumi/bean/widget/tv_idle_dismiss.dart';
 
 class VideoPage extends StatefulWidget {
   const VideoPage({
@@ -633,7 +634,14 @@ class _VideoPageState extends State<VideoPage>
                   ? 420
                   : MediaQuery.sizeOf(context).width / 3),
       child: TvMode.enabled
-          ? TvPlayerSidePanel(child: tabBody)
+          ? ListenableBuilder(
+              listenable: tabController,
+              builder: (context, _) => TvIdleDismiss(
+                enabled: _tabBodyTargetVisible && tabController.index == 0,
+                onDismiss: _closeTabBodyAnimated,
+                child: TvPlayerSidePanel(child: tabBody),
+              ),
+            )
           : Material(
               color: Theme.of(context).colorScheme.surface,
               borderRadius: const BorderRadiusDirectional.only(

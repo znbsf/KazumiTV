@@ -197,6 +197,8 @@ class MainActivity: AudioServiceActivity() {
                 val path = call.argument<String>("path") ?: filesDir.absolutePath
                 val availableBytes = getAvailableStorage(path)
                 result.success(availableBytes)
+            } else if (call.method == "getNoBackupDirectory") {
+                result.success(noBackupFilesDir.absolutePath)
             } else {
                 result.notImplemented()
             }

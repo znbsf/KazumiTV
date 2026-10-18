@@ -21,10 +21,11 @@ class AppRemoteLease {
 }
 
 class _Context {
-  _Context(this.label, this.commands, this.priority);
+  _Context(this.label, this.commands, this.priority, this.numberHint);
   final String label;
   final Map<String, AppRemoteCommand> Function() commands;
   final int priority;
+  final String? numberHint;
 }
 
 /// Only mounted application widgets expose capabilities. The transport submits
@@ -37,6 +38,10 @@ class AppRemote {
   int _revision = 0;
   String? _signature;
   bool _busy = false;
+  final ValueNotifier<int> _activity = ValueNotifier<int>(0);
+
+  /// Accepted user commands only; state polling must not keep overlays open.
+  Listenable get activity => _activity;
 
   AppRemoteLease attachShell() {
     _shells++;
@@ -47,8 +52,9 @@ class AppRemote {
     required String label,
     required Map<String, AppRemoteCommand> Function() commands,
     int priority = 0,
+    String? numberHint,
   }) {
-    final owner = _Context(label, commands, priority);
+    final owner = _Context(label, commands, priority, numberHint);
     _contexts.add(owner);
     return AppRemoteLease(() => _contexts.remove(owner));
   }
@@ -67,7 +73,8 @@ class AppRemote {
     'back': ('返回', LogicalKeyboardKey.goBack, PhysicalKeyboardKey.escape),
   };
 
-  ({String label, Map<String, AppRemoteCommand> commands}) _snapshot() {
+  ({String label, String? numberHint, Map<String, AppRemoteCommand> commands})
+      _snapshot() {
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     final node = FocusManager.instance.primaryFocus;
     final context = node?.context;
@@ -79,6 +86,7 @@ class AppRemote {
         route?.isCurrent != false;
     final commands = <String, AppRemoteCommand>{};
     var label = '当前页面';
+    String? numberHint;
     if (enabled) {
       for (final entry in _keys.entries) {
         commands[entry.key] = AppRemoteCommand(
@@ -90,6 +98,9 @@ class AppRemote {
         final offered = owner.commands();
         if (offered.isNotEmpty) {
           label = owner.label;
+          if (offered.keys.any((key) => key.startsWith('digit'))) {
+            numberHint = owner.numberHint;
+          }
           for (final entry in offered.entries) {
             final fallback = commands[entry.key];
             commands[entry.key] = AppRemoteCommand(
@@ -114,13 +125,31 @@ class AppRemote {
       _signature = signature;
       _revision++;
     }
-    return (label: label, commands: commands);
+    return (label: label, numberHint: numberHint, commands: commands);
   }
 
   Map<String, Object?> get state {
     final snapshot = _snapshot();
+    final context = FocusManager.instance.primaryFocus?.context;
+    final theme = context != null && context.mounted ? Theme.of(context) : null;
+    String hex(Color color) =>
+        '#${(color.toARGB32() & 0xffffff).toRadixString(16).padLeft(6, '0')}';
     return {
       'context': snapshot.label,
+      'numberHint': snapshot.numberHint,
+      if (theme != null)
+        'theme': {
+          'brightness': theme.brightness.name,
+          'background': hex(theme.scaffoldBackgroundColor),
+          'surface': hex(theme.colorScheme.surfaceContainer),
+          'onSurface': hex(theme.colorScheme.onSurface),
+          'muted': hex(theme.colorScheme.onSurfaceVariant),
+          'primary': hex(theme.colorScheme.primary),
+          'onPrimary': hex(theme.colorScheme.onPrimary),
+          'secondary': hex(theme.colorScheme.secondaryContainer),
+          'onSecondary': hex(theme.colorScheme.onSecondaryContainer),
+          'outline': hex(theme.colorScheme.outlineVariant),
+        },
       'revision': _revision,
       'keys': [
         for (final entry in snapshot.commands.entries)
@@ -139,6 +168,7 @@ class AppRemote {
     // changes cannot permit a second tap from the same view of the app.
     _revision++;
     try {
+      _activity.value++;
       return await command.invoke();
     } finally {
       _busy = false;

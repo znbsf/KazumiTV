@@ -161,7 +161,7 @@ class _TvDetailActionsState extends State<TvDetailActions> {
                     focusNode: _healthFocus,
                     onPressed: widget.onSourceHealth,
                     icon: const Icon(Icons.health_and_safety_outlined),
-                    label: const Text('源健康'),
+                    label: const Text('源健康 · 实验功能'),
                   ),
                 ),
               ),

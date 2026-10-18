@@ -149,7 +149,8 @@ void main() {
     expect(keyboard.session!.state['target'], isNull,
         reason: 'Covered editor is not an active target');
     expect(find.text(uri.toString()), findsOneWidget);
-    expect(find.text('断开连接'), findsOneWidget);
+    expect(find.text('断开全部（1）'), findsOneWidget);
+    expect(find.text('已连接 1 个遥控端'), findsOneWidget);
     expect((keyboard.session!.state['remote'] as Map)['keys'], isEmpty);
     expect(
         await send({
@@ -161,6 +162,8 @@ void main() {
         }),
         409);
     expect(keyboard.readTextAllowed, isFalse);
+    await tester.ensureVisible(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(SwitchListTile));
     await tester.pumpAndSettle();
     expect(keyboard.readTextAllowed, isTrue);

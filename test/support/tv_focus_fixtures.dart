@@ -133,10 +133,12 @@ class FocusHistoryRepository implements IHistoryRepository {
 
 class FocusPlaybackService implements HistoryPlaybackService {
   final List<History> opened = [];
+  Future<HistoryPlaybackResult> Function(History, RuleCancelToken?)? resolve;
   @override
   Future<HistoryPlaybackResult> open(History history,
       {RuleCancelToken? cancelToken}) async {
     opened.add(history);
+    if (resolve != null) return resolve!(history, cancelToken);
     return HistoryPlaybackReady(OfflineVideoPlaybackArgs(
         bangumiItem: history.bangumiItem,
         pluginName: history.adapterName,

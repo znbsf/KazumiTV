@@ -236,6 +236,14 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
       'yellow': ('选集', LogicalKeyboardKey.colorF2Yellow),
       'blue': ('播放信息', LogicalKeyboardKey.colorF3Blue),
       'playPause': ('播放 / 暂停', LogicalKeyboardKey.mediaPlayPause),
+      'play': ('播放', LogicalKeyboardKey.mediaPlay),
+      'pause': ('暂停', LogicalKeyboardKey.mediaPause),
+      'stop': ('停止播放', LogicalKeyboardKey.mediaStop),
+      'rewind': ('快退', LogicalKeyboardKey.mediaRewind),
+      'fastForward': ('快进', LogicalKeyboardKey.mediaFastForward),
+      'previous': ('上一集', LogicalKeyboardKey.mediaTrackPrevious),
+      'next': ('下一集', LogicalKeyboardKey.mediaTrackNext),
+      'guide': ('选集', LogicalKeyboardKey.guide),
     };
     return {
       for (final entry in keys.entries)

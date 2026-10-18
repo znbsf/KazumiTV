@@ -174,6 +174,14 @@ void main() {
       'yellow': 'showepisodes',
       'blue': 'showdetails',
       'playPause': 'playorpause',
+      'play': 'play',
+      'pause': 'pause',
+      'stop': 'exitplayer',
+      'rewind': 'rewind',
+      'fastForward': 'forward',
+      'previous': 'prev',
+      'next': 'next',
+      'guide': 'showepisodes',
     };
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -189,7 +197,7 @@ void main() {
                     })))));
     await tester.pumpAndSettle();
     expect(keys(), containsAll(aliases.keys));
-    expect(keys().intersection({'channelUp', 'channelDown', 'next', 'prev'}),
+    expect(keys().intersection({'channelUp', 'channelDown', 'prev'}),
         isEmpty);
     for (final entry in aliases.entries) {
       calls.clear();

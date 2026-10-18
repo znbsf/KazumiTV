@@ -23,6 +23,7 @@ import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/performance/tv_performance_probe.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/services/phone_keyboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -132,4 +133,14 @@ void main() async {
       child: const AppWidget(),
     ),
   );
+  if (Platform.isAndroid && TvMode.enabled) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(PhoneKeyboard.instance.restore());
+      } else {
+        // Register the observer; an audio-service engine must not open a listener.
+        PhoneKeyboard.instance;
+      }
+    });
+  }
 }

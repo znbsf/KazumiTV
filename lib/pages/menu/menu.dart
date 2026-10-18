@@ -13,6 +13,8 @@ import 'package:kazumi/services/platform/tv_channel_input.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
+import 'package:kazumi/services/platform/app_remote.dart';
 
 class ScaffoldMenu extends StatefulWidget {
   const ScaffoldMenu({super.key, required this.location});
@@ -44,10 +46,40 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   /// The shell sits at the bottom of the root stack and stays mounted while
   /// other pages cover it, so it publishes that state for its subtree.
   bool _isCovered = false;
+  AppRemoteLease? _homeRemote;
+
+  bool get _homeNumbersAvailable {
+    final focus = FocusManager.instance.primaryFocus?.context;
+    return mounted &&
+        TvMode.enabled &&
+        !_isCovered &&
+        _selectedIndex == 0 &&
+        ModalRoute.of(context)?.isCurrent == true &&
+        focus != null &&
+        ModalRoute.of(focus)?.isCurrent == true &&
+        focus.widget is! EditableText &&
+        focus.findAncestorWidgetOfExactType<EditableText>() == null;
+  }
 
   @override
   void initState() {
     super.initState();
+    _homeRemote = AppRemote.instance.register(
+      label: '首页节目',
+      numberHint: '输入首页海报编号后稍候：已看番剧直接续播；按确认查看详情，返回取消。',
+      commands: () => _homeNumbersAvailable
+          ? {
+              for (var digit = 0; digit < 10; digit++)
+                'digit$digit': AppRemoteCommand(
+                    label: '$digit',
+                    invoke: () {
+                      if (!_homeNumbersAvailable) return false;
+                      tvChannelInputController.addDigit(digit);
+                      return true;
+                    }),
+            }
+          : {},
+    );
     FocusManager.instance.addListener(_rememberTvContentFocus);
     _pendingInitialHomeFocus = TvMode.enabled && _selectedIndex == 0;
     if (_pendingInitialHomeFocus) {
@@ -97,6 +129,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
 
   @override
   void dispose() {
+    _homeRemote?.release();
     _finishInitialHomeFocus();
     FocusManager.instance.removeListener(_rememberTvContentFocus);
     rootRouteObserver.unsubscribe(this);
@@ -430,6 +463,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   Widget _buildTvFunctionBar(BuildContext context) {
     const entries = <(int, String, IconData)>[
       (4, '设置', Icons.settings_outlined),
+      (-2, '手机遥控', Icons.phonelink_ring),
       (-1, '搜索', Icons.search),
       (2, '排期', Icons.calendar_view_week_outlined),
       (1, '历史', Icons.history),
@@ -514,9 +548,18 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                   }
                   return KeyEventResult.ignored;
                 },
-                onPressed: () => entries[i].$1 == -1
-                    ? context.pushNamed('/search/')
-                    : _selectDestination(entries[i].$1),
+                onPressed: () {
+                  final index = entries[i].$1;
+                  if (index == -2) {
+                    unawaited(showDialog<void>(
+                        context: context,
+                        builder: (_) => const PhoneKeyboardDialog()));
+                  } else if (index == -1) {
+                    context.pushNamed('/search/');
+                  } else {
+                    _selectDestination(index);
+                  }
+                },
                 child: SizedBox(
                   height: 40,
                   child: FittedBox(
