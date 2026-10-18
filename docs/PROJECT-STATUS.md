@@ -2,7 +2,7 @@
 
 ## 2026-10-18：0.4.4 已正式发布
 
-用户明确授权发布并更新对应 issue。[v0.4.4](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.4) 已公开为 Latest，非草稿/预发布。精确源码与 tag 为 fe620e7604865cfcb9c220f11d165390588e9c34，正式版本 0.4.4/20557，三 ABI 版本码 205571/205572/205574。PR24 合并 737e743cd638c911d3629843970b032b86083adc 与构建源码完整树一致；后续 PR25 及本次收尾仅改文档。原功能 head CI39116075707 四项全部通过；最后文档合入后 main CI 另行跟踪，未把运行中写作通过。
+用户明确授权发布并更新对应 issue。[v0.4.4](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.4) 已公开为 Latest，非草稿/预发布。精确源码与 tag 为 fe620e7604865cfcb9c220f11d165390588e9c34，正式版本 0.4.4/20557，三 ABI 版本码 205571/205572/205574。PR24 合并 737e743cd638c911d3629843970b032b86083adc 与构建源码完整树一致；后续 PR25 及本次收尾仅改文档。原功能 head CI39116075707 四项全部通过；最终 main f53b2e5eefa5f5c7e2700586d3bff932a7ff6667 的 [CI39125245145](https://github.com/znbsf/KazumiTV/actions/runs/39125245145) 已 completed/success，checks 与三 ABI 全部通过；实际日志 1099 tests passed。之前两次 main 被文档合入自动取代，两个已合并文档 PR 的重复 CI 主动取消，取消均不算通过。终态和完整日志已归档，Release正文已回填并回读。
 
 11 项附件均按既有白名单上传，三正式 APK、源码、许可、验证 JSON 和 SHA256SUMS 已全部匿名实际下载核对大小与 SHA256。初次上传超时只补传缺失 ARM APK，未覆盖已上传或旧 Release 资产。发布证据位于根 artifacts/four-stream-20261017/release-044-publication；签名材料、原始日志和模拟器合成基线未上传。
 
