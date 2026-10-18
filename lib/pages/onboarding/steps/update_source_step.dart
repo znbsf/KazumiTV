@@ -20,8 +20,9 @@ class UpdateSourceStep extends StatelessWidget {
             icon: Icons.system_update_rounded,
             shape: OnboardingIconShape.cookie),
         title: '更新来源',
-        subtitle: 'TV 版本暂不支持应用内更新',
-        child: OnboardingHint(text: '请通过提供此 TV 安装包的来源获取更新。应用不会自动下载或安装更新。'),
+        subtitle: '从 GitHub 获取 KazumiTV 正式版',
+        child: OnboardingHint(
+            text: '正式版可检查更新，自动选择适合电视的安装包。下载和系统安装均由你确认；测试版不参与正式版升级。'),
       );
     }
     return OnboardingStepLayout(

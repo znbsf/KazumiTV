@@ -1,5 +1,14 @@
 # KazumiTV 当前状态
 
+## 2026-10-18：补齐GitHub下载与系统安装流程（rc2）
+
+用户要求检测更新后自动取得GitHub下载链接并下载安装。核对发现此前正式版只有版本检查和发布页入口，assets故意为空，因此先前0.4.4/20556候选不包含应用内下载。本轮沿用orchestrate-engineering与构建runbook，旧正式包保持不动。新的0.4.4/20557、QA 0.4.4-rc.2候选取代此前发布候选，旧附件只作历史证据，不能继续作为最终发布包。
+
+更新读取固定znbsf/KazumiTV的latest稳定Release，忽略draft/prerelease；按Android实际SUPPORTED_ABIS顺序选精确版本文件名，使用browser_download_url与GitHub SHA256 digest，不拼接未经验证的任意地址、不用mirror字段或上游Kazumi包。缺失/重复/不兼容APK或校验信息失败即拒绝。下载可取消，现有临时文件仅在哈希匹配时复用；下载后与调用安装器前分别由原生桥校验缓存文件、大小/哈希、正式包名/既有固定证书、非debug、版本名/递增versionCode、minSdk及真实ABI。安装源权限缺失时明确引导系统设置，返回后再次确认；不静默安装、不主动退出应用、不替QA安装正式包。
+
+验证计划与停止条件：聚焦测试覆盖链接/ABI/缺失digest/错误来源/测试身份拒绝/原生拒绝传播，再做完整回归、静态分析和三ABI构建。未发布更高版本且正式电视包保持不动，真实“正式旧版→GitHub新版本→系统覆盖安装”完整链路不可冒充已验收；本轮不为测试伪造公开Release、不把QA加入正式通道。发布后须在首次手动升至带更新器版本的设备上验证后续升级。0.4.3因旧代码缺失下载入口，无法仅靠更换链接获得新能力。
+
+
 ## 2026-10-18：失败诊断补齐与0.4.4发布准备
 
 用户要求普通失败日志可在下次复发后追查，同时跟完main CI、更新README截图并准备Release。main 0446fd268c23c231056b46fe5a798865b869e15b 的 [CI39104460857](https://github.com/znbsf/KazumiTV/actions/runs/39104460857) 已回读completed/success，checks及三ABI全通过。当前工作从该main新建 codex/playback-diagnostics-release-044，先前本地交接文档保留；新补丁不沿用r7安装验收。

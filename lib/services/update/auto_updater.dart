@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'project_update_policy.dart';
+import 'tv_update_asset.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/request/clients/download_http_client.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
@@ -30,6 +31,7 @@ enum InstallationType {
 }
 
 class UpdateInfo {
+  final TvUpdateAsset? tvAsset;
   final String version;
   final String description;
   final String downloadUrl;
@@ -40,6 +42,7 @@ class UpdateInfo {
   final List<dynamic> assets;
 
   UpdateInfo({
+    this.tvAsset,
     required this.version,
     required this.description,
     required this.downloadUrl,
@@ -136,9 +139,11 @@ class AutoUpdater {
       final currentVersion = ApiEndpoints.version;
 
       if (needStableUpdate(currentVersion, remoteVersion)) {
+        final tvAsset = await TvUpdateAsset.forDevice(data);
         final availableTypes = <InstallationType>[];
 
         return UpdateInfo(
+          tvAsset: tvAsset,
           version: remoteVersion,
           description: data['body'] ?? '发现新版本',
           downloadUrl: '',
@@ -146,7 +151,7 @@ class AutoUpdater {
           publishedAt: data['published_at'] ?? '',
           installationType: InstallationType.unknown,
           availableInstallationTypes: availableTypes,
-          assets: const [], // Never feed unchecked release assets to the installer.
+          assets: const [], // TV uses the strict asset path, not legacy matching.
         );
       }
 
@@ -342,6 +347,15 @@ class AutoUpdater {
                 },
                 child: const Text('立即更新'),
               ),
+            if (updateInfo.tvAsset != null)
+              TextButton(
+                autofocus: true,
+                onPressed: () {
+                  KazumiDialog.dismiss();
+                  _downloadUpdate(updateInfo, updateInfo.tvAsset!.sha256);
+                },
+                child: const Text('下载更新'),
+              ),
           ],
         );
       },
@@ -422,8 +436,16 @@ class AutoUpdater {
       _downloadProgress.value = 0;
       final cancelToken = CancelToken();
       final downloadPath = await task.loading(
-        action: () => _downloadFile(updateInfo.downloadUrl, updateInfo.version,
-            expectedHash, cancelToken),
+        action: () async {
+          final path = await _downloadFile(
+              updateInfo.tvAsset?.url ?? updateInfo.downloadUrl,
+              updateInfo.version,
+              expectedHash,
+              cancelToken);
+          await updateInfo.tvAsset?.validate(path);
+          if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+          return path;
+        },
         onCancel: cancelToken.cancel,
         builder: (context) {
           return AlertDialog(
@@ -533,7 +555,7 @@ class AutoUpdater {
               ),
               const SizedBox(height: 12),
               Text(
-                '安装过程中应用将会退出',
+                '请在系统安装界面确认；取消安装不会影响当前版本',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.error,
                   fontSize: 12,
@@ -584,8 +606,12 @@ class AutoUpdater {
             TextButton(
               onPressed: () {
                 KazumiDialog.dismiss();
-                _installUpdate(
-                    filePath, updateInfo.recommendedInstallationType);
+                if (updateInfo.tvAsset != null) {
+                  _installTvUpdate(filePath, updateInfo);
+                } else {
+                  _installUpdate(
+                      filePath, updateInfo.recommendedInstallationType);
+                }
               },
               child: const Text('立即安装'),
             ),
@@ -654,6 +680,48 @@ class AutoUpdater {
     KazumiLogger().i('Update: file downloaded and hash verified: $filePath');
 
     return filePath;
+  }
+
+  bool _installingTv = false;
+
+  Future<void> _installTvUpdate(String path, UpdateInfo info) async {
+    if (_installingTv) return;
+    _installingTv = true;
+    try {
+      final status = await info.tvAsset!.install(path);
+      if (status == 'permission_required') {
+        KazumiDialog.show(
+            builder: (context) => AlertDialog(
+                  title: const Text('允许安装更新'),
+                  content: const Text('请在系统设置中允许 KazumiTV 安装应用，返回后再次选择“立即安装”。'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => KazumiDialog.dismiss(context: context),
+                        child: const Text('稍后')),
+                    TextButton(
+                        autofocus: true,
+                        onPressed: () async {
+                          KazumiDialog.dismiss(context: context);
+                          _showDownloadCompleteDialog(path, info);
+                          try {
+                            await TvUpdateAsset.openPermissionSettings();
+                          } catch (_) {
+                            KazumiDialog.showToast(
+                                message: '无法打开系统设置，请在电视设置中允许安装应用');
+                          }
+                        },
+                        child: const Text('打开设置')),
+                  ],
+                ));
+      } else if (status != 'installer_opened') {
+        throw StateError('无法启动安装程序');
+      }
+    } catch (error) {
+      KazumiDialog.showToast(message: '无法安装更新：$error');
+      KazumiLogger().w('Update: verified TV install rejected', error: error);
+    } finally {
+      _installingTv = false;
+    }
   }
 
   void _installUpdate(
