@@ -32,6 +32,10 @@ import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/popular/tv_recent_watch.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/performance/tv_input_lifecycle.dart';
+import 'package:kazumi/repositories/history_repository.dart';
+import 'package:kazumi/services/player/history_playback_service.dart';
+import 'package:kazumi/services/plugin/rule_engine_models.dart'
+    show RuleCancelToken;
 
 class PopularPage extends StatefulWidget {
   const PopularPage({super.key, required this.controller});
@@ -42,7 +46,7 @@ class PopularPage extends StatefulWidget {
   State<PopularPage> createState() => _PopularPageState();
 }
 
-class _PopularPageState extends State<PopularPage> {
+class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
   static const _channelInputDelay = Duration(milliseconds: 1800);
   static const _channelLookupTimeout = Duration(seconds: 10);
   static const _channelLookupPageLimit = 5;
@@ -64,6 +68,7 @@ class _PopularPageState extends State<PopularPage> {
   Timer? _channelCommitTimer;
   Future<void>? _channelLookupFuture;
   String _channelInput = '';
+  int _channelCommitEpoch = 0;
   int? _channelCandidate;
   bool _channelSearching = false;
   bool _channelLookupFailed = false;
@@ -296,6 +301,13 @@ class _PopularPageState extends State<PopularPage> {
     if (!TvMode.enabled ||
         (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
       return KeyEventResult.ignored;
+    }
+    if (_channelInput.isNotEmpty &&
+        (event.logicalKey == LogicalKeyboardKey.select ||
+            event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+      unawaited(_commitChannel(_channelInput, resumeHistory: false));
+      return KeyEventResult.handled;
     }
     _homeReturnEpoch++;
     // Repeats and quick reversals advance from the last requested cell, even
@@ -604,6 +616,7 @@ class _PopularPageState extends State<PopularPage> {
       return;
     }
 
+    _channelCommitEpoch++;
     final nextInput = _channelInput.length >= 3
         ? '${event.digit}'
         : '$_channelInput${event.digit}';
@@ -620,7 +633,7 @@ class _PopularPageState extends State<PopularPage> {
     unawaited(_channelLookupFuture);
     _channelCommitTimer = Timer(
       _channelInputDelay,
-      () => unawaited(_commitChannel(nextInput)),
+      () => unawaited(_commitChannel(nextInput, resumeHistory: true)),
     );
   }
 
@@ -695,15 +708,23 @@ class _PopularPageState extends State<PopularPage> {
     }
   }
 
-  Future<void> _commitChannel(String expectedInput) async {
+  Future<void> _commitChannel(String expectedInput,
+      {required bool resumeHistory}) async {
     if (!mounted || _channelInput != expectedInput) return;
+    final epoch = ++_channelCommitEpoch;
+    _channelCommitTimer?.cancel();
     await _channelLookupFuture;
-    if (!mounted || _channelInput != expectedInput) return;
+    if (!mounted ||
+        _channelInput != expectedInput ||
+        epoch != _channelCommitEpoch) {
+      return;
+    }
     final channelNumber = int.tryParse(expectedInput) ?? 0;
     final items = _visibleBangumiList;
     if (channelNumber >= 1 && channelNumber <= items.length) {
       _clearChannelInput();
-      unawaited(_openChannel(items[channelNumber - 1]));
+      unawaited(_openHomeDetail(items[channelNumber - 1],
+          resumeHistory: resumeHistory));
       return;
     }
 
@@ -740,6 +761,7 @@ class _PopularPageState extends State<PopularPage> {
   }
 
   void _clearChannelInput({bool notifyController = true}) {
+    _channelCommitEpoch++;
     _channelCommitTimer?.cancel();
     _channelCommitTimer = null;
     if (mounted) {
@@ -767,8 +789,40 @@ class _PopularPageState extends State<PopularPage> {
 
   Future<void> _openChannel(BangumiItem item) => _openHomeDetail(item);
 
+  Future<void> _navigateHomeItem(BangumiItem item, bool resumeHistory) async {
+    if (TvMode.enabled && resumeHistory) {
+      final histories = HistoryRepository()
+          .getAllHistories()
+          .where((history) => history.bangumiItem.id == item.id);
+      if (histories.isNotEmpty) {
+        final cancel = RuleCancelToken();
+        Future<Object?>? playback;
+        await dialogs.run((task) async {
+          final result = await task.loading(
+            message: '继续观看',
+            onCancel: cancel.cancel,
+            action: () => inject<HistoryPlaybackService>()
+                .open(histories.first, cancelToken: cancel),
+          );
+          if (result is HistoryPlaybackReady) {
+            task.withContext((ctx) {
+              playback = ctx.pushNamed('/video/', arguments: result.args);
+            });
+          }
+        }, errorMessage: '上次的播放源暂不可用，请重新选源');
+        if (playback != null) {
+          await playback;
+          return;
+        }
+        if (!mounted || cancel.isCancelled) return;
+        KazumiDialog.showToast(message: '上次的播放源不可用，请在详情页重新选源');
+      }
+    }
+    if (mounted) await context.pushNamed('/info/', arguments: item);
+  }
+
   Future<void> _openHomeDetail(BangumiItem item,
-      {FocusNode? recentOrigin}) async {
+      {FocusNode? recentOrigin, bool resumeHistory = false}) async {
     if (TvInputLifecycle.active)
       _traceGrid('detail_activate',
           {'itemId': item.id, 'alreadyOpening': _openingHome});
@@ -778,7 +832,7 @@ class _PopularPageState extends State<PopularPage> {
     if (!TvMode.enabled ||
         !scrollController.hasClients ||
         (_visibleBangumiList.isEmpty && recentOrigin == null)) {
-      await context.pushNamed('/info/', arguments: item);
+      await _navigateHomeItem(item, resumeHistory);
       return;
     }
     final columns = _gridCrossCount();
@@ -818,7 +872,7 @@ class _PopularPageState extends State<PopularPage> {
         !RouteVisibility.isCoveredOf(context);
     try {
       try {
-        await context.pushNamed('/info/', arguments: item);
+        await _navigateHomeItem(item, resumeHistory);
       } finally {
         _openingHome = false;
         if (TvInputLifecycle.active)

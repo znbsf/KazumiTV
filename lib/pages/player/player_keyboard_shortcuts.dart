@@ -1,3 +1,4 @@
+import 'package:kazumi/services/platform/app_remote.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -65,6 +66,7 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
       onActiveChanged: (active) => unawaited(_tvRemoteChannel
           .invokeMethod<void>('setPlayerActive', {'active': active})));
   MethodChannelLease? _tvRemoteLease;
+  AppRemoteLease? _appRemoteLease;
   late Map<String, List<String>> _shortcuts;
   final _activeLongPressKeys = <LogicalKeyboardKey,
       ({String actionName, PlayerLongPressShortcutActions actions})>{};
@@ -75,6 +77,8 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
   @override
   void initState() {
     super.initState();
+    _appRemoteLease = AppRemote.instance
+        .register(label: '播放器', priority: 10, commands: _remoteCommands);
     _shortcuts = widget.shortcuts ?? _loadShortcuts();
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     _applicationActive =
@@ -118,6 +122,7 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
     FocusManager.instance.removeListener(_cancelInvalidLongPressShortcuts);
     WidgetsBinding.instance.removeObserver(this);
     _tvRemoteLease?.release();
+    _appRemoteLease?.release();
     _cancelAllLongPressShortcuts();
     super.dispose();
   }
@@ -213,6 +218,61 @@ class _PlayerKeyboardShortcutsState extends State<PlayerKeyboardShortcuts>
     }
 
     return KeyEventResult.ignored;
+  }
+
+  Map<String, AppRemoteCommand> _remoteCommands() {
+    if (!TvMode.enabled || !_shouldHandleShortcut()) return {};
+    const keys = <String, (String, LogicalKeyboardKey)>{
+      'up': ('上', LogicalKeyboardKey.arrowUp),
+      'down': ('下', LogicalKeyboardKey.arrowDown),
+      'left': ('左', LogicalKeyboardKey.arrowLeft),
+      'right': ('右', LogicalKeyboardKey.arrowRight),
+      'ok': ('确定', LogicalKeyboardKey.select),
+      'back': ('返回', LogicalKeyboardKey.goBack),
+      'menu': ('遥控帮助', LogicalKeyboardKey.contextMenu),
+      'info': ('播放信息', LogicalKeyboardKey.info),
+      'red': ('弹幕', LogicalKeyboardKey.colorF0Red),
+      'green': ('收藏', LogicalKeyboardKey.colorF1Green),
+      'yellow': ('选集', LogicalKeyboardKey.colorF2Yellow),
+      'blue': ('播放信息', LogicalKeyboardKey.colorF3Blue),
+      'playPause': ('播放 / 暂停', LogicalKeyboardKey.mediaPlayPause),
+      'play': ('播放', LogicalKeyboardKey.mediaPlay),
+      'pause': ('暂停', LogicalKeyboardKey.mediaPause),
+      'stop': ('停止播放', LogicalKeyboardKey.mediaStop),
+      'rewind': ('快退', LogicalKeyboardKey.mediaRewind),
+      'fastForward': ('快进', LogicalKeyboardKey.mediaFastForward),
+      'previous': ('上一集', LogicalKeyboardKey.mediaTrackPrevious),
+      'next': ('下一集', LogicalKeyboardKey.mediaTrackNext),
+      'guide': ('选集', LogicalKeyboardKey.guide),
+    };
+    return {
+      for (final entry in keys.entries)
+        if (_remoteAvailable(entry.value.$2))
+          entry.key: AppRemoteCommand(
+              label: entry.value.$1,
+              invoke: () {
+                if (!_shouldHandleShortcut()) return false;
+                final key = entry.value.$2;
+                final down = _handleKeyEvent(KeyDownEvent(
+                    physicalKey: const PhysicalKeyboardKey(0),
+                    logicalKey: key,
+                    timeStamp: Duration.zero));
+                _handleKeyEvent(KeyUpEvent(
+                    physicalKey: const PhysicalKeyboardKey(0),
+                    logicalKey: key,
+                    timeStamp: Duration.zero));
+                return down == KeyEventResult.handled;
+              })
+    };
+  }
+
+  bool _remoteAvailable(LogicalKeyboardKey key) {
+    if (widget.shortcuts == null) _shortcuts = _loadShortcuts();
+    final action = _findActionName(
+        key.keyLabel.isNotEmpty ? key.keyLabel : key.debugName ?? '');
+    return action != null &&
+        widget.actions.containsKey(action) &&
+        (widget.shouldHandleAction?.call(action, key) ?? true);
   }
 
   bool _shouldHandleShortcut() {

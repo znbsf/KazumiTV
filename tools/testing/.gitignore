@@ -1,0 +1,2 @@
+# Explicit exception for the intentionally public, untrusted QA signing fixture.
+!public-test-only.jks

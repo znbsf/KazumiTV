@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 class RuleCard extends StatelessWidget {
   const RuleCard({
@@ -40,7 +41,8 @@ class RuleCard extends StatelessWidget {
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 220);
-    return Padding(
+    return _RuleFocusFrame(
+        child: Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Semantics(
         selected: selected,
@@ -152,7 +154,7 @@ class RuleCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -181,4 +183,35 @@ class RuleTag extends StatelessWidget {
                 .labelSmall
                 ?.copyWith(color: foreground, fontWeight: FontWeight.w600)),
       );
+}
+
+class _RuleFocusFrame extends StatefulWidget {
+  const _RuleFocusFrame({required this.child});
+  final Widget child;
+  @override
+  State<_RuleFocusFrame> createState() => _RuleFocusFrameState();
+}
+
+class _RuleFocusFrameState extends State<_RuleFocusFrame> {
+  bool focused = false;
+  @override
+  Widget build(BuildContext context) {
+    if (!TvMode.enabled) return widget.child;
+    return Focus(
+      skipTraversal: true,
+      canRequestFocus: false,
+      onFocusChange: (value) => setState(() => focused = value),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+              width: 3,
+              color: focused
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.transparent),
+        ),
+        child: Padding(padding: const EdgeInsets.all(4), child: widget.child),
+      ),
+    );
+  }
 }

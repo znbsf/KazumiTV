@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,11 @@ import 'package:kazumi/pages/popular/popular_page.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/constants.dart';
+import 'package:kazumi/modules/history/history_module.dart';
+import 'package:kazumi/services/player/history_playback_service.dart';
+import 'package:kazumi/services/platform/app_remote.dart';
+import 'package:kazumi/services/plugin/rule_engine_models.dart';
+import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'support/tv_focus_fixtures.dart';
@@ -68,7 +74,8 @@ void main() {
     await Hive.close();
     await temporary.delete(recursive: true);
   });
-  setUp(() {
+  setUp(() async {
+    await GStorage.histories.clear();
     TvMode.setEnabledForTesting(true);
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
@@ -76,6 +83,146 @@ void main() {
             (_) async => null);
   });
   tearDown(() => TvMode.setEnabledForTesting(false));
+
+  Future<void> seed(WidgetTester tester) async {
+    final old = History(
+        focusItem(3), 1, 'old source', DateTime(2026, 10, 1), '/old', '1');
+    final recent = History(focusItem(3), 7, 'recent source',
+        DateTime(2026, 10, 2), '/recent', '7');
+    recent.progresses[7] = Progress(7, 0, 42000);
+    await tester.runAsync(
+        () => GStorage.histories.putAll({old.key: old, recent.key: recent}));
+  }
+
+  testWidgets(
+      'number timeout resumes latest history and returns to the same poster',
+      (tester) async {
+    await seed(tester);
+    final app = await _mount(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(app.openedInfoIds, isEmpty);
+    expect(app.playback.opened, hasLength(1));
+    expect(app.playback.opened.single.adapterName, 'recent source');
+    expect(app.playback.opened.single.lastWatchEpisode, 7);
+    expect(app.playback.opened.single.progresses[7]!.progress.inSeconds, 42);
+    expect(find.text('续播路由：仅验证参数，不是真实视频'), findsOneWidget);
+    await _back(tester);
+    expect(_focus(tester, 3).hasPrimaryFocus, true);
+    await _open(tester, 3);
+    expect(app.openedInfoIds, [3],
+        reason: 'ordinary poster activation still opens details');
+    expect(app.playback.opened, hasLength(1));
+  });
+
+  for (final key in [
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+  ]) {
+    testWidgets('confirmation ${key.keyLabel} opens details after digits',
+        (tester) async {
+      await seed(tester);
+      final app = await _mount(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 3));
+      expect(app.openedInfoIds, [3]);
+      expect(app.playback.opened, isEmpty);
+      await _back(tester);
+      expect(_focus(tester, 3).hasPrimaryFocus, true);
+    });
+  }
+
+  testWidgets('phone confirmation opens details after a number',
+      (tester) async {
+    await seed(tester);
+    final app = await _mount(tester);
+    final remote = AppRemote.instance;
+    final shell = remote.attachShell();
+    addTearDown(shell.release);
+    expect(
+        await remote.dispatch('digit3',
+            revision: remote.state['revision'] as int),
+        true);
+    await tester.pumpAndSettle();
+    expect(
+        await remote.dispatch('ok', revision: remote.state['revision'] as int),
+        true);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3));
+    expect(app.openedInfoIds, [3]);
+    expect(app.playback.opened, isEmpty);
+  });
+
+  testWidgets(
+      'phone number timeout resumes history; unwatched numbers open details',
+      (tester) async {
+    await seed(tester);
+    final app = await _mount(tester);
+    final remote = AppRemote.instance;
+    final shell = remote.attachShell();
+    addTearDown(shell.release);
+    expect(
+        await remote.dispatch('digit3',
+            revision: remote.state['revision'] as int),
+        true);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(app.playback.opened, hasLength(1));
+    expect(app.openedInfoIds, isEmpty);
+    await _back(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit4);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(app.openedInfoIds, [4]);
+    expect(app.playback.opened, hasLength(1));
+  });
+
+  testWidgets('unavailable history falls back to details', (tester) async {
+    await seed(tester);
+    final app = await _mount(tester);
+    app.playback.resolve =
+        (_, __) async => const HistoryPlaybackUnavailable('missing');
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(app.openedInfoIds, [3]);
+    expect(find.text('续播路由：仅验证参数，不是真实视频'), findsNothing);
+  });
+
+  testWidgets(
+      'cancelled number resume never opens a late result or detail fallback',
+      (tester) async {
+    await seed(tester);
+    final app = await _mount(tester);
+    final pending = Completer<HistoryPlaybackResult>();
+    RuleCancelToken? token;
+    app.playback.resolve = (_, cancel) {
+      token = cancel;
+      return pending.future;
+    };
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit3);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(app.playback.opened, hasLength(1));
+    await rootNavigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+    expect(token!.isCancelled, true);
+    pending.complete(HistoryPlaybackReady(OfflineVideoPlaybackArgs(
+        bangumiItem: focusItem(3),
+        pluginName: 'recent source',
+        episodeNumber: 7,
+        road: 0,
+        downloadedEpisodes: [])));
+    await tester.pumpAndSettle();
+    expect(app.openedInfoIds, isEmpty);
+    expect(find.byType(PopularPage), findsOneWidget);
+    expect(_focus(tester, 3).hasPrimaryFocus, true);
+  });
 
   testWidgets(
       'home detail return follows subject while channel numbers reorder',

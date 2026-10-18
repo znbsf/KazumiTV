@@ -1,7 +1,7 @@
 name: TV checks and candidate APKs
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/four-stream-review-20261017]
   push:
     branches: [main, codex/flutter-tv-main-ui-fusion-20261002, integration/flutter-tv-main]
   workflow_dispatch:
@@ -35,6 +35,10 @@ jobs:
       - run: flutter pub get --enforce-lockfile
       - run: flutter analyze --no-fatal-infos --fatal-warnings
       - run: flutter test --concurrency=2
+      - name: Verify phone remote browser behavior
+        run: node tools/qa/phone_keyboard_page_test.cjs
+      - name: Checks must not change dependency lockfile
+        run: git diff --exit-code -- pubspec.lock
   apk:
     needs: checks
     runs-on: ubuntu-24.04
@@ -68,14 +72,15 @@ jobs:
           flutter --version --machine > "$RUNNER_TEMP/flutter-sdk.json"
           python -c "import json,os,pathlib; d=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'flutter-sdk.json').read_text()); assert d['frameworkRevision']=='e8113bf45620cbeb8aff64947ee4c93e16adb4cf' and d['frameworkVersion']=='3.47.3'"
       - run: flutter pub get --enforce-lockfile
-      - name: Build isolated TV candidate (debug certificate; never a public release)
+      - name: Build isolated TV candidate (public test certificate; never a public release)
         run: >-
           flutter build apk --release --pub --flavor tv
           --android-project-arg=kazumiTv=true
-          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.fiveqa
-          --android-project-arg=kazumiTvLabel=KazumiTV-QA5
+          --android-project-arg=kazumiTvApplicationId=com.znbsf.kazumi.fluttertv.remoteqa
+          --android-project-arg=kazumiTvPublicTestSigning=true
+          --android-project-arg=kazumiTvLabel=KazumiTV-QA6
           --target-platform ${{ matrix.target }} --split-per-abi
-          --build-name=0.4.3-qa5 --build-number=20530
+          --build-name=0.4.3-qa6-r7 --build-number=20555
           --dart-define=KAZUMI_TV_PERF=false --dart-define=KAZUMI_TV_FIXED_SURFACES=true
       - name: Lockfile must remain unchanged after plugin regeneration
         run: git diff --exit-code -- pubspec.lock
@@ -85,12 +90,13 @@ jobs:
           python tools/verify_tv_artifact.py "build/app/outputs/flutter-apk/app-$ABI-tv-release.apk" \
             --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt" \
             --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
-            --application-id com.znbsf.kazumi.fluttertv.fiveqa --abi "$ABI" \
-            --build-number 20530 --version-name 0.4.3-qa5 --source-sha "$GITHUB_SHA" \
+            --application-id com.znbsf.kazumi.fluttertv.remoteqa --abi "$ABI" \
+            --build-number 20555 --version-name 0.4.3-qa6-r7 --source-sha "$GITHUB_SHA" \
+            --certificate-sha256 131f00a5a75f3e587ece7ef86a96a21c5971db5717123890121dc55363523ea1 \
             --output "build/tv-receipts/$ABI.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: tv-four-feature-qa-${{ matrix.abi }}-${{ github.sha }}
+          name: tv-remote-qa-${{ matrix.abi }}-${{ github.sha }}
           if-no-files-found: error
           retention-days: 14
           path: |

@@ -57,13 +57,13 @@ void main() {
           matching: find.byType(ColoredBox));
       expect(tester.widget<ColoredBox>(panel).color, theme.colorScheme.surface);
       expect(tester.widget<Text>(find.text('Play')).style?.color,
-          theme.colorScheme.primary);
+          theme.colorScheme.onPrimary);
       // Controls carry their own themed surface so light text colors do not
       // disappear into the black video gradient behind them.
       final material = find.descendant(
           of: find.byType(TvPlayerAction), matching: find.byType(Material));
-      expect(tester.widget<Material>(material).color,
-          theme.colorScheme.surface.withValues(alpha: .94));
+      expect(
+          tester.widget<Material>(material).color, theme.colorScheme.primary);
     });
   }
   testWidgets(

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:kazumi/services/platform/app_remote.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -158,6 +160,29 @@ void main() {
   });
 
   for (final destination in [1, 2, 3, 4]) {
+    testWidgets('phone home numbers share physical home digit behavior',
+        (tester) async {
+      await _mount(tester);
+      final remote = AppRemote.instance;
+      final lease = remote.attachShell();
+      addTearDown(lease.release);
+      final offered =
+          (remote.state['keys'] as List).map((e) => (e as Map)['id'] as String);
+      expect(offered.where((id) => id.startsWith('digit')), hasLength(10));
+      expect(
+          await remote.dispatch('digit2',
+              revision: remote.state['revision'] as int),
+          isTrue);
+      expect(tvChannelInputController.value?.digit, 2);
+      tvChannelInputController.cancel();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+      await tester.pump();
+      expect(tvChannelInputController.value?.digit, 2);
+      tvChannelInputController.cancel();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('shell Back restores originating function $destination',
         (tester) async {
       await _mount(tester);
@@ -175,6 +200,53 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+      'home pairing entry restores focus and hides numbers while covered',
+      (tester) async {
+    await _mount(tester);
+    final lease = AppRemote.instance.attachShell();
+    addTearDown(lease.release);
+    final entry = _node(tester, 'TV function -2');
+    entry.requestFocus();
+    await tester.pumpAndSettle();
+    await _press(tester, LogicalKeyboardKey.enter);
+    expect(find.byType(PhoneKeyboardDialog), findsOneWidget);
+    expect(
+        (AppRemote.instance.state['keys'] as List)
+            .where((v) => (v as Map)['id'].toString().startsWith('digit')),
+        isEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(entry.hasPrimaryFocus, isTrue);
+    expect(
+        (AppRemote.instance.state['keys'] as List)
+            .where((v) => (v as Map)['id'].toString().startsWith('digit')),
+        hasLength(10));
+    expect(AppRemote.instance.state['numberHint'], contains('首页海报'));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'phone number opens the same poster then removes number capability',
+      (tester) async {
+    await _mount(tester);
+    final remote = AppRemote.instance;
+    final lease = remote.attachShell();
+    addTearDown(lease.release);
+    expect(
+        await remote.dispatch('digit2',
+            revision: remote.state['revision'] as int),
+        isTrue);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+    expect(
+        (remote.state['keys'] as List)
+            .where((v) => (v as Map)['id'].toString().startsWith('digit')),
+        isEmpty);
+    expect(tvChannelInputController.value, isNull);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
       'home starts on Hot with one navigation row and five larger posters', (

@@ -1,6 +1,10 @@
 // TV-only identity/signing overlay. Normal Android variants remain unchanged.
 def tvAppId = project.findProperty('kazumiTvApplicationId')?.toString()
 def tvSigned = project.findProperty('kazumiTvSigned')?.toString() == 'true'
+def publicTestSigning = project.findProperty('kazumiTvPublicTestSigning')?.toString() == 'true'
+if (publicTestSigning && (tvSigned || tvAppId != 'com.znbsf.kazumi.fluttertv.remoteqa')) {
+    throw new GradleException('Public test signing is restricted to remoteqa and cannot use release signing')
+}
 def tvLabel = project.findProperty('kazumiTvLabel')?.toString() ?: 'KazumiTV Flutter'
 if (tvAppId != null && !(tvAppId ==~ /[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+/)) {
     throw new GradleException('Invalid kazumiTvApplicationId')
@@ -18,6 +22,16 @@ def requiredSigning = { String name ->
 }
 android {
     flavorDimensions 'device'
+    if (publicTestSigning) {
+        signingConfigs {
+            publicQa {
+                storeFile rootProject.file('../tools/testing/public-test-only.jks')
+                storePassword 'android'
+                keyAlias 'public-test-only'
+                keyPassword 'android'
+            }
+        }
+    }
     if (tvSigned) {
         signingConfigs {
             tvRelease {
@@ -45,4 +59,8 @@ android {
     }
     // The existing build type has debug signing; override it explicitly.
     if (tvSigned) buildTypes.release.signingConfig signingConfigs.tvRelease
+    if (publicTestSigning) {
+        buildTypes.release.signingConfig signingConfigs.publicQa
+        buildTypes.debug.signingConfig signingConfigs.publicQa
+    }
 }
