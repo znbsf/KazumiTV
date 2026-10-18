@@ -1,3 +1,4 @@
+import 'package:kazumi/services/source_health/source_health_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -41,10 +42,12 @@ class SourceSheet extends StatefulWidget {
   const SourceSheet(
       {super.key,
       required this.infoController,
+      this.autoSearchOnOpen = true,
       this.switchOrigin,
       this.createVideoSourceService});
 
   final InfoController infoController;
+  final bool autoSearchOnOpen;
   final SourceSwitchOrigin? switchOrigin;
   final IVideoSourceService Function()? createVideoSourceService;
 
@@ -76,7 +79,12 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
       onVerified: _showVerifiedResult,
       onCancelled: (plugin) => _retry(plugin.name),
     );
-    _searchService.queryAllSource(_keyword);
+    if (widget.autoSearchOnOpen) {
+      _searchService.queryAllSource(_keyword);
+    } else {
+      widget.infoController.pluginSearchResponseList.clear();
+      widget.infoController.pluginSearchStatus.clear();
+    }
   }
 
   @override
@@ -216,6 +224,8 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
         task.withContext((context) => Navigator.of(context).pop(prepared));
         return;
       }
+      await SourceHealthPreferences.remember(
+          widget.infoController.bangumiItem.id, plugin);
       task.withContext((context) => context.pushNamed(
             '/video/',
             arguments: OnlineVideoPlaybackArgs(
@@ -270,6 +280,9 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
               plugin.name: _SourceSearchGroup(
                 name: plugin.name,
                 keyword: _keywordFor(plugin.name),
+                unsearched: !widget.autoSearchOnOpen &&
+                    !widget.infoController.pluginSearchStatus
+                        .containsKey(plugin.name),
                 status: widget.infoController.pluginSearchStatus[plugin.name] ??
                     PluginSearchStatus.pending,
                 results: <SearchItem>[],

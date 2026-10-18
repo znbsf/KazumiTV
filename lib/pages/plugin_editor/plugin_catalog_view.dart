@@ -15,6 +15,7 @@ import 'package:kazumi/pages/plugin_editor/plugin_update_actions.dart';
 import 'package:kazumi/pages/plugin_editor/rule_management_widgets.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 enum _CatalogSort { lastUpdate, name }
 
@@ -350,7 +351,8 @@ class _CatalogRuleAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    if (!busy && status == PluginCatalogItemStatus.installed) {
+    final installed = status == PluginCatalogItemStatus.installed;
+    if (!TvMode.enabled && !busy && installed) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -370,14 +372,35 @@ class _CatalogRuleAction extends StatelessWidget {
         minimumSize: const Size(108, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16),
       ),
-      onPressed: busy ? null : onPressed,
+      // A TV remote must be able to cross every lazy-built row, including a
+      // long run of installed rules. Keep this same focus owner while an
+      // install is pending and after it completes; replacing/disabling it
+      // strands focus before the next offscreen rule can be built. Inert
+      // states consume OK without starting another request.
+      onPressed: TvMode.enabled
+          ? () {
+              if (!busy && !installed) onPressed();
+            }
+          : busy
+              ? null
+              : onPressed,
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         if (busy)
           const LoadingIndicator(size: 20)
         else
-          Icon(installing ? Icons.add_rounded : Icons.sync_rounded, size: 18),
+          Icon(
+              installed
+                  ? Icons.check_rounded
+                  : installing
+                      ? Icons.add_rounded
+                      : Icons.sync_rounded,
+              size: 18),
         const SizedBox(width: 6),
-        Text(installing ? (busy ? '安装中' : '安装') : (busy ? '更新中' : '更新')),
+        Text(installed
+            ? '已安装'
+            : installing
+                ? (busy ? '安装中' : '安装')
+                : (busy ? '更新中' : '更新')),
       ]),
     );
   }

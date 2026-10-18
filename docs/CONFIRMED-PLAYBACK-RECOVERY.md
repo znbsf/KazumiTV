@@ -1,0 +1,84 @@
+# 确认后尝试软件兼容播放（草稿）
+
+## 2026-10-17 新发现：首帧信号语义（进行中）
+
+源健康集成审查确认固定 media-kit `994465d9` 的 Android `android_video_controller/real.dart` 在视频尺寸事件后即完成 `waitUntilFirstFrameRenderedCompleter`，该 Future 单独不能证明真实纹理帧已消费。Java 输出端未实现相应 first-frame notify。旧模拟器/电视截图仍是其原始可见画面证据，但仅凭该 Future 的自动首帧判断需修正，不能把旧907测试或尺寸通知当新健康探测验收。当前正准备以实际 SurfaceTexture 帧消费回调替代；未构建/原生验证前不宣称解决。
+
+新问题建议单独追踪为“Android首帧Future被视频尺寸提前完成”，复现判据是仅尺寸事件而无输出帧时Future不应完成。本次尚未向远端创建issue。
+
+基于稳定版 v0.4.3 / main `ab273c1aca02238cf03d6f523dac7ef259e4830b`。这是独立功能候选，尚未合并、发布。默认 Android TV 输出和持久化设置不变。
+
+## 行为与边界
+
+仅 TV 的 `mediacodec_embed` 会话监听固定原生 mpv 的 `vd` / `Software decoding fallback is disabled.` 证据，并关闭该会话的隐式软件回退。缓冲、卡顿、普通网络错误、完成事件均不触发恢复提示。该证据对应解码初始化用尽可用硬解路径，不覆盖所有运行中硬件异常。
+
+失败后屏蔽该会话的自动下一集。提示默认聚焦“取消”；取消或返回不重试。用户确认只允许一次：等待旧播放器释放，再用原 URL/headers 新建 `gpu` + `hwdec=no` 会话，不复用旧输出。软件恢复需要 media-kit 首帧通知才能成功，最长等待15秒；原生错误或退出立即终止等待。恢复失败保持自动下一集屏蔽，展示失败操作或结束恢复加载，用户可手动换源或退出。软件尝试过程中及之后若收到当前播放器的原生 error，也保守地屏蔽自动下一集；不会再自动重试。
+
+保存精确 Duration、明确的播放/暂停意图、倍速，以及保留外部 URI 元数据的音轨/字幕对象。原生 EOF 会把 observed playing 改成 false，因此播放意图由播放器所有者保存，并由明确的 play/pause 更新。恢复不写解码默认值；下一集/新会话仍走原默认。软件解码可能无法实时播放，不承诺兼容所有视频。
+
+会话门控防止重复确认；新初始化/退出使旧令牌失效。每个异步轨道/位置恢复步骤、失败清理后的状态写入均复查所有权。旧播放器的 log/error/debug 订阅随所有者释放；无法确认旧原生播放器成功释放时不启动软件重建。
+
+## 源码入口
+
+- `lib/services/player/confirmed_playback_recovery.dart`：证据分类、会话状态、确认与清理门控。
+- `lib/pages/player/controller/player_playback_controller.dart`：原生属性、所有者、订阅、释放顺序和 EOF 屏蔽。
+- `lib/pages/player/controller/playback_recovery_snapshot.dart`：typed state 与逐步恢复。
+- `lib/pages/player/player_controller.dart`：初始化、确认和退出联动。
+- `lib/pages/player/player_item.dart`、`tv_recovery_confirmation.dart`：正式播放器提示、焦点及菜单占用释放。
+
+## 验证（2026-10-16 UTC）
+
+最终本地全量 **907 项测试通过**；静态检查 **0 error / 0 warning，71 info**。测试覆盖精确失败信号、默认取消/确认焦点、一次确认、取消、新会话/关闭失效、迟到清理、恢复成功后的正常 EOF、毫秒位置/倍速/外部轨道、异步恢复途中切集、失败后的播放意图，以及首帧等待、取消、超时和迟到软件错误提示。
+
+API36 Google TV x86_64 原生组件夹具使用本地合成的 40 秒 MJPEG：真实硬解失败触发提示，取消未创建新播放器；确认日志按旧 VideoOutput dispose → 新 create 排序。暂停状态恢复到17秒/1.25倍，画面可见；autoplay 场景确认后 playing=true 且位置持续前进。HTTP 失败原请求和重建请求均带同一合成 header。新会话回到 mediacodec，持久化输出设置不变。
+
+夹具 `tools/qa/confirmed_recovery.dart` 只允许独立 `com.znbsf.kazumi.fluttertv.recoveryqa` debug 身份，使用真实 PlayerController、PlayerItemSurface、TV导航壳和提示管理，下载/弹幕控制器为替身。不是完整正式页面验收；外部音轨/字幕仅自动化验证，合成视频无音轨，不能据截图声称音画同步、全片流畅或实际网站全覆盖。旧 FFV1 素材因精简解码器缺失不可用，不计入恢复通过。原始私人设备日志不提交仓库。
+
+Android9 ARMv7 电视独立 QA 包已核验安装字节，默认 auto 选择 mediacodec，合成 MJPEG 触发真实目标错误并显示提示（低分辨率有界视频取帧及语义树已核对）。电视 Back 取消保持17秒暂停且没有重建；新会话仍走原硬解默认。明确确认后日志显示旧 VideoOutput dispose → 新 create，软件解码恢复17秒暂停/1.25倍，低分辨率有界取帧确认实际画面；继续播放后位置推进。持久化输出仍为 auto，正常退出释放 VideoOutput，前台、音量和电源状态已恢复。当时尚未覆盖软件恢复本身失败；后续模拟器补测见下。首次调试冷启动过早输入产生系统 ANR、shell stdin 传输产生空文件均已定位；就绪后按键与 push/复制后逐字节核验解决了测试输入问题。
+
+API36 的原组件入口已验证 Back 只取消、焦点回原按钮；快速两次初始化结果 false/true，只有最后一个会话创建；默认取消不重试，正常退出释放旧 VideoOutput。完整页面的后续补测如下；外部音轨原生恢复仍未覆盖。
+
+## 完整页面原生补测（2026-10-16 12:08 UTC）
+
+新增 `tools/qa/recovery_page.dart` 使用真实 VideoPage、PlayerItem、coreModule 和路由所属控制器，仅媒体解析返回受控本机 URL，评论请求替换为空。独立 debug 身份检查仍生效。此测试的弹幕 ID 为合成0，其后台403不计为播放器失败，也不扩展站点排查。
+
+实际发现并修复：原生 open 返回只代表命令接受，FFV1 的解码错误可能稍后到达。旧实现会先认定恢复成功，随后只拦截 EOF 而未提供失败入口。现等待首帧通知（15秒上限，退出/错误即时取消），并将软件尝试的原生错误交给正式页面现有失败处理，释放输出并显示重试/换线路/换源。普通会话的错误分类不变。
+
+- 真实页面硬解失败提示默认取消；Back 后焦点回当前剧集，控制栏和设置菜单可再次打开、返回。
+- 明确确认后先 dispose 旧输出再 create 新输出，保持17秒暂停和1.25倍；继续播放可见画面与位置推进。最终成功播完自动进入第2集，并回到 mediacodec 默认。
+- 硬解失败后将同 URL 的受控响应切换为 FFV1，真实原生错误触发可操作失败页面，软件输出已释放；仍停第1集，无自动重试或跳集。
+- 受控 HTTP 延迟30秒；在日志确认 software/no、loading=true、completed=false 的首帧等待中经 Back 退出，旧输出释放；立即重新进入新控制器，新会话走原硬解默认。旧响应到达后，新会话仍能确认恢复并正常播放。
+
+最终原生包为20408，SHA-256 8b09d1eac12ef12503cf75d1ce65c226bb12590c57f343d0a5b318400b173dbf，安装后拉回逐字节核验。采集为3秒有界 H.264 后取帧并人工查看，不能解释为全片音画同步验证；素材无音轨。外部 URI 音轨/字幕仍只有自动化验证，仓库现有生成器生成的是内嵌轨道，不能替代外部轨道原生验收。新增变更未重新跑 ARMv7 真机；既有电视证据对应本次首帧/失败提示修复前。维持草稿，不合并发布。
+
+私人证据保存在任务工作区 recovery-qa：final-negative(.log/.xml)、final-negative-observe、race-during、race-exited、race-reentered、final-success、final-menu、final-play、final-eof、final-closed、final-recovered-observe 和 page-install.json。模拟器、受控HTTP服务和限时采集均已停止。
+
+## 2026-10-17 首帧等待期间的视频挂载修复
+
+20511完整页面出现replacement Resize640x360但未收到真实firstFrameNotify；相同GPU/no的独立external_snapshot入口可首帧。源码确认两层门控：VideoPage在loading时不挂PlayerItem，PlayerItemSurface又在loading时不挂Video；原尺寸推断通知曾掩盖首帧与挂载之间的互锁。现在加载期间在原加载/取消UI下单独挂Surface，VideoController非空即可渲染；controller赋值/置空改用Observable，Video按controller身份重建订阅。加载和调试遮罩alpha .99，避免完全不透明遮挡；不放宽首帧完成条件，不提前挂载完整播放器交互层。
+
+真实media-kit Video/Texture widget回归确认loading仍true时TextureLayer存在，旧/新controller及null更新可观察，加载取消覆盖按钮可操作。测试只替代原生输出元数据，不伪造首帧完成；它不是原生解码/显示验收。后续20514/20515已补真实firstFrameNotify与恢复状态，见下方最新验收；该widget结果本身仍不替代设备证据。独立QA补rootScaffoldMessengerKey使toast有合法宿主，该遗漏不归为生产缺陷。
+
+20512首次设备复验在真实stop→videoController=null触发MobX严格写入断言，原widget回归的外层runInAction掩盖了该调用边界。已将action封装到生产setter本身（getter仍可追踪），改回归为ReactiveWritePolicy.always下直接??=发布、await后直接替换、调用真实playback.stop清空，禁止测试外包action；该定向回归通过。QA定时日志在decoder尚未初始化时显示not_initialized，避免在原错误后增加LateInitializationError。该修复的后续新包复验见下，不把20512失败改写为通过。
+
+## 2026-10-17 最新验收（集成负责人设备执行，离线核对）
+
+### 用户反馈整改后的补证据（13:38–13:41 UTC）
+
+最新生产修复 `b44276ed` 全量1017项通过；只改QA初始化的后续 `82277968` 定向实际构造测试另通过1项。播放QA20528（源码含上述提交）安装回读SHA256 `c3b53fe02ea616de7ce7a8595d999bdae3c9fafa92cb96203325badd4aecafd8`。20527曾因QA重赋late final danmaku红屏，已修为QA专属getter并加入真实Controller构造测试；这是失败样本，不计播放验收，也未改变生产初始化。
+
+- 首帧上限：本机服务立即给合法头、每秒flush一个真实媒体字节；13:38:34.884请求，13:39:04.563安全诊断 `firstFrameTimeout`，错误页明确等待画面超时，pending=false，无软解确认或循环重试。证据A/lifecycle-final-drip-result与media-requests.jsonl。此前delay40在约5.5秒失败只能对应底层网络超时可能性，不算本项通过。
+- 原生重叠：13:40:10.241旧sample请求delay12，旧播放器13:40:11.390释放；新H264请求13:40:11.798，新控制器878472694于13:40:11.836进入，13:40:12.238真实首帧。旧响应预计13:40:22.241返回后，新会话继续至11291ms正常EOF，13:40:42仍blocked=false/nativeError=false/pending=false。无Unhandled Exception。证据A/rapid-overlap-events.json、lifecycle-rapid-overlap与lifecycle-rapid-after-old-return；此项补足下方旧记录明确未覆盖的原生时间重叠，不扩大为所有原生竞态证明。
+- 完整生产main20529（非fixture）安装回读SHA256 `7ae97cc1d31ba249df2751767b1d5f9913a8d0468a62efa40b36bf8a73395a29`，正常启动使用约定首屏（A/main-final-smoke）。未代同意或绕过既有审批限制，后续生产引导/首页人工验收未完成。未操作用户电视。
+
+实际硬件方法故障的正例、Android9外部轨道恢复与物理扬声器/校准声画仍是现场边界；明确方法日志分类有自动正负例，不能当成真实硬件故障验收。正常下载包仍为lib/main，不含本地故障fixture。
+
+全量 **955项测试通过**，测试head `606593f1`，本播放生产修复为 `7595a9ad`。完整页面模拟器20514与Android9 ARMv7电视20515使用独立recoveryqa身份，不等同正式版发布/合入。私人证据根目录为 `artifacts/four-stream-20261017`，下文简称A；原始设备日志不提交。
+
+- 模拟器20514完整VideoPage：`A/recovery-emu-action-restored.log` 中11:54:00.779真实firstFrameNotify，随后恢复17秒暂停，blocked=false、loading=false、pending=false、decoder=no，焦点回当前剧集。与此前20511仅Resize、20512MobX异常分别保留。
+- 电视20515完整VideoPage：`A/tv-recovery-restored`（log/png/xml）确认恢复17秒暂停；`A/tv-recovery-playing` 记录位置27.7→39秒持续推进，并正常EOF至第2集，下一集回默认mediacodec。只覆盖本受控素材与此设备，不扩展到所有站点/长片。
+- 模拟器FFV1负向：`A/recovery-emu-failed-visible` 显示明确软件播放失败及重试、选集/换线路、换源三个入口，无自动重试或跳集。日志内部loading仍true，错误页有效；**不写成loading=false**，也不将不可解码素材算作成功。
+- 外部轨道独立入口：模拟器20506 `A/external-asserted.log` 与电视20510 `A/tv-external-pass.log` 均记录先捕获17秒/1.25倍/暂停，再重建后轨道一致及同状态持续500ms的typed restore PASS。该入口验证原生snapshot/restorer，不是完整硬解失败提示链携带外部轨道的证明。
+- `A/external-emulator-av2.mkv` 离线分析确认外部音频A约440.19Hz、外部字幕B推进；录制内22组脉冲音频晚159–224ms、中位205.5ms。这是模拟器内部录制，未校准采集链路；物理扬声器、自然影片口型与校准后的AV同步仍缺证据。第一次静音录制为失败样本，不计成功。详见 `A/external-av-analysis.json/.md`。
+
+delay12最终证据：`A/media-requests.jsonl` 12:03:12.914记录sample请求mode=delay12；旧控制器471688714于12:03:14.728离开（约1.8秒，`A/recovery-delay-inflight-exit`），证明请求在途时退出。新控制器3555623于12:03:28.093进入，已晚于旧请求预计返回；12:03:37.418真实firstFrameNotify，12:03:39恢复17秒暂停、blocked=false/loading=false（`A/recovery-delay-final`）。只声明“在途请求退出+随后新会话恢复”，**不声明旧响应与新会话并发重叠的原生实证**；并发回调隔离仍由单元测试覆盖。首轮请求未建立即退出只证明立即退出，未用作该结论。既有2026-10-16延迟案例保留历史范围。当前不新增合并、正式发布或全部验收完成声明。

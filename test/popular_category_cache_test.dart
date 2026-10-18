@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:kazumi/pages/popular/tv_popular_controller.dart';
+import 'package:kazumi/services/storage/home_catalog_cache.dart';
+import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/pages/popular/popular_controller.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/services/storage/storage.dart';
@@ -41,12 +43,19 @@ void main() {
   });
   tearDownAll(() async {
     DioFactory.reset();
+    await HomeCatalogCache.flush();
     await Hive.close();
     await temp.delete(recursive: true);
   });
   setUp(() async {
+    await HomeCatalogCache.flush();
     await GStorage.putSetting(SettingsKeys.enableBangumiProxy, true);
     DioFactory.reset();
+    for (final file in temp.listSync().whereType<File>().where(
+          (f) => f.path.contains('home-catalog-'),
+        )) {
+      await file.delete();
+    }
     controller = TvPopularController();
     requests = [];
     DioFactory.apiDio.interceptors.insert(
@@ -64,6 +73,108 @@ void main() {
         },
       ),
     );
+  });
+
+  test(
+      'slow startup displays cache before refresh; overlapping refresh deduplicates',
+      () async {
+    final cache = HomeCatalogCache(directory: temp);
+    await cache.write(
+      true,
+      _subjects(500).map(BangumiItem.fromJson).toList(),
+      DateTime.now(),
+    );
+    controller = TvPopularController(homeCache: cache);
+    final gate = Completer<void>();
+    DioFactory.apiDio.interceptors.clear();
+    var count = 0;
+    DioFactory.apiDio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (o, h) async {
+          count++;
+          await gate.future;
+          h.resolve(
+            Response(
+              requestOptions: o,
+              statusCode: 200,
+              data: {'data': _subjects(900)},
+            ),
+          );
+        },
+      ),
+    );
+    final loading = controller.queryBangumiByTrend();
+    while (count == 0) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    expect(controller.trendList.first.id, 500);
+    expect(controller.homeRefreshing.value, true);
+    final duplicate = controller.refreshHome();
+    gate.complete();
+    await Future.wait([loading, duplicate]);
+    expect(count, 1);
+    expect(controller.trendList.first.id, 900);
+    expect(controller.trendList.length, 24);
+  });
+
+  test(
+    'refresh failure preserves cards and timestamp; next refresh recovers',
+    () async {
+      await controller.queryBangumiByTrend();
+      final ids = controller.trendList.map((e) => e.id).toList();
+      final stamp = controller.homeUpdatedAt.value;
+      DioFactory.apiDio.interceptors.clear();
+      DioFactory.apiDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (o, h) {
+            h.resolve(
+              Response(requestOptions: o, statusCode: 200, data: {'data': []}),
+            );
+          },
+        ),
+      );
+      await controller.refreshHome();
+      expect(controller.trendList.map((e) => e.id), ids);
+      expect(controller.homeUpdatedAt.value, stamp);
+      expect(controller.homeRefreshFailed.value, true);
+      expect(controller.isTimeOut, false);
+      DioFactory.apiDio.interceptors.clear();
+      DioFactory.apiDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (o, h) {
+            h.resolve(
+              Response(
+                requestOptions: o,
+                statusCode: 200,
+                data: {'data': _subjects(100)},
+              ),
+            );
+          },
+        ),
+      );
+      await controller.refreshHome();
+      expect(controller.trendList.first.id, 100);
+      expect(controller.homeRefreshFailed.value, false);
+    },
+  );
+
+  test('offline cold start retains persisted cards and reports refresh failure',
+      () async {
+    final cache = HomeCatalogCache(directory: temp);
+    await cache.write(true, _subjects(500).map(BangumiItem.fromJson).toList(),
+        DateTime.now());
+    controller = TvPopularController(homeCache: cache);
+    DioFactory.apiDio.interceptors.clear();
+    DioFactory.apiDio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      h.reject(DioException(
+          requestOptions: o, type: DioExceptionType.connectionError));
+    }));
+    await controller.queryBangumiByTrend();
+    expect(controller.trendList.first.id, 500);
+    expect(controller.homeRefreshFailed.value, true);
+    expect(controller.isLoadingMore, false);
+    expect(controller.isTimeOut, false);
+    expect((await cache.read(true))!.items.first.id, 500);
   });
 
   test('non-TV controller retains upstream request behavior', () async {
@@ -522,33 +633,22 @@ void main() {
     },
   );
 
-  test(
-    'refreshing trends invalidates the earlier request and its finalizer',
-    () async {
-      final pending = <Completer<(RequestOptions, RequestInterceptorHandler)>>[
-        for (var i = 0; i < 2; i++) Completer(),
-      ];
-      DioFactory.apiDio.interceptors.insert(
-        0,
-        InterceptorsWrapper(
-          onRequest: (options, handler) {
-            requests.add(options.uri.toString());
-            pending[requests.length - 1].complete((options, handler));
-          },
-        ),
-      );
-      final old = controller.queryBangumiByTrend();
-      final first = await pending[0].future;
-      final refreshed = controller.queryBangumiByTrend(type: 'init');
-      final second = await pending[1].future;
-      respond(first.$1, first.$2, _subjects(1));
-      await old;
-      expect(controller.trendList, isEmpty);
-      expect(controller.isLoadingMore, true);
-      respond(second.$1, second.$2, _subjects(101));
-      await refreshed;
-      expect(controller.trendList.first.id, 101);
-      expect(controller.isLoadingMore, false);
-    },
-  );
+  test('init during an active request coalesces without duplicate network work',
+      () async {
+    final pending = Completer<(RequestOptions, RequestInterceptorHandler)>();
+    DioFactory.apiDio.interceptors.insert(0,
+        InterceptorsWrapper(onRequest: (options, handler) {
+      requests.add(options.uri.toString());
+      pending.complete((options, handler));
+    }));
+    final old = controller.queryBangumiByTrend();
+    final first = await pending.future;
+    final refreshed = controller.queryBangumiByTrend(type: 'init');
+    expect(requests.length, 1);
+    expect(controller.isLoadingMore, true);
+    respond(first.$1, first.$2, _subjects(101));
+    await Future.wait([old, refreshed]);
+    expect(controller.trendList.first.id, 101);
+    expect(controller.isLoadingMore, false);
+  });
 }

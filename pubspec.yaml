@@ -8,6 +8,7 @@ environment:
   flutter: 3.47.3
 
 dependencies:
+  qr_flutter: ^4.1.0
   flutter:
     sdk: flutter
   flutter_localizations:
@@ -108,6 +109,8 @@ dependencies:
   macos_secure_bookmarks: ^0.2.1
 
 dependency_overrides:
+  media_kit_video:
+    path: third_party/media_kit_video
   media_kit_libs_linux:
     git:
       url: https://github.com/Predidit/media-kit.git

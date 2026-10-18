@@ -291,7 +291,7 @@ void main() {
     await sourceServer.server
         .close(force: true)
         .timeout(const Duration(seconds: 5));
-    await Hive.close();
+    await Hive.close().timeout(const Duration(seconds: 10));
     PathProviderPlatform.instance = previousPaths;
     await temporaryDirectory.delete(recursive: true);
   });
@@ -359,11 +359,16 @@ void main() {
     expect(find.byType(InfoPage), findsOneWidget);
     expect(app.openedSubjectIds.last, 21);
 
-    // Reselect source is now between watch and collection in the real row.
+    // Verify each real action while traversing to collection with the remote.
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
     expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV detail source');
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV source health');
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pump();
+    expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV detail collect');
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -379,12 +384,17 @@ void main() {
     // Results can reorder while detail is open; Back must follow the subject ID.
     app.search.bangumiList.remove(selectedSubject);
     app.search.bangumiList.insert(3, selectedSubject);
-    await tester.tap(find.widgetWithText(FilledButton, '开始观看'));
+    // This workflow explicitly chooses a fixture source. First-play automatic
+    // probing is exercised separately with its native-player boundary.
+    await tester.tap(find.widgetWithText(OutlinedButton, '重新选源'));
     await _pumpUntil(
         tester,
         () => find.text('Loopback chapter result').evaluate().isNotEmpty,
         'SourceSheet must run a real RuleEngine search over loopback HTTP');
-    await tester.tap(find.text('Loopback chapter result'));
+    // Manual choice now persists a per-subject preference. Keep its Hive write
+    // in the real event loop so close() cannot inherit the disposed fake zone.
+    await tester.runAsync(
+        () => tester.tap(find.text('Loopback chapter result')));
     await _pumpUntil(
         tester,
         () => find.byType(StubNativeVideoBoundary).evaluate().isNotEmpty,
@@ -509,7 +519,8 @@ void main() {
         tester,
         () => find.text('Loopback chapter result').evaluate().isNotEmpty,
         'The destination source must produce its own real search result');
-    await tester.tap(find.text('Loopback chapter result'));
+    await tester.runAsync(
+        () => tester.tap(find.text('Loopback chapter result')));
     await _pumpUntil(tester, () => find.text('同集换源').evaluate().isNotEmpty,
         'Cross-source transfer must wait for an explicit user choice');
     expect(restored.openedVideoArgs, hasLength(1),
@@ -526,7 +537,8 @@ void main() {
     expect(find.text('subject 21; episode 1; offset 0'), findsOneWidget);
     await rootNavigatorKey.currentState!.maybePop();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Loopback chapter result'));
+    await tester.runAsync(
+        () => tester.tap(find.text('Loopback chapter result')));
     await _pumpUntil(tester, () => find.text('同集换源').evaluate().isNotEmpty,
         'Reopening a source must again require confirmation');
     await tester.tap(find.textContaining('继续 347 秒'));

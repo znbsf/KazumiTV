@@ -1,6 +1,9 @@
 // ignore_for_file: library_private_types_in_public_api
 
 import 'dart:async';
+import 'package:kazumi/services/player/current_output_failure.dart';
+import 'package:kazumi/pages/player/controller/playback_recovery_snapshot.dart';
+import 'package:kazumi/services/player/confirmed_playback_recovery.dart';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -63,7 +66,16 @@ final class _OwnedPlayer {
   final PlaybackHistoryRecorder? history;
   StreamSubscription<bool>? _playingSubscription;
   StreamSubscription<double>? _rateProbeSubscription;
+  bool intendedPlaying = false;
+  bool hasNativeError = false;
+  final recoveryAborted = Completer<void>();
+  void abortRecoveryWait() {
+    if (!recoveryAborted.isCompleted) recoveryAborted.complete();
+  }
+
   bool ready = false;
+  bool released = false;
+  final List<StreamSubscription<dynamic>> subscriptions = [];
   Future<void>? _disposeFuture;
 
   Future<void> recordHistory() async {
@@ -85,13 +97,18 @@ final class _OwnedPlayer {
   }
 
   Future<void> _dispose() async {
+    abortRecoveryWait();
     // Capture synchronously before the native player is detached/disposed.
     final finalHistory = recordHistory();
     ready = false;
+    for (final subscription in subscriptions) {
+      await subscription.cancel();
+    }
     await _rateProbeSubscription?.cancel();
     await _playingSubscription?.cancel();
     try {
       await player.dispose();
+      released = true;
     } catch (error, stackTrace) {
       KazumiLogger().e(
         'PlayerPlaybackController: failed to dispose media player',
@@ -126,15 +143,31 @@ abstract class _PlayerPlaybackController with Store {
   );
 
   _OwnedPlayer? _ownedPlayer;
+  Future<void> _pendingDisposal = Future<void>.value();
+  bool _lastReleaseSucceeded = true;
+  bool get lastReleaseSucceeded => _lastReleaseSucceeded;
+  bool recoveryBlocksCompletion = false;
+  bool get recoveryHasNativeError => _ownedPlayer?.hasNativeError ?? false;
   Player? get mediaPlayer => _ownedPlayer?.player;
   Future<void> recordHistory() =>
       _ownedPlayer?.recordHistory() ?? Future<void>.value();
+
+  // Native failure/EOF can report paused before the decoder log arrives.
+  // Keep explicit playback intent on the owner, separate from observed state.
+  void setPlaybackIntent(Player player, bool playing) {
+    if (isCurrentPlayer(player)) _ownedPlayer!.intendedPlaying = playing;
+  }
 
   void enableHistoryFor(Player player) {
     if (identical(mediaPlayer, player)) _ownedPlayer!.ready = true;
   }
 
-  VideoController? videoController;
+  final Observable<VideoController?> _videoController = Observable(null);
+  VideoController? get videoController => _videoController.value;
+  set videoController(VideoController? value) {
+    // Initialization and stop() also publish outside generated store actions.
+    runInAction(() => _videoController.value = value);
+  }
 
   final AsyncSerialQueue _prefetchWrites = AsyncSerialQueue();
   bool _prefetchSuspendWanted = false;
@@ -209,6 +242,7 @@ abstract class _PlayerPlaybackController with Store {
 
   @action
   void resetForInit() {
+    recoveryBlocksCompletion = false;
     playing = false;
     loading = true;
     isBuffering = true;
@@ -240,6 +274,7 @@ abstract class _PlayerPlaybackController with Store {
       if (!isCurrentPlayer(player)) {
         return;
       }
+      setPlaybackIntent(player, true);
       await player.play();
       startOffset = 0;
     } catch (e) {
@@ -343,6 +378,8 @@ abstract class _PlayerPlaybackController with Store {
     bool adBlockerEnabled, {
     required bool Function() canInstall,
     int offset = 0,
+    PlaybackRecoverySnapshot? recoverySnapshot,
+    void Function(PlaybackRecoverySnapshot snapshot)? onDirectDecoderFailure,
     VideoSourceFormat videoSourceFormat = VideoSourceFormat.auto,
     PlaybackProgressWriter? onHistoryProgress,
     void Function(String message)? onPlaybackError,
@@ -366,7 +403,10 @@ abstract class _PlayerPlaybackController with Store {
         configuration: PlayerConfiguration(
           bufferSize: cachePolicy.bufferSize,
           osc: false,
-          logLevel: MPVLogLevel.values[debug.playerLogLevel],
+          logLevel: MPVLogLevel.values[
+              TvMode.enabled && debug.playerLogLevel < 3
+                  ? 3
+                  : debug.playerLogLevel],
           adBlocker: adBlockerEnabled,
         ),
       ),
@@ -462,37 +502,66 @@ abstract class _PlayerPlaybackController with Store {
         }
         androidEmulator = isEmulator;
 
-        if (androidVideoRenderer == 'auto') {
-          // Android 14 及以上使用基于 Vulkan 的 MPV GPU-NEXT 视频输出，着色器性能更好
-          // GPU-NEXT 需要 Vulkan 1.2 支持
-          // 避免 Android 13 及以下设备上部分机型 Vulkan 支持不佳导致的黑屏问题
-          final int androidSdkVersion =
-              await PlatformEnvironmentService.getAndroidSdkVersion();
-          if (!isCurrentPlayer(player)) {
-            return await _discardIfNotCurrent(candidate);
-          }
-          videoRenderer = selectAndroidVideoOutput(
-            configuredOutput: androidVideoRenderer,
-            isTv: TvMode.enabled,
-            androidSdkVersion: androidSdkVersion,
-            isEmulator: androidEmulator,
-          );
+        final androidSdkVersion = androidVideoRenderer == 'auto'
+            ? await PlatformEnvironmentService.getAndroidSdkVersion()
+            : 0;
+        if (!isCurrentPlayer(player)) {
+          return await _discardIfNotCurrent(candidate);
         }
-        videoRenderer ??= androidVideoRenderer;
-        if (usesAndroidAutoSoftwareOutput(
+        final configuration = resolveAndroidVideoConfiguration(
           configuredOutput: androidVideoRenderer,
           isTv: TvMode.enabled,
+          androidSdkVersion: androidSdkVersion,
           isEmulator: androidEmulator,
-        )) {
-          hAenable = false;
-          hardwareDecoder = 'no';
-        }
+          hardwareAcceleration: hAenable,
+          hardwareDecoder: hardwareDecoder,
+        );
+        videoRenderer = configuration.output;
+        hAenable = configuration.hardwareAcceleration;
+        hardwareDecoder = configuration.hardwareDecoder;
       }
 
+      if (recoverySnapshot != null) {
+        videoRenderer = 'gpu';
+        hAenable = false;
+        hardwareDecoder = 'no';
+        superResolutionMode = SuperResolutionMode.off;
+      }
+      var outputTerminalFailure = false;
       if (videoRenderer == 'mediacodec_embed') {
         hAenable = true;
         hardwareDecoder = 'mediacodec';
         superResolutionMode = SuperResolutionMode.off;
+        if (TvMode.enabled && onDirectDecoderFailure != null) {
+          await pp.setProperty('hwdec-software-fallback', 'no');
+          if (!isCurrentPlayer(player))
+            return await _discardIfNotCurrent(candidate);
+          candidate.subscriptions.add(player.stream.log.listen((event) {
+            if (isCurrentPlayer(player) &&
+                event.prefix == 'vd' &&
+                event.text.trim() ==
+                    'Software decoding fallback is disabled.') {
+              KazumiLogger().w(
+                  'PlaybackDiagnostic session=${identityHashCode(candidate)} output=mediacodec_embed category=hardwareUnavailable signal=mpv_no_software_fallback');
+              if (!recoveryBlocksCompletion) {
+                recoveryBlocksCompletion = true;
+                completed = false;
+                onPlaybackError?.call('当前视频没有可用的硬件解码路径，可重试或更换视频源');
+              }
+            }
+            if (isCurrentPlayer(player) &&
+                !outputTerminalFailure &&
+                isDirectDecoderFailure(
+                    prefix: event.prefix, text: event.text)) {
+              KazumiLogger().w(
+                  'PlaybackDiagnostic session=${identityHashCode(candidate)} output=mediacodec_embed category=hardwareDecoder signal=mpv_hardware_method_failed');
+              recoveryBlocksCompletion = true;
+              completed = false;
+              onDirectDecoderFailure(PlaybackRecoverySnapshot(player.state,
+                  intendedPlaying: candidate.intendedPlaying));
+            }
+          }));
+        }
       }
 
       videoController ??= VideoController(
@@ -510,30 +579,71 @@ abstract class _PlayerPlaybackController with Store {
         return await _discardIfNotCurrent(candidate);
       }
 
-      bool showPlayerError = GStorage.getSetting(SettingsKeys.showPlayerError);
-      player.stream.error.listen((event) {
-        if (isCurrentPlayer(player)) {
-          final actionableMessage = PlayerErrorMapper.toActionableMessage(
-            event,
-            isBuffering: playerBuffering,
-          );
-          if (actionableMessage != null) {
-            if (onPlaybackError != null) {
-              onPlaybackError(actionableMessage);
-            } else {
-              KazumiDialog.showToast(
-                  message: actionableMessage, showActionButton: true);
-            }
-          } else if (showPlayerError) {
-            KazumiDialog.showToast(
-                message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
-                duration: const Duration(seconds: 5),
-                showActionButton: true);
+      final outputFailure = CurrentOutputFailureHandler(
+        isCurrent: () => isCurrentPlayer(player),
+        abort: () {
+          outputTerminalFailure = true;
+          candidate.hasNativeError = true;
+          candidate.abortRecoveryWait();
+          recoveryBlocksCompletion = true;
+          completed = false;
+        },
+        report: (failure) {
+          final message = switch (failure) {
+            CurrentOutputFailure.releasedSession => '当前播放器会话已失效，请重试当前集或更换视频源',
+            CurrentOutputFailure.initialization => '视频输出初始化失败，请重试当前集或更换视频源',
+            CurrentOutputFailure.firstFrameTimeout => '等待画面超时，可重试当前集或更换视频源',
+          };
+          KazumiLogger().w(
+              'PlaybackDiagnostic session=${identityHashCode(candidate)} output=$videoRenderer category=${failure.name} signal=current_output_failure');
+          if (onPlaybackError != null) {
+            onPlaybackError(message);
+          } else {
+            KazumiDialog.showToast(message: message, showActionButton: true);
           }
-        }
-        KazumiLogger().e('PlayerController: Player intent error ${videoUrl()}',
-            error: event);
-      });
+        },
+      );
+      bool showPlayerError = GStorage.getSetting(SettingsKeys.showPlayerError);
+      candidate.subscriptions.add(player.stream.error.listen((event) {
+        PlayerErrorMapper.dispatchCurrentError(event,
+            isCurrent: () => isCurrentPlayer(player),
+            record: (category) => KazumiLogger().w(
+                'PlaybackDiagnostic session=${identityHashCode(candidate)} output=$videoRenderer category=${category.name} signal=native_error'),
+            handle: (category) {
+              if (category == PlaybackFailureCategory.releasedSession) {
+                outputFailure.fail(CurrentOutputFailure.releasedSession);
+                return;
+              }
+              candidate.hasNativeError = true;
+              if (isCurrentPlayer(player) && recoverySnapshot != null) {
+                candidate.hasNativeError = true;
+                candidate.abortRecoveryWait();
+                recoveryBlocksCompletion = true;
+                completed = false;
+              }
+              if (isCurrentPlayer(player) &&
+                  (recoverySnapshot != null || !recoveryBlocksCompletion)) {
+                final actionableMessage = PlayerErrorMapper.toActionableMessage(
+                  event,
+                  isBuffering: playerBuffering,
+                  softwareRecovery: recoverySnapshot != null,
+                );
+                if (actionableMessage != null) {
+                  if (onPlaybackError != null) {
+                    onPlaybackError(actionableMessage);
+                  } else {
+                    KazumiDialog.showToast(
+                        message: actionableMessage, showActionButton: true);
+                  }
+                } else if (showPlayerError) {
+                  KazumiDialog.showToast(
+                      message: '播放器内部错误 ${event.toString()} ${videoUrl()}',
+                      duration: const Duration(seconds: 5),
+                      showActionButton: true);
+                }
+              }
+            });
+      }));
 
       if (superResolutionMode != SuperResolutionMode.off) {
         await setShader(superResolutionMode, player: player);
@@ -549,10 +659,23 @@ abstract class _PlayerPlaybackController with Store {
         }
       }
 
+      final initialOutput = videoController;
+      if (TvMode.enabled && recoverySnapshot == null && initialOutput != null) {
+        unawaited(observeFirstFrame(
+          firstFrame: initialOutput.waitUntilFirstFrameRendered,
+          cancelled: candidate.recoveryAborted.future,
+        ).then((outcome) {
+          outputFailure.observe(outcome,
+              alreadyHandled:
+                  candidate.hasNativeError || recoveryBlocksCompletion);
+        }));
+      }
+      candidate.intendedPlaying = recoverySnapshot?.playing ?? autoPlay;
       await player.open(
         Media(videoUrl(),
-            start: Duration(seconds: offset), httpHeaders: httpHeaders),
-        play: autoPlay,
+            start: recoverySnapshot?.position ?? Duration(seconds: offset),
+            httpHeaders: httpHeaders),
+        play: recoverySnapshot == null && autoPlay,
       );
       if (!isCurrentPlayer(player)) {
         return await _discardIfNotCurrent(candidate);
@@ -701,8 +824,9 @@ abstract class _PlayerPlaybackController with Store {
     if (duration != state.duration) {
       duration = state.duration;
     }
-    if (completed != state.completed) {
-      completed = state.completed;
+    final ended = state.completed && !recoveryBlocksCompletion;
+    if (completed != ended) {
+      completed = ended;
     }
   }
 
@@ -717,6 +841,19 @@ abstract class _PlayerPlaybackController with Store {
     }
   }
 
+  Future<bool> waitForRecoveredFrame(Player player) {
+    final owner = _ownedPlayer;
+    final output = videoController;
+    if (owner == null || owner.player != player || output == null) {
+      return Future.value(false);
+    }
+    return waitForRecoveryFrame(
+      firstFrame: output.waitUntilFirstFrameRendered,
+      aborted: owner.recoveryAborted.future,
+      isCurrent: () => isCurrentPlayer(player) && !owner.hasNativeError,
+    );
+  }
+
   Future<void> stop() async {
     cachePolicy.stopWatching();
     final ownedPlayer = _ownedPlayer;
@@ -726,10 +863,16 @@ abstract class _PlayerPlaybackController with Store {
     loading = true;
     // media_kit stops playback as part of disposal before releasing native
     // resources. Debug subscriptions can be cancelled concurrently.
-    await Future.wait([
+    final previousDisposal = _pendingDisposal;
+    final disposal = Future.wait([
+      previousDisposal,
       ownedPlayer?.dispose() ?? Future<void>.value(),
       _cancelDebugInfo(),
-    ]);
+    ]).then((_) {
+      if (ownedPlayer != null) _lastReleaseSucceeded = ownedPlayer.released;
+    });
+    _pendingDisposal = disposal;
+    await disposal;
   }
 
   Future<Uint8List?> screenshot({String format = 'image/jpeg'}) async {

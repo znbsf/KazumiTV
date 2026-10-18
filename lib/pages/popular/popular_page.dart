@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:kazumi/pages/popular/tv_popular_controller.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -57,6 +58,7 @@ class _PopularPageState extends State<PopularPage> {
   final Map<int, FocusNode> _channelFocusNodes = {};
   final Map<String, FocusNode> _tagFocusNodes = {};
   final _retryFocusNode = FocusNode(debugLabel: 'TV directory retry');
+  final _homeRefreshFocusNode = FocusNode(debugLabel: 'Refresh home cache');
   int? _retryReturnId;
   Timer? _tagSelectionTimer;
   Timer? _channelCommitTimer;
@@ -191,6 +193,7 @@ class _PopularPageState extends State<PopularPage> {
       node.dispose();
     }
     _retryFocusNode.dispose();
+    _homeRefreshFocusNode.dispose();
     scrollController.dispose();
     super.dispose();
   }
@@ -1164,6 +1167,60 @@ class _PopularPageState extends State<PopularPage> {
     );
   }
 
+  Widget _buildHomeCacheStatus() {
+    final controller = popularController as TvPopularController;
+    return Observer(
+      builder: (_) {
+        if (controller.currentTag.isNotEmpty) return const SizedBox.shrink();
+        final updated = controller.homeUpdatedAt.value?.toLocal();
+        final stamp = updated == null
+            ? '尚无首页缓存'
+            : '更新于 ${updated.year}-${updated.month.toString().padLeft(2, '0')}-${updated.day.toString().padLeft(2, '0')} ${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
+        final status = controller.homeRefreshing.value
+            ? ' · 后台刷新中'
+            : controller.homeRefreshFailed.value
+                ? ' · 未取得新内容，保留已有内容'
+                : controller.homeIsStale.value
+                    ? ' · 缓存较旧'
+                    : '';
+        return Padding(
+          padding: EdgeInsets.zero,
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$stamp$status',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              TvFocusableSurface(
+                borderRadius: 8,
+                focusScale: 1,
+                focusNode: _homeRefreshFocusNode,
+                onKeyEvent: (node, event) {
+                  if (event is! KeyDownEvent) return KeyEventResult.ignored;
+                  if (event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                      event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    _focusNodeForTag('').requestFocus();
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                onPressed: () => unawaited(controller.refreshHome()),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: Text('刷新首页'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildTvSpotlight() => SizedBox(
         key: const Key('tv-home-spotlight'),
         height: MediaQuery.textScalerOf(context).scale(74),
@@ -1194,14 +1251,18 @@ class _PopularPageState extends State<PopularPage> {
                       style: TvVisuals.heading,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      summary,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TvVisuals.body.copyWith(
-                          color:
-                              Theme.of(context).colorScheme.onSurfaceVariant),
-                    ),
+                    if (popularController is TvPopularController &&
+                        popularController.currentTag.isEmpty)
+                      _buildHomeCacheStatus()
+                    else
+                      Text(
+                        summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TvVisuals.body.copyWith(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
                   ],
                 );
               },
@@ -1501,8 +1562,12 @@ class _PopularPageState extends State<PopularPage> {
             return KeyEventResult.handled;
           }
           if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            if (index + 1 < tags.length)
+            if (index + 1 < tags.length) {
               _focusNodeForTag(tags[index + 1]).requestFocus();
+            } else if (popularController.currentTag.isEmpty &&
+                popularController is TvPopularController) {
+              _homeRefreshFocusNode.requestFocus();
+            }
             return KeyEventResult.handled;
           }
           if (event.logicalKey == LogicalKeyboardKey.arrowDown) {

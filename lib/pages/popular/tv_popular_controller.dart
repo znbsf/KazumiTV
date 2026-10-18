@@ -1,4 +1,7 @@
 import 'dart:math';
+import 'dart:async';
+
+import 'package:kazumi/services/storage/home_catalog_cache.dart';
 
 import 'package:kazumi/pages/popular/popular_controller.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
@@ -8,6 +11,18 @@ import 'package:mobx/mobx.dart';
 
 /// TV category state; mobile and desktop keep the upstream controller.
 class TvPopularController extends PopularController {
+  TvPopularController({HomeCatalogCache? homeCache})
+      : _homeCache = homeCache ?? HomeCatalogCache();
+  final HomeCatalogCache _homeCache;
+  final _homeRequests = <bool, Future<void>>{};
+  final _restoredProviders = <bool>{};
+  final homeUpdatedAt = Observable<DateTime?>(null);
+  final homeRefreshFailed = Observable(false);
+  final homeRefreshing = Observable(false);
+  final homeIsStale = Observable(false);
+
+  Future<void> refreshHome() => queryBangumiByTrend(type: 'refresh');
+
   static const _pageSize = 24;
   static const _sampleSize = 100;
   static const _maxDirectoryItems = 1008;
@@ -75,32 +90,66 @@ class TvPopularController extends PopularController {
   }
 
   @override
-  Future<void> queryBangumiByTrend({String type = 'add'}) =>
+  Future<void> queryBangumiByTrend({String type = 'add'}) {
+    final mirror = _bangumiMirrorEnabled;
+    final pending = _homeRequests[mirror];
+    if (pending != null) return pending;
+    final request = _queryTrend(type: type);
+    _homeRequests[mirror] = request;
+    return request.whenComplete(() => _homeRequests.remove(mirror));
+  }
+
+  Future<void> _queryTrend({required String type}) =>
       AsyncAction('TvPopularController.queryBangumiByTrend').run(() async {
         final mirror = _bangumiMirrorEnabled;
-        final state = type == 'init'
-            ? (_trendCache[mirror] = _TvDirectoryState())
-            : _trendCache.putIfAbsent(mirror, _TvDirectoryState.new);
+        var refreshing = type == 'init' || type == 'refresh';
+        if (_restoredProviders.add(mirror)) {
+          final cached = await _homeCache.read(mirror);
+          if (mirror != _bangumiMirrorEnabled) {
+            _restoredProviders.remove(mirror);
+            return;
+          }
+          if (cached != null) {
+            final restored = _TvDirectoryState()
+              ..items.addAll(cached.items)
+              ..updatedAt = cached.updatedAt;
+            restored.offset = cached.items.length;
+            restored.batches = (cached.items.length / _pageSize).ceil();
+            _trendCache[mirror] = restored;
+            if (mirror == _bangumiMirrorEnabled) {
+              homeUpdatedAt.value = cached.updatedAt;
+              homeIsStale.value = cached.stale;
+            }
+            refreshing = true;
+          }
+        }
+        final state = _trendCache.putIfAbsent(mirror, _TvDirectoryState.new);
         trendList = ObservableList.of(state.items);
-        if (type == 'retry') state.retry(_maxPagedBatches);
-        if (state.request != null || !state.hasMore) {
+        if (type == 'retry' || refreshing) state.retry(_maxPagedBatches);
+        if (state.request != null || (!state.hasMore && !refreshing)) {
           _publishLoading();
           return;
         }
         final request = Object();
         state.request = request;
+        homeRefreshing.value = refreshing;
         _publishLoading();
         try {
           final result = mirror
               ? await BangumiApi.getBangumiMirrorPopularSubjects(
                   limit: _pageSize,
-                  offset: state.offset,
+                  offset: refreshing ? 0 : state.offset,
                 )
               : await BangumiApi.getBangumiTrendsList(
                   limit: _pageSize,
-                  offset: state.offset,
+                  offset: refreshing ? 0 : state.offset,
                 );
           if (_trendCache[mirror] != state || state.request != request) return;
+          if (refreshing && result.isNotEmpty) {
+            state.items.clear();
+            state.offset = 0;
+            state.batches = 0;
+          }
           state.append(
             result,
             pageSize: _pageSize,
@@ -111,13 +160,23 @@ class TvPopularController extends PopularController {
           // currently selected provider may replace the public trends list.
           if (mirror == _bangumiMirrorEnabled) {
             trendList = ObservableList.of(state.items);
+            homeRefreshFailed.value = result.isEmpty;
+            if (result.isNotEmpty) {
+              homeUpdatedAt.value = state.updatedAt;
+              homeIsStale.value = false;
+            }
+          }
+          if (result.isNotEmpty) {
+            unawaited(_homeCache.write(mirror, state.items, state.updatedAt));
           }
         } catch (_) {
           if (_trendCache[mirror] == state && state.request == request) {
             state.stop(_TvDirectoryStopReason.error);
+            if (mirror == _bangumiMirrorEnabled) homeRefreshFailed.value = true;
           }
         } finally {
           if (state.request == request) state.request = null;
+          if (mirror == _bangumiMirrorEnabled) homeRefreshing.value = false;
           _publishLoading();
         }
       });
@@ -205,7 +264,7 @@ enum _TvDirectoryStopReason {
   error,
   shortBatch,
   noProgress,
-  limit
+  limit,
 }
 
 class _TvDirectoryState {
@@ -251,7 +310,7 @@ class _TvDirectoryState {
       offset += pageSize;
       batches += 1;
     }
-    updatedAt = DateTime.now();
+    if (result.isNotEmpty) updatedAt = DateTime.now();
     if (result.isEmpty) {
       stop(_TvDirectoryStopReason.emptyResponse);
     } else if (items.length >= TvPopularController._maxDirectoryItems ||
