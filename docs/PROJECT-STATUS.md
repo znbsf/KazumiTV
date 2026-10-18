@@ -8,6 +8,16 @@
 
 验证：完整回归1091项通过；随后新增真实日志文件落盘测试，验证在普通模式/全局日志等级off下失败仍保留，后续会话不覆盖，签名URL不落盘。最终聚焦35项通过。分析0error/0warning，175既有info；最终新head CI另外跟踪。README新增r7电视首页原图和当前生产手机HTML的浏览器场景截图（明确固定状态展示数据），说明数字续播/确认进详情、7天配对、缓存、实验源健康等。版本准备为0.4.4+20556，CI测试包0.4.4-rc.1；签名候选、升级测试与发布分别记录，正式电视安装及现有Release保持不动。
 
+新增诊断的设备检查预算：固定签名remoteqa覆盖升级后先回读APK/版本/UID/首次安装/数据目录，并比较正式包哈希与身份完全不变。已知7sefun第03集仅尝试一次，最多60秒；成功则正常Back释放，核对解析和native日志保留及设置中的日志入口。失败则保留错误记录停止，不切源，不恢复旧copy/GPU路线。音量8/100保持，配对不撤销；不运行持续采集。此次只验证新日志在实际Android链路接通，不用成功播放替代未知失败根因。
+
+最终CI：[39106407415](https://github.com/znbsf/KazumiTV/actions/runs/39106407415) 对应PR24精确head28698655，completed/success；checks和三ABI全通过。实际日志1092 tests passed、21组网页逻辑通过，静态0error/0warning/175既有info。CI终态与完整日志保存在diagnostics-release-prep/pr24-ci-final.json及pr24-ci-full.log。PR24仍OPEN/MERGEABLE，公开Release仍v0.4.3；此PR合并与正式候选安装/发布尚未执行。
+
+实际执行：补丁已提交并推送到 [PR24](https://github.com/znbsf/KazumiTV/pull/24)，head `28698655864b184ae6bfb3be77b1b556fca580b4`；PR24尚未合并。QA升级为0.4.4-rc.1/205561，APK SHA256 `bb641cf0e9728d0b682311ede436f0f86453be2cf4667eb95b80777b8b33c0b5`，固定QA证书与数据身份保持，正式0.4.3完整身份及APK哈希前后相同。15:11同源一次数字续播成功，解析会话1792307486831021-0与native会话1792307490030666-1通过媒体指纹关联，首帧4737ms；正常返回后，从应用错误日志页读回两条完整记录，证明真实Android路径已落盘。没有复现新失败；失败保留由真实文件测试覆盖，不把成功播放说成修复。原始证据在根 `artifacts/four-stream-20261017/tv-044-rc1-install-20261018/`，脱敏摘录为persisted-traces-redacted.log。
+
+正式0.4.4/20556三ABI已从上述精确提交冻结构建，沿用正式证书3225e3b8…ce806，不创建新身份。校验包名/版本/ABI/TV入口/16KB对齐/原生库哈希/探针排除，通过后生成三APK、三回执、源码、NOTICE、许可及SHA256SUMS，共11个公开附件；源码包含原生构建配方和明确公开的QA签名夹具，不含正式签名材料。候选目录为根 `artifacts/four-stream-20261017/diagnostics-release-prep/release-0.4.4/tv-build/`，candidate-verification.json定义唯一公开附件清单，intermediate目录禁止分发。ARMv7 SHA256 `b1508f9fde9bf6bc5000f5e6b69f427a6a66a62bb7dd1cebde18c618ffcb7f59`；ARM64 `bf4ce35521338162d29ce608ae9ffde8efae803e7ec3dd899c3d5558310a3797`；x64 `a683451b4a19e9a1083714cb7e3c0bf9cb95096669797af1245c428aaf675ec1`。正式候选未安装、未发布，升级保数据验收与公开Release仍待用户决定；已准备RELEASE-BODY.md，公开前须核对main/目标tag与候选源码一致。
+
+设备结束状态：首页、媒体inactive、音量8/100，三次短时top样本中QA进程CPU为0.0%；不是长期负载保证。无持续采集，配对不撤销。浏览器展示服务已停止且端口无监听，本轮Gradle daemon22480确认归属后停止并回读不存在；既有Kotlin daemon31080保留。本节运行后结果留在本地交接，PR正文同步实际结果，不为结果记账重复触发相同源码CI。
+
 ## 2026-10-18：用户通过剩余验收，授权合并；当前源失败调查
 
 用户确认剩余电视项目验收无问题，授权合并 PR20/22；正式包安装及 Release 不在本次授权内。当前 QA 包实测仍为 0.4.3-qa6-r7 / 205551，MiTV-ASTP0 / mulan。用户另报当前源播放失败，并明确允许点击当前源复现；先保存原日志、截图、控件树和包/音量状态，证据位于根 artifacts/four-stream-20261017/tv-r7-failure-20261018-143043。
