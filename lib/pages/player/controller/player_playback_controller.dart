@@ -1,6 +1,7 @@
 // ignore_for_file: library_private_types_in_public_api
 
 import 'dart:async';
+import 'package:kazumi/services/logging/playback_trace.dart';
 import 'package:kazumi/services/player/current_output_failure.dart';
 import 'package:kazumi/pages/player/controller/playback_recovery_snapshot.dart';
 import 'package:kazumi/services/player/confirmed_playback_recovery.dart';
@@ -62,6 +63,7 @@ final class _OwnedPlayer {
     }
   }
 
+  final trace = PlaybackTrace('native');
   final Player player;
   final PlaybackHistoryRecorder? history;
   StreamSubscription<bool>? _playingSubscription;
@@ -97,6 +99,7 @@ final class _OwnedPlayer {
   }
 
   Future<void> _dispose() async {
+    trace.finish('disposed');
     abortRecoveryWait();
     // Capture synchronously before the native player is detached/disposed.
     final finalHistory = recordHistory();
@@ -418,6 +421,18 @@ abstract class _PlayerPlaybackController with Store {
       return null;
     }
     _ownedPlayer = candidate;
+    candidate.trace.event('created',
+        url: videoUrl(),
+        detail:
+            'owner=${identityHashCode(candidate)} recovery=${recoverySnapshot != null}');
+    candidate.subscriptions.add(player.stream.log.listen((event) {
+      if (!isCurrentPlayer(player)) return;
+      // Keep only warning/error/fatal native context, not verbose HTTP headers.
+      if (['warn', 'error', 'fatal'].contains(event.level)) {
+        candidate.trace.event('mpv_${event.level}',
+            detail: '${event.prefix}: ${event.text}');
+      }
+    }));
     cachePolicy.startWatching();
 
     try {
@@ -527,6 +542,9 @@ abstract class _PlayerPlaybackController with Store {
         hardwareDecoder = 'no';
         superResolutionMode = SuperResolutionMode.off;
       }
+      candidate.trace.event('output',
+          detail:
+              'vo=$videoRenderer hwdec=$hardwareDecoder hardware=$hAenable');
       var outputTerminalFailure = false;
       if (videoRenderer == 'mediacodec_embed') {
         hAenable = true;
@@ -543,6 +561,7 @@ abstract class _PlayerPlaybackController with Store {
                     'Software decoding fallback is disabled.') {
               KazumiLogger().w(
                   'PlaybackDiagnostic session=${identityHashCode(candidate)} output=mediacodec_embed category=hardwareUnavailable signal=mpv_no_software_fallback');
+              candidate.trace.finish('hardware_unavailable', error: event.text);
               if (!recoveryBlocksCompletion) {
                 recoveryBlocksCompletion = true;
                 completed = false;
@@ -555,6 +574,7 @@ abstract class _PlayerPlaybackController with Store {
                     prefix: event.prefix, text: event.text)) {
               KazumiLogger().w(
                   'PlaybackDiagnostic session=${identityHashCode(candidate)} output=mediacodec_embed category=hardwareDecoder signal=mpv_hardware_method_failed');
+              candidate.trace.finish('hardware_decoder', error: event.text);
               recoveryBlocksCompletion = true;
               completed = false;
               onDirectDecoderFailure(PlaybackRecoverySnapshot(player.state,
@@ -589,6 +609,7 @@ abstract class _PlayerPlaybackController with Store {
           completed = false;
         },
         report: (failure) {
+          candidate.trace.finish('output_${failure.name}');
           final message = switch (failure) {
             CurrentOutputFailure.releasedSession => '当前播放器会话已失效，请重试当前集或更换视频源',
             CurrentOutputFailure.initialization => '视频输出初始化失败，请重试当前集或更换视频源',
@@ -607,8 +628,13 @@ abstract class _PlayerPlaybackController with Store {
       candidate.subscriptions.add(player.stream.error.listen((event) {
         PlayerErrorMapper.dispatchCurrentError(event,
             isCurrent: () => isCurrentPlayer(player),
-            record: (category) => KazumiLogger().w(
-                'PlaybackDiagnostic session=${identityHashCode(candidate)} output=$videoRenderer category=${category.name} signal=native_error'),
+            record: (category) {
+              candidate.trace.event('native_error',
+                  detail: 'vo=$videoRenderer category=${category.name}');
+              candidate.trace.finish('native_error', error: event);
+              KazumiLogger().w(
+                  'PlaybackDiagnostic session=${identityHashCode(candidate)} output=$videoRenderer category=${category.name} signal=native_error');
+            },
             handle: (category) {
               if (category == PlaybackFailureCategory.releasedSession) {
                 outputFailure.fail(CurrentOutputFailure.releasedSession);
@@ -665,12 +691,16 @@ abstract class _PlayerPlaybackController with Store {
           firstFrame: initialOutput.waitUntilFirstFrameRendered,
           cancelled: candidate.recoveryAborted.future,
         ).then((outcome) {
+          if (isCurrentPlayer(player)) {
+            candidate.trace.event('first_frame', detail: outcome.name);
+          }
           outputFailure.observe(outcome,
               alreadyHandled:
                   candidate.hasNativeError || recoveryBlocksCompletion);
         }));
       }
       candidate.intendedPlaying = recoverySnapshot?.playing ?? autoPlay;
+      candidate.trace.event('open', url: videoUrl());
       await player.open(
         Media(videoUrl(),
             start: recoverySnapshot?.position ?? Duration(seconds: offset),
@@ -687,6 +717,7 @@ abstract class _PlayerPlaybackController with Store {
 
       return player;
     } catch (error, stackTrace) {
+      candidate.trace.finish('initialization_failed', error: error);
       if (identical(_ownedPlayer, candidate)) {
         cachePolicy.stopWatching();
         _ownedPlayer = null;

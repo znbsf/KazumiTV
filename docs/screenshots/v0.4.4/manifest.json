@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-18",
+  "published_release": false,
+  "phone_source_sha256": "b4f154f734aafbd187b97369403e5753a8b6c6656921f83c23f76d836d0271e6",
+  "images": {
+    "home.png": {
+      "sha256": "6bff3159877655ade0deb20de0f715ca9bbe1516de2f63082e9800940e0e6fde",
+      "bytes": 2062171
+    },
+    "phone-remote.png": {
+      "sha256": "c6963803a40064e56de52670f4ed17518c6596d3eb7c8a1b019c8c4eb27dd2c5",
+      "bytes": 118923
+    }
+  }
+}

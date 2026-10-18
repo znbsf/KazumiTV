@@ -16,6 +16,8 @@ typedef VideoParserEvent = ({
   VideoSourceFormat format,
 });
 
+typedef VideoParserDiagnostic = ({String stage, String url, String detail});
+
 abstract class VideoWebviewController<T> {
   // WebView controller.
   T? webviewController;
@@ -41,6 +43,18 @@ abstract class VideoWebviewController<T> {
 
   // Stream to subscribe to webview logs
   Stream<String> get onLog => logEventController.stream;
+
+  // Structured platform events only: page console text is not persisted here.
+  final _diagnosticController =
+      StreamController<VideoParserDiagnostic>.broadcast(sync: true);
+  Stream<VideoParserDiagnostic> get onDiagnostic =>
+      _diagnosticController.stream;
+
+  void reportDiagnostic(String stage, String url, String detail) {
+    if (!_diagnosticController.isClosed) {
+      _diagnosticController.add((stage: stage, url: url, detail: detail));
+    }
+  }
 
   final StreamController<bool> videoLoadingEventController =
       StreamController<bool>.broadcast();
@@ -69,6 +83,7 @@ abstract class VideoWebviewController<T> {
   }
 
   void disposeEventControllers() {
+    _diagnosticController.close();
     if (!initEventController.isClosed) {
       initEventController.close();
     }

@@ -1,8 +1,8 @@
 import 'package:kazumi/utils/version.dart';
 
 /// Only stable TV builds query the stable project release feed. Checking a
-/// version is not authorization to install an APK: package, ABI and signing
-/// identity have no trusted update manifest yet, so updates remain manual.
+/// version is not authorization to install an APK: the TV asset selector and
+/// native bridge separately verify the download, ABI, package and certificate.
 class ProjectUpdatePolicy {
   static bool canCheck(
           {required bool releaseMode,

@@ -1,12 +1,65 @@
 # KazumiTV 当前状态
 
-## 2026-10-18：PR22 同步与 CI 发布准备
+## 2026-10-18：补齐GitHub下载与系统安装流程（rc2）
+
+用户要求检测更新后自动取得GitHub下载链接并下载安装。核对发现此前正式版只有版本检查和发布页入口，assets故意为空，因此先前0.4.4/20556候选不包含应用内下载。本轮沿用orchestrate-engineering与构建runbook，旧正式包保持不动。新的0.4.4/20557、QA 0.4.4-rc.2候选取代此前发布候选，旧附件只作历史证据，不能继续作为最终发布包。
+
+更新读取固定znbsf/KazumiTV的latest稳定Release，忽略draft/prerelease；按Android实际SUPPORTED_ABIS顺序选精确版本文件名，使用browser_download_url与GitHub SHA256 digest，不拼接未经验证的任意地址、不用mirror字段或上游Kazumi包。缺失/重复/不兼容APK或校验信息失败即拒绝。下载可取消，现有临时文件仅在哈希匹配时复用；下载后与调用安装器前分别由原生桥校验缓存文件、大小/哈希、正式包名/既有固定证书、非debug、版本名/递增versionCode、minSdk及真实ABI。安装源权限缺失时明确引导系统设置，返回后再次确认；不静默安装、不主动退出应用、不替QA安装正式包。
+
+验证计划与停止条件：聚焦测试覆盖链接/ABI/缺失digest/错误来源/测试身份拒绝/原生拒绝传播，再做完整回归、静态分析和三ABI构建。未发布更高版本且正式电视包保持不动，真实“正式旧版→GitHub新版本→系统覆盖安装”完整链路不可冒充已验收；本轮不为测试伪造公开Release、不把QA加入正式通道。发布后须在首次手动升至带更新器版本的设备上验证后续升级。0.4.3因旧代码缺失下载入口，无法仅靠更换链接获得新能力。
+
+
+## 2026-10-18：失败诊断补齐与0.4.4发布准备
+
+用户要求普通失败日志可在下次复发后追查，同时跟完main CI、更新README截图并准备Release。main 0446fd268c23c231056b46fe5a798865b869e15b 的 [CI39104460857](https://github.com/znbsf/KazumiTV/actions/runs/39104460857) 已回读completed/success，checks及三ABI全通过。当前工作从该main新建 codex/playback-diagnostics-release-044，先前本地交接文档保留；新补丁不沿用r7安装验收。
+
+本轮诊断不改变解析期限、重试、解码和恢复策略：每次解析与原生播放器各有独立会话ID/UTC时间/耗时，媒体地址以域名及不可逆指纹关联。两个Android解析实现记录加载阶段、HTTP状态和资源错误码/主框架标识；解析超时、失败、取消、成功均写入现有错误日志文件。播放器在失败处理或释放之前保存脱敏错误详情与最多12条上下文，保留首条身份、每条最多600字符；详细调试开关关闭仍落盘。未知错误保留为未知，不用分类掩盖原始详情；日志订阅随owner释放，重试不清文件。平台回调仅代表当前解析窗口内的资源事件，不把任意子资源错误直接判为主视频原因。
+
+验证：完整回归1091项通过；随后新增真实日志文件落盘测试，验证在普通模式/全局日志等级off下失败仍保留，后续会话不覆盖，签名URL不落盘。最终聚焦35项通过。分析0error/0warning，175既有info；最终新head CI另外跟踪。README新增r7电视首页原图和当前生产手机HTML的浏览器场景截图（明确固定状态展示数据），说明数字续播/确认进详情、7天配对、缓存、实验源健康等。版本准备为0.4.4+20556，CI测试包0.4.4-rc.1；签名候选、升级测试与发布分别记录，正式电视安装及现有Release保持不动。
+
+新增诊断的设备检查预算：固定签名remoteqa覆盖升级后先回读APK/版本/UID/首次安装/数据目录，并比较正式包哈希与身份完全不变。已知7sefun第03集仅尝试一次，最多60秒；成功则正常Back释放，核对解析和native日志保留及设置中的日志入口。失败则保留错误记录停止，不切源，不恢复旧copy/GPU路线。音量8/100保持，配对不撤销；不运行持续采集。此次只验证新日志在实际Android链路接通，不用成功播放替代未知失败根因。
+
+最终CI：[39106407415](https://github.com/znbsf/KazumiTV/actions/runs/39106407415) 对应PR24精确head28698655，completed/success；checks和三ABI全通过。实际日志1092 tests passed、21组网页逻辑通过，静态0error/0warning/175既有info。CI终态与完整日志保存在diagnostics-release-prep/pr24-ci-final.json及pr24-ci-full.log。PR24仍OPEN/MERGEABLE，公开Release仍v0.4.3；此PR合并与正式候选安装/发布尚未执行。
+
+实际执行：补丁已提交并推送到 [PR24](https://github.com/znbsf/KazumiTV/pull/24)，head `28698655864b184ae6bfb3be77b1b556fca580b4`；PR24尚未合并。QA升级为0.4.4-rc.1/205561，APK SHA256 `bb641cf0e9728d0b682311ede436f0f86453be2cf4667eb95b80777b8b33c0b5`，固定QA证书与数据身份保持，正式0.4.3完整身份及APK哈希前后相同。15:11同源一次数字续播成功，解析会话1792307486831021-0与native会话1792307490030666-1通过媒体指纹关联，首帧4737ms；正常返回后，从应用错误日志页读回两条完整记录，证明真实Android路径已落盘。没有复现新失败；失败保留由真实文件测试覆盖，不把成功播放说成修复。原始证据在根 `artifacts/four-stream-20261017/tv-044-rc1-install-20261018/`，脱敏摘录为persisted-traces-redacted.log。
+
+正式0.4.4/20556三ABI已从上述精确提交冻结构建，沿用正式证书3225e3b8…ce806，不创建新身份。校验包名/版本/ABI/TV入口/16KB对齐/原生库哈希/探针排除，通过后生成三APK、三回执、源码、NOTICE、许可及SHA256SUMS，共11个公开附件；源码包含原生构建配方和明确公开的QA签名夹具，不含正式签名材料。候选目录为根 `artifacts/four-stream-20261017/diagnostics-release-prep/release-0.4.4/tv-build/`，candidate-verification.json定义唯一公开附件清单，intermediate目录禁止分发。ARMv7 SHA256 `b1508f9fde9bf6bc5000f5e6b69f427a6a66a62bb7dd1cebde18c618ffcb7f59`；ARM64 `bf4ce35521338162d29ce608ae9ffde8efae803e7ec3dd899c3d5558310a3797`；x64 `a683451b4a19e9a1083714cb7e3c0bf9cb95096669797af1245c428aaf675ec1`。正式候选未安装、未发布，升级保数据验收与公开Release仍待用户决定；已准备RELEASE-BODY.md，公开前须核对main/目标tag与候选源码一致。
+
+设备结束状态：首页、媒体inactive、音量8/100，三次短时top样本中QA进程CPU为0.0%；不是长期负载保证。无持续采集，配对不撤销。浏览器展示服务已停止且端口无监听，本轮Gradle daemon22480确认归属后停止并回读不存在；既有Kotlin daemon31080保留。本节运行后结果留在本地交接，PR正文同步实际结果，不为结果记账重复触发相同源码CI。
+
+## 2026-10-18：用户通过剩余验收，授权合并；当前源失败调查
+
+用户确认剩余电视项目验收无问题，授权合并 PR20/22；正式包安装及 Release 不在本次授权内。当前 QA 包实测仍为 0.4.3-qa6-r7 / 205551，MiTV-ASTP0 / mulan。用户另报当前源播放失败，并明确允许点击当前源复现；先保存原日志、截图、控件树和包/音量状态，证据位于根 artifacts/four-stream-20261017/tv-r7-failure-20261018-143043。
+
+新现场：学生会也有洞！来源选择框，当前焦点为 7sefun 播放项，音量 8/100。复用 CONFIRMED-PLAYBACK-RECOVERY 的 direct/copy 分类与停止条件；不重开已停止的 GPU/copy 实验。最小观察：仅点击该源一次，最长观察 60 秒，区分详情/解析网络阶段和 native 播放器创建/首帧阶段；出现决定性失败即停止重试。保存带时间日志与结果截图，不切源、不换包、不改配对。若开始播放，取证后正常返回停播；音量保持既有低音量。后续实验须由本轮证据支持。
+
+合并结果：已重新读取 main保护/ruleset详情/有效规则、两PR精确head的四项成功checks、reviews及review threads（均无），未绕过保护。PR20先普通merge到 main，merge SHA 7f1642d8aee27614e469ab50c75b66b32c1b69fe；该树与原PR20 head一致。PR22改base为main并复查，head仍9aa56ad8、checks全绿、合并候选源码未变，随后普通merge，merge SHA 0446fd268c23c231056b46fe5a798865b869e15b。两PR均回读MERGED，main最终树与已验证PR22 head完全一致；Latest Release仍v0.4.3，无正式安装/发行操作。main push的新CI 39104460857当前运行中，不能写成已通过；此前PR head CI成功证据保留。
+
+现场结果：本次同源单次播放成功，原始旧日志发现7sefun解析阶段异常及另一个mgnacg会话unknown native error。分层结论、观测缺口和停止条件已补入 CONFIRMED-PLAYBACK-RECOVERY 顶部；当前没有足够证据认定具体根因或宣布修复。用户此前功能验收通过与新发现的间歇来源故障分开记录。
+
+## 2026-10-18：PR22 已同步，CI 与三 ABI 下载核验通过
 
 用户已明确授权继续完成可执行的发布准备、同步 PR 并跑 CI；剩余电视验收由用户进行，正式版先不动。本轮不操作电视、不构建或安装正式包、不合并 main、不创建或更新正式 Release。r7 功能源码和本地安装包沿用下面的确切提交/哈希；新增工作只涉及 CI 与交接文档。
 
 向 PR22 的现有 head `ec48aef0` 追加已核对的完整树差异，保留其压缩评审历史，不强推或改写本地开发分支。发布说明为 0.4.4 草稿；PR 继续保留 draft，避免将用户待验收状态表述为已完成。CI 除 Flutter 分析/完整回归与三 ABI 固定签名产物核验外，增加 21 组手机网页逻辑检查及检查阶段锁文件不变断言。签名夹具为已明确公开的 remoteqa 测试夹具，不涉及正式密钥。
 
 执行要求：核对新 PR head 与待同步树一致，跟踪新 head 的 checks 和三 ABI 构建到终态，回读 PR 正文和状态；不能沿用旧 head 的绿色结果。取得候选附件后验证每 ABI 的版本/包名/固定证书/源码/哈希与回执，并整理后续正式发行的附件范围。CI 成功不代替电视验收，也不代表正式发布完成。
+
+香港时间约 14:10 已完成：[PR22](https://github.com/znbsf/KazumiTV/pull/22) head 为 `9aa56ad8bf35e5cca70255c7844cdcbd67675ad8`，在原 `ec48aef0` 上普通快进追加，完整树与本地准备提交 `4b77126e` 一致；功能源码仍与已装 r7 的 `16b34fb6` 一致。[CI 39101671248](https://github.com/znbsf/KazumiTV/actions/runs/39101671248) 的 checks 和三 ABI 全部 success；实际日志为 **1085 tests passed、21 组网页逻辑通过、静态 0 error / 0 warning / 175 既有 info**。CI merge `d8cadba39a03756311c23bf7789c3c0bafb1004f` 与 PR head 源码树一致。PR22 标题/正文已重写并回读，PR20 也已补充指向最新 r7 的说明，两者均保持 draft，PR20 的 head 未变。
+
+| CI ABI | versionCode | 实际下载 APK SHA256 |
+|---|---:|---|
+| armeabi-v7a | 205551 | `5114658e8dcb5aa4701ff8dfbe5116bbdbc562a830cc403f83ae64065a3f86ee` |
+| arm64-v8a | 205552 | `6b21947d21052d29d5d88b56ffece4750a9d670433bc2ac988a6cf9545250bf3` |
+| x86_64 | 205554 | `51ecbc5b2864e46bf751246092853c67817b4ad2a08b9288eb07bc13e085fd2b` |
+
+三个下载包均为 `0.4.3-qa6-r7 / com.znbsf.kazumi.fluttertv.remoteqa`。本地独立核验签名、身份、ABI、TV入口、无debuggable/sharedUserId、16KB对齐、libmpv与固定源码索引一致、探针排除，以及大小/哈希与 CI 回执一致。它们没有安装；电视上的本机 r7 保持原哈希 `6b0b7095...8dfb0`，不以 CI 字节替代其设备验收记录。
+
+准备包位于根 `artifacts/four-stream-20261017/release-prep-0.4.4/`，包括确切源码候选 ZIP（46,317,172 字节，CRC已查）、许可/NOTICE、发布草稿、原生来源索引、三个 QA APK、独立回执、manifest 和 SHA256SUMS。源码 ZIP 的 git archive 不展开工具链子模块；已核对其中包含对应 libmpv 构建配方归档及依赖来源索引，Flutter构建SDK按文档固定版本。该 ZIP 是候选快照，正式版本提交后须重生成正式对应源码，不冒充已经产出的正式版本。
+
+首次推送因 GitHub 邮箱隐私保护拒绝，改用当前账号公开 noreply 标识重建同树同步提交后成功；没有关闭保护、改全局 Git 配置或强推。附件经已有本地代理一次下载完成，代理/接口可达，过程中仅传输较慢，无网络设置变化。CI观察和下载进程均已结束；本轮没有 ADB/电视操作、正式构建、合并或 Release 写入。最终 main 仍 `70c3769a`，Latest 仍 v0.4.3。运行后结论已同步 PR 正文；本节为本地交接补记，不为更新运行后计数重复触发 CI。
+
+下一步由用户验收电视上的续播位置、选集闲置收起和规则长列表；自然数日连接与手机马达仍按实际反馈记录。代码/PR/新 head CI/候选包/发布材料准备已完成。正式签名构建、保数据正式升级、合并及公开发布仍未执行。下方 r7 节的“待同步/待 CI”是此前准备时的状态，以本节为准。
 
 ## 2026-10-18：r7 确认键语义已纠正并安装，下一版发布材料已整理
 

@@ -112,7 +112,8 @@ void main() {
       () async {
     const firstPage = 'https://site.example/episode/1';
     const secondPage = 'https://site.example/episode/2';
-    final service = WebViewVideoSourceService(controllerFactory: () => parser);
+    final service = WebViewVideoSourceService(
+        controllerFactory: () => parser, diagnosticSink: (_) {});
     final firstLoaded = Completer<void>();
     final secondLoaded = Completer<void>();
     final cleanupEntered = Completer<void>();

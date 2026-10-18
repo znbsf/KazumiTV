@@ -48,6 +48,7 @@ class MainActivity: AudioServiceActivity() {
     private var tvNavigationActive = false
     private var tvBackDownAt: Long? = null
     private var episodeBrowserBridge: EpisodeBrowserBridge? = null
+    private var updateBridge: TvUpdateBridge? = null
 
     private var pipIsPlaying = false
     private var pipDanmakuEnabled = false
@@ -89,6 +90,8 @@ class MainActivity: AudioServiceActivity() {
     }
 
     override fun onDestroy() {
+        updateBridge?.detach()
+        updateBridge = null
         episodeBrowserBridge?.detach()
         episodeBrowserBridge = null
         unregisterPipActionReceiverIfNeeded()
@@ -162,6 +165,8 @@ class MainActivity: AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         episodeBrowserBridge?.detach()
         episodeBrowserBridge = EpisodeBrowserBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        updateBridge?.detach()
+        updateBridge = TvUpdateBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         intentChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         intentChannel?.setMethodCallHandler { call, result ->
             if (call.method == "openWithMime") {

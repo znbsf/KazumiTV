@@ -55,12 +55,20 @@ class VideoWebviewImpl
           }
           return null;
         },
+        onReceivedHttpError: (controller, request, response) {
+          if (_pageActive) {
+            reportDiagnostic('http_error', request.url.toString(),
+                'status=${response.statusCode} mainFrame=${request.isForMainFrame}');
+          }
+        },
         onLoadStart: (controller, url) async {
           _log('started loading: $url');
+          if (_pageActive) reportDiagnostic('load_start', '$url', '');
           if (url.toString() != 'about:blank') await _injectParser();
         },
         onLoadStop: (controller, url) async {
           _log('loading completed: $url');
+          if (_pageActive) reportDiagnostic('load_stop', '$url', '');
           if (url.toString() != 'about:blank') await _injectParser();
         },
         onConsoleMessage: (controller, consoleMessage) {
@@ -69,6 +77,10 @@ class VideoWebviewImpl
         },
         onReceivedError: (controller, request, error) {
           _log('Error: ${error.description} - ${request.url}');
+          if (_pageActive) {
+            reportDiagnostic('resource_error', request.url.toString(),
+                'code=${error.type.toNativeValue()} mainFrame=${request.isForMainFrame} ${error.description}');
+          }
         },
       ),
     );
