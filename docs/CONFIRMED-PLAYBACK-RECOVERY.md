@@ -1,5 +1,24 @@
 # 确认后尝试软件兼容播放（草稿）
 
+## 后续诊断补齐（0.4.4候选）
+
+针对下节现场留下的证据缺口，新增 PlaybackTrace 关联解析与原生会话：错误详情先脱敏，再保留有限上下文；通过强制写入既有kazumi_logs.log，在普通模式和重试后仍保留。WebView同时记录资源错误的域名/请求指纹、平台错误码、HTTP状态与mainFrame；取消和替换单独记结果。未知原生错误不会自动变成硬解结论。查看入口为设置→存储与日志→错误日志；下次现场先保留该文件及logcat，再重试，按同会话、同地址指纹和时间关联。
+
+本地覆盖脱敏、未知错误在同步释放前记录、限长/限条、取消后重试隔离、真实文件持久化。不会开启全量HTTP头或脚本console持久化，也不改现有解码策略。日志不保证追溯到平台未上报的内部原因；进程崩溃或WebView init永不返回仍需系统日志。0.4.4候选实际安装后的取证以项目状态为准，r7旧原生错误无法由新代码补回。
+
+## 2026-10-18 14:30：r7 当前源间歇失败，旧日志已保留
+
+用户确认剩余电视 UI/遥控验收通过，同时另报当前源失败；允许点击当前源一次。实机 MiTV-ASTP0 / mulan，remoteqa 0.4.3-qa6-r7 / 205551。新证据目录为根 artifacts/four-stream-20261017/tv-r7-failure-20261018-143043：before-logcat.txt 在操作前完整保存，before.png/xml 确认当前焦点是「学生会也有洞！」7sefun；原始日志含媒体签名地址，仅本地保留。prior-app-redacted.log 为脱敏旧应用日志。
+
+- 13:45:15 与13:46:00，7sefun 剧集页 HTTP200；13:45:16/13:46:01 进入第03集，WebView 出现 SSL handshake failed / net_error -101，尚无相应 resolved video URL 或 native VideoOutput 创建。13:45:55 同时有 SourceSheet 的15秒 VideoSourceTimeoutException。只能确认解析阶段曾失败及同期连接异常；握手日志没有具体失败资源，不能断言主媒体域名、证书、DNS或路由根因，不能把 SourceSheet 超时等同所有 VideoPage 请求的精确终态。
+- 13:49:01 是另一来源 mgnacg 第1话；13:49:06 已解析到带签名的 .mknvideo URL，direct 输出 handle2271706984 已完成1×1预挂。13:49:08 session102588664 只有 category=unknown / signal=native_error，随即 dispose；无本会话 hardwareUnavailable 证据。未知错误不可改写为硬解不可用、格式错误或网络错误。
+- 本次14:31:22点击7sefun，第03集在14:31:25.901解析完成；14:31:26 direct预挂，14:31:28选择 OMX.amlogic.avc.decoder.awesome，14:31:29.923尺寸1920×1080，14:31:30.207真实首帧回调；attempt.png 有画面，after-media 位置99974ms，后续170002ms。本次成功与用户“好像又好了”一致，不能证明间歇问题已修复。成功会话仍有 ACodec setPortMode/nBufferCountActual 警告，故单凭这些警告不可归因失败。
+- 弹幕403同时出现在失败和成功会话；该日志不是视频流403证据。
+
+源码复核发现观测缺口：VideoWebviewImpl._log 仅流向页面日志流；VideoPage 的解析超时只改UI，未持久记录请求终态。PlayerErrorMapper 只保留安全分类，unknown 没有原始错误详情；MPV详细日志仅 playerDebugMode 时写入文件，普通 playerLog 每次新建播放清空。因此当前系统日志不能追补已消失的旧原生错误内容。后续优先补可脱敏、带会话关联的解析阶段/失败原因有限日志，再在同源复发时观测；不根据本次未知错误调整解码或扩大重试。
+
+本轮未新增功能修改、换源对照、安装或重开copy/GPU实验。取证后正常Back停播，media_session inactive/state0；音量保持8/100、配对不变。所有采集均为已完成的单次命令，无持续录制。即时 dumpsys cpuinfo 含过去播放窗口，不作为停后安静证明；另保存短时 top 采样观察实际负载。
+
 ## 2026-10-18 QA6 用户现场：Surface 初始化互锁修复候选
 
 ### 当前路由：先按现场输出路径判断，copy/GPU不阻塞本轮

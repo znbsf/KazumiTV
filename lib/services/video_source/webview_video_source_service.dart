@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:kazumi/services/logging/playback_trace.dart';
 
 import 'package:kazumi/webview/video/video_webview_controller.dart';
 import 'package:kazumi/services/video_source/video_source_service.dart';
@@ -12,12 +13,15 @@ class WebViewVideoSourceService implements IVideoSourceService {
   WebViewVideoSourceService({
     VideoWebviewController Function()? controllerFactory,
     Duration cleanupTimeout = const Duration(seconds: 2),
+    PlaybackTraceSink? diagnosticSink,
   })  : _cleanupTimeout = cleanupTimeout,
+        _diagnosticSink = diagnosticSink,
         _controllerFactory =
             controllerFactory ?? VideoWebviewControllerFactory.getController;
 
   final VideoWebviewController Function() _controllerFactory;
   final Duration _cleanupTimeout;
+  final PlaybackTraceSink? _diagnosticSink;
   VideoWebviewController? _webview;
   StreamSubscription? _logSubscription;
 
@@ -69,6 +73,11 @@ class WebViewVideoSourceService implements IVideoSourceService {
   }) async {
     request.throwIfNotCurrent(_activeRequest);
 
+    final trace = PlaybackTrace('parser', sink: _diagnosticSink);
+    trace.event('initialize',
+        url: episodeUrl,
+        detail: 'legacy=$useLegacyParser timeoutMs=${timeout.inMilliseconds}');
+    StreamSubscription<VideoParserDiagnostic>? diagnosticSubscription;
     var didStartLoad = false;
     Future<void>? loadFuture;
     StreamSubscription<VideoParserEvent>? parserSubscription;
@@ -93,6 +102,12 @@ class WebViewVideoSourceService implements IVideoSourceService {
 
       request.throwIfNotCurrent(_activeRequest);
 
+      diagnosticSubscription = _webview!.onDiagnostic.listen((event) {
+        if (request.isCurrent(_activeRequest)) {
+          trace.event(event.stage, url: event.url, detail: event.detail);
+        }
+      });
+
       // 广播流不会重放事件：iframe/原生拦截可能在 loadUrl 返回前
       // 已经给出 URL，因此必须先订阅，且订阅只属于当前解析请求。
       parserSubscription = _webview!.onVideoURLParser.listen(
@@ -114,6 +129,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
       );
 
       didStartLoad = true;
+      trace.event('load', url: episodeUrl);
       loadFuture = Future<void>.sync(
         () => _webview!.loadUrl(
           episodeUrl,
@@ -138,6 +154,9 @@ class WebViewVideoSourceService implements IVideoSourceService {
 
       request.throwIfNotCurrent(_activeRequest);
 
+      trace.event('resolved', url: event.url, detail: event.format.name);
+      trace.finish('resolved');
+
       return VideoSource(
         url: event.url,
         offset: event.offset,
@@ -146,11 +165,19 @@ class WebViewVideoSourceService implements IVideoSourceService {
       );
     } catch (e) {
       if (e is VideoSourceCancelledException) {
+        trace.finish('cancelled');
         rethrow;
+      }
+      if (!request.isCurrent(_activeRequest)) {
+        trace.finish('superseded');
+      } else {
+        trace.finish(e is VideoSourceTimeoutException ? 'timeout' : 'failed',
+            error: e);
       }
       request.throwIfNotCurrent(_activeRequest);
       rethrow;
     } finally {
+      await diagnosticSubscription?.cancel();
       await parserSubscription?.cancel();
       if (parserSubscription != null && !parserResult.isCompleted) {
         parserResult.completeError(const VideoSourceCancelledException());

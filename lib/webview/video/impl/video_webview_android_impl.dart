@@ -39,11 +39,25 @@ class VideoWebviewAndroidImpl
           webviewController = controller;
           initEventController.add(true);
         },
+        onReceivedHttpError: (controller, request, response) {
+          if (_pageActive) {
+            reportDiagnostic('http_error', request.url.toString(),
+                'status=${response.statusCode} mainFrame=${request.isForMainFrame}');
+          }
+        },
+        onReceivedError: (controller, request, error) {
+          if (_pageActive) {
+            reportDiagnostic('resource_error', request.url.toString(),
+                'code=${error.type.toNativeValue()} mainFrame=${request.isForMainFrame} ${error.description}');
+          }
+        },
         onLoadStart: (controller, url) async {
           _log('started loading: $url');
+          if (_pageActive) reportDiagnostic('load_start', '$url', '');
         },
         onLoadStop: (controller, url) {
           _log('loading completed: $url');
+          if (_pageActive) reportDiagnostic('load_stop', '$url', '');
         },
       ),
     );
