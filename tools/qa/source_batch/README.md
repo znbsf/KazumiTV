@@ -50,3 +50,12 @@ Android9对应环境：官方 `system-images/android-28/default/x86_64` revision
 集成适配入口：清单可以直接传入 `rule: <effective plain JSON>`，无需 `rule_file`。规则候选/集成树负责调用 `plugin.toJson(includeLocalMetadata: false)`；当前分支不导入尚未合入的 RuleOverlay。可附 `rule_provenance: {overlay, base_sha256, effective_sha256, upstream_commit}`，运行器原样携带为调用者声明，同时独立记录输入 JSON SHA256 与运行时 ruleFingerprint；三种摘要算法不应混用。未知上游 commit 必须 null。基础/有效对照各自作为不同案例，禁止修改真实规则列表以构造对照。
 
 官方参考：[GeckoView WebExtensions](https://firefox-source-docs.mozilla.org/mobile/android/geckoview/consumer/web-extensions.html)、[MAIN world 支持](https://blog.mozilla.org/addons/2024/07/10/manifest-v3-updates-landed-in-firefox-128/)。
+
+## 规则覆盖集成候选
+
+集成版rule同时接受生产模型支持的普通规则、覆盖bundle和带本地元数据的导出规则。
+rule_variant默认为effective；只有带覆盖元数据时可选base，它构造独立基础对象，不改写已安装规则。
+基础/有效对照使用不同case id，其余条件保持相同。运行时observed_rule_snapshot记录实际有效摘要、
+基础摘要、覆盖文档摘要及来源标签；摘要统一使用RuleOverlay.fingerprint。
+普通纯规则的来源和基础摘要未知，保留null。来源标签未经联网或签名验证；调用者rule_provenance
+仍单独保存，不能代替运行时测量。这不新增播放profile或改变默认内核、网页fetch请求头。

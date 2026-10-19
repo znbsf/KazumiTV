@@ -25,6 +25,7 @@ import 'package:kazumi/webview/video/impl/video_webview_android_impl.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
 import 'package:kazumi/utils/http_headers.dart';
 import 'gecko_controller.dart';
+import 'rule_snapshot.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -93,7 +94,11 @@ class _BatchCaseState extends State<BatchCase> {
       bool legacy = false;
       bool adBlocker = false;
       if (c['rule'] != null) {
-        final plugin = Plugin.fromJson(Map<String, dynamic>.from(c['rule']));
+        final snapshot = BatchRuleSnapshot.fromJson(
+            Map<String, dynamic>.from(c['rule']),
+            variant: c['rule_variant'] as String? ?? 'effective');
+        final plugin = snapshot.plugin;
+        result['observed_rule_snapshot'] = snapshot.identity;
         result['rule_fingerprint'] = ruleFingerprint(plugin);
         final hits = await run.wait(plugin.queryBangumi(c['keyword'] as String,
             shouldRethrow: true, cancelToken: run.token), const Duration(seconds: 10));
