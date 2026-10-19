@@ -1,5 +1,34 @@
 import 'package:kazumi/utils/media.dart';
 
+/// A page-shaped URL explicitly supplied as a video source, never an arbitrary
+/// link/iframe destination. Following it is a service-level, one-hop fallback.
+String? nestedVideoPageUrl(String source, {bool fromPlayerQuery = false}) {
+  try {
+    if (!isVideoParserNetworkUrl(source) || isVideoParserAdUrl(source)) {
+      return null;
+    }
+    var candidate = source;
+    if (fromPlayerQuery) {
+      final values = Uri.parse(source).queryParametersAll['url'];
+      if (values == null || values.length != 1) return null;
+      candidate = values.single;
+    }
+    final uri = Uri.tryParse(candidate);
+    if (uri == null ||
+        !isVideoParserNetworkUrl(candidate) ||
+        isVideoParserAdUrl(candidate) ||
+        uri.userInfo.isNotEmpty ||
+        candidate.length > 8192) {
+      return null;
+    }
+    final path = uri.path.toLowerCase();
+    if (!path.endsWith('.html') && !path.endsWith('.htm')) return null;
+    return candidate;
+  } on FormatException {
+    return null;
+  }
+}
+
 /// Read only the public media URL embedded in an iframe's query. Preserve
 /// signed query bytes; decodeVideoSource adds an outer encodeFull layer.
 String? embeddedVideoParserUrl(String source) {

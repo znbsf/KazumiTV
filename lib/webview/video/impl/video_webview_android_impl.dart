@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -17,10 +18,12 @@ class VideoWebviewAndroidImpl
   bool _useLegacyParser = false;
   bool _pageActive = false;
   int _session = 0;
+  bool _disposed = false;
 
   @override
   Future<void> init() async {
     await _setupProxy();
+    if (_disposed) return;
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSettings: InAppWebViewSettings(
@@ -35,6 +38,7 @@ class VideoWebviewAndroidImpl
           geolocationEnabled: false,
         ),
         onWebViewCreated: (controller) {
+          if (_disposed) return;
           KazumiLogger().i('[WebView] Created');
           webviewController = controller;
           initEventController.add(true);
@@ -61,7 +65,9 @@ class VideoWebviewAndroidImpl
         },
       ),
     );
-    await headlessWebView?.run();
+    final view = headlessWebView;
+    await view?.run();
+    if (_disposed) await view?.dispose();
   }
 
   @override
@@ -109,7 +115,12 @@ class VideoWebviewAndroidImpl
       callback: (args) {
         if (!_isCurrentReply(args)) return;
         final url = embeddedVideoParserUrl(args[0].toString());
-        if (url != null) _resolve(url);
+        if (url != null) {
+          _resolve(url);
+        } else if (nestedVideoPageUrl(args[0].toString(), fromPlayerQuery: true)
+            case final page?) {
+          notifyNestedPageCandidate(page);
+        }
       },
     );
     webviewController?.addJavaScriptHandler(
@@ -117,6 +128,10 @@ class VideoWebviewAndroidImpl
       callback: (args) {
         if (!_isCurrentReply(args) || _useLegacyParser) return;
         final url = args[0].toString();
+        if (nestedVideoPageUrl(url) case final page?) {
+          notifyNestedPageCandidate(page);
+          return;
+        }
         if (isVideoParserNetworkUrl(url) && !isVideoParserAdUrl(url)) {
           _resolve(url);
         }
@@ -150,7 +165,23 @@ class VideoWebviewAndroidImpl
   }
 
   @override
+  Future<void> captureParserSnapshot() async {
+    if (!_pageActive) return;
+    final session = _session;
+    final value = await webviewController?.evaluateJavascript(
+        source: videoParserSnapshotScript);
+    if (!_pageActive || session != _session || value is! String) return;
+    final data = jsonDecode(value) as Map<String, dynamic>;
+    reportDiagnostic('dom_snapshot', '',
+        'ready=${data['ready']} frames=${data['frames']} videos=${data['videos']} installed=${data['installed']} active=${data['active']}');
+    for (final url in (data['urls'] as List).whereType<String>()) {
+      reportDiagnostic('iframe_snapshot', url, '');
+    }
+  }
+
+  @override
   Future<void> dispose() async {
+    _disposed = true;
     _pageActive = false;
     _session++;
     await headlessWebView?.dispose();

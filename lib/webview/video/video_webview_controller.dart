@@ -32,6 +32,9 @@ abstract class VideoWebviewController<T> {
   /// WebView initialization method.
   Future<void> init();
 
+  /// Bounded by the source service; implementations may report safe DOM state.
+  Future<void> captureParserSnapshot() async {}
+
   final StreamController<bool> initEventController =
       StreamController<bool>.broadcast();
 
@@ -49,6 +52,14 @@ abstract class VideoWebviewController<T> {
       StreamController<VideoParserDiagnostic>.broadcast(sync: true);
   Stream<VideoParserDiagnostic> get onDiagnostic =>
       _diagnosticController.stream;
+
+  final _nestedPageController = StreamController<String>.broadcast(sync: true);
+  Stream<String> get onNestedPageCandidate => _nestedPageController.stream;
+
+  @protected
+  void notifyNestedPageCandidate(String url) {
+    if (!_nestedPageController.isClosed) _nestedPageController.add(url);
+  }
 
   void reportDiagnostic(String stage, String url, String detail) {
     if (!_diagnosticController.isClosed) {
@@ -83,6 +94,7 @@ abstract class VideoWebviewController<T> {
   }
 
   void disposeEventControllers() {
+    _nestedPageController.close();
     _diagnosticController.close();
     if (!initEventController.isClosed) {
       initEventController.close();

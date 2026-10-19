@@ -25,6 +25,8 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/player/source_switch.dart';
 import 'package:kazumi/services/player/cross_source_resume.dart';
 import 'package:kazumi/services/video_source/services.dart';
+import 'package:kazumi/services/video_source/resolved_source_cache.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'support/tv_focus_fixtures.dart' show focusItem;
@@ -86,7 +88,17 @@ class _Source implements WebViewVideoSourceService {
   Future<void> dispose() async {}
 }
 
+class _Output implements VideoController {
+  final frame = Completer<void>();
+  @override
+  Future<void> get waitUntilFirstFrameRendered => frame.future;
+  @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+}
+
 class _Playback implements PlayerPlaybackController {
+  @override
+  VideoController? videoController;
   @override
   bool playing = true;
   @override
@@ -161,7 +173,7 @@ void main() {
     source = _Source();
     player = _Player();
     controller = VideoPageController(history, _Downloads(), _DownloadManager(),
-        videoSourceService: source);
+        videoSourceService: source, resolvedSourceCache: ResolvedSourceCache());
     controller.applyPlaybackArgs(OnlineVideoPlaybackArgs(
       bangumiItem: focusItem(1),
       plugin: Plugin.fromJson(
@@ -214,6 +226,56 @@ void main() {
             offset: 42,
             type: VideoSourceType.online),
       );
+
+  test(
+      'rendered episode falls back after parser timeout once with same headers',
+      () async {
+    final output = _Output();
+    player.playback.videoController = output;
+    await controller.changeEpisode(1, playerController: player);
+    final original = player.initializations.single;
+    output.frame.complete();
+    await Future<void>.delayed(Duration.zero);
+    source.answer = (_, __) =>
+        Future.error(const VideoSourceTimeoutException(Duration(seconds: 15)));
+    player.playback.playerPosition = const Duration(seconds: 99);
+    await controller.retryCurrentEpisode(playerController: player);
+    expect(player.initializations, hasLength(2));
+    expect(player.initializations.last.videoUrl, original.videoUrl);
+    expect(player.initializations.last.httpHeaders, original.httpHeaders);
+    expect(player.initializations.last.offset, 99);
+    expect(controller.errorMessage, isNull);
+    await controller.retryCurrentEpisode(playerController: player);
+    expect(player.initializations, hasLength(2));
+    expect(controller.errorMessage, contains('解析超时'));
+  });
+
+  test('rendered first episode cannot be reused for another episode', () async {
+    final output = _Output();
+    player.playback.videoController = output;
+    await controller.changeEpisode(1, playerController: player);
+    output.frame.complete();
+    await Future<void>.delayed(Duration.zero);
+    source.answer = (_, __) =>
+        Future.error(const VideoSourceTimeoutException(Duration(seconds: 15)));
+    await controller.changeEpisode(2, playerController: player);
+    expect(player.initializations, hasLength(1));
+    expect(controller.errorMessage, contains('解析超时'));
+  });
+
+  test('native failure invalidates previously confirmed address', () async {
+    final output = _Output();
+    player.playback.videoController = output;
+    await controller.changeEpisode(1, playerController: player);
+    output.frame.complete();
+    await Future<void>.delayed(Duration.zero);
+    player.initializations.single.onPlaybackError!('network failed');
+    source.answer = (_, __) =>
+        Future.error(const VideoSourceTimeoutException(Duration(seconds: 15)));
+    await controller.retryCurrentEpisode(playerController: player);
+    expect(player.initializations, hasLength(1));
+    expect(controller.errorMessage, contains('解析超时'));
+  });
 
   test('source switch commits pre-resolved media without a second parse',
       () async {

@@ -18,6 +18,192 @@ const _staleVideo = 'https://example.test/video/stale.m3u8';
 Future<void> _flushAsync() => Future<void>.delayed(Duration.zero);
 
 void main() {
+  test('stuck timeout diagnostics remain bounded and do not poison retry',
+      () async {
+    final gate = Completer<void>();
+    final controller = _FakeWebviewController()..onSnapshot = () => gate.future;
+    final service = _service(
+        controllerFactory: () => controller,
+        cleanupTimeout: const Duration(milliseconds: 20));
+    addTearDown(service.dispose);
+    await expectLater(
+        service
+            .resolve(_firstPage,
+                useLegacyParser: false,
+                timeout: const Duration(milliseconds: 20))
+            .timeout(const Duration(seconds: 1)),
+        throwsA(isA<VideoSourceTimeoutException>()));
+    controller.onLoad = (_) async => controller.emit(_secondVideo);
+    expect((await service.resolve(_secondPage, useLegacyParser: false)).url,
+        _secondVideo);
+    gate.completeError(StateError('late snapshot error'));
+    await _flushAsync();
+  });
+  for (final cancelDuringInit in [true, false]) {
+    test(
+        'initialization is bounded and retired on ${cancelDuringInit ? 'cancel' : 'timeout'}',
+        () async {
+      final gate = Completer<void>();
+      final old = _FakeWebviewController()..onInit = () => gate.future;
+      final next = _FakeWebviewController();
+      next.onLoad = (_) async => next.emit(_secondVideo);
+      var creations = 0;
+      final service =
+          _service(controllerFactory: () => creations++ == 0 ? old : next);
+      addTearDown(service.dispose);
+      final future = service.resolve(_firstPage,
+          useLegacyParser: false, timeout: const Duration(milliseconds: 30));
+      final failed = expectLater(
+          future,
+          throwsA(cancelDuringInit
+              ? isA<VideoSourceCancelledException>()
+              : isA<VideoSourceTimeoutException>()));
+      await _flushAsync();
+      if (cancelDuringInit) service.cancel();
+      await failed;
+      expect(old.disposals, 1);
+      expect(old.loads, isEmpty);
+      expect((await service.resolve(_secondPage, useLegacyParser: false)).url,
+          _secondVideo);
+      gate.completeError(StateError('late native init failure'));
+      await _flushAsync();
+    });
+  }
+  const nested = 'https://nested.test/play/3.html?token=PRIVATE';
+  for (final failure in ['timeout', 'not found']) {
+    test('follows one explicit page only after $failure', () async {
+      final records = <String>[];
+      final controller = _FakeWebviewController();
+      controller.onLoad = (url) async {
+        if (url == _firstPage) {
+          controller.candidate(nested);
+          controller.candidate(nested);
+          if (failure == 'not found') {
+            controller.emitError(const VideoSourceNotFoundException());
+          }
+        } else {
+          controller.emit(_secondVideo);
+        }
+      };
+      final service = _service(
+          controllerFactory: () => controller, diagnosticSink: records.add);
+      addTearDown(service.dispose);
+      final source = await service.resolve(_firstPage,
+          useLegacyParser: false,
+          offset: 37,
+          timeout: const Duration(milliseconds: 30));
+      expect(source.url, _secondVideo);
+      expect(source.offset, 37);
+      expect(controller.loads.map((load) => load.url), [_firstPage, nested]);
+      expect(records.join(), isNot(contains('PRIVATE')));
+      expect(records.join(), contains('nested_page'));
+    });
+  }
+
+  test('normal success never follows a captured HTML candidate', () async {
+    final controller = _FakeWebviewController();
+    controller.onLoad = (_) async {
+      controller.candidate(nested);
+      controller.emit(_firstVideo);
+    };
+    final service = _service(controllerFactory: () => controller);
+    addTearDown(service.dispose);
+    expect((await service.resolve(_firstPage, useLegacyParser: false)).url,
+        _firstVideo);
+    expect(controller.loads, hasLength(1));
+  });
+
+  for (final candidates in [
+    <String>[],
+    [nested, 'https://other.test/4.html'],
+    ['https://example.test/root.html#cycle'],
+    ['https://googleads.example/ad.html'],
+    ['javascript:alert(1)'],
+  ]) {
+    test(
+        'no fallback for absent, ambiguous, cyclic or invalid candidates $candidates',
+        () async {
+      final controller = _FakeWebviewController();
+      controller.onLoad = (_) async {
+        for (final candidate in candidates) {
+          controller.candidate(candidate);
+        }
+        controller.emitError(const VideoSourceNotFoundException());
+      };
+      final service = _service(controllerFactory: () => controller);
+      addTearDown(service.dispose);
+      await expectLater(
+          service.resolve('https://example.test/root.html',
+              useLegacyParser: false),
+          throwsA(isA<VideoSourceNotFoundException>()));
+      expect(controller.loads, hasLength(1));
+    });
+  }
+
+  test('nested page has a deadline and cannot recurse into a third page',
+      () async {
+    final controller = _FakeWebviewController();
+    controller.onLoad = (url) async {
+      controller
+          .candidate(url == _firstPage ? nested : 'https://third.test/4.html');
+      if (url == _firstPage) {
+        controller.emitError(const VideoSourceNotFoundException());
+      }
+    };
+    final service = _service(
+        controllerFactory: () => controller,
+        nestedPageTimeout: const Duration(milliseconds: 20));
+    addTearDown(service.dispose);
+    await expectLater(service.resolve(_firstPage, useLegacyParser: false),
+        throwsA(isA<VideoSourceTimeoutException>()));
+    expect(controller.loads.map((load) => load.url), [_firstPage, nested]);
+  });
+
+  for (final cancelAtNested in [false, true]) {
+    test(
+        'cancel during ${cancelAtNested ? 'nested' : 'original'} page prevents late recovery',
+        () async {
+      final controller = _FakeWebviewController();
+      final reached = Completer<void>();
+      controller.onLoad = (url) async {
+        controller.candidate(nested);
+        if (cancelAtNested && url == _firstPage) {
+          controller.emitError(const VideoSourceNotFoundException());
+        } else if (!reached.isCompleted) {
+          reached.complete();
+        }
+      };
+      final service = _service(controllerFactory: () => controller);
+      addTearDown(service.dispose);
+      final future = service.resolve(_firstPage, useLegacyParser: false);
+      final cancelled =
+          expectLater(future, throwsA(isA<VideoSourceCancelledException>()));
+      await reached.future;
+      service.cancel();
+      await cancelled;
+      controller.candidate('https://stale.test/old.html');
+      controller.emit(_staleVideo);
+      expect(controller.loads, hasLength(cancelAtNested ? 2 : 1));
+      controller.onLoad = (_) async => controller.emit(_secondVideo);
+      expect((await service.resolve(_secondPage, useLegacyParser: true)).url,
+          _secondVideo);
+    });
+  }
+
+  test('unexpected parser error never triggers nested fallback', () async {
+    final controller = _FakeWebviewController();
+    final error = StateError('unexpected failure');
+    controller.onLoad = (_) async {
+      controller.candidate(nested);
+      controller.emitError(error);
+    };
+    final service = _service(controllerFactory: () => controller);
+    addTearDown(service.dispose);
+    await expectLater(service.resolve(_firstPage, useLegacyParser: false),
+        throwsA(same(error)));
+    expect(controller.loads, hasLength(1));
+  });
+
   test('parser timeout persists structured resource error without secrets',
       () async {
     final records = <String>[];
@@ -443,6 +629,8 @@ class _FakeWebviewController extends VideoWebviewController<Object> {
   final loads = <({String url, bool useLegacyParser, int offset})>[];
   Future<void> Function(String url)? onLoad;
   Future<void> Function()? onUnload;
+  Future<void> Function()? onInit;
+  Future<void> Function()? onSnapshot;
   Object? initFailure;
   int initializations = 0;
   int unloads = 0;
@@ -457,13 +645,18 @@ class _FakeWebviewController extends VideoWebviewController<Object> {
       _parser.add((url: url, offset: offset, format: format));
 
   void emitError(Object error) => _parser.addError(error, StackTrace.current);
+  void candidate(String url) => notifyNestedPageCandidate(url);
 
   Future<void> closeParser() => _parser.close();
+
+  @override
+  Future<void> captureParserSnapshot() async => onSnapshot?.call();
 
   @override
   Future<void> init() async {
     initializations++;
     if (initFailure != null) throw initFailure!;
+    await onInit?.call();
   }
 
   @override
@@ -496,10 +689,12 @@ class _FakeWebviewController extends VideoWebviewController<Object> {
 WebViewVideoSourceService _service({
   required VideoWebviewController Function() controllerFactory,
   Duration cleanupTimeout = const Duration(seconds: 2),
+  Duration nestedPageTimeout = const Duration(seconds: 10),
   PlaybackTraceSink? diagnosticSink,
 }) =>
     WebViewVideoSourceService(
       controllerFactory: controllerFactory,
       cleanupTimeout: cleanupTimeout,
+      nestedPageTimeout: nestedPageTimeout,
       diagnosticSink: diagnosticSink ?? (_) {},
     );

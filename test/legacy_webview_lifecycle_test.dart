@@ -25,6 +25,31 @@ void main() {
     await parser.dispose();
   });
 
+  test('HTML media candidates remain pending and stale candidates are ignored',
+      () async {
+    final candidates = <String>[];
+    final candidateSubscription =
+        parser.onNestedPageCandidate.listen(candidates.add);
+    addTearDown(candidateSubscription.cancel);
+    const page = 'https://nested.example/play/3.html';
+    final player =
+        Uri.https('player.example', '/player.php', {'url': page}).toString();
+    await parser.loadUrl('https://site.example/episode/3', false);
+    controller.reply('JSBridgeDebug', [player, 1]);
+    controller.reply('VideoBridgeDebug', [page, 1]);
+    expect(candidates, [page, page]);
+    expect(events, isEmpty);
+    await parser.unloadPage();
+    controller.reply('JSBridgeDebug', [player, 1]);
+    expect(candidates, hasLength(2));
+    await parser.loadUrl('https://site.example/episode/4', false);
+    controller.reply('JSBridgeDebug', [player, 1]);
+    expect(candidates, hasLength(2));
+    controller.reply('VideoBridgeDebug', ['https://media.example/4.mp4', 3]);
+    await Future<void>.delayed(Duration.zero);
+    expect(events.single.url, 'https://media.example/4.mp4');
+  });
+
   test('ordinary mode resolves an iframe query without running its player',
       () async {
     await parser.loadUrl('https://site.example/episode/1', false, offset: 42);
