@@ -1,6 +1,6 @@
 # KazumiTV 当前状态
 
-## 2026-10-20：规则与批测独立集成审查（进行中）
+## 2026-10-20：规则与批测独立集成审查（已完成，未发布）
 
 用户授权无人值守统筹、独立审查和集成验证，发现问题交原会话修复；正式包与实体电视不动。
 本树 kazumi-rules-parser-integration/Kazumi、分支 codex/rules-parser-integration-20261020
@@ -18,6 +18,18 @@
 环境无效或清理失败立即停该轮；完成后核实本任务模拟器/采样/fixture退出。
 代码/测试/构建/运行分别记录，旧来源结果不冒充新集成包验证。尚未合并、推送或发布。
 
+
+统筹收口：集成代码候选106da1ab（规则64b37ced、播放f5e3bdbd、批测修复89931d6d、构建前提279d13dd，及统筹胶水67071347）。双方源工作树保持独立，未推送/合并/发布。所有本轮审查项已修复：生产导入名称/API准入、overlay运行时name/version/api、环境异常分类和无效统计、清理异常隔离、未知/未执行范围、缺Android注册文件的构建前置拒绝。规则作者只读复核67071347已关闭两项意见；统筹独立阅读并复验了其余修复。
+
+验证分层：固定Flutter3.47.3全仓1172项通过；之后仅对胶水准入/身份修订重验27项通过，定向分析无问题；全仓分析0error/0warning、175条既有info。Python19项故障注入/报告测试通过；构建脚本语法及“缺注册文件在输出/构建前拒绝”独立验证通过。普通debug依赖图成功且Mozilla依赖0，普通产品代码未引入Gecko执行入口。
+
+App源码67071347的独立parserqa 0.4.5-integrationqa.2/20575构建成功，SHA256 dc45b0b95e20dc2246b18454542444d43e973b2f1615454eb7a800ae6e251769。最终候选相对此提交只改宿主Python报告/运行器、构建前置脚本、测试与说明，android/lib/main.dart胶水无变化；不冒称最终文档提交重新构建。安装到只读Android9/API28/x86_64、实际com.android.webview/66.0.3359.158实例emulator-5584，安装字节经运行器核对。使用新的Python修复运行器，2个合成案例均有终态，unknown=0、unattempted=0：base按预期no_match；effective走生产默认解析工厂与PlayerPlaybackController，真实首帧并推进1866ms，App与host清理均confirmed。运行时记录基础/有效摘要、覆盖摘要和实际名称/API。manifest明确synthetic=true，覆盖标签全零SHA只是夹具格式占位，不是上游存在性证据，不作为线上规则发布。
+
+先前runtime批次启动超时保留为environment_invalid的人工归因：Windows软链尾步骤导致GeneratedPluginRegistrant缺失，MissingPluginException发生在产品测试之前，不能计入规则/内核成功率。用固定Flutter injectPlugins(androidPlatform:true)生成注册文件，未改系统设置；仅此前提实质变化后重建并执行runtime-registered。最早构建因审查中源码变化被构建摘要门禁拒绝，未拿来验收；所有旧失败产物/日志保留。生成注册文件另有摘要回执及副本。
+
+私有证据根C:/Users/hentai/Documents/Kazumi/artifacts/parser-ab-20261020/integration：build-registered/artifact.json、registration-recovery.json、runtime-registered/{identity,results,summary,cleanup}.json或jsonl、report.html、fixture-cleanup.json、emulator-cleanup.json及build-preflight-verification.json。全仓与定向检查日志在本树.dart_tool/integration-*.log。两例沿用本次最多4例/10分钟预算，没有访问真实源。模拟器read-only/no-snapshot覆盖层已关闭，所属模拟器退出、fixture监听0；运行器/采样/本任务构建进程无残留，原AVD和已存QA不改动。
+
+保留缺口：旧来源Frieren/WebView66超时仍是上游工作包保留的失败样本，根因未定；本轮没有重试或声称修复。Gecko仍仅QA可选，不更改默认内核。模拟器不替代小米ROM/ARMv7/硬解、长稳、音画同步及真实电视验收；远端CI/正式包升级均未执行。本轮可审查的集成和修复闭环完成，下一步是用户决定是否推进候选远端审查或后续来源诊断，绝不自动部署。
 ## 2026-10-20：批测数据可信度修复（只做本地故障注入）
 
 统筹复核f5e3bdbd后指出环境分类、清理异常和中断范围三处缺口。本轮仅在本分支修改Python运行器/报告及针对性测试，不动集成树、规则、App/内核策略，不构建/启动模拟器或访问真实站点。旧实播证据维持其原版本范围，不以这些单元测试重写来源验收。
