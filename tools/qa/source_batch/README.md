@@ -33,6 +33,15 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 - 内存每约1秒用 `dumpsys meminfo` 采样 PSS：App 命名进程 + 专用模拟器本例新增的命名 WebView sandbox 进程。记录 PID/进程名和样本；缺失用 null，不用0；这是采样峰值，未包含共享系统服务，也不是严格完整浏览器归因。不得拿单主进程冒充全内核内存。
 - 报告先分 fixture/live/negative fixture。成功率同时保留全部尝试数、解析成功数、真实首帧数；速度中位数只针对成功阶段，失败/未执行分母单列。跨引擎需核对 `episode_page_sha256` 相同才称同集配对。小样本不外推全站成功率。
 
+### 报告/清理契约 v2
+
+- 环境错配的 `stage=environment_invalid` 优先于残留error_type；原stage保留在observed_stage。每组 `attempted` 仍是有终态记录数，另报 `invalid/infrastructure/eligible_results`；无效环境不进入解析/首帧/耗时/PSS统计，不把它归为解析失败。原始results行不改写。
+- 新批次在identity保存 `planned_attempts`，另存无URL的 `plan.json`（key、案例、engine、group、repeat）。开始日志和结果账本分别追加。报告重建输出 `report_schema=2`，同时报告planned、started、completed、unknown、unattempted及case_states；completed表示持久终态记录，不表示产品通过。
+- `unknown` 是有开始、无终态；`unattempted` 必须有可信计划和完整开始日志才计算。旧identity没计划时可使用原summary已保存的planned，但不能从结果数推断总计划。缺计划/开始日志或日志截断时，相应总数为JSON null、界面显示unknown。`known_unknown` 只是可识别的下界；`remaining_without_result` 包含unknown与unattempted，不冒充后者。旧的未保存案例清单不能追补案例名称。
+- `report.py <folder>` 只重建summary.json、comparison.md、report.html，不改identity、plan、attempts或results。CLI标准输出从旧版摘要数组改为v2完整对象，其 `summary` 字段保留原每组统计数组。消费方须按report_schema识别；跨运行器版本继续要求新的输出目录。
+- 单例和整批清理逐步独立尝试：停止QA、读取进程表、采样线程退出、fixture shutdown/close、每个已申请反向端口移除、报告写入。force-stop成功不能证明退出；named QA进程（单例另含基线之外可识别WebView renderer）必须在有效进程清单中消失，否则host_cleanup=unconfirmed。它不证明未命名共享系统服务已退出。
+- App的cleanup与host_cleanup分别保留。任何单例清理未确认都会停止后续案例；只有清理失败时以BatchCleanupError非零退出；已有主异常或用户中断时重新抛出原异常，清理错误不能覆盖它。`.host-error.json`、run-status.json、cleanup.json保留异常类型/超时和各步失败，不记录可能含签名地址的异常命令。因原始异常未拿到App终态的案例仍是unknown，不伪造产品失败行。cleanup.json是最终清理收据；报告可再次离线重建。
+
 ## 已知实验限制
 
 Gecko158实测要求 compileSdk37/AGP9.1+，本原型固定146.0.20251217121356（与现有工具链兼容的较旧稳定版），不是最新安全版本或生产推荐。系统 WebView 记录运行时实际版本。Gecko通过内置 WebExtension 在 MAIN world 注入同一解析脚本，覆盖所有 http(s) 子框架，与 Android document-start 注入范围一致（插件 forMainFrameOnly 仅对 iOS/macOS 生效）。内容桥接是只读候选输入，并由当前 session/generation 和生产 URL 校验隔离。尚不支持 `useLegacyParser=true` 的 iframe-only 模式，显式失败，不悄悄改变规则。

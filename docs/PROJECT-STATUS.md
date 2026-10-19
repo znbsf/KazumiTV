@@ -18,6 +18,16 @@
 环境无效或清理失败立即停该轮；完成后核实本任务模拟器/采样/fixture退出。
 代码/测试/构建/运行分别记录，旧来源结果不冒充新集成包验证。尚未合并、推送或发布。
 
+## 2026-10-20：批测数据可信度修复（只做本地故障注入）
+
+统筹复核f5e3bdbd后指出环境分类、清理异常和中断范围三处缺口。本轮仅在本分支修改Python运行器/报告及针对性测试，不动集成树、规则、App/内核策略，不构建/启动模拟器或访问真实站点。旧实播证据维持其原版本范围，不以这些单元测试重写来源验收。
+
+- environment_invalid优先于VideoSourceTimeoutException，统计单列invalid/infrastructure/eligible_results；无效环境不进入解析数、首帧数及速度/PSS统计，raw stage/error_type保留。
+- Device.case及整批finally独立尽力清理，force-stop之后另查进程退出，错误/超时收据与App cleanup分开。ADB、服务器或端口清理失败不能遮蔽原异常；原中断/异常重新抛出，单例清理未确认停止后续案例，纯清理失败非零退出。异常无App终态的开始记录维持unknown。
+- 新批次保存planned_attempts和无URL的plan.json；离线报告v2从identity/plan/attempts/results重建completed、unknown、unattempted及案例状态。旧格式缺失的数据用null/unknown，不从已完成数猜计划或把未知补0。原始账本字节不变；CLI报告返回v2对象，旧统计数组移到其summary字段。契约见 [source_batch/README](../tools/qa/source_batch/README.md)。
+
+针对性验证：`python -X utf8 -m unittest discover -s tools/qa/source_batch -p 'test_*.py' -v` 19项通过（新增13项），覆盖环境优先/统计排除、原异常与清理超时并存、force-stop零返回但进程仍在、整批中断时shutdown/close/两个端口及报告继续执行、清理失败停后续、完成后最终清理失败非零、计划/未知/未执行重建、旧格式缺口、JSON/UTF8中途截断以及账本不变。均使用fake device/临时文件，现有HTTP Range测试仅本地loopback；无ADB设备操作。待统筹在独立集成树cherry-pick后复验。
+
 ## 2026-10-20：App 默认路径及 Android9/WebView66 模拟回归已验证
 
 用户要求自动批量尽量复用App代码/操作，并在电脑模拟电视Android/WebView。复用上节API36受控内核比较；它强制现代控制器、固定UA/软件输出，不能当完整App回归。此次实质变化：新增App默认解析工厂/请求头/共享播放配置路径，保留原受控A/B作为独立profile；尝试官方API28 AOSP x86_64独立AVD，读取实际WebView版本，再评估官方Android9预置WebView66能否被系统接受。只动电脑专用实验环境，实体电视/正式包不操作，不改系统代理/全局构建配置。镜像下载最多15分钟、单启动最多3分钟，旧provider准入一次检查；签名/SDK/API不满足则记录环境不等价，不改APK targetSdk伪装通过。每样本70秒，首轮最多8次/15分钟；确定实现缺口才修复重测。完整遥控UI回归与服务级批测分开，不把新QA入口宣称为已覆盖首页/焦点/恢复历史。结束退出自建模拟器/下载/测试进程并核实。
