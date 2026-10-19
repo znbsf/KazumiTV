@@ -20,10 +20,12 @@ class VideoWebviewImpl
   int _session = 0;
   bool _pageActive = false;
   bool _polling = false;
+  bool _disposed = false;
 
   @override
   Future<void> init() async {
     await _setupProxy();
+    if (_disposed) return;
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSize: const Size(360, 640),
@@ -34,6 +36,7 @@ class VideoWebviewImpl
           mixedContentMode: MixedContentMode.MIXED_CONTENT_COMPATIBILITY_MODE,
         ),
         onWebViewCreated: (controller) {
+          if (_disposed) return;
           KazumiLogger().i('[WebView] Created (legacy fallback)');
           webviewController = controller;
           initEventController.add(true);
@@ -49,9 +52,17 @@ class VideoWebviewImpl
           final embedded = embeddedVideoParserUrl(url);
           if (embedded != null) {
             _resolve(embedded, 'Native intercepted embedded video URL');
+          } else if (nestedVideoPageUrl(url, fromPlayerQuery: true)
+              case final page?) {
+            notifyNestedPageCandidate(page);
           } else if (!useLegacyParser &&
               (_isM3U8Url(url) || _isRangeVideoRequest(url, request.headers))) {
-            _resolve(url, 'Native intercepted video URL');
+            final page = nestedVideoPageUrl(url);
+            if (page != null) {
+              notifyNestedPageCandidate(page);
+            } else {
+              _resolve(url, 'Native intercepted video URL');
+            }
           }
           return null;
         },
@@ -84,7 +95,9 @@ class VideoWebviewImpl
         },
       ),
     );
-    await headlessWebView?.run();
+    final view = headlessWebView;
+    await view?.run();
+    if (_disposed) await view?.dispose();
   }
 
   @override
@@ -122,7 +135,12 @@ class VideoWebviewImpl
       callback: (args) {
         if (!_isCurrentReply(args)) return;
         final url = embeddedVideoParserUrl(args[0].toString());
-        if (url != null) _resolve(url, 'Iframe embedded video URL');
+        if (url != null) {
+          _resolve(url, 'Iframe embedded video URL');
+        } else if (nestedVideoPageUrl(args[0].toString(), fromPlayerQuery: true)
+            case final page?) {
+          notifyNestedPageCandidate(page);
+        }
       },
     );
     webviewController?.addJavaScriptHandler(
@@ -130,6 +148,10 @@ class VideoWebviewImpl
       callback: (args) {
         if (!_isCurrentReply(args) || useLegacyParser) return;
         final url = args[0].toString();
+        if (nestedVideoPageUrl(url) case final page?) {
+          notifyNestedPageCandidate(page);
+          return;
+        }
         if (isVideoParserNetworkUrl(url) && !isVideoParserAdUrl(url)) {
           _resolve(url, 'Video source URL');
         }
@@ -224,6 +246,7 @@ class VideoWebviewImpl
 
   @override
   Future<void> dispose() async {
+    _disposed = true;
     _pageActive = false;
     _session++;
     videoParserTimer?.cancel();

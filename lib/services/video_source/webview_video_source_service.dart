@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:kazumi/services/logging/playback_trace.dart';
 
 import 'package:kazumi/webview/video/video_webview_controller.dart';
+import 'package:kazumi/webview/video/video_parser_url.dart';
 import 'package:kazumi/services/video_source/video_source_service.dart';
 
 /// WebView 视频源解析服务
@@ -13,14 +14,17 @@ class WebViewVideoSourceService implements IVideoSourceService {
   WebViewVideoSourceService({
     VideoWebviewController Function()? controllerFactory,
     Duration cleanupTimeout = const Duration(seconds: 2),
+    Duration nestedPageTimeout = const Duration(seconds: 10),
     PlaybackTraceSink? diagnosticSink,
-  })  : _cleanupTimeout = cleanupTimeout,
+  })  : _nestedPageTimeout = nestedPageTimeout,
+        _cleanupTimeout = cleanupTimeout,
         _diagnosticSink = diagnosticSink,
         _controllerFactory =
             controllerFactory ?? VideoWebviewControllerFactory.getController;
 
   final VideoWebviewController Function() _controllerFactory;
   final Duration _cleanupTimeout;
+  final Duration _nestedPageTimeout;
   final PlaybackTraceSink? _diagnosticSink;
   VideoWebviewController? _webview;
   StreamSubscription? _logSubscription;
@@ -71,6 +75,70 @@ class WebViewVideoSourceService implements IVideoSourceService {
     required int offset,
     required Duration timeout,
   }) async {
+    final clock = Stopwatch()..start();
+    final candidates = <String>{};
+    final originalPage = Uri.tryParse(episodeUrl)?.removeFragment();
+    try {
+      try {
+        return await _resolvePage(request, episodeUrl,
+            useLegacyParser: useLegacyParser,
+            offset: offset,
+            timeout: timeout, onCandidate: (url) {
+          final candidate = nestedVideoPageUrl(url);
+          if (candidate != null &&
+              Uri.parse(candidate).removeFragment() != originalPage &&
+              candidates.length < 2) {
+            candidates.add(candidate);
+          }
+        });
+      } catch (error) {
+        request.throwIfNotCurrent(_activeRequest);
+        if (error is! VideoSourceTimeoutException &&
+            error is! VideoSourceNotFoundException) {
+          rethrow;
+        }
+        final remaining = timeout + _nestedPageTimeout - clock.elapsed;
+        if (candidates.length != 1 ||
+            remaining <= Duration.zero ||
+            _nestedPageTimeout <= Duration.zero) {
+          rethrow;
+        }
+        final budget =
+            remaining < _nestedPageTimeout ? remaining : _nestedPageTimeout;
+        final page = candidates.single;
+        final trace = PlaybackTrace('nested_page', sink: _diagnosticSink);
+        trace.event('fallback',
+            url: page,
+            detail:
+                'reason=${error.runtimeType} hop=1 timeoutMs=${budget.inMilliseconds}');
+        try {
+          // Deliberately do not collect candidates from this page: never recurse.
+          final source = await _resolvePage(request, page,
+              useLegacyParser: useLegacyParser,
+              offset: offset,
+              timeout: budget);
+          trace.finish('resolved');
+          return source;
+        } catch (error) {
+          trace.finish(
+              error is VideoSourceCancelledException ? 'cancelled' : 'failed',
+              error: error);
+          rethrow;
+        }
+      }
+    } finally {
+      if (identical(_activeRequest, request)) _activeRequest = null;
+    }
+  }
+
+  Future<VideoSource> _resolvePage(
+    _ResolveRequest request,
+    String episodeUrl, {
+    required bool useLegacyParser,
+    required int offset,
+    required Duration timeout,
+    void Function(String)? onCandidate,
+  }) async {
     request.throwIfNotCurrent(_activeRequest);
 
     final trace = PlaybackTrace('parser', sink: _diagnosticSink);
@@ -78,6 +146,8 @@ class WebViewVideoSourceService implements IVideoSourceService {
         url: episodeUrl,
         detail: 'legacy=$useLegacyParser timeoutMs=${timeout.inMilliseconds}');
     StreamSubscription<VideoParserDiagnostic>? diagnosticSubscription;
+    StreamSubscription<String>? candidateSubscription;
+    final pageClock = Stopwatch()..start();
     var didStartLoad = false;
     Future<void>? loadFuture;
     StreamSubscription<VideoParserEvent>? parserSubscription;
@@ -86,9 +156,18 @@ class WebViewVideoSourceService implements IVideoSourceService {
       if (_webview == null) {
         final webview = _controllerFactory();
         try {
-          await webview.init();
+          await Future.any<void>([
+            webview.init(),
+            request.cancelled
+                .then<void>((_) => throw const VideoSourceCancelledException()),
+          ]).timeout(timeout,
+              onTimeout: () => throw VideoSourceTimeoutException(timeout));
         } catch (_) {
-          await webview.dispose();
+          try {
+            await webview.dispose().timeout(_cleanupTimeout);
+          } catch (_) {
+            // A failed or unfinished controller is never reused.
+          }
           rethrow;
         }
         _webview = webview;
@@ -107,6 +186,11 @@ class WebViewVideoSourceService implements IVideoSourceService {
           trace.event(event.stage, url: event.url, detail: event.detail);
         }
       });
+      if (onCandidate != null) {
+        candidateSubscription = _webview!.onNestedPageCandidate.listen((url) {
+          if (request.isCurrent(_activeRequest)) onCandidate(url);
+        });
+      }
 
       // 广播流不会重放事件：iframe/原生拦截可能在 loadUrl 返回前
       // 已经给出 URL，因此必须先订阅，且订阅只属于当前解析请求。
@@ -145,7 +229,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
         parserResult.future,
       ], eagerError: true)
           .then((results) => results[1] as VideoParserEvent)
-          .timeout(timeout,
+          .timeout(timeout - pageClock.elapsed,
               onTimeout: () => throw VideoSourceTimeoutException(timeout));
       final cancelFuture = request.cancelled.then<VideoParserEvent>((_) {
         throw const VideoSourceCancelledException();
@@ -178,6 +262,7 @@ class WebViewVideoSourceService implements IVideoSourceService {
       rethrow;
     } finally {
       await diagnosticSubscription?.cancel();
+      await candidateSubscription?.cancel();
       await parserSubscription?.cancel();
       if (parserSubscription != null && !parserResult.isCompleted) {
         parserResult.completeError(const VideoSourceCancelledException());
@@ -197,9 +282,6 @@ class WebViewVideoSourceService implements IVideoSourceService {
         } catch (_) {
           await _retireWebview();
         }
-      }
-      if (identical(_activeRequest, request)) {
-        _activeRequest = null;
       }
     }
   }

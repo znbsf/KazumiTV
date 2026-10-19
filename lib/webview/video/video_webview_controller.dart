@@ -50,6 +50,14 @@ abstract class VideoWebviewController<T> {
   Stream<VideoParserDiagnostic> get onDiagnostic =>
       _diagnosticController.stream;
 
+  final _nestedPageController = StreamController<String>.broadcast(sync: true);
+  Stream<String> get onNestedPageCandidate => _nestedPageController.stream;
+
+  @protected
+  void notifyNestedPageCandidate(String url) {
+    if (!_nestedPageController.isClosed) _nestedPageController.add(url);
+  }
+
   void reportDiagnostic(String stage, String url, String detail) {
     if (!_diagnosticController.isClosed) {
       _diagnosticController.add((stage: stage, url: url, detail: detail));
@@ -83,6 +91,7 @@ abstract class VideoWebviewController<T> {
   }
 
   void disposeEventControllers() {
+    _nestedPageController.close();
     _diagnosticController.close();
     if (!initEventController.isClosed) {
       initEventController.close();
