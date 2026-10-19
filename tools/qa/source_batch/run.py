@@ -60,6 +60,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split('?')[0]
         status, kind = 200, 'text/html; charset=utf-8'
+        content_range = None
         if path == '/fixture.mp4':
             body, kind = self.media, 'video/mp4'
         elif path == '/video':
@@ -76,15 +77,40 @@ class FixtureHandler(BaseHTTPRequestHandler):
             body = b'<html><body>No media</body></html>'
         else:
             status, body = 404, b'not found'
+        if path == '/fixture.mp4' and self.headers.get('Range'):
+            length = len(body)
+            match = re.fullmatch(r'bytes=(\d*)-(\d*)', self.headers['Range'])
+            start, end = 0, length - 1
+            if match and (match[1] or match[2]):
+                if match[1]:
+                    start = int(match[1]); end = min(int(match[2]), end) if match[2] else end
+                else:
+                    start = max(0, length - int(match[2]))
+                valid = start <= end and start < length
+            else:
+                valid = False
+            if valid:
+                status, body = 206, body[start:end+1]
+                content_range = f'bytes {start}-{end}/{length}'
+            else:
+                status, body, content_range = 416, b'', f'bytes */{length}'
         self.send_response(status)
         self.send_header('Content-Type', kind)
+        if path == '/fixture.mp4':
+            self.send_header('Accept-Ranges', 'bytes')
+        if content_range is not None:
+            self.send_header('Content-Range', content_range)
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.end_headers()
+        if self.command == 'HEAD':
+            return
         try:
             self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError):
             pass
+
+    do_HEAD = do_GET
 
 class Device:
     def __init__(self, adb, serial):
@@ -256,7 +282,7 @@ def main():
                 f.flush()
             row = device.case(config, args.output, key)
             environment = row.get('environment', {})
-            if environment.get('sdk') != sdk or environment.get('webview') != provider:
+            if environment and (environment.get('sdk') != sdk or environment.get('webview') != provider):
                 row['observed_stage'] = row.get('stage')
                 row['stage'] = 'environment_invalid'
             row.update(key=key, group=config['group'], repeat=config['repeat'],

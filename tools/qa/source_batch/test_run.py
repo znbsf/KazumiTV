@@ -1,5 +1,9 @@
 import unittest
-from run import paired_plan, summarize, classified_stage, Device
+import threading
+import urllib.request
+import urllib.error
+from http.server import ThreadingHTTPServer
+from run import paired_plan, summarize, classified_stage, Device, FixtureHandler
 
 class ReportingTests(unittest.TestCase):
     def test_app_profile_runs_once_per_case_without_engine_substitution(self):
@@ -36,6 +40,28 @@ class ReportingTests(unittest.TestCase):
             'error_type': 'VideoSourceTimeoutException'}), 'resolve_timeout')
         self.assertEqual(classified_stage({'stage': 'resolve_error',
             'error_type': 'PlatformException'}), 'resolve_error')
+
+    def test_fixture_http_supports_real_player_range_and_head_requests(self):
+        previous = FixtureHandler.media
+        FixtureHandler.media = b'0123456789'
+        server = ThreadingHTTPServer(('127.0.0.1', 0), FixtureHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        url = f'http://127.0.0.1:{server.server_port}/fixture.mp4'
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={'Range':'bytes=3-5'})) as response:
+                self.assertEqual(response.status, 206)
+                self.assertEqual(response.headers['Content-Range'], 'bytes 3-5/10')
+                self.assertEqual(response.read(), b'345')
+            with urllib.request.urlopen(urllib.request.Request(url, method='HEAD')) as response:
+                self.assertEqual(response.headers['Accept-Ranges'], 'bytes')
+                self.assertEqual(response.headers['Content-Length'], '10')
+                self.assertEqual(response.read(), b'')
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(urllib.request.Request(url, headers={'Range':'bytes=99-'}))
+            self.assertEqual(error.exception.code, 416)
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=2)
+            FixtureHandler.media = previous
 
 if __name__ == '__main__':
     unittest.main()

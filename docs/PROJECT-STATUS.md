@@ -1,8 +1,29 @@
 # KazumiTV 当前状态
 
-## 2026-10-20：补齐 App 默认路径与旧 Android 模拟环境（进行中）
+## 2026-10-20：App 默认路径及 Android9/WebView66 模拟回归已验证
 
 用户要求自动批量尽量复用App代码/操作，并在电脑模拟电视Android/WebView。复用上节API36受控内核比较；它强制现代控制器、固定UA/软件输出，不能当完整App回归。此次实质变化：新增App默认解析工厂/请求头/共享播放配置路径，保留原受控A/B作为独立profile；尝试官方API28 AOSP x86_64独立AVD，读取实际WebView版本，再评估官方Android9预置WebView66能否被系统接受。只动电脑专用实验环境，实体电视/正式包不操作，不改系统代理/全局构建配置。镜像下载最多15分钟、单启动最多3分钟，旧provider准入一次检查；签名/SDK/API不满足则记录环境不等价，不改APK targetSdk伪装通过。每样本70秒，首轮最多8次/15分钟；确定实现缺口才修复重测。完整遥控UI回归与服务级批测分开，不把新QA入口宣称为已覆盖首页/焦点/恢复历史。结束退出自建模拟器/下载/测试进程并核实。
+
+已从Google官方镜像安装 `system-images/android-28/default/x86_64` revision4，新建 `Kazumi_App_Android9`（无窗口、无音频、2核/2GiB、SwiftShader）。实际启动48764ms；Android9/API28、x86_64，系统与App都确认当前provider `com.android.webview/66.0.3359.158`、targetSdk28有效，匹配此前电视内核版本。没有替换系统WebView APK、修改版本号或绕过provider准入。AOSP/x86_64/软件输出不等价小米ROM/ARMv7/硬解；Android/WebView层的匹配不覆盖设备硬件差异。
+
+程序提交 `a095e28c95c36a1626e3a42a613a4a6773ea97fe`，批量包 `parserqa` 0.4.5-parserqa.2/20572，APK SHA256 `ed0ceafd240b5e5dc2d2c5f48e54f09b5c4f607185ee4a818370350c888c7f15`，500项构建源摘要与该提交全部匹配。`app` 现在为运行器默认profile：实际调用生产工厂（旧环境观察到 `VideoWebviewImpl`、DOCUMENT_START_SCRIPT=false、WebView66补救准入=true），复用 `Plugin.buildHttpHeaders`、`ResolvedSourceCache`、整个 `PlayerPlaybackController`，包括App缓冲、广告过滤、代理、输出选择、错误处理和释放。QA Activity通过继承生产MainActivity复用原生通道；生产MainActivity仅开放继承，默认行为未改。独立debug包在身份检查后使用既有TV模式测试钩子，实际SDK/provider/模拟器能力仍走生产检测。CLI的 `--expect-sdk 28 --expect-webview 66.0.3359.158` 前置核对和每例App回读均生效。
+
+首轮四个真实案例：
+
+| 案例 | App默认路径 / WebView66 | 额外Gecko146对照 |
+| --- | --- | --- |
+| DM84《某暗部的少女共栖》第2集 | 接口403 → 有界兼容补救 → 首帧/1876ms进度 | 首帧成功 |
+| 7sefun《学生会也有洞！》第2集 | 首帧/1751ms进度 | 未执行 |
+| 同源第3集 | 首帧/1626ms进度 | 未执行 |
+| DM84《葬送的芙莉莲》第1集 | 15秒解析超时；403后补救启动并结束，但未取得可接受媒体 | 首帧成功 |
+
+App批次3/4首帧，全部确认清理；Gecko为针对成功控制与失败样本的2次补充检查，2/2首帧。两对案例的剧集页和规则指纹一致。Gecko仍是受控播放器profile，与App profile的缓存/播放器配置不同，因此仅支持“同一旧系统上该Gecko配置能完成这两个案例”的功能结论，不拿两组PSS/速度直接作内核性能排名。Frieren失败原因尚未细化为bootstrap/参数/响应准入哪一步；保留原诊断，不断言规则或内核固有缺陷，不原样重试。这个失败样本可被规则/后续诊断任务消费。
+
+另构建正常 `lib/main.dart` TV入口独立QA：`com.znbsf.kazumi.fluttertv.remoteqa`，0.4.5-computerqa.1/20573，APK SHA256 `a5629bd0e16c519c16a75411077bdb798d8efd11206193cedf8b86655801d751`，安装后APK摘要一致、包内无Gecko native/扩展资产。实跑纯DPAD：首次引导 → 首页第2卡《学生会也有洞！》 → 确认进入详情 → 开始观看 → 来源sheet选7sefun → 第1集播放，native首帧与实际视频截图均有。MediaSession位置观察到44252ms；Back回来源sheet、再回详情、再回首页，焦点恢复第2卡，停播state0。没有用内部测试页面冒充这个UI链路。暂停/播放键虽发送，紧随的缓存状态不足以判定暂停通过；历史恢复、长稳和音画同步未验收。UI按键/截图与XML是本轮独立smoke，不代表所有批量案例都经过UI。
+
+本地可控App首帧也通过。真实App控制器额外暴露测试HTTP服务不支持seek的问题，已在运行器补HTTP Range/HEAD，真实客户端206/416/HEAD测试通过；该实质变更后只重验此一例，首帧/进度/释放通过，最近日志无seek警告，不改App来迎合fixture。当前44项相关Dart测试、6项Python检查通过，变更文件静态检查无问题。正式包与所有实体设备不操作；两种电脑QA安装/数据保留，专用AVD已关闭。
+
+证据根沿用 `artifacts/parser-ab-20261020/android9-app`：`build-app/{artifact,source-commit-verification}.json`、`live-app`、`gecko-check`、`smoke-results/smoke-range`、`ui-acceptance.json`、逐步 `ui-*.xml/png`、私有原始日志、`analyze.log/tests.log`、`owned-emulator.json/cleanup.json`。工具契约仍在 [source_batch/README](../tools/qa/source_batch/README.md)，没有创建第二套规则或播放实现。正常UI包与带Gecko批量包分开，本轮不合并、不发布。
 
 ## 2026-10-20：电脑批量解析与 GeckoView QA 已完成首轮比较
 

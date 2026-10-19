@@ -2,6 +2,10 @@
 
 ## 2026-10-20 浏览器内核比较的准入条件
 
+- 服务级batch默认复用实际工厂及整个播放控制器；受控内核A/B另列profile。强制现代解析器会绕过旧WebView原生拦截与补救，不能声称等价App。真实UI还要从正常main入口按DPAD确认，不以内核测试页面代替。此次Android9/WebView66已复现403并验证补救，也发现现代通过、旧环境超时的另一集；结果见[状态](PROJECT-STATUS.md)。
+- 旧版本环境先查官方镜像，不预设必须提取电视APK或手工降级：API28 AOSP x86_64 revision4实际自带66.0.3359.158，系统provider与App回读均须一致。SDK/内核版本匹配不抹平ARM、厂商系统和解码器差异。官方SDK新CLI的分号兼容包装器拆包错误不是网络失败，优先用其原生斜线包路径，禁止为此改全局代理。
+- 用实际播放控制器会暴露fixture自身缺失的HTTP行为。本轮MP4本地服务补齐Range/HEAD以支持真实播放器seek，保留原失败日志；不通过关掉App行为让fixture“通过”。
+
 - 固定UA须取自App实际配置。7sefun对手机UA跳下载页、桌面UA返回播放页；这种失败先归测试条件，不归内核。保留最终URL/页面结构的有界对照，不重新走电视403路线。
 - 不能只看跨平台参数名判断注入范围：当前inappwebview插件的 forMainFrameOnly 仅iOS/macOS有效，Android document-start注入全部匹配框架。Gecko要同等覆盖并通过跨域iframe正例后再比较来源成功率。MAIN world桥接仍按当前GeckoSession和代次隔离，候选经原URL校验。
 - 相同案例必须核对剧集页摘要、规则内容、UA与实际provider；进程冷不代表DNS/扩展安装冷。PSS要记录进程覆盖、采样间隔及缺失；debug整包峰值不能当正式版内核增量。未执行/无匹配/解析/首帧分开；本次结果与撤销假设见 [当前状态](PROJECT-STATUS.md)，复用工具契约见 [批量QA](../tools/qa/source_batch/README.md)。
