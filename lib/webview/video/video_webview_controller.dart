@@ -32,6 +32,9 @@ abstract class VideoWebviewController<T> {
   /// WebView initialization method.
   Future<void> init();
 
+  /// Bounded by the source service; implementations may report safe DOM state.
+  Future<void> captureParserSnapshot() async {}
+
   final StreamController<bool> initEventController =
       StreamController<bool>.broadcast();
 

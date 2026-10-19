@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -161,6 +162,21 @@ class VideoWebviewAndroidImpl
     _session++;
     await webviewController?.loadUrl(
         urlRequest: URLRequest(url: WebUri('about:blank')));
+  }
+
+  @override
+  Future<void> captureParserSnapshot() async {
+    if (!_pageActive) return;
+    final session = _session;
+    final value = await webviewController?.evaluateJavascript(
+        source: videoParserSnapshotScript);
+    if (!_pageActive || session != _session || value is! String) return;
+    final data = jsonDecode(value) as Map<String, dynamic>;
+    reportDiagnostic('dom_snapshot', '',
+        'ready=${data['ready']} frames=${data['frames']} videos=${data['videos']} installed=${data['installed']} active=${data['active']}');
+    for (final url in (data['urls'] as List).whereType<String>()) {
+      reportDiagnostic('iframe_snapshot', url, '');
+    }
   }
 
   @override

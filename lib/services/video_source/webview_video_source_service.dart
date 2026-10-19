@@ -248,6 +248,14 @@ class WebViewVideoSourceService implements IVideoSourceService {
         format: event.format,
       );
     } catch (e) {
+      if (e is VideoSourceTimeoutException &&
+          request.isCurrent(_activeRequest)) {
+        try {
+          await _webview?.captureParserSnapshot().timeout(_cleanupTimeout);
+        } catch (_) {
+          // Diagnostics cannot turn a bounded parser failure into another hang.
+        }
+      }
       if (e is VideoSourceCancelledException) {
         trace.finish('cancelled');
         rethrow;

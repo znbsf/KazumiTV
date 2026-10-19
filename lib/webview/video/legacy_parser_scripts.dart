@@ -15,6 +15,20 @@ String legacyVideoParserPollScript(int session) => '''
 })();
 ''';
 
+// Read-only, same-origin metadata. URLs are fingerprinted by PlaybackTrace;
+// never return page text, cookies, storage or player configuration tokens.
+const videoParserSnapshotScript = r'''
+(function () {
+  var frames = document.querySelectorAll('iframe');
+  var urls = [];
+  for (var i = 0; i < frames.length && i < 4; i++) urls.push(frames[i].src);
+  var state = window.__kazumiVideoParser;
+  return JSON.stringify({ready: document.readyState, frames: frames.length,
+    videos: document.querySelectorAll('video').length,
+    installed: !!state, active: !!(state && state.active), urls: urls});
+})();
+''';
+
 const _script = r'''
 (function () {
   if (window.location.href === 'about:blank') return;

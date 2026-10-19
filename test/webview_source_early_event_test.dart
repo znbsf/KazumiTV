@@ -18,6 +18,27 @@ const _staleVideo = 'https://example.test/video/stale.m3u8';
 Future<void> _flushAsync() => Future<void>.delayed(Duration.zero);
 
 void main() {
+  test('stuck timeout diagnostics remain bounded and do not poison retry',
+      () async {
+    final gate = Completer<void>();
+    final controller = _FakeWebviewController()..onSnapshot = () => gate.future;
+    final service = _service(
+        controllerFactory: () => controller,
+        cleanupTimeout: const Duration(milliseconds: 20));
+    addTearDown(service.dispose);
+    await expectLater(
+        service
+            .resolve(_firstPage,
+                useLegacyParser: false,
+                timeout: const Duration(milliseconds: 20))
+            .timeout(const Duration(seconds: 1)),
+        throwsA(isA<VideoSourceTimeoutException>()));
+    controller.onLoad = (_) async => controller.emit(_secondVideo);
+    expect((await service.resolve(_secondPage, useLegacyParser: false)).url,
+        _secondVideo);
+    gate.completeError(StateError('late snapshot error'));
+    await _flushAsync();
+  });
   for (final cancelDuringInit in [true, false]) {
     test(
         'initialization is bounded and retired on ${cancelDuringInit ? 'cancel' : 'timeout'}',
@@ -609,6 +630,7 @@ class _FakeWebviewController extends VideoWebviewController<Object> {
   Future<void> Function(String url)? onLoad;
   Future<void> Function()? onUnload;
   Future<void> Function()? onInit;
+  Future<void> Function()? onSnapshot;
   Object? initFailure;
   int initializations = 0;
   int unloads = 0;
@@ -626,6 +648,9 @@ class _FakeWebviewController extends VideoWebviewController<Object> {
   void candidate(String url) => notifyNestedPageCandidate(url);
 
   Future<void> closeParser() => _parser.close();
+
+  @override
+  Future<void> captureParserSnapshot() async => onSnapshot?.call();
 
   @override
   Future<void> init() async {
