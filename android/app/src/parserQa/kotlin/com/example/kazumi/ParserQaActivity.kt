@@ -2,7 +2,6 @@ package com.example.kazumi
 
 import android.os.Build
 import android.webkit.WebView
-import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
@@ -16,7 +15,7 @@ import org.mozilla.geckoview.WebRequestError
 import java.io.File
 
 /** Loaded only by the opt-in parserQa/debug variant. One case per process. */
-class ParserQaActivity : FlutterActivity() {
+class ParserQaActivity : MainActivity() {
     private lateinit var channel: MethodChannel
     private var runtime: GeckoRuntime? = null
     private var session: GeckoSession? = null

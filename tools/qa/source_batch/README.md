@@ -1,6 +1,12 @@
-# 电脑批量解析 / GeckoView QA
+# 电脑批量 App 服务路径 / GeckoView QA
 
 仅实验包 `com.znbsf.kazumi.fluttertv.parserqa`，debug/x86_64/API26+。运行器硬拒绝物理设备；不安装 APK、不改变正式包。调用者先检查 APK 包名，再明确安装到专用 emulator。Gecko 只解析地址，播放仍使用项目 media-kit 的真实首帧回调、静音软件输出。生产构建不启用 `kazumiParserQa` 时不包含依赖、Activity、扩展。
+
+默认 `--engines app`：搜索/集表调用现有Plugin；解析调用生产 `VideoWebviewControllerFactory`，由真实DOCUMENT_START_SCRIPT能力选择现代/legacy实现（包含WebView66的兼容准入）；媒体头使用 `Plugin.buildHttpHeaders`，确认地址缓存复用 `ResolvedSourceCache`；播放直接复用 `PlayerPlaybackController`，包含缓冲策略、广告过滤、代理、真实SDK/模拟器输出选择和错误/释放处理。QA Activity继承生产MainActivity以复用原生通道，只在debug实验身份下启用TV模式测试钩子。首帧仍须实际native回调，不能只看尺寸。
+
+这仍是服务/播放控制器批测；它按清单选择作品/线路/剧集，未经过首页、详情、遥控焦点、切集界面、历史/弹幕等完整UI。不得将结果标记为全App端到端通过。UI遥控回归应另用正式App入口的独立测试包及真实DPAD动作。
+
+`--engines webview,gecko` 保留上一轮受控内核比较：固定浏览器/媒体UA、现代WebView控制器、8MiB缓冲和软件输出。其结果不得混入 `app` profile。app模式进程冷启，缓存代码被调用但不会凭此证明缓存失败回退或历史续播已测。
 
 ## 构建及运行
 
@@ -10,8 +16,8 @@
 4. 自行生成 320x180 H264/MP4 测试图（例如 ffmpeg testsrc2，8秒，无音频）。运行：
 
 ```text
-python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --manifest fixtures.json --fixture-media <fixture.mp4> --output <new-fixture-results> --repeats 1
-python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --manifest live.json --output <new-live-results> --repeats 2
+python run.py --adb <adb.exe> --serial emulator-5582 --apk <parserqa.apk> --manifest live.json --engines app --expect-sdk 28 --expect-webview 66.0.3359.158 --output <new-app-results>
+python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --manifest live.json --engines webview,gecko --output <new-controlled-results> --repeats 2
 ```
 
 单例70秒；每轮最多24例/30分钟；host timeout 或清理未确认停止该轮。在输出目录创建 `STOP` 可完成当前例后停止。`attempts.jsonl` 记录开始、`results.jsonl` 记录完成；未知结果拒绝自动重试。相同输出目录只允许完全相同 APK/清单/模拟器/运行器身份，已有 ledger 行不重跑。变更样本/产物用新的目录，保留失败结果。结束运行器关闭自建服务器/采样线程并 force-stop 实验包；宿主负责关闭自己启动的 emulator 并核实退出。
@@ -20,6 +26,7 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 
 - 清单 `cases[]`：`id/group` 必填；真实源使用 `rule_file/keyword/names/road/episode`，后两项零基索引。精确匹配唯一作品，不自动采用搜索第一项。规则 JSON 内联后计算摘要；目前 `overlay=none`，不修改规则/覆盖模型。
 - 固定清单中的同一例分别跑 webview/gecko，奇偶样本及重复轮交换顺序；每次 force-stop 后冷进程启动。浏览器缓存策略不同但都不复用网页会话；OS/DNS 缓存仍可能热。固定同一 UA，此结果不是各内核默认 UA 的比较。
+- `app` profile 保留App默认UA行为，记录actual_controller、能力准入、是否命中确认缓存及实际播放配置；不强制桌面UA或伪造WebView版本。`--expect-sdk/--expect-webview`先核对系统选中provider，每例再核对App实际报告，错配标为environment_invalid并停止。
 - `identity.json` 关联 APK/清单哈希、Android fingerprint、serial、UA；旁边保留 `artifact.json/source-digests.json`。`results.jsonl` 是可恢复账本；`summary.json/report.html` 为派生报告，不能代替原始行。
 - 每行记录 engine/environment（实际 provider/version/SDK/ABI）、rule version/content hash/fingerprint/overlay、案例/匹配作品/线路/集标签/剧集页摘要、启用能力与结果。内部地址可写本地输入；对外报告只保留媒体 host 和摘要，不公开签名 URL/原始日志。
 - 分阶段 `search/chapters/resolve/media_open/first_frame/total` 毫秒；`progress_ms` 为首帧后2秒进度。`media_open` 是播放器 open 完成时间，不是独立 HTTP TTFB。未到达的阶段缺失，不能计失败。无匹配/歧义/缺集/验证码/阶段超时/错误分别保留。resolved 不等于可播放；首帧不等于长稳/音画同步。
@@ -35,6 +42,8 @@ Gecko158实测要求 compileSdk37/AGP9.1+，本原型固定146.0.20251217121356�
 两个内核都关闭网络图片；Gecko使用内置扩展阻止 image 请求。APK 为 Flutter debug 包（原生依赖可能包含其他 ABI），本轮只执行 x86_64；不可把包大小或 debug PSS 当生产开销。
 
 现代模拟器不能证明 Android9/WebView66/ARMv7 电视兼容；本轮不操作电视，不绕过站点挑战。搜索/集表失败通常先排查规则/网络；已确认同一剧集一内核失败另一成功，才是运行时差异线索。HTTP请求响应的逐包对照、热会话/长时间取消压力、最新Gecko及旧Android矩阵仍需后续独立验证。
+
+Android9对应环境：官方 `system-images/android-28/default/x86_64` revision4 自带 `com.android.webview/66.0.3359.158`，与已记录电视内核版本相同。创建专用AVD后须再次核对dumpsys和App报告，不靠镜像名称推定。SDK/内核一致仍不等于厂商系统、ARMv7、GPU/MediaCodec硬件一致；模拟器会按App已有保护选择软件输出，不能验证电视硬解路径。新Android CLI使用斜线包路径；其sdkmanager兼容包装器会把分号路径拆成多个包，可直接用 `android.exe sdk --ignore-outdated-xmls install system-images/android-28/default/x86_64`，无需改全局代理或SDK设置。
 
 规则覆盖会话负责声明式契约，本工具只消费既有 Plugin 规则，不包含第二套覆盖实现；不把 HHJX 兼容补救偷偷转成任意规则脚本。
 

@@ -2,6 +2,11 @@ import unittest
 from run import paired_plan, summarize, classified_stage, Device
 
 class ReportingTests(unittest.TestCase):
+    def test_app_profile_runs_once_per_case_without_engine_substitution(self):
+        plan = list(paired_plan([{'id': 'one'}, {'id': 'two'}], 2, ('app',)))
+        self.assertEqual(len(plan), 4)
+        self.assertEqual({row['engine'] for row in plan}, {'app'})
+
     def test_counterbalanced_pairs_use_same_case(self):
         cases = [{'id': 'a', 'url': 'https://example.test/a'}, {'id': 'b', 'url': 'https://example.test/b'}]
         plan = list(paired_plan(cases, 2))

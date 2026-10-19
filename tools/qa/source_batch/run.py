@@ -18,11 +18,11 @@ UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
-def paired_plan(cases, repeats):
+def paired_plan(cases, repeats, engines=('webview', 'gecko')):
     for repeat in range(repeats):
         for index, case in enumerate(cases):
-            engines = ['webview', 'gecko'] if (index + repeat) % 2 == 0 else ['gecko', 'webview']
-            for engine in engines:
+            order = engines if (index + repeat) % 2 == 0 else tuple(reversed(engines))
+            for engine in order:
                 yield {**case, 'engine': engine, 'repeat': repeat, 'user_agent': UA}
 
 def classified_stage(row):
@@ -35,7 +35,7 @@ def classified_stage(row):
 def summarize(rows):
     output = []
     for group in sorted({r['group'] for r in rows}):
-        for engine in ('webview', 'gecko'):
+        for engine in ('app', 'webview', 'gecko'):
             subset = [r for r in rows if r['group'] == group and r['engine'] == engine]
             if not subset:
                 continue
@@ -176,19 +176,33 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--fixture-media', type=Path)
     p.add_argument('--repeats', type=int, default=1)
+    p.add_argument('--engines', default='app', help='app (production service path) or webview,gecko (controlled A/B)')
+    p.add_argument('--expect-sdk', type=int)
+    p.add_argument('--expect-webview')
     p.add_argument('--budget-seconds', type=int, default=1800)
     args = p.parse_args()
+    engines = tuple(args.engines.split(','))
+    if not engines or len(set(engines)) != len(engines) or not set(engines) <= {'app', 'webview', 'gecko'}:
+        p.error('Engines must be unique values from app,webview,gecko')
     if not 1 <= args.repeats <= 5 or not 1 <= args.budget_seconds <= 1800:
         p.error('repeats 1..5, total budget 1..1800 seconds')
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
     cases = manifest['cases']
-    if len(cases) * 2 * args.repeats > 24:
+    if len(cases) * len(engines) * args.repeats > 24:
         p.error('At most 24 attempts per run')
     for c in cases:
         if 'rule_file' in c:
             rule_path = args.manifest.parent / c.pop('rule_file')
             c['rule'] = json.loads(rule_path.read_text(encoding='utf-8-sig'))
     device = Device(args.adb, args.serial)
+    sdk = int(device.call('shell', 'getprop ro.build.version.sdk').strip())
+    provider_state = device.call('shell', 'dumpsys webviewupdate')
+    match = re.search(r'Current WebView package \(name, version\): \(([^,]+), ([^)]+)\)', provider_state)
+    provider = '/'.join(match.groups()) if match else None
+    if args.expect_sdk is not None and sdk != args.expect_sdk:
+        raise RuntimeError('Android SDK does not match the requested test environment')
+    if args.expect_webview is not None and (not match or match[2] != args.expect_webview):
+        raise RuntimeError('Actual selected WebView does not match the requested version')
     # Installation is a separate, explicit setup step. Verify the installed APK
     # bytes here; never blindly install a supplied APK with an unknown identity.
     remote = device.call('shell', f'pm path {PACKAGE}').strip().removeprefix('package:')
@@ -206,8 +220,9 @@ def main():
                 'runner_sha256': digest(Path(__file__).read_bytes()),
                 'manifest_sha256': digest(json.dumps(cases, sort_keys=True).encode()),
                 'serial': args.serial, 'build_fingerprint': device.call('shell', 'getprop ro.build.fingerprint').strip(),
+                'sdk': sdk, 'selected_provider': provider,
                 'ua': UA, 'cache_policy': 'process cold; WebView cache disabled; Gecko private session; OS/DNS warm',
-                'repeats': args.repeats}
+                'engines': list(engines), 'repeats': args.repeats}
     identity_hash = digest(json.dumps(identity, sort_keys=True).encode())
     identity_file = args.output / 'identity.json'
     if identity_file.exists() and json.loads(identity_file.read_text()) != identity:
@@ -229,7 +244,7 @@ def main():
             threading.Thread(target=server.serve_forever, daemon=True).start()
             device.call('reverse', 'tcp:8769', 'tcp:8769')
             device.call('reverse', 'tcp:8768', 'tcp:8769')
-        for config in paired_plan(cases, args.repeats):
+        for config in paired_plan(cases, args.repeats, engines):
             key = digest((identity_hash + json.dumps(config, sort_keys=True)).encode())[:20]
             if key in completed:
                 continue
@@ -240,19 +255,24 @@ def main():
                                     'repeat': config['repeat'], 'started_epoch': time.time()}) + '\n')
                 f.flush()
             row = device.case(config, args.output, key)
+            environment = row.get('environment', {})
+            if environment.get('sdk') != sdk or environment.get('webview') != provider:
+                row['observed_stage'] = row.get('stage')
+                row['stage'] = 'environment_invalid'
             row.update(key=key, group=config['group'], repeat=config['repeat'],
                        rule_version=config.get('rule', {}).get('version'),
                        rule_name=config.get('rule', {}).get('name'),
                        rule_sha256=digest(json.dumps(config['rule'], sort_keys=True).encode()) if 'rule' in config else None,
                        rule_provenance=config.get('rule_provenance', {'overlay': 'none', 'upstream_commit': None}),
                        road=config.get('road', 0), episode=config.get('episode', 0),
-                       compatibility='modern shared script; bounded nested HTML fallback; no WebView66 adapter')
+                       compatibility=('production capability factory and default headers/player controller'
+                           if config['engine'] == 'app' else 'controlled shared script; bounded nested HTML fallback; no WebView66 adapter'))
             with ledger.open('a', encoding='utf-8') as f:
                 f.write(json.dumps(row, ensure_ascii=False) + '\n')
                 f.flush()
             rows.append(row)
             print(json.dumps({k: row.get(k) for k in ('id', 'engine', 'stage', 'host_elapsed_ms', 'cleanup')}, ensure_ascii=False), flush=True)
-            if row.get('cleanup') == 'unconfirmed' or row['stage'] == 'host_timeout':
+            if row.get('cleanup') == 'unconfirmed' or row['stage'] in ('host_timeout', 'environment_invalid'):
                 break
     finally:
         device.call('shell', f'am force-stop {PACKAGE}', check=False)
@@ -261,8 +281,8 @@ def main():
             server.server_close()
             device.call('reverse', '--remove', 'tcp:8769', check=False)
             device.call('reverse', '--remove', 'tcp:8768', check=False)
-        report = {'planned': len(cases) * 2 * args.repeats, 'completed': len(rows),
-                  'unattempted': len(cases) * 2 * args.repeats - len(rows), 'summary': summarize(rows)}
+        report = {'planned': len(cases) * len(engines) * args.repeats, 'completed': len(rows),
+                  'unattempted': len(cases) * len(engines) * args.repeats - len(rows), 'summary': summarize(rows)}
         (args.output / 'summary.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
         (args.output / 'report.html').write_text('<meta charset="utf-8"><title>Parser QA</title><h1>Parser QA</h1><p>Modern emulator exploratory results; no TV compatibility claim. Time medians are successful parses/frames only. Memory is sampled PSS with limited process attribution.</p><pre>' + html.escape(json.dumps(report, ensure_ascii=False, indent=2)) + '</pre>', encoding='utf-8')
 

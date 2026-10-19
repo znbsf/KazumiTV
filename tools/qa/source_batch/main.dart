@@ -10,13 +10,23 @@ import 'package:media_kit_video/media_kit_video.dart';
 // ignore: depend_on_referenced_packages
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:mobx/mobx.dart' show reaction;
+import 'package:kazumi/pages/player/controller/player_playback_controller.dart';
+import 'package:kazumi/pages/player/controller/player_debug_controller.dart';
+import 'package:kazumi/services/shaders/shader_asset_service.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/video_source/resolved_source_cache.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/services/platform/webview_feature_service.dart';
 import 'package:kazumi/services/source_health/source_health.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/video_source/services.dart';
 import 'package:kazumi/webview/video/impl/video_webview_android_impl.dart';
+import 'package:kazumi/webview/video/video_webview_controller.dart';
+import 'package:kazumi/utils/http_headers.dart';
 import 'gecko_controller.dart';
+
+final _shaderAssets = ShaderAssetService();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,11 +36,17 @@ Future<void> main() async {
   }
   final config = jsonDecode((await qaChannel.invokeMethod<String>('config'))!)
       as Map<String, dynamic>;
-  if (config['engine'] == 'webview') await WebViewFeatureService.initialize();
+  await TvMode.initialize();
+  // QA debug identity was checked above. Simulate the TV build flag while
+  // retaining the real SDK/provider/ABI detection and native MainActivity.
+  // ignore: invalid_use_of_visible_for_testing_member
+  TvMode.setEnabledForTesting(true);
+  if (config['engine'] != 'gecko') await WebViewFeatureService.initialize();
   MediaKit.ensureInitialized();
   final root = await getApplicationSupportDirectory();
   await Hive.initFlutter('${root.path}/hive');
   await GStorage.init();
+  if (config['engine'] == 'app') await _shaderAssets.copyShadersToExternalDirectory();
   runApp(MaterialApp(home: BatchCase(config)));
 }
 
@@ -52,26 +68,30 @@ class _BatchCaseState extends State<BatchCase> {
 
   Future<void> _run() async {
     final c = widget.config;
+    final appProfile = c['engine'] == 'app';
     final watch = Stopwatch()..start();
     final result = <String, dynamic>{
       'id': c['id'], 'engine': c['engine'], 'stage': 'starting',
       'environment': await qaChannel.invokeMethod('environment'),
       'timings_ms': <String, int>{},
-      'player': 'media_kit/emulator/gpu/software/muted',
-      'parser_profile': 'shared-script/document-start/all-frames/fixed-UA',
+      'player': appProfile ? 'production PlayerPlaybackController/TV defaults' : 'media_kit/emulator/gpu/software/muted',
+      'parser_profile': appProfile ? 'production factory/default UA/legacy capability detection' : 'shared-script/document-start/all-frames/fixed-UA',
+      'coverage': appProfile ? 'service path; no TV UI navigation/history/danmaku' : 'controlled engine comparison',
       'diagnostics': <String>[],
     };
     final timings = result['timings_ms'] as Map<String, int>;
     final run = HealthRun();
     WebViewVideoSourceService? resolver;
     Player? player;
+    PlayerPlaybackController? appPlayback;
     StreamSubscription<String>? errors;
     String phase = 'search';
     try {
       final ua = c['user_agent'] as String;
       String episodeUrl;
-      Map<String, String> headers = {'User-Agent': ua};
+      Map<String, String> headers = {'user-agent': appProfile ? getRandomUA() : ua};
       bool legacy = false;
+      bool adBlocker = false;
       if (c['rule'] != null) {
         final plugin = Plugin.fromJson(Map<String, dynamic>.from(c['rule']));
         result['rule_fingerprint'] = ruleFingerprint(plugin);
@@ -102,8 +122,9 @@ class _BatchCaseState extends State<BatchCase> {
         result['matched_title'] = match.name;
         result['road_name'] = candidate.roads[road].name;
         result['episode_label'] = candidate.roads[road].identifier[episode];
-        headers = {...plugin.buildHttpHeaders(), 'user-agent': ua};
+        headers = appProfile ? plugin.buildHttpHeaders() : {...plugin.buildHttpHeaders(), 'user-agent': ua};
         legacy = plugin.useLegacyParser;
+        adBlocker = plugin.adBlocker || GStorage.getSetting(SettingsKeys.forceAdBlocker);
       } else {
         episodeUrl = c['url'] as String;
       }
@@ -116,11 +137,25 @@ class _BatchCaseState extends State<BatchCase> {
         final diagnostics = result['diagnostics'] as List<String>;
         if (diagnostics.length < 80) diagnostics.add(record);
       }, controllerFactory: () {
+        if (appProfile) {
+          final controller = VideoWebviewControllerFactory.getController();
+          result['actual_controller'] = controller.runtimeType.toString();
+          result['document_start_supported'] = WebViewFeatureService.isDocumentStartScriptSupported;
+          result['legacy_player_compat_eligible'] = WebViewFeatureService.needsLegacyPlayerCompat;
+          return controller;
+        }
         if (c['engine'] == 'gecko') return GeckoQaController(ua);
         return VideoWebviewAndroidImpl(userAgent: ua);
       });
-      final source = await resolver.resolve(episodeUrl, useLegacyParser: legacy,
+      final cache = ResolvedSourceCache.shared;
+      final cacheKey = jsonEncode([c['id'], c['rule'], c['road'] ?? 0, c['episode'] ?? 0, episodeUrl]);
+      Future<VideoSource> fresh() => resolver!.resolve(episodeUrl, useLegacyParser: legacy,
           timeout: const Duration(seconds: 15));
+      final attempt = appProfile ? await cache.resolve(key: cacheKey, offset: 0,
+          headers: headers, fresh: fresh, isCurrent: () => !run.cancelled)
+          : ResolvedSourceAttempt(await fresh(), headers, fromCache: false);
+      final source = attempt.source;
+      result['from_confirmed_cache'] = attempt.fromCache;
       timings['resolve'] = watch.elapsedMilliseconds - beginResolve;
       result['stage'] = 'resolved';
       // Never persist signed media URLs or query strings in exported reports.
@@ -128,6 +163,50 @@ class _BatchCaseState extends State<BatchCase> {
       phase = 'first_frame';
       setState(() => _stage = phase);
       final beginPlay = watch.elapsedMilliseconds;
+      if (appProfile) {
+        appPlayback = PlayerPlaybackController(shaderAssetService: _shaderAssets,
+            debug: PlayerDebugController(), videoUrl: () => source.url,
+            isLocalPlayback: () => false);
+        final playback = appPlayback;
+        final rendered = Completer<void>();
+        final disposeReaction = reaction<VideoController?>(
+          (_) => playback.videoController, (video) {
+            if (video == null || !mounted) return;
+            setState(() => _video = video);
+            video.waitUntilFirstFrameRendered.then((_) {
+              if (!rendered.isCompleted) rendered.complete();
+            }, onError: (Object e, StackTrace s) {
+              if (!rendered.isCompleted) rendered.completeError(e, s);
+            });
+          });
+        try {
+          final frame = rendered.future.timeout(const Duration(seconds: 20));
+          final opened = playback.createVideoController(attempt.headers, adBlocker,
+            videoSourceFormat: source.format, canInstall: () => mounted && !run.cancelled,
+            onPlaybackError: (_) {
+              if (!rendered.isCompleted) rendered.completeError(StateError('production_player_error'));
+            }).then((created) {
+              if (created == null) throw StateError('production_player_retired');
+              timings['media_open'] = watch.elapsedMilliseconds - beginPlay;
+              player = created;
+              return created.setVolume(0);
+            }).timeout(const Duration(seconds: 15));
+          await Future.wait([frame, opened]);
+          timings['first_frame'] = watch.elapsedMilliseconds - beginPlay;
+          result['stage'] = 'first_frame';
+          await cache.rememberAfterFirstFrame(key: cacheKey, attempt: attempt,
+              firstFrame: rendered.future, isCurrent: () => !run.cancelled);
+          result['player_settings'] = {'tv': TvMode.enabled,
+            'emulator': playback.androidEmulator, 'hwdec': playback.hardwareDecoder,
+            'hardware_acceleration': playback.hAenable,
+            'renderer_setting': GStorage.getSetting(SettingsKeys.androidVideoRenderer),
+            'ad_blocker': adBlocker};
+          final start = player!.state.position;
+          await Future<void>.delayed(const Duration(seconds: 2));
+          result['progress_ms'] = (player!.state.position - start).inMilliseconds;
+        } finally { disposeReaction(); }
+        return;
+      }
       final playbackError = Completer<void>();
       player = Player(configuration: const PlayerConfiguration(
           bufferSize: 8 * 1024 * 1024, osc: false));
@@ -176,7 +255,12 @@ class _BatchCaseState extends State<BatchCase> {
       setState(() => _video = null);
       try {
         await errors?.cancel();
-        await player?.dispose().timeout(const Duration(seconds: 4));
+        if (appPlayback != null) {
+          await appPlayback.stop().timeout(const Duration(seconds: 4));
+          if (!appPlayback.lastReleaseSucceeded) throw StateError('production_player_release_failed');
+        } else {
+          await player?.dispose().timeout(const Duration(seconds: 4));
+        }
         await resolver?.dispose().timeout(const Duration(seconds: 4));
         result['cleanup'] = 'confirmed';
       } catch (_) { result['cleanup'] = 'unconfirmed'; }
