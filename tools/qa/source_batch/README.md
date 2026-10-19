@@ -10,6 +10,8 @@
 
 ## 构建及运行
 
+构建前必须存在 `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`。Windows离线 `pub get` 在软链阶段失败后，即使已有package_config等依赖元数据，也不代表Android插件注册已生成；缺失会造成APK可以构建、启动却报MissingPluginException（例如package_info）。须先由固定Flutter工具的 **Android-only injectPlugins准备流程** 生成注册文件（这是Flutter工具内部API，不是CLI子命令），然后再运行本脚本。脚本在解析脚本生成、创建输出目录及构建之前检查；缺失立即失败，不自动生成、不复制该Java文件入库，也不修改系统设置。此生成文件保持忽略，但其内容哈希明确纳入source-digests.json及构建前后比较。
+
 1. 使用项目既有 Flutter3.47.3 工具链和已解析依赖，运行 `build.ps1`，传入 `FlutterRoot/PubCache/GradleHome/JavaHome/Output/Python`。它生成与生产共用的解析脚本、构建实验 APK 并保存源码内容哈希/基线 SHA/APK 哈希。缺少 Android 插件元数据时按构建 runbook 的 Android-only 流程准备；不更改 Windows 开发者模式。
 2. 新建专用 API36 Google TV x86_64 AVD；以 `-no-window -no-audio -no-snapshot -gpu swiftshader -cores 2 -memory 2048` 后台启动，选择未占用端口。不得复用/清除他人 AVD。
 3. 用 Android SDK `aapt dump badging` 核实 APK 包名及 x86_64，再使用明确 emulator serial 安装；运行器会核对已安装 APK 与传入文件的 SHA256。

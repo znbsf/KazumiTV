@@ -11,12 +11,17 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 Set-Location -LiteralPath $repo
+$androidRegistrant = 'android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java'
+if (-not (Test-Path -LiteralPath (Join-Path $repo $androidRegistrant) -PathType Leaf)) {
+    throw "Missing Android GeneratedPluginRegistrant: $androidRegistrant. Run the pinned Flutter Android-only injectPlugins preparation first (see tools/qa/source_batch/README.md). Dependency metadata alone is insufficient; refusing --no-pub QA build."
+}
 New-Item -ItemType Directory -Force -Path $Output | Out-Null
 & $Python -X utf8 tools/qa/source_batch/prepare.py
 if ($LASTEXITCODE -ne 0) { throw 'Parser generation failed' }
 function Source-Digests {
     $paths = @(& git ls-files --cached --others --exclude-standard -- android lib tools/qa/source_batch)
     $paths += 'android/app/src/parserQa/assets/parserqa/parser.generated.js'
+    $paths += $androidRegistrant
     $map = [ordered]@{}
     foreach ($path in ($paths | Sort-Object -Unique)) {
         if (Test-Path -LiteralPath $path -PathType Leaf) {
