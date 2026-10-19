@@ -1,8 +1,29 @@
 # KazumiTV 当前状态
 
-## 2026-10-20：电脑批量解析与 GeckoView QA 实验（进行中）
+## 2026-10-20：电脑批量解析与 GeckoView QA 已完成首轮比较
 
 用户授权先做批量工具、独立 QA 对比成功率/速度/内存，尽量电脑执行。分支 `codex/source-batch-gecko-qa` 基于 PR #28 的 d3fcc60f；不合并/发布、不操作电视、手机或 Quest。复用上节 WebView66 的接口403与语法失败证据，不重跑电视旧路线。首次新增内核实验：专用无窗口/无音频 API36 AVD，固定 Gecko 稳定依赖，QA 独立包名；两组共享规则、解析脚本、地址校验与 native 首帧判据。先本地 fixture 检查桥接，再固定真实样本交叉顺序。每例最多70秒，首轮最多24例/30分钟；环境失效、清理失败或明确实现错误时停止该轮并修复，禁止原样循环。网络失败保留；不绕过验证码，不把无匹配计为内核失败。采样标注进程覆盖，现代模拟器结果不外推旧电视。结束停止本任务模拟器/服务并核实进程退出；产物和结果关联源码/规则/APK哈希，原始地址仅本地留存。
+
+程序提交 `0b4e0aed7265bce64e25c6b3139327a83e3b3493`。工具/快照契约见 [source_batch/README](../tools/qa/source_batch/README.md)，清单为同目录 `fixtures.json/live.json`，可传有效规则纯JSON及独立 `rule_provenance`；未引入规则候选模型，未 cherry-pick 规则分支。运行器有精确APK校验、固定UA、冷进程交叉顺序、逐例超时、STOP、开始/完成账本、未知结果保护和报告重建。Gecko内核与Activity只在显式 parserQa/debug 变体进入；普通debug依赖图检查成功，Mozilla依赖0。生产控制器只新增默认值不变的可选UA注入。
+
+最终包 `com.znbsf.kazumi.fluttertv.parserqa`，0.4.5-parserqa.1/20570，APK SHA256 `cd059af7e2b7ff878e70d7a6ccdd128e0e984a5b100c2cc0348248d8bc16e823`。build-v4 的500项源码内容摘要全部对应程序提交；APK中的x86_64 libxul与Mozilla AAR逐字节摘要相同。API36 Google TV x86_64模拟器，系统WebView `143.0.7499.24`；Gecko `146.0.20251217121356`。最新158要求SDK37/AGP9.1+，本次没有为其升级正式工具链。实验包是Flutter debug且打包包含多个ABI，375,140,586字节，不能把该包体/内存当作正式版增量。
+
+最终真实样本为DM84《某暗部的少女共栖》第2集、《葬送的芙莉莲》第1集，以及7sefun《学生会也有洞！》第2/3集；每内核2轮，共16次执行，8对剧集页摘要及规则指纹均相同。每个结果均真实native首帧、首帧后2秒进度增长（最小1292ms）及清理确认，不以拿到URL/尺寸代替首帧。
+
+| 真实源结果 | 系统WebView143 | Gecko146 |
+| --- | ---: | ---: |
+| 搜索/集表/解析后真实首帧 | 8/8 | 8/8 |
+| 解析耗时中位数（含内核初始化） | 2074ms | 3486.5ms |
+| 解析后首帧中位数 | 1458.5ms | 1442.5ms |
+| 每次采样峰值PSS的中位数 | 681.3MiB | 941.1MiB |
+
+内存包含实验App及可识别浏览器子进程，排除共享系统服务；约1秒采样不是绝对峰值。两组固定同一App桌面UA、禁网络图片、相同播放器/软件输出/静音；进程冷启动，OS/DNS和扩展注册可能热。小样本现代模拟器未发现Gecko成功率优势，解析及内存开销更高；暂留实验方案，不据此将正式版默认内核替换。
+
+可控验证最终10次：两内核各4个正例（直接视频、延迟DOM、一层HTML补救、跨域iframe）均首帧成功；两次空页均预期15秒超时并释放。新增跨域用例是已发现桥接覆盖缺口后的可区分检查；单批仍不超过24例。67项Dart相关回归、4项Python运行器测试、变更文件静态检查均通过。尚未验证热会话长稳、页面媒体HTTP逐包计时、最新Gecko、Android9/ARMv7及电视视觉/声画同步；首帧和2秒进度不能替代这些验收。
+
+撤销的早期推断保留：v2手机UA使7sefun跳到 `/app/android.php`（桌面UA对照仍返回播放页）；Gecko最初仅主框架注入，而Android插件的 forMainFrameOnly 只对iOS/macOS生效。修正UA与all_frames并增加跨域正例后最终全部通过，不能将早期超时称为Gecko固有不兼容。v1/v2/v3原始结果不并入最终成功率；v2中断时7条完成、第8次无终态，其余未执行；v3真实批次因STOP为0执行。
+
+私有证据根：根工作区 `artifacts/parser-ab-20261020`；`build-v4/{artifact,source-commit-verification,engine-binary-verification}.json`、`fixtures-v4/live-v4/{identity,summary}.json`、`results.jsonl`、逐例内存、`comparison.md/report.html`、`validation.json`、`cleanup.json`。已关闭专用AVD，模拟器两个PID退出，QA采样/运行器及8768/8769监听为0；没有向实体设备发送操作命令。分支仅本地交付，未合并、发布或更换正式包。规则会话可消费有效规则JSON和失败阶段，不把当前原型当作播放profile契约已实现。
 
 ## 2026-10-20：旧 WebView 来源兼容已通过独立 QA 实播
 

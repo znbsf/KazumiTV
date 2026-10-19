@@ -1,5 +1,11 @@
 # KazumiTV 工程经验
 
+## 2026-10-20 浏览器内核比较的准入条件
+
+- 固定UA须取自App实际配置。7sefun对手机UA跳下载页、桌面UA返回播放页；这种失败先归测试条件，不归内核。保留最终URL/页面结构的有界对照，不重新走电视403路线。
+- 不能只看跨平台参数名判断注入范围：当前inappwebview插件的 forMainFrameOnly 仅iOS/macOS有效，Android document-start注入全部匹配框架。Gecko要同等覆盖并通过跨域iframe正例后再比较来源成功率。MAIN world桥接仍按当前GeckoSession和代次隔离，候选经原URL校验。
+- 相同案例必须核对剧集页摘要、规则内容、UA与实际provider；进程冷不代表DNS/扩展安装冷。PSS要记录进程覆盖、采样间隔及缺失；debug整包峰值不能当正式版内核增量。未执行/无匹配/解析/首帧分开；本次结果与撤销假设见 [当前状态](PROJECT-STATUS.md)，复用工具契约见 [批量QA](../tools/qa/source_batch/README.md)。
+
 ## 2026-10-18 故障分路与固定测试签名
 
 - 先依据同一次失败的session/output与该版本解码配置分路；SurfaceTexture只表示输出承载方式，不能单独证明GPU或具体硬件decoder。已确认的QA6用户失败为direct MediaCodec请求，详见[原始行号与边界](CONFIRMED-PLAYBACK-RECOVERY.md)。copy/GPU模拟器历史按原适用环境保留，不自动重开或变成本轮阻塞。
