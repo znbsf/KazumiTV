@@ -114,6 +114,64 @@ void main() {
   );
 
   test(
+    'write-only credentials never read values even with global permission',
+    () async {
+      var reads = 0;
+      session.setTarget(PhoneKeyboardTarget(
+        label: 'Access Token',
+        writeOnly: true,
+        onText: edits.add,
+        onConfirm: () => confirms++,
+        readValue: () {
+          reads++;
+          return {
+            'text': 'saved-secret-token',
+            'selection': {'baseOffset': 0, 'extentOffset': 18},
+          };
+        },
+        onSelection: (_, __) => fail('Credentials cannot expose selection'),
+      ));
+      session.setReadTextAllowed(true);
+      expect(session.state['readTextAllowed'], false);
+      expect((session.state['target'] as Map)['writeOnly'], true);
+      expect(jsonEncode(session.state), isNot(contains('saved-secret-token')));
+      final response =
+          await (await client.getUrl(uri.replace(path: '${uri.path}/state')))
+              .close();
+      final stateBody = await utf8.decoder.bind(response).join();
+      expect(stateBody, isNot(contains('saved-secret-token')));
+      expect(stateBody, isNot(contains('baseOffset')));
+      expect(
+          await post({
+            ...payload('credential-selection', action: 'selection'),
+            'selection': {'baseOffset': 0, 'extentOffset': 0},
+          }),
+          400);
+      expect(
+          await post({
+            ...payload('credential-with-selection', text: 'new-token'),
+            'selection': {'baseOffset': 0, 'extentOffset': 0},
+          }),
+          400);
+      expect(edits, isEmpty);
+      expect(reads, 0);
+      expect(await post(payload('credential-replace', text: 'new-token')), 200);
+      expect(edits, ['new-token']);
+      expect(await post(payload('credential-confirm', action: 'confirm')), 200);
+      expect(confirms, 1);
+      expect(reads, 0);
+      session.setTarget(PhoneKeyboardTarget(
+        label: 'ordinary',
+        onText: (_) {},
+        onConfirm: () {},
+        readValue: () => {'text': 'ordinary text'},
+      ));
+      expect(session.state['readTextAllowed'], true);
+      expect((session.state['target'] as Map)['text'], 'ordinary text');
+    },
+  );
+
+  test(
     'selection requires permission and validates offsets without text mutation',
     () async {
       final selected = <List<int>>[];

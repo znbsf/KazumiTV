@@ -13,13 +13,18 @@ class TvTextEntry extends StatefulWidget {
       {super.key,
       required this.child,
       this.title,
-      this.allowPhoneKeyboard = true});
+      this.allowPhoneKeyboard = true,
+      this.phoneKeyboardWriteOnly = false});
   final TextField child;
   final String? title;
 
-  /// Set false for credentials even if a show-password toggle makes them visible.
+  /// Set false to exclude a field regardless of visibility or write-only opt-in.
   /// Label checks and obscureText are additional safeguards, not classification.
   final bool allowPhoneKeyboard;
+
+  /// Explicit credential entry: accept replacements without exporting the draft.
+  /// Other sensitive fields remain excluded unless they opt in to this mode.
+  final bool phoneKeyboardWriteOnly;
 
   @override
   State<TvTextEntry> createState() => _TvTextEntryState();
@@ -45,6 +50,7 @@ class _TvTextEntryState extends State<TvTextEntry> {
           field: field,
           title: widget.title,
           allowPhoneKeyboard: widget.allowPhoneKeyboard,
+          phoneKeyboardWriteOnly: widget.phoneKeyboardWriteOnly,
           onPhoneConfirm: (value) {
             if (!mounted) return;
             field.controller?.value = TextEditingValue(
@@ -114,11 +120,13 @@ class _TvTextEditor extends StatefulWidget {
   const _TvTextEditor(
       {required this.field,
       required this.allowPhoneKeyboard,
+      required this.phoneKeyboardWriteOnly,
       required this.onPhoneConfirm,
       this.title});
   final TextField field;
   final String? title;
   final bool allowPhoneKeyboard;
+  final bool phoneKeyboardWriteOnly;
   final ValueChanged<String> onPhoneConfirm;
   @override
   State<_TvTextEditor> createState() => _TvTextEditorState();
@@ -147,9 +155,10 @@ class _TvTextEditorState extends State<_TvTextEditor> {
     final field = widget.field;
     final label = widget.title ?? field.decoration?.labelText ?? '文本输入';
     final allowed = widget.allowPhoneKeyboard &&
-        !field.obscureText &&
-        !RegExp(r'password|token|secret|密码|密钥|口令', caseSensitive: false)
-            .hasMatch(label);
+        (widget.phoneKeyboardWriteOnly ||
+            (!field.obscureText &&
+                !RegExp(r'password|token|secret|密码|密钥|口令', caseSensitive: false)
+                    .hasMatch(label)));
     final dialog = AlertDialog(
       title: Text(widget.title ??
           field.decoration?.labelText ??
@@ -191,6 +200,7 @@ class _TvTextEditorState extends State<_TvTextEditor> {
     return PhoneKeyboardEditorTarget(
         controller: _draft,
         label: label,
+        writeOnly: widget.phoneKeyboardWriteOnly,
         maxLength: field.maxLength != null && field.maxLength! > 0
             ? field.maxLength!
             : 2048,

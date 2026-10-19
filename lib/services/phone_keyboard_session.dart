@@ -7,8 +7,8 @@ String _randomId() => List.generate(16, (_) => Random.secure().nextInt(256))
     .map((v) => v.toRadixString(16).padLeft(2, '0'))
     .join();
 
-/// Only an explicitly opened, non-sensitive editor may own a target.
-/// Existing contents are exposed only with explicit, session-scoped TV consent.
+/// Only an explicitly opened editor may own a target.
+/// Credentials use writeOnly; ordinary text needs session-scoped read consent.
 class PhoneKeyboardTarget {
   PhoneKeyboardTarget(
       {required this.label,
@@ -17,10 +17,12 @@ class PhoneKeyboardTarget {
       this.readValue,
       this.onSelection,
       this.isActive,
+      this.writeOnly = false,
       this.maxLength = 2048});
   final String id = _randomId();
   final String label;
   final int maxLength;
+  final bool writeOnly;
   final void Function(String) onText;
   final void Function() onConfirm;
   final Map<String, Object?> Function()? readValue;
@@ -126,7 +128,7 @@ class PhoneKeyboardSession {
         'sessionId': sessionId,
         'pairingExpiresAt': expiresAt?.toUtc().toIso8601String(),
         'generation': _generation,
-        'readTextAllowed': _readTextAllowed,
+        'readTextAllowed': _readTextAllowed && _target?.writeOnly != true,
         'remoteSequence': _remoteSequence,
         'remote': remoteState?.call() ??
             {'context': '', 'revision': 0, 'keys': <Object>[]},
@@ -137,7 +139,9 @@ class PhoneKeyboardSession {
                 'label': _target!.label,
                 'revision': _target!.revision,
                 'maxLength': _target!.maxLength,
-                if (_readTextAllowed) ...?_target!.readValue?.call(),
+                'writeOnly': _target!.writeOnly,
+                if (_readTextAllowed && !_target!.writeOnly)
+                  ...?_target!.readValue?.call(),
               },
       };
 
@@ -336,6 +340,10 @@ class PhoneKeyboardSession {
             if (selectionOnly && selection == null)
               throw const FormatException('Missing selection');
             if (selection != null) {
+              // Reject before readValue: selection must not inspect credentials.
+              if (target.writeOnly) {
+                throw const FormatException('Write-only target');
+              }
               final value =
                   action == 'input' ? text : target.readValue?.call()['text'];
               if (!_readTextAllowed ||
@@ -433,9 +441,10 @@ let browserId=client;try{const saved=localStorage.getItem('kazumi-remote-browser
 function key(s){return s?.target ? (s.sessionId||'')+':'+s.generation+':'+s.target.id : (s?.sessionId||null);}
 function selection(){return {baseOffset:box.selectionDirection==='backward'?box.selectionEnd:box.selectionStart,extentOffset:box.selectionDirection==='backward'?box.selectionStart:box.selectionEnd};}
 function sameSelection(a,b){return a?.baseOffset===b?.baseOffset&&a?.extentOffset===b?.extentOffset;}
+function canRead(s){return !!s?.readTextAllowed&&!s.target?.writeOnly;}
 async function request(url,options={}){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),5000);try{const response=await fetch(url,{...options,headers:{...options.headers,'X-Kazumi-Client':browserId},signal:controller.signal});const data=await response.json();return {ok:response.ok,status:response.status,json:async()=>data};}finally{clearTimeout(timer);}}
 function setText(element,text){if(element.textContent!==text)element.textContent=text;}
-function render(){const expiry=state?.pairingExpiresAt;setText(document.getElementById('connectionPolicy'),expiry?'配对有效至 '+new Date(expiry).toLocaleString()+' · 可收藏本页；电视应用回到前台后自动重连':'临时连接 · 闲置 10 分钟或电视应用进入后台后断开');const t=state?.target;box.disabled=!t||offline;clear.disabled=!t||offline||sending||composing;confirm.disabled=!t||offline||sending||composing||uncertain;if(t)box.maxLength=t.maxLength;setText(status,offline?'连接已断开或网络不可达，请等待重连或在电视上重新开启':uncertain?'电视内容已变化或上次发送未确认，请检查后重新输入或清空':t?'正在编辑：'+t.label:'已连接 · 可遥控电视，或打开输入框输入文字');setText(document.getElementById('privacy'),state?.readTextAllowed?'本次已允许读取普通文本，可编辑原文与选择区；断开即撤销。':'仅替换草稿，不读取电视已有文本。可在电视连接弹窗授权本次读取。');const remote=state?.remote;setText(document.getElementById('remoteStatus'),remoteMessage||('当前场景：'+(remote?.context||'无可用操作')));renderRemote(remote);}
+function render(){const expiry=state?.pairingExpiresAt;setText(document.getElementById('connectionPolicy'),expiry?'配对有效至 '+new Date(expiry).toLocaleString()+' · 可收藏本页；电视应用回到前台后自动重连':'临时连接 · 闲置 10 分钟或电视应用进入后台后断开');const t=state?.target;box.disabled=!t||offline;clear.disabled=!t||offline||sending||composing;confirm.disabled=!t||offline||sending||composing||uncertain;if(t)box.maxLength=t.maxLength;setText(status,offline?'连接已断开或网络不可达，请等待重连或在电视上重新开启':uncertain?'电视内容已变化或上次发送未确认，请检查后重新输入或清空':t?'正在编辑：'+t.label:'已连接 · 可遥控电视，或打开输入框输入文字');setText(document.getElementById('privacy'),t?.writeOnly?'凭据只写：可粘贴新内容；电视已有内容始终不回读。确认后请在电视验证并保存。':canRead(state)?'本次已允许读取普通文本，可编辑原文与选择区；断开即撤销。':'仅替换草稿，不读取电视已有文本。可在电视连接弹窗授权本次读取。');const remote=state?.remote;setText(document.getElementById('remoteStatus'),remoteMessage||('当前场景：'+(remote?.context||'无可用操作')));renderRemote(remote);}
 const remoteButtons=new Map();
 const fixedExtras=[['playPause','播放 / 暂停'],['play','播放'],['pause','暂停'],['stop','停止'],['rewind','快退'],['fastForward','快进'],['previous','上一集'],['next','下一集'],['guide','选集'],['menu','Menu 菜单'],['info','Info 信息'],['red','红键'],['green','绿键'],['yellow','黄键'],['blue','蓝键']];
 function applyTheme(theme){if(!theme)return;const root=document.documentElement;for(const name of ['background','surface','onSurface','muted','primary','onPrimary','secondary','onSecondary','outline']){const value=theme[name];if(typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value))root.style.setProperty('--'+name,value);}if(['light','dark'].includes(theme.brightness))root.style.colorScheme=theme.brightness;}
@@ -443,15 +452,15 @@ function renderRemote(remote){applyTheme(remote?.theme);document.getElementById(
 for(const item of items){let button=remoteButtons.get(item.id);if(!button){button=document.createElement('button');button.dataset.key=item.id;button.onclick=()=>{if(!button.disabled)sendRemote(item.id,state?.remote?.revision);};remoteButtons.set(item.id,button);let area='remoteExtras';if(['up','left','ok','right','down'].includes(item.id)){area='remoteDpad';button.style.gridArea=item.id;}else if(item.id==='back')area='remoteBack';else if(/^digit[0-9]$/.test(item.id))area='remoteDigits';document.getElementById(area).appendChild(button);}const capability=offered.get(item.id);const arrows={up:'↑',down:'↓',left:'←',right:'→',ok:'OK'};const label=arrows[item.id]||(capability?(['red','green','yellow','blue'].includes(item.id)?item.label+' · '+capability.label:capability.label):item.label);if(button.textContent!==label)button.textContent=label;button.setAttribute('aria-label',capability?.label||item.label);button.title=capability?capability.label:'当前页面未提供此操作';button.disabled=!capability||offline||sending||composing||dirty;button.hidden=false;}
 for(const [id,button] of remoteButtons){if(!items.some(item=>item.id===id))button.hidden=true;}}
 
-function applyValue(s){const t=s.target;if(s.readTextAllowed&&typeof t?.text==='string'){box.value=t.text;const sel=t.selection;if(sel)box.setSelectionRange(Math.min(sel.baseOffset,sel.extentOffset),Math.max(sel.baseOffset,sel.extentOffset),sel.baseOffset>sel.extentOffset?'backward':'forward');}else box.value='';}
-function update(s,ack=false){if(composing){deferred={s,ack};return;}const changed=key(state)!==key(s),revisionChanged=state?.target?.revision!==s.target?.revision;state=s;if(changed){dirty=false;selectionDirty=false;uncertain=false;applyValue(s);}else if(!ack&&revisionChanged&&(dirty||selectionDirty)){dirty=false;selectionDirty=false;uncertain=true;}else if(!dirty&&!selectionDirty&&s.readTextAllowed&&(revisionChanged||ack)){applyValue(s);}render();}
+function applyValue(s){const t=s.target;if(canRead(s)&&typeof t?.text==='string'){box.value=t.text;const sel=t.selection;if(sel)box.setSelectionRange(Math.min(sel.baseOffset,sel.extentOffset),Math.max(sel.baseOffset,sel.extentOffset),sel.baseOffset>sel.extentOffset?'backward':'forward');}else box.value='';}
+function update(s,ack=false){if(composing){deferred={s,ack};return;}const changed=key(state)!==key(s),revisionChanged=state?.target?.revision!==s.target?.revision;state=s;if(changed){dirty=false;selectionDirty=false;uncertain=false;applyValue(s);}else if(!ack&&revisionChanged&&(dirty||selectionDirty)){dirty=false;selectionDirty=false;uncertain=true;}else if(!dirty&&!selectionDirty&&canRead(s)&&(revisionChanged||ack)){applyValue(s);}render();}
 async function poll(){if(busy||document.visibilityState==='hidden')return;busy=true;try{const r=await request(base+'/state');if(!r.ok)throw Error();const s=await r.json();offline=false;failures=0;nextPollAt=0;update(s);}catch(e){offline=true;uncertain=true;nextPollAt=Date.now()+Math.min(15000,1000*Math.pow(2,Math.min(++failures,4)));}finally{busy=false;sending=false;render();}}
-async function send(action){if(busy||composing||offline||!state?.target||(action==='confirm'&&uncertain))return false;busy=true;sending=true;render();const t=state.target,payload={sessionId:state.sessionId,requestId:client+'-'+(++serial),targetId:t.id,generation:state.generation,revision:t.revision,action,text:box.value};if(state.readTextAllowed&&(action==='input'||action==='selection'))payload.selection=selection();try{const r=await request(base+'/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const s=await r.json();if(!r.ok){dirty=false;selectionDirty=false;uncertain=true;update(s);return false;}dirty=box.value!==payload.text;selectionDirty=!!payload.selection&&!sameSelection(selection(),payload.selection);if(action!=='confirm')uncertain=false;update(s,true);return true;}catch(e){dirty=false;selectionDirty=false;uncertain=true;offline=true;return false;}finally{busy=false;sending=false;render();}}
+async function send(action){if(busy||composing||offline||!state?.target||(action==='confirm'&&uncertain))return false;busy=true;sending=true;render();const t=state.target,payload={sessionId:state.sessionId,requestId:client+'-'+(++serial),targetId:t.id,generation:state.generation,revision:t.revision,action,text:box.value};if(canRead(state)&&(action==='input'||action==='selection'))payload.selection=selection();try{const r=await request(base+'/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const s=await r.json();if(!r.ok){dirty=false;selectionDirty=false;uncertain=true;update(s);return false;}dirty=box.value!==payload.text;selectionDirty=!!payload.selection&&!sameSelection(selection(),payload.selection);if(action!=='confirm')uncertain=false;update(s,true);return true;}catch(e){dirty=false;selectionDirty=false;uncertain=true;offline=true;return false;}finally{busy=false;sending=false;render();}}
 async function sendRemote(id,revision){if(busy||composing||offline||dirty||state?.remote?.revision!==revision)return false;pulse();busy=true;sending=true;render();const payload={sessionId:state.sessionId,requestId:client+'-'+(++serial),action:'remote',key:id,remoteRevision:revision,remoteSequence:(state.remoteSequence||0)+1};try{const r=await request(base+'/input',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const s=await r.json();remoteMessage=r.ok?'':r.status===429?'按键过快，请稍后再按；不会自动重试':'场景已变化或操作未确认，请查看电视';update(s);return r.ok;}catch(e){offline=true;remoteMessage='操作结果未确认，请先查看电视；不会重发';return false;}finally{busy=false;sending=false;render();}}
 box.addEventListener('compositionstart',()=>{composing=true;compositionTarget=key(state);compositionRevision=state?.target?.revision;render();});
 box.addEventListener('compositionend',()=>{composing=false;const next=deferred;deferred=null;const conflict=next&&(key(next.s)!==compositionTarget||(!next.ack&&next.s.target?.revision!==compositionRevision));if(conflict){dirty=false;selectionDirty=false;update(next.s);applyValue(next.s);uncertain=true;discardComposition=true;render();return;}dirty=true;if(next)update(next.s,next.ack);if(compositionTarget!==key(state)){dirty=false;discardComposition=true;render();return;}send('input');});
 box.addEventListener('input',()=>{if(composing)return;if(discardComposition){discardComposition=false;applyValue(state);dirty=false;render();return;}dirty=true;send('input');});
-box.addEventListener('select',()=>{if(composing||!state?.readTextAllowed||sameSelection(selection(),state?.target?.selection))return;selectionDirty=true;if(!dirty)send('selection');});
+box.addEventListener('select',()=>{if(composing||!canRead(state)||sameSelection(selection(),state?.target?.selection))return;selectionDirty=true;if(!dirty)send('selection');});
 clear.onclick=()=>{if(busy||composing)return;box.value='';dirty=true;send('clear');};
 confirm.onclick=async()=>{if(busy||composing||uncertain||!state?.target)return;const target=key(state);if(dirty&&!(await send('input')))return;if(selectionDirty&&!(await send('selection')))return;if(!dirty&&!uncertain&&key(state)===target)await send('confirm');};
 function showMode(keyboard){document.getElementById('keyboardPanel').hidden=!keyboard;document.getElementById('remotePanel').hidden=keyboard;document.getElementById('keyboardMode').setAttribute('aria-pressed',String(keyboard));document.getElementById('remoteMode').setAttribute('aria-pressed',String(!keyboard));}

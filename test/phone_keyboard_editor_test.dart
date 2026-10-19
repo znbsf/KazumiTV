@@ -200,6 +200,86 @@ void main() {
 
   for (final obscure in [false, true]) {
     testWidgets(
+        'write-only Token replacement and cancellation obscure=$obscure',
+        (tester) async {
+      final controller = TextEditingController(text: 'previous-secret-token');
+      final focus = FocusNode();
+      var submits = 0;
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: TvTextEntry(
+                  phoneKeyboardWriteOnly: true,
+                  child: TextField(
+                      controller: controller,
+                      focusNode: focus,
+                      obscureText: obscure,
+                      decoration:
+                          const InputDecoration(labelText: 'Access Token'),
+                      onSubmitted: (_) => submits++)))));
+      focus.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+      expect(find.byType(PhoneKeyboardButton), findsOneWidget);
+      final keyboard = PhoneKeyboard.instance;
+      await tester.runAsync(() async {
+        keyboard.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await keyboard.start(address: InternetAddress.loopbackIPv4);
+      });
+      expect(keyboard.uri, isNotNull);
+      keyboard.setReadTextAllowed(true);
+      final client =
+          HttpOverrides.runWithHttpOverrides(() => HttpClient(), _RealHttp());
+      var serial = 0;
+      Future<int?> send(String action, [String text = '']) =>
+          tester.runAsync(() async {
+            final state = keyboard.session!.state;
+            expect(jsonEncode(state), isNot(contains('previous-secret-token')));
+            expect(state['readTextAllowed'], false);
+            final target = state['target'] as Map;
+            expect(target['writeOnly'], true);
+            final uri = keyboard.uri!;
+            final req =
+                await client.postUrl(uri.replace(path: '${uri.path}/input'));
+            req.add(utf8.encode(jsonEncode({
+              'requestId': 'credential-${++serial}',
+              'generation': state['generation'],
+              'targetId': target['id'],
+              'revision': target['revision'],
+              'action': action,
+              'text': text,
+            })));
+            final response = await req.close();
+            final body = await utf8.decoder.bind(response).join();
+            expect(body, isNot(contains('previous-secret-token')));
+            expect(body, isNot(contains('replacement-token')));
+            return response.statusCode;
+          });
+      expect(await send('input', 'discard-this-token'), 200);
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(controller.text, 'previous-secret-token');
+      expect(keyboard.session!.state['target'], isNull);
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+      expect(await send('input', 'replacement-token'), 200);
+      await tester.pump();
+      expect(controller.text, 'previous-secret-token');
+      expect(await send('confirm'), 200);
+      await tester.pumpAndSettle();
+      expect(controller.text, 'replacement-token');
+      expect(submits, 0,
+          reason: 'Saving/verification still needs TV confirmation');
+      expect(keyboard.session!.state['target'], isNull);
+      client.close(force: true);
+      await tester.runAsync(keyboard.disconnect);
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+      focus.dispose();
+    });
+
+    testWidgets(
         'sensitive field excludes phone input even when visible=$obscure',
         (tester) async {
       final controller = TextEditingController(text: 'secret');

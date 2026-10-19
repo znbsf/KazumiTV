@@ -116,7 +116,7 @@ class _PhoneKeyboardDialogState extends State<PhoneKeyboardDialog> {
                     SwitchListTile(
                       title: const Text('允许已连接手机读取当前普通输入框文本'),
                       subtitle: const Text(
-                          '仅本次连接；可能包含 URL 和其中的私人信息。密码与令牌字段始终排除，断开后自动关闭。'),
+                          '仅本次连接；可能包含 URL 和其中的私人信息。密码与令牌不回读；支持的凭据输入框只能接收新内容。断开后自动关闭。'),
                       value: keyboard.readTextAllowed,
                       onChanged: keyboard.setReadTextAllowed,
                     ),

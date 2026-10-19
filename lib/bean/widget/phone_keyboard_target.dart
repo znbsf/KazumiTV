@@ -11,6 +11,7 @@ class PhoneKeyboardEditorTarget extends StatefulWidget {
       required this.label,
       required this.onConfirm,
       required this.child,
+      this.writeOnly = false,
       this.maxLength = 2048,
       this.inputFormatters = const []});
   final TextEditingController controller;
@@ -19,6 +20,7 @@ class PhoneKeyboardEditorTarget extends StatefulWidget {
   final Widget child;
   final int maxLength;
   final List<TextInputFormatter> inputFormatters;
+  final bool writeOnly;
   @override
   State<PhoneKeyboardEditorTarget> createState() =>
       _PhoneKeyboardEditorTargetState();
@@ -31,6 +33,7 @@ class _PhoneKeyboardEditorTargetState extends State<PhoneKeyboardEditorTarget> {
     super.initState();
     target = PhoneKeyboardTarget(
         label: widget.label,
+        writeOnly: widget.writeOnly,
         maxLength: widget.maxLength,
         isActive: () => mounted && ModalRoute.of(context)?.isCurrent == true,
         readValue: () {

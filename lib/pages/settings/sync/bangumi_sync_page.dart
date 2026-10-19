@@ -327,7 +327,7 @@ class _BangumiSyncPageState extends State<BangumiSyncPage> {
           children: [
             const SizedBox(height: 12),
             TvTextEntry(
-                allowPhoneKeyboard: false,
+                phoneKeyboardWriteOnly: true,
                 child: TextField(
                   controller: _tokenController,
                   enabled: !_busy,
