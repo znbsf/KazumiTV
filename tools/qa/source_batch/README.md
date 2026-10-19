@@ -30,7 +30,7 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 
 Gecko158实测要求 compileSdk37/AGP9.1+，本原型固定146.0.20251217121356（与现有工具链兼容的较旧稳定版），不是最新安全版本或生产推荐。系统 WebView 记录运行时实际版本。Gecko通过内置 WebExtension 在 MAIN world 注入同一解析脚本，覆盖所有 http(s) 子框架，与 Android document-start 注入范围一致（插件 forMainFrameOnly 仅对 iOS/macOS 生效）。内容桥接是只读候选输入，并由当前 session/generation 和生产 URL 校验隔离。尚不支持 `useLegacyParser=true` 的 iframe-only 模式，显式失败，不悄悄改变规则。
 
-固定UA取自 App 的 `userAgentsList` 第一项。初始手机UA实验发现7sefun跳转App下载页，已保留并排除出代表App的比较。诊断补充后必须重测跨域 iframe，用它区分桥接覆盖缺口和真实内核兼容失败。扩展脚本变化时更新 manifest version，避免复用旧内置扩展注册。
+固定UA取自 App 的 `userAgentsList` 第一项，仅应用于浏览器解析和媒体请求；搜索/集表仍走原规则请求实现，空UA可能随机取桌面列表，因此另行核对两组剧集页摘要。初始手机UA实验发现7sefun跳转App下载页，已保留并排除出代表App的比较。诊断补充后必须重测跨域 iframe，用它区分桥接覆盖缺口和真实内核兼容失败。扩展脚本变化时更新 manifest version，避免复用旧内置扩展注册。
 
 两个内核都关闭网络图片；Gecko使用内置扩展阻止 image 请求。APK 为 Flutter debug 包（原生依赖可能包含其他 ABI），本轮只执行 x86_64；不可把包大小或 debug PSS 当生产开销。
 
