@@ -39,6 +39,23 @@ void main() {
     final saved = Plugin.fromOverlay(overlay).toJson();
     expect(BatchRuleSnapshot.fromJson(saved).identity,
         BatchRuleSnapshot.fromJson(overlay.toJson()).identity);
+    expect(BatchRuleSnapshot.fromJson(overlay.toJson()).identity['name'],
+        base.name);
+    expect(BatchRuleSnapshot.fromJson(overlay.toJson()).identity['version'],
+        base.version);
+    expect(
+        BatchRuleSnapshot.fromJson(overlay.toJson()).identity['api'], base.api);
+  });
+
+  test('production import rejects future or invalid API and empty names', () {
+    for (final patch in <Map<String, dynamic>>[
+      {'api': '999'},
+      {'api': 'invalid'},
+      {'name': '  '},
+    ]) {
+      expect(() => BatchRuleSnapshot.fromJson({...base.toJson(), ...patch}),
+          throwsFormatException);
+    }
   });
 
   test('plain snapshots preserve effective hash but do not invent provenance',
