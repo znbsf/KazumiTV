@@ -1,5 +1,7 @@
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:kazumi/services/video_source/resolved_source_cache.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
@@ -65,7 +67,10 @@ abstract class _VideoPageController with Store implements Disposable {
     this.downloadRepository,
     this.downloadManager, {
     WebViewVideoSourceService? videoSourceService,
-  }) : _videoSourceService = videoSourceService;
+    ResolvedSourceCache? resolvedSourceCache,
+  })  : _videoSourceService = videoSourceService,
+        _resolvedSourceCache =
+            resolvedSourceCache ?? ResolvedSourceCache.shared;
 
   late BangumiItem bangumiItem;
   EpisodeInfo episodeInfo = EpisodeInfo.fromTemplate();
@@ -150,6 +155,7 @@ abstract class _VideoPageController with Store implements Disposable {
   final IDownloadManager downloadManager;
 
   WebViewVideoSourceService? _videoSourceService;
+  final ResolvedSourceCache _resolvedSourceCache;
   int _requestedOffset = 0;
   int _playbackRevision = 0;
   int get playbackRevision => _playbackRevision;
@@ -821,16 +827,44 @@ abstract class _VideoPageController with Store implements Disposable {
       }
     });
 
+    final cacheKey = jsonEncode([
+      bangumiItem.id,
+      currentPlugin.toJson(),
+      resolvedEpisode.roadIndex,
+      resolvedEpisode.listIndex,
+      url,
+    ]);
+    final requestHeaders = <String, String>{
+      'user-agent': currentPlugin.userAgent.isEmpty
+          ? getRandomUA()
+          : currentPlugin.userAgent,
+      if (currentPlugin.referer.isNotEmpty) 'referer': currentPlugin.referer,
+    };
     try {
-      final source = preparedSource ??
-          await _videoSourceService!.resolve(
-            url,
-            useLegacyParser: currentPlugin.useLegacyParser,
-            offset: offset,
-          );
+      final attempt = preparedSource != null
+          ? ResolvedSourceAttempt(preparedSource, requestHeaders,
+              fromCache: false)
+          : await _resolvedSourceCache.resolve(
+              key: cacheKey,
+              offset: offset,
+              headers: requestHeaders,
+              isCurrent: () => session.isActive,
+              fresh: () => _videoSourceService!.resolve(
+                url,
+                useLegacyParser: currentPlugin.useLegacyParser,
+                offset: offset,
+              ),
+            );
+      final source = attempt.source;
 
       if (session.isStale) {
         return;
+      }
+      if (attempt.fromCache) {
+        KazumiLogger().i(
+            'VideoPageController: parser failed; trying one '
+            'recent first-frame-confirmed address for the same episode',
+            forceLog: true);
       }
       _finishLoading();
       KazumiLogger()
@@ -852,13 +886,7 @@ abstract class _VideoPageController with Store implements Disposable {
         danmakuEpisodeNumber: resolvedEpisode.danmakuEpisodeNumber,
         pageUrl: resolvedEpisode.pageUrl,
         sortNumber: resolvedEpisode.sortNumber,
-        httpHeaders: {
-          'user-agent': currentPlugin.userAgent.isEmpty
-              ? getRandomUA()
-              : currentPlugin.userAgent,
-          if (currentPlugin.referer.isNotEmpty)
-            'referer': currentPlugin.referer,
-        },
+        httpHeaders: attempt.headers,
         adBlockerEnabled: forceAdBlocker || currentPlugin.adBlocker,
         episodeTitle: resolvedEpisode.displayTitle,
         referer: currentPlugin.referer,
@@ -876,20 +904,35 @@ abstract class _VideoPageController with Store implements Disposable {
                 }
               }
             : null,
-        onPlaybackError: (message) =>
-            _handlePlaybackFailure(message, session, playerController),
+        onPlaybackError: (message) {
+          if (session.isActive) _resolvedSourceCache.invalidate(cacheKey);
+          _handlePlaybackFailure(message, session, playerController);
+        },
       );
 
       final initialized = await playerController.init(params);
       if (session.isActive && initialized) {
         historyAccepted = true;
         _lastResolvedSource = source;
+        final output = playerController.playback.videoController;
+        if (output != null && preparedSource == null) {
+          unawaited(_resolvedSourceCache.rememberAfterFirstFrame(
+            key: cacheKey,
+            attempt: attempt,
+            firstFrame: output.waitUntilFirstFrameRendered,
+            isCurrent: () =>
+                session.isActive &&
+                identical(output, playerController.playback.videoController) &&
+                _errorMessage == null,
+          ));
+        }
         playingEpisode = VideoEpisodeSelection(
           episode: resolvedEpisode.listIndex,
           road: resolvedEpisode.roadIndex,
         );
         unawaited(_loadPlaybackDanmaku(playerController, params, session));
       } else if (session.isActive) {
+        _resolvedSourceCache.invalidate(cacheKey);
         _failLoading('视频已解析，但播放器加载失败。请重试当前集或更换线路');
         _playbackSessions.cancel();
       }
