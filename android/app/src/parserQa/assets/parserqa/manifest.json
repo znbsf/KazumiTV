@@ -1,0 +1,12 @@
+{
+  "manifest_version": 2,
+  "name": "Kazumi parser QA bridge",
+  "version": "1.2",
+  "browser_specific_settings": {"gecko": {"id": "parserqa@kazumi.local"}},
+  "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons", "webRequest", "webRequestBlocking", "http://*/*", "https://*/*"],
+  "background": {"scripts": ["background.js"]},
+  "content_scripts": [
+    {"matches": ["http://*/*", "https://*/*"], "js": ["bridge.js"], "run_at": "document_start", "all_frames": true},
+    {"matches": ["http://*/*", "https://*/*"], "js": ["parser.generated.js"], "run_at": "document_start", "all_frames": true, "world": "MAIN"}
+  ]
+}

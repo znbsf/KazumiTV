@@ -1,0 +1,23 @@
+// Explicit opt-in, debug-only, independent identity. No production signing.
+if (project.findProperty("kazumiTv") == "true") {
+    throw new GradleException("Parser QA cannot be combined with the TV release overlay")
+}
+repositories { maven { url 'https://maven.mozilla.org/maven2/' } }
+android {
+    flavorDimensions += "device"
+    productFlavors {
+        parserQa {
+            dimension "device"
+            applicationId "com.znbsf.kazumi.fluttertv.parserqa"
+            minSdkVersion 26
+            ndk { abiFilters "x86_64" }
+        }
+    }
+    sourceSets { parserQa.java.srcDirs += 'src/parserQa/kotlin' }
+    variantFilter { variant ->
+        if (variant.buildType.name != 'debug') variant.setIgnore(true)
+    }
+}
+dependencies {
+    parserQaImplementation 'org.mozilla.geckoview:geckoview:146.0.20251217121356'
+}

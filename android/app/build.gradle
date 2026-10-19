@@ -103,3 +103,8 @@ android.applicationVariants.all { variant ->
 if (project.findProperty("kazumiTv") == "true") {
     apply from: "tv.gradle"
 }
+
+// Experimental engine dependencies and activities never enter normal builds.
+if (project.findProperty("kazumiParserQa") == "true") {
+    apply from: "parser-qa.gradle"
+}
