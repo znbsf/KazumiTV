@@ -207,4 +207,34 @@ void main() {
     expect(adapter.requests.single.cancelToken?.isCancelled, isTrue);
     pending.complete(ResponseBody.fromString(bootstrap(), 200));
   });
+
+  test('deadline also cancels a stalled response body', () async {
+    compat.cancel();
+    compat = LegacyPlayerCompat(
+        client: Dio()..httpClientAdapter = adapter,
+        budget: const Duration(milliseconds: 20));
+    compat.begin(episode, enabled: true);
+    observe();
+    final body = StreamController<Uint8List>();
+    adapter.handle = (_) async => ResponseBody(body.stream, 200);
+    expect(await fail().timeout(const Duration(seconds: 1)), isNull);
+    expect(adapter.requests.single.cancelToken?.isCancelled, isTrue);
+    await body.close();
+  });
+
+  test('ambiguity arriving during parsing cancels the attempt', () async {
+    final pending = Completer<ResponseBody>();
+    final entered = Completer<void>();
+    adapter.handle = (_) {
+      entered.complete();
+      return pending.future;
+    };
+    final result = fail();
+    await entered.future;
+    observe('${LegacyPlayerCompat.origin}/?url=${'ef' * 32}');
+    expect(await result.timeout(const Duration(seconds: 1)), isNull);
+    pending.complete(ResponseBody.fromString(bootstrap(), 200));
+    expect(await fail(), isNull);
+    expect(adapter.requests, hasLength(1));
+  });
 }
