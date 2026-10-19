@@ -11,6 +11,7 @@ import 'package:kazumi/pages/plugin_editor/editor_form_widgets.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_editor_page.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
+import 'package:kazumi/plugins/rule_overlay.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,45 @@ void main() {
     await Hive.close();
     await temp.delete(recursive: true);
   });
+  testWidgets('editor cannot silently detach an active TV overlay',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var writes = 0;
+    final controller =
+        PluginsController(pluginJsonWriter: (_) async => writes++);
+    final base = Plugin.fromTemplate()
+      ..name = 'Protected fixture'
+      ..version = '1.0'
+      ..baseUrl = 'https://example.invalid/';
+    final plugin = Plugin.fromOverlay(RuleOverlay.create(
+        repository: 'Predidit/KazumiRules',
+        commit: 'ba8e10b35b0c3a56bbb6032a12356b0473844c64',
+        baseRule: base.toJson(),
+        overrides: {'referer': 'https://example.invalid/'}));
+    controller.pluginList.add(plugin);
+    await tester.pumpWidget(ModularApp(
+        module: createModule(register: (c) {
+          c.route('/',
+              child: (_, __) =>
+                  PluginEditorPage(plugin: plugin, controller: controller));
+        }),
+        initialRoute: '/',
+        child: Builder(
+            builder: (context) => MaterialApp.router(
+                routerConfig: ModularApp.routerConfigOf(context)))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('请先在规则菜单还原基础规则再编辑'), findsOneWidget);
+    expect(writes, 0);
+    expect(controller.pluginList.single, same(plugin));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('editor restores, validates and saves the API 9 detail template',
       (tester) async {
     tester.view.physicalSize = const Size(1280, 1000);

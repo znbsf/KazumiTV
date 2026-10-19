@@ -189,6 +189,19 @@ class _PluginViewPageState extends State<PluginViewPage> {
     }
   }
 
+  Future<void> _restoreBase(Plugin plugin) async {
+    if (_updating || !_updatingNames.add(plugin.name)) return;
+    setState(() {});
+    try {
+      await _controller.restorePluginBase(plugin);
+      KazumiDialog.showToast(message: '已还原基础规则；重新导入覆盖文件可再次启用');
+    } catch (_) {
+      KazumiDialog.showToast(message: '还原失败，请重新检查规则');
+    } finally {
+      if (mounted) setState(() => _updatingNames.remove(plugin.name));
+    }
+  }
+
   @override
   Widget build(BuildContext context) => PopScope(
         canPop: !_selecting,
@@ -403,6 +416,11 @@ class _PluginViewPageState extends State<PluginViewPage> {
                               label: plugin.version,
                               background: colors.surfaceContainerHighest,
                               foreground: colors.onSurfaceVariant),
+                          if (plugin.tvOverlay != null)
+                            RuleTag(
+                                label: 'TV 覆盖',
+                                background: colors.tertiaryContainer,
+                                foreground: colors.onTertiaryContainer),
                           if (updatable)
                             RuleTag(
                                 label: '可更新',
@@ -480,6 +498,11 @@ class _PluginViewPageState extends State<PluginViewPage> {
               leadingIcon: const Icon(Icons.ios_share_rounded),
               onPressed: () => showRuleShareDialog(context, plugin),
               child: const Text('分享规则')),
+          if (plugin.tvOverlay != null)
+            MenuItemButton(
+                leadingIcon: const Icon(Icons.restore_rounded),
+                onPressed: _updating ? null : () => _restoreBase(plugin),
+                child: const Text('还原基础规则')),
           const Divider(),
           MenuItemButton(
               leadingIcon: const Icon(Icons.arrow_upward_rounded),

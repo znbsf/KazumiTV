@@ -34,6 +34,7 @@ Future<PluginUpdateResult> updatePluginWithFeedback(
     PluginUpdateResult.requiresNewerClient => '规则需要更高版本客户端',
     PluginUpdateResult.failed => installing ? '导入规则失败' : '更新规则失败',
     PluginUpdateResult.notNewer => '远程规则版本不高于本地，已跳过更新',
+    PluginUpdateResult.overlayConflict => '已保留 TV 覆盖；请更新覆盖文件或还原基础规则后再更新',
   };
   KazumiDialog.showToast(message: message);
   return result;
@@ -45,7 +46,8 @@ String _batchUpdateMessage(PluginBatchUpdateResult result) {
   }
   if (result.failed == 0 &&
       result.requiresNewerClient == 0 &&
-      result.notNewer == 0) {
+      result.notNewer == 0 &&
+      result.overlayConflicts == 0) {
     return '更新成功 ${result.updated} 条';
   }
 
@@ -55,6 +57,10 @@ String _batchUpdateMessage(PluginBatchUpdateResult result) {
   }
   if (result.notNewer > 0) {
     parts.add('已跳过 ${result.notNewer} 条');
+  }
+  if (result.overlayConflicts > 0) {
+    final count = result.overlayConflicts;
+    parts.add('保留 TV 覆盖 $count 条');
   }
   if (result.failed > 0) {
     parts.add('失败 ${result.failed} 条');

@@ -24,7 +24,13 @@ enum PluginUpdateAvailability { unknown, notInCatalog, latest, updatable }
 
 enum PluginCatalogItemStatus { install, installed, update }
 
-enum PluginUpdateResult { updated, requiresNewerClient, failed, notNewer }
+enum PluginUpdateResult {
+  updated,
+  requiresNewerClient,
+  failed,
+  notNewer,
+  overlayConflict,
+}
 
 class PluginBatchUpdateResult {
   const PluginBatchUpdateResult({
@@ -33,6 +39,7 @@ class PluginBatchUpdateResult {
     required this.requiresNewerClient,
     required this.failed,
     required this.notNewer,
+    this.overlayConflicts = 0,
   });
 
   final int candidates;
@@ -40,6 +47,7 @@ class PluginBatchUpdateResult {
   final int requiresNewerClient;
   final int failed;
   final int notNewer;
+  final int overlayConflicts;
 
   bool get hasNoCandidates => candidates == 0;
 }
@@ -265,6 +273,23 @@ abstract class _PluginsController with Store {
     );
   }
 
+  /// Explicit local rollback. A stale menu must not replace a newer import.
+  Future<void> restorePluginBase(Plugin expected) {
+    return _mutateAndPersist(
+      () {
+        final index = pluginList.indexWhere((plugin) =>
+            pluginNameKey(plugin.name) == pluginNameKey(expected.name));
+        if (index < 0 || !identical(pluginList[index], expected)) {
+          throw StateError('规则已变化，请重新打开规则菜单');
+        }
+        final overlay = expected.tvOverlay;
+        if (overlay == null) throw StateError('当前规则没有 TV 覆盖');
+        runInAction(() => _replacePlugin(Plugin.fromJson(overlay.baseRule)));
+      },
+      errorMessage: 'Plugin: failed to restore overlay base',
+    );
+  }
+
   Future<void> updatePlugins(Iterable<Plugin> plugins) {
     return _mutateAndPersist(
       () {
@@ -431,6 +456,14 @@ abstract class _PluginsController with Store {
     }
     // Validate at the injected loader boundary so production and test/custom
     // loaders follow the same integrity rule. Preserve the catalog spelling.
+    if (remotePlugin.tvOverlay != null) {
+      _errorReporter(
+        'Plugin: rejected remotely downloaded TV overlay',
+        const FormatException('TV 覆盖只能通过本地显式导入'),
+        StackTrace.current,
+      );
+      return (result: PluginUpdateResult.failed, plugin: null);
+    }
     if (remotePlugin.name.isEmpty ||
         pluginNameKey(remotePlugin.name) != pluginNameKey(name)) {
       final error = FormatException(
@@ -470,6 +503,11 @@ abstract class _PluginsController with Store {
     if (local != null && !_remoteIsNewer(local.version, remotePlugin.version)) {
       return (result: PluginUpdateResult.notNewer, plugin: null);
     }
+    // Local overlays are pinned. Never silently remove or rebase one during
+    // either individual or batch upstream updates.
+    if (local?.tvOverlay != null) {
+      return (result: PluginUpdateResult.overlayConflict, plugin: null);
+    }
     return (result: PluginUpdateResult.updated, plugin: remotePlugin);
   }
 
@@ -496,6 +534,7 @@ abstract class _PluginsController with Store {
     var requiresNewerClient = 0;
     var failed = 0;
     var notNewer = 0;
+    var overlayConflicts = 0;
 
     final updatedPlugins = <Plugin>[];
     for (final attempt in attempts) {
@@ -509,6 +548,8 @@ abstract class _PluginsController with Store {
           failed++;
         case PluginUpdateResult.notNewer:
           notNewer++;
+        case PluginUpdateResult.overlayConflict:
+          overlayConflicts++;
       }
     }
 
@@ -528,6 +569,7 @@ abstract class _PluginsController with Store {
       requiresNewerClient: requiresNewerClient,
       failed: failed,
       notNewer: notNewer,
+      overlayConflicts: overlayConflicts,
     );
   }
 

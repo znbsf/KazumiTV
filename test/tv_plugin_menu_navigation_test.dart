@@ -12,6 +12,7 @@ import 'package:kazumi/pages/plugin_editor/plugin_view_page.dart';
 import 'package:kazumi/pages/settings/settings_page.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
+import 'package:kazumi/plugins/rule_overlay.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -46,7 +47,8 @@ class _Fixture {
     },
   );
 
-  Future<void> mount(WidgetTester tester, {required bool shop}) async {
+  Future<void> mount(WidgetTester tester,
+      {required bool shop, bool overlay = false}) async {
     TvMode.setEnabledForTesting(true);
     addTearDown(() => TvMode.setEnabledForTesting(false));
     tester.view.physicalSize = const Size(1280, 720);
@@ -58,6 +60,13 @@ class _Fixture {
         ..name = name
         ..version = '1.0.0'
         ..baseUrl = 'https://example.invalid');
+    }
+    if (overlay) {
+      controller.pluginList[0] = Plugin.fromOverlay(RuleOverlay.create(
+          repository: 'Predidit/KazumiRules',
+          commit: 'ba8e10b35b0c3a56bbb6032a12356b0473844c64',
+          baseRule: controller.pluginList.first.toJson(),
+          overrides: {'referer': 'https://example.invalid/'}));
     }
     await controller.ensurePluginCatalog();
     await tester.pumpWidget(ModularApp(
@@ -130,6 +139,21 @@ void main() {
     await Hive.close();
     PathProviderPlatform.instance = oldPaths;
     await directory.delete(recursive: true);
+  });
+
+  testWidgets('overlay tag and menu restore the base without network access',
+      (tester) async {
+    final fixture = _Fixture();
+    await fixture.mount(tester, shop: false, overlay: true);
+    expect(find.text('TV 覆盖'), findsOneWidget);
+    await fixture.open(tester, shop: false);
+    await tester.tap(find.widgetWithText(MenuItemButton, '还原基础规则'));
+    await tester.pumpAndSettle();
+    expect(fixture.controller.pluginList.first.tvOverlay, isNull);
+    expect(fixture.controller.pluginList.first.referer, isEmpty);
+    expect(find.text('TV 覆盖'), findsNothing);
+    expect(fixture.writes, 1);
+    expect(fixture.downloads, 0);
   });
 
   for (final shop in [false, true]) {

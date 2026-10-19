@@ -419,6 +419,10 @@ class _PluginEditorPageState extends State<PluginEditorPage> {
 
   Future<void> _save() async {
     if (_saving) return;
+    if (widget.plugin.tvOverlay != null) {
+      _showEditorError(const FormatException('当前规则有 TV 覆盖，请先在规则菜单还原基础规则再编辑'));
+      return;
+    }
     final editedPlugin = _tryBuildEditedPlugin();
     if (editedPlugin == null) return;
     setState(() {

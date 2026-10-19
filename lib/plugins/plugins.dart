@@ -2,6 +2,7 @@ import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/plugins/anti_crawler_config.dart';
 import 'package:kazumi/plugins/api_rule_config.dart';
+import 'package:kazumi/plugins/rule_overlay.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/services/plugin/api_rule_engine.dart';
 import 'package:kazumi/utils/episode_url.dart';
@@ -47,6 +48,9 @@ class Plugin {
   ApiSearchConfig searchApiConfig;
   ApiChapterConfig chapterApiConfig;
   AntiCrawlerConfig antiCrawlerConfig;
+  RuleOverlay? _tvOverlay;
+
+  RuleOverlay? get tvOverlay => _tvOverlay;
 
   Plugin({
     required this.api,
@@ -78,6 +82,27 @@ class Plugin {
         antiCrawlerConfig = antiCrawlerConfig ?? AntiCrawlerConfig.empty();
 
   factory Plugin.fromJson(Map<String, dynamic> json) {
+    if (json.containsKey('kind')) {
+      if (json['kind'] != RuleOverlay.kind) {
+        throw const FormatException('不支持的规则文档类型');
+      }
+      return Plugin.fromOverlay(RuleOverlay.fromJson(json));
+    }
+    if (json.containsKey(RuleOverlay.metadataKey)) {
+      final metadata = json[RuleOverlay.metadataKey];
+      if (metadata is! Map) {
+        throw const FormatException('TV 覆盖记录需要 JSON 对象');
+      }
+      final plugin = Plugin.fromOverlay(
+          RuleOverlay.fromJson(Map<String, dynamic>.from(metadata)));
+      final stored = Map<String, dynamic>.from(json)
+        ..remove(RuleOverlay.metadataKey);
+      if (RuleOverlay.fingerprint(Plugin.fromJson(stored).toJson()) !=
+          RuleOverlay.fingerprint(plugin.toJson(includeLocalMetadata: false))) {
+        throw const FormatException('规则内容与 TV 覆盖记录不一致');
+      }
+      return plugin;
+    }
     return Plugin(
       api: json['api']?.toString() ?? '1',
       type: json['type'] as String? ?? 'anime',
@@ -118,6 +143,13 @@ class Plugin {
     );
   }
 
+  factory Plugin.fromOverlay(RuleOverlay overlay) {
+    final base = Plugin.fromJson(overlay.baseRule).toJson();
+    final plugin = Plugin.fromJson(overlay.apply(base));
+    plugin._tvOverlay = overlay;
+    return plugin;
+  }
+
   factory Plugin.fromTemplate() {
     return Plugin(
       api: ApiEndpoints.apiLevel.toString(),
@@ -147,7 +179,7 @@ class Plugin {
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson({bool includeLocalMetadata = true}) {
     return <String, dynamic>{
       'api': api,
       'type': type,
@@ -178,6 +210,8 @@ class Plugin {
           chapterApiConfig.request.url.isNotEmpty)
         'chapterApiConfig': chapterApiConfig.toJson(),
       'antiCrawlerConfig': antiCrawlerConfig.toJson(),
+      if (includeLocalMetadata && _tvOverlay != null)
+        RuleOverlay.metadataKey: _tvOverlay!.toJson(),
     };
   }
 

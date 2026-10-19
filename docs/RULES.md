@@ -1,5 +1,81 @@
 # 自定义规则与 TV 适配
 
+## 2026-10-20：本地 TV 数据覆盖 v1（候选，未发布）
+
+这项候选在独立分支 codex/rules-overlay-minimal-20261020 开发，基于 main
+410ca4a2a35195c3306aca012997eb4750c34cfe。它不改默认规则仓库、WebView、媒体发现、
+播放器或正式包。上一轮规则研究的“按引擎能力匹配的播放 profile”仍是后续设计，
+本版不实现或宣称支持这些 profile，也不根据 Android 系统版本自动启用覆盖。
+
+Android 版本与 WebView 引擎版本需分别识别。Android10不能单独保证播放；
+Android9设备也不必然使用WebView66。已观察的旧核JS语法和来源策略问题可按实际
+provider、版本、功能及失败条件适配，源站间接HTML、网络或原生输出问题仍需独立
+处理。平台诊断依据见[Android WebView Version API](https://developer.android.com/develop/ui/views/layout/webapps/managing-webview#version-api)。
+
+最小闭环为：导出基础规则 → 离线生成覆盖文件 → 原有剪贴板/JSON 文件入口导入 →
+以有效规则执行搜索和集表 → 保存/分享时保留基础与覆盖 → 菜单“还原基础规则”。
+还原会移除覆盖记录，重新导入原覆盖文件可再次启用。存在覆盖时编辑器拒绝保存，
+避免把修改与基础身份混在一起；请先还原再编辑。
+
+### 文件格式与摘要
+
+JSON 根对象包含 kind=kazumi-tv-rule-overlay、schemaVersion=1、
+upstream（repository 和完整 commit）、baseSha256、baseRule、overrides。
+v1 只接受 Predidit/KazumiRules 来源标签；标签是待审查的来源记录，不会联网验证该
+提交是否含有所附基础规则，也不是签名或可信发布证明。导入者仍需核实来源。
+
+baseRule 必须是当前客户端导出的单条完整规则（包含默认值，不带已有覆盖）。
+baseSha256 为该对象按所有层级键名排序后，紧凑 UTF-8 JSON 的 SHA-256；
+不是原始上游文件的字节摘要。不同字段顺序不影响它，任何基础内容变化会失配。
+规则身份 name、version、api 不可由覆盖改变；普通规则和上游 API 级别维持原语义。
+
+overrides 是扁平的字段到值映射，仅允许：
+
+- 文本：baseURL、searchURL、searchList、searchName、searchResult、
+  chapterRoads、chapterResult、userAgent、referer、
+  searchApiConfig.sourceTemplate（要求已有 API 搜索）。
+- 布尔：usePost、useLegacyParser、adBlocker。
+
+不接受任意 JS、验证码脚本、未知字段/必需能力、API 对象替换、解析服务、引擎匹配
+或网络安全开关；超过 256 KiB、嵌套覆盖、类型不符和摘要失配均拒绝。
+文本上限 8192 字符，请求头拒绝换行，地址覆盖只接受无内嵌凭据的 HTTP(S) URL。
+顶层 UA/Referer 仍仅作用于原播放器/下载请求，不能修复网页 fetch 来源策略。
+
+### 生成与导入
+
+先核对上游提交和对应规则，再从候选客户端导出该基础规则为 base.json；
+也可使用只含一条基础规则的导出数组。不要导出当前已应用覆盖的规则作为基础。
+overrides.json 的教学示例（保留域名，不是实际站点修复）：
+
+~~~json
+{
+  "referer": "https://example.invalid/",
+  "chapterResult": ".//li/a"
+}
+~~~
+
+在已有依赖配置的开发环境中执行，四个参数依次为基础、覆盖、上游完整提交和输出：
+
+~~~powershell
+dart --packages=.dart_tool/package_config.json tools/rules/create_overlay.dart base.json overrides.json ba8e10b35b0c3a56bbb6032a12356b0473844c64 tv-overlay.json
+~~~
+
+工具仅离线读写指定文件，输出已存在则拒绝覆盖，不连接站点或导入应用。
+把 tv-overlay.json 通过原有规则导入入口导入候选客户端；也支持规则数组、现有分享
+链接。分享后的本地记录保留有效规则及覆盖信息，仅本候选及兼容版本支持该元数据；
+旧客户端可能将分享内容当普通规则并丢弃覆盖身份，不承诺跨版本往返兼容。
+
+### 更新、冲突和撤回
+
+有覆盖的规则不自动重定位到上游新版本。单条和批量更新遇到更高版本会报告
+“保留 TV 覆盖”，不替换当前规则；普通规则仍正常更新。远端规则下载不能激活覆盖
+文档，覆盖必须经用户显式导入。处理上游变化时，核实新基础后重新生成/导入覆盖，
+或先还原基础规则再更新；不通过虚增版本号阻止上游更新。
+
+本版保留现有按名称的单一上游目录模型，没有自定义远程仓库订阅、多仓库命名空间、
+签名发布、自动三方合并或通用兼容适配器。上述能力不因 v1 格式存在而自动具备。
+测试使用合成规则与响应，不改变已安装规则；不代表线上来源或电视播放验收通过。
+
 核对日期：2026-10-14 UTC。已发布 v0.4.2 支持 API 8；本文的 API 9 `sourceTemplate` 是 #11 候选改动，未发布。实际 schema 以 [plugins.dart](../lib/plugins/plugins.dart)、[api_rule_config.dart](../lib/plugins/api_rule_config.dart) 为准。
 
 ## 最小 XPath 示例
