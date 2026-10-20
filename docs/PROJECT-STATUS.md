@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+17:35统筹独立复核depth-modern-control-20588-v1两例：runner/展开rule的manifest、同20588 APK、同rule/work/road/episode hash及exactlabel与旧失败对应，两例终态/两层及final清理confirmed。DM84标签2在API36/WebView143的实际VideoWebviewAndroidImpl首帧+完整10秒进度9551ms/采样错0；mgnacg第2话仍resolve_timeout/播放器未创建，不能据此编HTTP拒绝或整源失效。旧API28实际VideoWebviewImpl，现代ABI列含ARM64兼容但Flutter target均x64，SDK/provider/factory不同；仅支持环境表现差异，不单独证明WebView版本根因。回执.dart_tool/depth-modern-control-independent-review.json。
+
+配对证据更正：已独立审读main.dart/plugin头与两WebView controller，生产App路径getRandomUA从池抽取且原实际抽样值未记录；identity.ua只是受控profile元数据，不代表实际App UA。此前本项目App对照在缺现场UA时均只能说同默认UA策略/代码，不能说同字节UA或严格单变量对照；原数据不改写，四源QA补救实播结果保留但因果表述须带此限制，不据此修改正式默认策略。
+
+已续派唯一播放owner先完成现代包停后核验/交付，再对上述两精确终态失败各首次旧环境App QA单次fallback验证：.dart_tool/depth-failure-fallback-plan-20588-v1.json，SHA b83e87d535d62cfc772521f1508bbb318ad0fda4b926137683009cfea8f72646。现成20588不构建、不碰旧unknown/七通过；primary15秒/共享25秒/Gecko最多一次/原服务先退、10秒首帧进度，不改headers/规则/产品默认，不开observer；现代AVD退出后核实原API28/WebView66归属再一次后台实验。每例70秒/总300秒，挑战/unknown/环境无效/清理不明停包，primary若直接成功记零fallback/波动、不能强迫触发重跑；eligible=false保留缺口，实际UA未知仍不声称相同。DM84用于验证旧环境补救是否可行，mgnacg用于最小判别两WebView共同失败是否跨不同引擎仍在，不凭单次失败判外部。规则bef44d16增量v6已交付，七新页/两阶段失败与旧正例共存，尚未纳入现代/新fallback结果；不改变原账本。主目标未完成，五无可播及电视/旧unknown缺口继续保留。
+
 17:20统筹独立复核depth-playback-20588-v1九例：计划与展开固定rule后的input摘要、runner快照、唯一作品、episode hash/精确label及索引、实际规则、两层/final清理全部对应，planned/started/completed9、unknown0。七例真实首帧且完整10秒窗口/正进度/采样错误0：akianime9920ms、ezdmw6069ms、giri6444ms、moonci9926ms、mutefun9843ms、MXdm6694ms、xfdmneo8341ms；仅ezdmw/moonci/MXdm显式QA fallback且最多一次，primary retired先于fallback started，普通构建策略未改。DM84标签2与mgnacg第2话为明确resolve_timeout，未创建播放器，解析/host清理confirmed；其此前其他集正例保留，不说整源全失效或全可播。回执.dart_tool/depth-playback-independent-review.json。
 
 新失败区别观察：DM84最终ready=loading/iframe hhjx.hhplayer.com，mgnacg ready=complete/frames3/videos0/iframe play.mknacg.top，均无足够证据判定规则错误或外部根因；不追加媒体请求/换线。已准备两例同规则/同作品线路/剧集hash与label的modern App control计划.dart_tool/depth-modern-control-20588-v1.json，SHA256 a8e8944a4f283c80183bf1bcd808b5063f1dc467c7a8b5ea32e7ad335a780b05，尚未执行、不重试unknown；已续派唯一owner先完成本包清理/交付，再各一次现代App对照（每例70秒/总300秒），不构建、不改provider、无fallback/observer，身份或环境不符/挑战/unknown/清理不明停包。七个通过精确案例不再跑。
