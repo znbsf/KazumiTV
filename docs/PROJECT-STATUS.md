@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:05统筹独立核tv-gecko-phase-control-20591-v1（3aa65895运行交付）：同现装APK/physical identity/provider/runner/展开rule输入、ezdmw页hash+标签3一致，trace12713ms解析成功，target load_start7317→resolved12699，目标后5382ms取得媒体/native首帧；2秒进度0，仍仅解析/首帧可行，不计完整短播通过。受控UA与软件播放器不同于App默认，不能断纯预算单变量/正式默认修复；原各层清理/原三包前后hash和自有runner退出已核，回执.dart_tool/tv-gecko-phase-independent-review.json。未追加同包重试或延长等待。
+
+规则ac473982 v8已独立重算43输入hash/17源分环境清单，TV1短播+3解析超时、不撤销x64原11限定样本且未纳入这次controlled首帧；回执.dart_tool/depth-v8-independent-review.json。实际Gecko环境字段仍构建依赖常量，不冒称runtime API查询，App实际随机UA缺失保留。
+
+唯一播放owner仍在完成已授权的纯离线onPageStop假根页归属修复/最小反例测试，未知URI应unattributed，独立提交不改解析/JS/网络/期限；本轮不新增媒体根观察。另已明确续派下一独立QA调度候选：使用现有primaryBudget参数，只在显式QA opt-in App分支primary10秒/共享total25秒/最多一次fallback，给冷启动后备最多15秒，总解析期限不增加，普通App与无opt-in不变、旧服务构造默认能力保留；结果明确候选预算，不新加规则schema/清单profile/任意JS或正式默认策略。须另提交有意义服务反例（正常零fallback/先退役/最多一次/总期限/取消/慢清理/晚到隔离）及拟20592单ARM一次构建计划，统筹review前不构建/安装/实跑。原“不改期限”约束继续作用诊断提交；新QA调度候选仅改分配且总25秒不变，不能提前声称修复成功。TV已关停保包，当前先离线完成，主目标未完成。
+
 19:50统筹独立审读62c51bcb TV真实4源：4计划/4终态/unknown0，展开rule后manifest、父runner、同20591 APK/physical identity/provider/页hash+exactlabel、各清理和三保护包/音量/资源退出逐项对应。7sefun默认native首帧、完整10秒position_delta10218ms/错0，原生设置mediacodec/非模拟器；ezdmw/moonci/MXdm共享25秒/一次fallback后仍解析超时、player未创建，不当解码失败，也不撤销模拟器正例。回执.dart_tool/tv-live20591-independent-review.json。
 
 新区别观察已经从原脱敏trace量出：三个fallback记录约9886/9791/9787ms截止，首次实际target load_start为7037/6894/6903ms，仅余2849/2897/2884ms。可支持启动/可用预算假设，不能唯一归因。独立代码检查ParserQaActivity.kt onPageStop把闭包请求url作为实际stop资源，导致aboutblank stop早于target start却标根页；这是已证诊断归属缺陷，不能用success=true声称目标加载完成/或推断失败根因。
