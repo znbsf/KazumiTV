@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+最新安装阻塞与已续派修正（用户询问“怎么卡住了”）：20590第一次streamed新装120秒未返回，3fixture实际均unattempted，不计产品失败。统筹已独立读installation-timeout与timeout-state-readback：parserqa pm path未安装、无自有安装进程，历史session150153987 Destroyed/finalStatus=-115/Session was abandoned；不是已安装或仍有进行中会话的证明。原三包hash/桌面/系统音量与media状态保持，reverse未建、fixture/采样未启动。原包此次不重装、不延长等待；owner完成只读收尾与原始终态交付。
+
+统筹独立ZIP分组：344946680字节包压缩数据约other70.3MB、ARMv7 94.7MB、ARM64 86.1MB、x64 93.6MB，后两套依赖库并非TV所需。会话记录clientProgress约0.635但不足单独断网络/安装器根因；可先解决明确QA包装体积问题，回执.dart_tool/tv-install-timeout-independent-review.json。已给唯一owner仅离线修QA构建契约：复核固定Flutter/Gradle singleABI语义（target-platform当前只约束Flutter本体而未排额外依赖），支持目标ABI-only、实际输出路径/versionCodeOverride/artifact实值与target一致、ZIP关键库和拒额外ABI，保留普通生产及其他QA模式；不得抄删so/重新压包改签。先交最小提交/反例/拟新包版本和一次构建预算，统筹review前不构建/安装/启动/联网/加超时。TV3fixture及live4暂停在安装前，其他离线工作继续；不把此次安装障碍冒称来源失败或全部任务已完成。
+
 18:55新ARM QA20590已独立核验并续派首次物理fixture包：编译2c35a010、APK12a34e674eba2a9150f345182fa18196c721648f5e23bbf8db596c2f0939abd9、534项源before/after/作者逐项字节匹配，registrant原前后副本相同；统筹对应仅CRLF差异。实际apksigner证书24f61454…e32aa31，aapt独立包/20590/minSDK26，ZIP libflutter仅ARMv7，libflutter/libmpv/libxul均ELF32 ARM，XML INET成立；回执.dart_tool/tv-arm20590-independent-review.json。未重复无改动代码全量测试，沿880ac317独立64Python+20Dart/分析。
 
 已给唯一device owner具体执行许可：完成构建收尾后核同现场身份/包保护基线/桌面音量和资源归属，parserqa仍未安装才装新独立包并完整读回；意外已装或错配即停。只执行原3fixture计划（SHA89dc332122fef28abb69b5c833be9a259799e3d63fbb905bbc648e32c2f3445a），每例70秒/总300秒，显式physical serial+实际fingerprint gate。reverse8769/8768和host端口必须无占用，只创建/清理自有映射；内部播放器音量0，系统音量不改。首例QA单次fallback、正常零fallback、第三例primary真实QA switch/取消后新页，保留迟到probe synthetic限制；任何unknown/envinvalid/挑战/清理不明停，不换例/重试。末次只停止parserqa并核旧三包hash/桌面/音量/media与自有fixture/采样/reverse退出和负载。尚未消费安装/fixture运行结果，不提前记通过；live4仍待统筹独立验fixture再派。
