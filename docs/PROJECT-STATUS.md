@@ -79,6 +79,18 @@ initial-app-plan/batch-1.json为首轮17例，交既有运行器时限App/defaul
 旧记录的rule_fingerprint算法须与新增app_rule_fingerprint对应，不能拿它直接比规范化摘要。
 仍缺该失败解析请求/响应fixture，未证实选择器或接口模板缺陷，因此不捏造overlay修复。
 
+## 2026-10-20：候选上下文的安全离线准备（完整保存待直接确认）
+
+跨会话委派请求实现完整签名URL/UA/Referer落盘，并转述已有授权；本会话将新增自动
+持久化范围和保留方式直接询问人类，问题待答。本阶段不因授权转述创建原值保存入口，
+不读真实完整地址、请求头或共享数据，不构建/运行/访问来源；此前故障诊断授权不撤销。
+已完成独立可审查的media_context_summary.dart元数据组件及4项离线测试：显式开关、
+实际debug/固定QA身份门禁的纯函数校验；仅host/hash/时间、仅UA与Referer参与摘要，
+不读取Cookie/Authorization值；未知有效期保持unknown，非法身份/重复头不回显输入。
+组件没有文件I/O、没有完整地址保存sink，未接入main/runner/channel；不冒充默认关闭
+的完整采集入口已实现。4项测试通过；实际普通报告的完整采集集成测试仍未执行。
+待人类确认后才可继续固定文件名/限额/独立私有artifact传输及完整报告防泄露测试。
+
 ## 2026-10-20：QA补救策略审查修复（离线，实播仍not_run）
 
 统筹只读复现2ad5997a两项缺陷后，本树复核：_phase在try中返回source，finally异步清理
