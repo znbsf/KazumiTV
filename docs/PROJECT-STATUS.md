@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+用户指定MXdm已实际单次执行并收尾，统筹独立核tv20592-mxdm-only-v1：输入原字节/展开rule后manifest hash/冻结runner1018a268…/physical身份/20592全hash/provider与原精确第01集计划一致。planned1 started1 completed0 unknown1，原始无App终态或provisional，不能假补搜索/解析/媒体进度。Android am返回Status timeout/Wait10195ms/expectedActivitytrue，宿主等候未抛20秒timeout；到55秒工作窗无result.json，HostBudgetExpired，CLI56.977秒在70秒内退出。只证明QA启动/终态等待链有缺口，无法判断是否已执行搜索/解析，不据此说MXdm来源不可播或解码失败。回执.dart_tool/tv20592-mxdm-independent-review.json。
+
+全包90.625<180秒，命名QA/renderer及case/final清理confirmed，原三保护包/QA全meta/桌面音乐8/provider/media0/reverse保持，自有runner目标ADB/监听退出；TV短采样CPU17.29%/宿主9%。未重试、换源或改工具，没有再运行fixture/协议/已测源；本次已从未尝试变unknown，不能随后按未尝试重派。遵循用户新方向：直接按能否播放与实际卡点汇报，不因该unknown进入继续修测试工具循环。
+
 最新直接人类指令：补完负载立即继续尚未尝试MXdm，直接报告能否播放及失败阶段，不重复已测项。统筹已独立核tv20592-load-readback-v1原件：冻结8c20d176…/固定runner客户端、两个CPU8整数样本即时落盘/间隔1.094秒/差值418忙57=13.64%、前后保护meta与两层退出/12.360<30秒，回执.dart_tool/load-readback-independent-review.json。
 
 已具体续派唯一owner只MXdm新候选单例，.dart_tool/tv-mxdm-only-plan-20592-v1.json SHA cf81767b7ee31004f1ef0b49e8041c8da1adfd33118fad3dc8b55664e2470c93；case逐字段等于原remaining第二项，学生会也有洞第01集/road0episode0/rule78163afd…/page d766c338…、primary10/shared25/max1/10秒进度。现装20592/新runner1018a268…不构建重装/改工具，case70秒、全包含前后保护收尾180秒且预留60秒，直接原唯一CLI无新wrapper；身份保护基线先核、challenge/unknown/envinvalid/清理不明停不重试换case/加探针。末次只停QA保包，原保护及自有资源退出与已成功CPU数值即时保存；结果尚未交，不提前说能播，未到媒体不得称解码失败。不自动追加已测来源/fixture/aafun。
