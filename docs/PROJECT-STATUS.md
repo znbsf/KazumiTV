@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+21:48宿主实现仍由唯一owner正常离线推进，run.py/test_runner_integrity.py与新test_host_deadline.py为作者dirty草稿，统筹未集成/验收、不运行该草稿设备入口。统筹只读初审提出两项具体检查并已送作者：HostDeadline.child继承父started导致第二case虽截止end正确但host_elapsed/limit收据使用父累计起点，须新case显式origin并用实际两case假钟覆盖；result_file含if/分号的sh -c脚本作为exec-out分散argv，须离线核实固定ADB远端拼接/引号契约并用真实安全shell反例覆盖，当前仅风险待证，不预判已复现。未要求中断正常实现或扩大修改面，原70/父预算/保护/清理/不设备不来源不构建限制继续。
+
 21:35统筹审26924618宿主修正方案，并独立执行保存的原run.py实际Device.case/run_batch的6项fake clock/device反例，全部复现旧缺口；不是已修复或真实来源测试。第64秒15秒读回到79秒仍接受、准备53秒后20秒am可到73秒、55秒结果后stop3+join30返回88秒、200/300父预算未预留final可到203/303秒，以及坏字节/tuple契约均已核；未确认原moonci具体被杀步骤。回执.dart_tool/host-deadline-proposal-independent-review.json。
 
 现已具体授权唯一播放owner只实施原host run.py及针对性测试的最小修正：CLI设备IO前绝对父截止与首case70包含前提、阻塞cap夹剩余/返回后验、必要清理和不可变sampler deadline、已有规则/设备/生命周期门禁保持；原子保存provisional观察不追认terminal，保护/清理或期限不足仍unknown/未尝试，父末恢复也不改写按时通过。15秒case清理预留只是保守策略不保证清完，70与200/300总上限不增加，多例60秒末预留不得泛套使单例120秒永不准入。normal/selection固定文件真实长度/有界字节/UTF8JSON类型/hash与当前case校验，launch既有32768契约不变、超限不截断或保存敏感原文；派生报告让位必要证据，不删保护/共享ADB隔离或primary错误。Windows调度/文件IO超限必须如实记录，不冒称硬实时保证；若需广泛重写先缩小报缺口。先交提交/新旧75宿主定向测试及有意义反例供统筹review，无构建/连接/启动/真实来源，包括未尝试MXdm/aafun均尚不执行，moonci/旧unknown不重跑。
