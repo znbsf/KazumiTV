@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+2026-10-21 00:50统筹独立审aafun-modern-default-20588-v1：同base0968af…/葬送的芙莉莲/第01话页f63fd948…App实际一致，API36/x64/provider143.0.7499.24、VideoWebviewAndroidImpl/documentstart=true，搜索1171ms/集表481ms正常，15017ms明确resolve_timeout、无媒体/player，resolver与App清理confirmed。现成20588一次install-r6.485秒/UID10090和firstInstall保持，原20570与20588本地完整hash及兼容签名记录对应；生产lib/android-main从e3到649无diff。回执.dart_tool/aafun-modern-independent-review.json。现代默认亦失败，不能仅归电视旧WebView，也不能因跨环境失败断网站外因；实际随机UA未配对。截图独立查看只有resolve_timeout状态，不是视频验收。
+
+执行超限如实保留：QA stop75.312>70，原总300秒退出核验timeout后必要恢复核323.621秒，原overallfalse不追认；最终自有AVD/qemu/目标客户端/5588与5589端口空、共享ADB19624保持，QA/保护包meta/音乐/provider/media/reverse保持，AVD配置原hash保持、CPU短1.46%/host20%。未再操作TV、不重跑来源/修工具。aafun当前base已能选目标，TV默认、既有Gecko补救、现代默认均解析失败，当前没有依据安装overlay或调整解码；停止重复这组环境矩阵，下一步只针对已有源页面/iframe失败上下文与解析代码寻找可证修复点。
+
 现代对照设置边界补充：统筹撤销自己刚加的“现代缺包就不能安装”过严限制。只读AVD退出可能不保留此前20588，已有签名/源码绑定的现成x64 QA可在已核归属同一现代AVD内常规install-r一次<=45秒：缺包或旧版<=20588且真实签名兼容才可，旧包meta先保留、升级后全hash/版本/签名/ABI/UID首次安装核对；不卸载清数据/降级，签名或版本不满足就停。启动+安装+身份设置合计<=120秒、原总300不扩，余不足70+60不启来源。已装匹配20588不重复安装，TV20592不动、不新构建或修工具；其他唯一案例边界原样。
 
 2026-10-21 00:34统筹独立审tv20592-aafun-fallback-v1：原base/作品/第01话页运行时精确，primary10019ms超时/10101retired先唯一Gecko10103start，共享25001ms明确timeout、25013retired，无resolved/accepted/player；App28648ms，既有10/25/max1策略未补救此TV例。snapshot readycomplete frames3/videos0缺senderframe，stopURIunattributed不当目标完成证明；原非主框架400/reset线索不唯一外因。case64.657秒收尾/stop65.634<70、全包80.547<180，完整保护QAmeta桌面音乐8/provider/media0/reverse与自有退出confirmed、TV短CPU12.68%/host8%。回执.dart_tool/aafun-fallback-independent-review.json，原默认失败与旧unknown保持，不再同TV同策略重试或工具修复。静态亦核adBlocker只在播放器构造使用，当前未建player，不以该字段猜解析失败或做无依据开关试验。
