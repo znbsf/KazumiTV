@@ -67,6 +67,31 @@ initial-app-plan/batch-1.json为首轮17例，交既有运行器时限App/defaul
 旧记录的rule_fingerprint算法须与新增app_rule_fingerprint对应，不能拿它直接比规范化摘要。
 仍缺该失败解析请求/响应fixture，未证实选择器或接口模板缺陷，因此不捏造overlay修复。
 
+## 2026-10-20：旧环境解析失败后的App播放器/Gecko补救实验（进行中）
+
+复用上一阶段4例旧App超时、现代App/旧系统受控Gecko成功及精确配对证据，不原样重跑。
+本轮具体区分点：VideoWebviewImpl在load回调/轮询注入主文档、只能递归同源frame，
+原生请求侧仅识别m3u8后缀/Range/明确媒体query；现代实现document-start在各frame执行
+同一ES5解析脚本。moonci日志8606/8613见Artplayer5.4语法错误及Artplayer未定义；
+xfdmnext日志11959起见多个现代语法错误/globalThis缺失，页面完成却frames/videos均0。
+ezdmw日志5800为播放器null属性TypeError、主页frames2/videos0且存在跨域播放器；
+MXdm有inline语法错误、主页frames/videos0。后两者尚不足以证明唯一根因，成功的
+giriGiriLove也有无关语法错误，因此不把console错误本身当统一根因或规则字段缺陷。
+
+暂不修改产品默认策略或规则schema。仅parserQa显式app_gecko_fallback=true、真实旧核
+准入且非iframe-only时，在生产默认解析失败（timeout/notfound）后尝试一次Gecko，
+仍用同规则/媒体headers及整个PlayerPlaybackController。总解析预算25秒（与原15+10
+上限一致，含切换耗时；每服务退出额外最多2秒），不因Gecko重新得到完整15秒；
+取消/切集代次隔离，先确认旧服务退出再新建补救服务；非解析错误/现代核/正常成功不触发。
+原接口/生产包不导入QA策略，不增加Mozilla依赖；失败不得自动重试。
+
+首次实验：本地现代语法页面旧核按预期失败，新QA opt-in补救应实际首帧并推进；
+单例70秒、夹具最多3例/5分钟。先用假服务验证取消/替换/耗尽/只回退一次/退出失败拒绝
+启动下一服务；夹具失败或环境/清理无效停该轮，保留unknown。夹具通过后最多4个原
+失败样本加1正常来源（最多5例/10分钟），核对规则/剧集页摘要及生产播放器配置；
+观察带时间戳的切换事件与已有PSS采样，区分切换前后和释放，不与受控播放器混算。
+只用后台只读Android9/WebView66模拟器，结束核实所属PID/监听退出；实体设备/正式版不动。
+
 ## 2026-10-20：当前官方目录17源首轮实播（执行中）
 
 本阶段新增范围是固定官方目录 ba8e10b35b0c3a56bbb6032a12356b0473844c64 的17条合格规则，

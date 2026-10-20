@@ -27,6 +27,7 @@ import 'package:kazumi/utils/http_headers.dart';
 import 'gecko_controller.dart';
 import 'rule_snapshot.dart';
 import 'failure_snapshot.dart';
+import 'app_fallback_service.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -83,7 +84,7 @@ class _BatchCaseState extends State<BatchCase> {
     };
     final timings = result['timings_ms'] as Map<String, int>;
     final run = HealthRun();
-    WebViewVideoSourceService? resolver;
+    IVideoSourceService? resolver;
     Player? player;
     PlayerPlaybackController? appPlayback;
     StreamSubscription<String>? errors;
@@ -153,6 +154,34 @@ class _BatchCaseState extends State<BatchCase> {
         if (c['engine'] == 'gecko') return GeckoQaController(ua);
         return VideoWebviewAndroidImpl(userAgent: ua);
       });
+      if (appProfile && c['app_gecko_fallback'] == true) {
+        final primary = resolver;
+        final eligible = WebViewFeatureService.needsLegacyPlayerCompat &&
+            !WebViewFeatureService.isDocumentStartScriptSupported && !legacy;
+        final events = <Map<String, Object?>>[];
+        result['fallback_events'] = events;
+        result['fallback_policy'] = {
+          'explicit_qa_opt_in': true, 'eligible': eligible,
+          'total_resolution_budget_ms': 25000, 'max_fallbacks': 1,
+          'media_headers': 'unchanged production Plugin.buildHttpHeaders',
+          'gecko_ua': 'same UA as media headers; primary keeps App default UA',
+        };
+        resolver = QaAppFallbackService(
+          primaryFactory: () => primary,
+          fallbackFactory: () {
+            result['fallback_controller'] = 'GeckoQaController';
+            return WebViewVideoSourceService(
+            nestedPageTimeout: Duration.zero,
+            controllerFactory: () => GeckoQaController(headers['user-agent'] ?? ua),
+            diagnosticSink: (record) {
+              final diagnostics = result['diagnostics'] as List<String>;
+              if (diagnostics.length < 80) diagnostics.add(record);
+            });
+          },
+          enabled: true, eligible: eligible,
+          onEvent: (event) { if (events.length < 32) events.add(event); },
+        );
+      }
       final cache = ResolvedSourceCache.shared;
       final cacheKey = jsonEncode([c['id'], c['rule'], c['road'] ?? 0, c['episode'] ?? 0, episodeUrl]);
       Future<VideoSource> fresh() => resolver!.resolve(episodeUrl, useLegacyParser: legacy,

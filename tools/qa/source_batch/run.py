@@ -179,6 +179,8 @@ class FixtureHandler(BaseHTTPRequestHandler):
             body = b'<iframe src="http://127.0.0.1:8768/video"></iframe>'
         elif path == '/empty':
             body = b'<html><body>No media</body></html>'
+        elif path == '/modern-syntax':
+            body = b'<html><body><script>var state={};var required=state?.value;document.body.innerHTML=\'<video preload="none" src="/fixture.mp4"></video>\';</script></body></html>'
         else:
             status, body = 404, b'not found'
         if path == '/fixture.mp4' and self.headers.get('Range'):
