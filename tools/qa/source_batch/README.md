@@ -70,3 +70,15 @@ rule_variant默认为effective；只有带覆盖元数据时可选base，它构�
 基础摘要、覆盖文档摘要及来源标签；摘要统一使用RuleOverlay.fingerprint。
 普通纯规则的来源和基础摘要未知，保留null。来源标签未经联网或签名验证；调用者rule_provenance
 仍单独保存，不能代替运行时测量。这不新增播放profile或改变默认内核、网页fetch请求头。
+
+## 可选媒体响应观察（仅集成 QA）
+
+单例显式 observe_media_root=true 才会在解析到候选后、原生播放前执行。
+默认不请求。入口核对debug及parserqa身份，只取现有URL于内存，不保存URL/query/fragment、
+请求头值或原始响应正文；普通结果仅输出status、content-type、结构、host和摘要。
+请求保留实际生产UA/referer，不发送Cookie/Authorization，不跟随redirect，证书验证保持开启。
+总观察时间最多10秒（同时受case前35秒剩余窗口限制），每响应最多64KiB，最多根及一个唯一子项。
+超时、取消、挑战、含混、签名子项、重定向即停止；不会无限加载列表或下载整集。
+已由解析器取得的短效公开root URL可在内存用于一次请求，分析后不会继续签名子项。
+Dart HttpClient观察不等于native播放器的请求路径，不能据此宣称mpv传输原因已定或UA覆盖已有效。
+原始播放器仍按App路径执行；观察结果与真实首帧/进度分别记录。修改配置/代码需新输出目录和身份。

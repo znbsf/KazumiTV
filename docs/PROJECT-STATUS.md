@@ -1,6 +1,10 @@
 # KazumiTV 当前状态
 
 ## 2026-10-20：全来源无验证码播放探测与修复统筹（进行中）
+媒体观察交叉审查后修正：大chunk先限长再复制，2MiB合成块只读取65536元素；清理等待受剩余总预算约束，先关闭client，清理异常独立保留，不覆盖已观察响应/原传输错误，未确认即不进入子请求。作者只读反例在本树加入正式回归，修订后22项transport/分析/脱敏/边界测试通过；集成全仓1218项已通过，后两项新增反例单独复验，不冒称重跑全仓。定向静态检查已通过，最终候选构建准备中。没有外部请求、模拟器、信任变更或原值采集。
+统筹在本树补齐媒体观察transport与observe_media_root显式QA入口，默认关闭，仅既有解析候选的内存请求；不落盘完整URL/header/body，不读Cookie/Authorization。根及至多一个唯一子项、64KiB/响应、10秒总预算，保留原生播放所需时间，默认TLS、不自动redirect，取消时关闭当前client，challenge/含混/签名child停止。输出状态/结构/host/hash，明确Dart观察与native播放器HTTP路径不等价。20项本地loopback/元数据/响应分析测试通过，定向分析无问题；未访问外部来源、未启动被拒模拟器。交叉审查与全仓回归进行中，待定稿后仅构建更新候选。
+
+AGE静态证据已交付：同已保存链以提取137锚验证失败，以电脑对应根验证成功，根DER/SPKI皆不在旧镜像；原system.img前后SHA256一致。证据在source-catalog-playback-20261020/android28-static-ca-20261020的identity.json、android28-ca-index.json、comparison.json及两个verify回执。仍未配对原失败peer chain与实际运行时trust；HTTP403独立存在，不能宣称AGE播放已解决，不新增信任或overlay。
 媒体诊断采取更小范围路径：28dc10a5仅有默认关闭的host/hash/time元数据帮助器，尚未接入；统筹集成为6e3c587c并独立4项测试通过。完整签名地址落盘不再作为推进依赖，不把委派消息当批准采集凭据。已给播放侧明确替代任务：只在已解析URL的内存生命周期内用实际UA/referer做显式QA根/最多一个子请求观察，最多64KiB/10秒，不保存完整URL/query/headers/原始列表正文，输出状态/结构/host/hash；用假transport离线验证默认关闭、预算、取消、challenge和脱敏。不启动设备/访问来源，不重试被拒执行。
 
 规则侧新增独立只读工作包：若本机既有工具支持，从Google Android28基础system.img（不读用户userdata）静态核对CA store与已保存AGE公开证书链，最多20分钟/两种现有只读工具，不安装、不挂载写入、不启动模拟器、不改信任。缺根不能单独证明原失败peer chain根因，HTTP403仍单列；工具不支持即保留缺口。两个会话正在推进这些可独立项，自动跟进仍ACTIVE；真实fallback、root/child404和现代/旧Android链配对仍not_run。

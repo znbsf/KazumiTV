@@ -28,6 +28,7 @@ import 'gecko_controller.dart';
 import 'rule_snapshot.dart';
 import 'failure_snapshot.dart';
 import 'app_fallback_service.dart';
+import 'media_root_observer.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -195,6 +196,18 @@ class _BatchCaseState extends State<BatchCase> {
       result['stage'] = 'resolved';
       // Never persist signed media URLs or query strings in exported reports.
       result['media_host'] = Uri.tryParse(source.url)?.host;
+      if (c['observe_media_root'] == true) {
+        final available = const Duration(seconds: 35) - watch.elapsed;
+        result['media_root_observation'] = await observeMediaRoot(
+          enabled: true,
+          debug: kDebugMode,
+          packageName: (await PackageInfo.fromPlatform()).packageName,
+          mediaUrl: source.url,
+          headers: attempt.headers,
+          isCancelled: () => run.cancelled || !mounted,
+          budget: available,
+        );
+      }
       phase = 'first_frame';
       setState(() => _stage = phase);
       final beginPlay = watch.elapsedMilliseconds;
