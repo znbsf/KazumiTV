@@ -102,22 +102,21 @@ class QaAppFallbackService implements IVideoSourceService {
       int offset,
       Duration timeout) async {
     final remaining = _remaining(request);
+    final phaseBudget = timeout < remaining ? timeout : remaining;
     final service = factory();
     _service = service;
     _event(request, phase, 'started');
+    late final VideoSource source;
     try {
-      final source = await Future.any<VideoSource>([
+      source = await Future.any<VideoSource>([
         service.resolve(url,
-            useLegacyParser: legacy,
-            offset: offset,
-            timeout: timeout < remaining ? timeout : remaining),
+            useLegacyParser: legacy, offset: offset, timeout: phaseBudget),
         request.cancelled.future.then<VideoSource>(
             (_) => throw const VideoSourceCancelledException()),
-      ]).timeout(remaining,
-          onTimeout: () => throw VideoSourceTimeoutException(totalBudget));
+      ]).timeout(phaseBudget,
+          onTimeout: () => throw VideoSourceTimeoutException(phaseBudget));
       _remaining(request);
       _event(request, phase, 'resolved');
-      return source;
     } catch (error) {
       _event(request, phase, 'failed', error);
       rethrow;
@@ -135,6 +134,11 @@ class QaAppFallbackService implements IVideoSourceService {
         if (identical(_service, service)) _service = null;
       }
     }
+    // A candidate is not committed until asynchronous retirement finishes.
+    // Cancellation, supersession and deadline expiry can all happen there.
+    _remaining(request);
+    _event(request, phase, 'accepted');
+    return source;
   }
 
   @override

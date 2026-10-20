@@ -41,6 +41,115 @@ Future<VideoSource> fail(Duration _) async =>
     throw const VideoSourceTimeoutException(Duration(seconds: 15));
 
 void main() {
+  for (final fallback in [false, true]) {
+    for (final action in ['cancel', 'switch', 'dispose']) {
+      test(
+          '${fallback ? 'fallback' : 'primary'} retirement rejects $action before publication',
+          () async {
+        final entered = Completer<void>(), retired = Completer<void>();
+        var primaryCalls = 0;
+        final events = <Map<String, Object?>>[];
+        Future<void> close() {
+          entered.complete();
+          return retired.future;
+        }
+
+        final service = QaAppFallbackService(
+            primaryFactory: () {
+              primaryCalls++;
+              if (primaryCalls > 1) return FakeService((_) async => source);
+              return fallback
+                  ? FakeService(fail)
+                  : FakeService((_) async => source, close: close);
+            },
+            fallbackFactory: () =>
+                FakeService((_) async => source, close: close),
+            enabled: true,
+            eligible: true,
+            onEvent: events.add);
+        final first =
+            service.resolve('https://page.test/old', useLegacyParser: false);
+        final rejected =
+            expectLater(first, throwsA(isA<VideoSourceCancelledException>()));
+        await entered.future;
+        Future<VideoSource>? next;
+        Future<void>? disposed;
+        if (action == 'cancel') {
+          service.cancel();
+        }
+        if (action == 'switch') {
+          next =
+              service.resolve('https://page.test/new', useLegacyParser: false);
+        }
+        if (action == 'dispose') {
+          disposed = service.dispose();
+        }
+        retired.complete();
+        await rejected;
+        if (next != null) expect(await next, same(source));
+        await disposed;
+        if (action != 'dispose') await service.dispose();
+        expect(
+            events
+                .where((x) => x['generation'] == 1 && x['stage'] == 'accepted'),
+            isEmpty);
+      });
+    }
+  }
+
+  test(
+      'primary phase deadline leaves budget even when the engine ignores timeout',
+      () async {
+    var fallbackCount = 0;
+    Duration? backupBudget;
+    final service = QaAppFallbackService(
+        primaryFactory: () =>
+            FakeService((_) => Completer<VideoSource>().future),
+        fallbackFactory: () {
+          fallbackCount++;
+          return FakeService((timeout) async {
+            backupBudget = timeout;
+            return source;
+          });
+        },
+        enabled: true,
+        eligible: true,
+        primaryBudget: const Duration(milliseconds: 30),
+        totalBudget: const Duration(seconds: 2));
+    try {
+      expect(await service.resolve('https://page.test', useLegacyParser: false),
+          same(source));
+      expect(fallbackCount, 1);
+      expect(backupBudget, greaterThan(Duration.zero));
+      expect(backupBudget, lessThan(const Duration(seconds: 2)));
+    } finally {
+      await service.dispose();
+    }
+  });
+
+  test('successful retirement preserves deadline and accepts current media',
+      () async {
+    final entered = Completer<void>(), retired = Completer<void>();
+    final events = <Map<String, Object?>>[];
+    final service = QaAppFallbackService(
+        primaryFactory: () => FakeService((_) async => source, close: () {
+              entered.complete();
+              return retired.future;
+            }),
+        fallbackFactory: () => FakeService(fail),
+        enabled: true,
+        eligible: true,
+        onEvent: events.add);
+    final request =
+        service.resolve('https://page.test', useLegacyParser: false);
+    await entered.future;
+    retired.complete();
+    expect(await request, same(source));
+    expect(events.where((x) => x['stage'] == 'accepted'), hasLength(1));
+    expect(events.last['stage'], 'accepted');
+    await service.dispose();
+  });
+
   test('primary success never constructs fallback; telemetry cannot break it',
       () async {
     var fallbackCount = 0;

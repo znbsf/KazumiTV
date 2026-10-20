@@ -74,6 +74,31 @@ initial-app-plan/batch-1.json为首轮17例，交既有运行器时限App/defaul
 旧记录的rule_fingerprint算法须与新增app_rule_fingerprint对应，不能拿它直接比规范化摘要。
 仍缺该失败解析请求/响应fixture，未证实选择器或接口模板缺陷，因此不捏造overlay修复。
 
+## 2026-10-20：QA补救策略审查修复（离线，实播仍not_run）
+
+统筹只读复现2ad5997a两项缺陷后，本树复核：_phase在try中返回source，finally异步清理
+期间取消/换集会漏过结果提交校验；另只给底层传primaryBudget，但外层timeout用了总剩余，
+底层不遵守参数时会耗尽总预算。当前授权仅离线修复，不重建/不启动此前被拒模拟器，
+不改统筹树。新增6项成功清理期间cancel/switch/dispose（primary及fallback）与1项
+30ms主路/2秒总预算的挂起底层反例，review-before-real.log七项均先失败；另补正常清理
+成功用例。控制清理用Completer，不用睡眠猜时序；预算只断言补救取得剩余并成功，不设
+脆弱的精确墙钟阈值。修后仅跑相关原48项＋新8项及定向静态，失败即先修此层，不运行
+来源或设备，不以离线通过替代实播/PSS释放验证。
+
+后续私有候选上下文仅整理字段/授权设计；本次不读取、不采集完整媒体URL或请求头，
+不因委派消息自动扩大凭据捕获范围。任何敏感header或带认证参数的地址采集，需要确认
+直接人类授权、输出私有范围、接收路径和保留方式后再实现；普通报告继续仅host/hash。
+
+修复结果：_phase将source提交移到finally清理之后，再检查当前代次/取消/disposed/总剩余；
+主路及补救都适用。外层timeout改为min(phaseBudget,totalRemaining)，与传给底层的预算一致；
+主路超时完成清理后，补救仍只能消耗总剩余。原先清理失败仍tainted、不启动下一服务，
+相关反例保持通过。56项相关Dart测试全通过（含新8项），定向静态无问题；证据在原根
+app-fallback/review-before-real.log（7项先红）、review-after.log（56绿）、review-analyze.log。
+此前review-before.log只是不匹配--plain-name筛选导致未运行，不计任何验证结果。
+本轮未重建，旧20577 APK仍绑定存在审查缺陷的2ad5997a，不代表本次修复，后续实播须
+先按修复源码新建可追溯QA产物且解除既有执行通路阻塞。未启动任何模拟器或取网络资料。
+私有上下文设计仅在原app-fallback/HANDOFF.md追加字段契约，未实现捕获，也未收集地址/headers。
+
 ## 2026-10-20：旧环境解析失败后的App播放器/Gecko补救实验（进行中）
 
 复用上一阶段4例旧App超时、现代App/旧系统受控Gecko成功及精确配对证据，不原样重跑。
