@@ -1,6 +1,38 @@
 # KazumiTV 当前状态
 
-## 2026-10-20：全来源无验证码播放探测与修复统筹（进行中）
+## 2026-10-20：全来源播放探测与修复统筹（阶段阻塞，自动跟进已暂停）
+
+### 当前可接续结论（03:59Z，未完成产品验收）
+
+官方目录固定ba8e10b35b0c3a56bbb6032a12356b0473844c64，共17源；首轮17例＋无匹配后备用作品2例，共19次都有App终态及两层清理确认。当前为5源代表样本首帧/正进度、1源实际挑战跳过、11源未解决。不是整站成功率，尚未完成每源首集/较新集、其他线路和长播覆盖；不把测试工具通过计为实际修复。
+
+| 来源 | 当前证据与归因 | 下一步及验收门槛 |
+| --- | --- | --- |
+| 7sefun、DM84、giriGiriLove、mgnacg、mutefun | 旧App默认路径样本已播放；保留上游，无overlay需要 | 作为回归对照；补样本深度不能复写旧成功 |
+| LMM | 明确cf-mitigated=challenge | 实际挑战跳过，不自动处理或绕过 |
+| ezdmw、moonci、MXdm、xfdmnext | 同规则/剧集摘要，旧App失败，现代App及旧Android受控Gecko成功；code候选 | 新QA单次fallback仍not_run；先夹具再原案例生产播放器首帧/进度、取消/释放复验 |
+| AGE | 旧环境证书issuer校验失败；保存链在137旧镜像锚失败、电脑对应根成功；桌面HTTP403另存 | external/unknown；尚缺原失败peer chain及有效运行时trust配对；不改信任、不声称规则或播放已修复 |
+| sorani | TLS握手前中断，无peer certificate/HTTP响应 | external/unknown；无证据支持overlay；新环境证据前不重复耗尽路线 |
+| dalvdm | Cloudflare403，但未确认实际挑战 | external/unknown；不能编造成CAPTCHA或客户端缺陷 |
+| akianime、baimao、xfdmneo | 前两者新旧App均媒体失败，旧日志有列表后404；第三者open失败，具体HTTP未知 | unknown；根/子媒体观察计划待执行，签名/认证参数跳过，未观察不能归因root或child |
+| aafun | 旧App备用作品解析超时，现代对照搜索前SIGSEGV | unknown；现代对照为environment_invalid，不算来源失败，不自动重试 |
+
+当前没有证据充分、已实测修复的真实来源overlay。规则v1不表达内核能力、fallback预算/生命周期或TLS信任；UA/Referer覆盖不能代替网页fetch兼容方案。四个旧核差异优先客户端方向，其余保持external/unknown，不能为了填结论修改规则。
+
+统筹独立集成程序提交为6f875e0e8025ad68b9dfa510b3c4b8c30ae5010d。相关实质修复包括76db4445日志非法百分号、63ac6ae7取消/代次与阶段deadline，以及456581ad/bcf5597b/f714c6d3/6f875e0e的默认关闭媒体观察及审查修正。新QA策略不改变普通构建/默认内核，不增加规则schema。两个owner均已交付，统筹与播放会话交叉审查发现的问题已修复并复核。
+
+验证：集成全仓1218项通过（.dart_tool/catalog-final-full-tests.log）；后续局部边界修订仅重验相关22项（media-root-observer-signature-final.log）及作者原6项反例（observer-signature-author-reproducer-after.log），均通过，不冒称全仓已重跑。全仓静态检查0 error/0 warning、175条既有info；最终改动定向分析无问题。source_inventory的31项Python及相关Dart契约此前已独立通过，此次不涉及其实现。diff检查干净。
+
+最新独立QA包：com.znbsf.kazumi.fluttertv.parserqa，0.4.5-catalogqa.1/20579，构建源码6f875e0e、dirty=false；APK SHA256 e696690e40267792f679d17a8056633968543ac15e01ab0914de826b4377eec8。文件在C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/app-fallback/build-signed-boundary/{parserqa.apk,artifact.json,source-digests.json,apk-identity.txt,verification.json,build.log,closeout.json}。独立核对包身份、514项源摘要及registrant/fallback/observer覆盖；未安装、未运行。旧20577/20578不代表最新候选。
+
+证据及后续计划继续复用C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020：REPORT.md、diagnosis.json、validation.json、coverage-after-diagnosis、android28-static-ca-20261020；app-fallback/{fixture-plan.json,live-plan.json,media-observer-plan.json,HANDOFF.md}。先fixture（3例/300秒），有效且清理确认后再live（原4失败＋1正常/600秒），每例70秒；媒体观察仅显式QA根＋最多一个子项、64KiB/响应、共享10秒，签名/认证/嵌套URL请求前停止。记录Dart HTTP观察不等于native播放器请求行为；缺口仍unknown。
+
+外部阻塞未解除：原组合模拟器启动/计划生成命令在执行前被自动审批返回blocked by policy，无具体原因，整条未执行。没有换工具、换包装或拆分重试，也不把播放会话新收到的「允许按这些边界准备」解释成实际网络/启动恢复许可；该答复仅限离线准备。新fallback、根/子观察、运行时PSS/资源释放、原案例修复复验仍not_run。没有独立的剩余离线工作可推进，本阶段目标未完成；已通过应用工具将kazumi自动化置PAUSED，恢复须有新用户指令或执行通路确实解除，再核对原停止条件，不因时间到自动启动。
+
+停后核验03:58:55Z：本任务归属进程0、Gradle/Kotlin残留0、宿主CPU快照5%；本次设备操作0、外部请求0。正式包、实体电视、系统WebView/信任与个人preview均未操作；未推送/合并远端main/发布。独立集成树及双方原状态文档保留，后续文档提交不改变以上APK源码身份。
+
+### 以下为本阶段过程记录（历史时点，不覆盖上述当前状态）
+
 签名边界独立复核：播放侧纯内存6项发现X-Goog-Signature/auth_key两漏检，统筹补入明确签名/认证key；root预检拒绝记skipped，0个client而非observed。相关22项通过，作者原6项反例在统筹固定工具链复验6/6通过，定向静态无问题；日志.dart_tool/media-root-observer-signature-final.log、observer-signature-author-reproducer-after.log。旧20578/bcf5597b仍缺最新root边界，不作为未来执行候选；准备20579新构建。
 03:54Z后新指令：播放会话收到人类对离线准备的直接答复，明确「遇到签名参数即停止」。此前transport允许已解析带签名root，仅拦child，不再符合该边界。统筹复用现有mediaObservationStopReason，于root/child创建client前统一检查；新增纯内存反例要求签名/大小写/编码key/嵌套URL均0个client、0个请求且无原值输出。仅相关22项及定向分析，准备一次更新QA构建；不联网、不重试已拒启动，未获得实播通路恢复。
 媒体观察交叉审查后修正：大chunk先限长再复制，2MiB合成块只读取65536元素；清理等待受剩余总预算约束，先关闭client，清理异常独立保留，不覆盖已观察响应/原传输错误，未确认即不进入子请求。作者只读反例在本树加入正式回归，修订后22项transport/分析/脱敏/边界测试通过；集成全仓1218项已通过，后两项新增反例单独复验，不冒称重跑全仓。定向静态检查已通过，最终候选构建准备中。没有外部请求、模拟器、信任变更或原值采集。
