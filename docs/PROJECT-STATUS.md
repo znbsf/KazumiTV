@@ -1,6 +1,13 @@
 # KazumiTV 当前状态
 
 ## 2026-10-20：全来源无验证码播放探测与修复统筹（进行中）
+补救方案与执行阻塞：播放侧2ad5997a已独立构建QA显式app_gecko_fallback策略，旧核解析失败后在25秒总预算内单次Gecko，仍用生产播放器；规则schema和默认产品策略均不变。统筹集成为c371503b作审查候选。原受控Gecko四例成功不代表此新策略实播通过，3夹具/4失败+1正常及运行时PSS/释放仍not_run。
+
+播放侧组合模拟器启动/计划生成命令被自动审批执行前返回blocked by policy，未给原因，整条未执行。统筹不推断拒绝子动作、不换工具/包装/拆分重试同一启动，也不改审批/系统设置，不重复索要已获用户授权。当前可继续离线审查/修复，真实新候选、旧Android peer chain和运行效果仍待可用执行通路。
+
+统筹新增两个先红反例（.dart_tool/qa_fallback_review_test.dart、qa-fallback-review-before.log）：primary成功后dispose未完成期间cancel，当前策略仍返回旧media；primary忽略传入timeout时会占满total而非局部primaryBudget，导致不启用fallback。已回派播放侧在自有树修复并加主/后备退出期间取消、独立deadline反例，不要求重新构建或启动模拟器。还请其准备仅debug私有的候选上下文契约，避免规则侧永远只有hash无法辨root/child404。
+
+规则侧8cfec022已完成预算内传输观察：AGE代理/直连均验证TLS并HTTP403，不能证明缺中间证书，也没有效HTML支持改XPath/域；sorani两路径均握手前中断、无peer certificate，根因未知。3媒体源仅摘要无完整URL/headers/时效，媒体请求0次，不能伪称新验证404。不得原样重开耗尽预算。规则侧继续只读整理code/overlay/external/unknown逐源方案与复验门槛；本轮尚无经证据证明的真实规则overlay。阶段未完成，自动跟进ACTIVE，先完成可独立离线修复和审查。
 首轮诊断交付后继续修复推进：补充7例原因链及4例旧Android Gecko功能对照均有终态、正例均有首帧/正进度，后续派生状态为5 played、LMM实际challenge跳过、11未解决。ezdmw/moonci/MXdm/xfdmnext在现代App及旧Android Gecko均成功，旧App失败；AGE证书链失败、sorani握手中断、dalvdm403未确认挑战、akianime/baimao媒体404、xfdmneo媒体打开失败，均不能凭阶段结果编造overlay。
 
 统筹已独立阅读并组合27ab79e5为76db4445：修复PlaybackTrace对非法百分号的ArgumentError导致原生日志丢失，加入被动脱敏原因链/正面challenge证据。8项日志/持久化/QA快照反例复验通过；不将日志修复称为视频已修好。阶段报告与原证据保持宿主source-catalog-playback-20261020/{REPORT.md,diagnosis.json,validation.json,final-cleanup.json}，现代启动崩溃和未执行案例单列。
