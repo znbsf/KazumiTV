@@ -15,6 +15,7 @@ from run import (BatchCleanupError, Device, PACKAGE, build_report,
 def result(key='k0', **changes):
     row = dict(key=key, id=key, group='live', engine='app', repeat=0,
                stage='first_frame', cleanup='confirmed',
+               host_cleanup={'status': 'confirmed'},
                environment={'sdk': 28, 'webview': 'provider/66'},
                timings_ms={'resolve': 400, 'first_frame': 200},
                memory={'sampled_peak_pss_kib': 2048})
@@ -70,6 +71,44 @@ class CaseDevice(Device):
 
 
 class IntegrityTests(unittest.TestCase):
+    def test_playback_challenge_stops_before_next_case(self):
+        device=Mock();device.case.return_value=result(stage='captcha')
+        device.stop_and_verify.return_value={'status':'confirmed'}
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            report=run_batch(device,plan(2),Path(temp),[])
+            self.assertEqual(device.case.call_count,1)
+            self.assertEqual(report['run_status']['stop_reason'],'challenge')
+
+    def test_episode_identity_mismatch_is_environment_invalid_and_stops(self):
+        device=Mock();device.case.return_value=result(stage='sample_identity_mismatch')
+        device.stop_and_verify.return_value={'status':'confirmed'}
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            report=run_batch(device,plan(2),Path(temp),[])
+            self.assertEqual(device.case.call_count,1)
+            self.assertEqual(report['summary'][0]['eligible_results'],0)
+            row=json.loads((Path(temp)/'results.jsonl').read_text())
+            self.assertEqual(row['stage'],'environment_invalid')
+            self.assertEqual(row['observed_stage'],'sample_identity_mismatch')
+
+    def test_missing_or_unknown_cleanup_never_allows_next_case(self):
+        for field in ('app','host'):
+            device=Mock();row=result()
+            if field=='app':row.pop('cleanup')
+            else:row['host_cleanup']['status']='unknown'
+            device.case.return_value=row;device.stop_and_verify.return_value={'status':'confirmed'}
+            with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(BatchCleanupError):run_batch(device,plan(2),Path(temp),[])
+                self.assertEqual(device.case.call_count,1)
+
+    def test_unknown_terminal_stops_and_is_not_product_playback_failure(self):
+        device=Mock();device.case.return_value=result(stage='unknown')
+        device.stop_and_verify.return_value={'status':'confirmed'}
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            report=run_batch(device,plan(2),Path(temp),[])
+            self.assertEqual(device.case.call_count,1)
+            self.assertEqual(report['run_status']['stop_reason'],'unknown')
+            self.assertEqual(report['summary'][0]['eligible_results'],0)
+
     def test_selection_only_results_never_enter_playback_success_or_failure_metrics(self):
         discovered = result('discover', stage='selection_only', selection_only=True)
         no_sample = result('no-sample', stage='no_match', selection_only=True)

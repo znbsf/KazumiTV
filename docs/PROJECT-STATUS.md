@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+17:20统筹独立复核depth-playback-20588-v1九例：计划与展开固定rule后的input摘要、runner快照、唯一作品、episode hash/精确label及索引、实际规则、两层/final清理全部对应，planned/started/completed9、unknown0。七例真实首帧且完整10秒窗口/正进度/采样错误0：akianime9920ms、ezdmw6069ms、giri6444ms、moonci9926ms、mutefun9843ms、MXdm6694ms、xfdmneo8341ms；仅ezdmw/moonci/MXdm显式QA fallback且最多一次，primary retired先于fallback started，普通构建策略未改。DM84标签2与mgnacg第2话为明确resolve_timeout，未创建播放器，解析/host清理confirmed；其此前其他集正例保留，不说整源全失效或全可播。回执.dart_tool/depth-playback-independent-review.json。
+
+新失败区别观察：DM84最终ready=loading/iframe hhjx.hhplayer.com，mgnacg ready=complete/frames3/videos0/iframe play.mknacg.top，均无足够证据判定规则错误或外部根因；不追加媒体请求/换线。已准备两例同规则/同作品线路/剧集hash与label的modern App control计划.dart_tool/depth-modern-control-20588-v1.json，SHA256 a8e8944a4f283c80183bf1bcd808b5063f1dc467c7a8b5ea32e7ad335a780b05，尚未执行、不重试unknown；已续派唯一owner先完成本包清理/交付，再各一次现代App对照（每例70秒/总300秒），不构建、不改provider、无fallback/observer，身份或环境不符/挑战/unknown/清理不明停包。七个通过精确案例不再跑。
+
+统筹独立审读b3cdb5bf宿主门禁修正：所有播放挑战停批、episode身份错配按environment_invalid停止、任一缺失/unknown清理停止、显式unknown排除产品分母并停批；59项Python（含原四类反例与真实Java/PowerShell检查）独立通过，未改APK/Android/Dart，不重建。规则e804ee0f独立审查九绑定无误对应/重复，发现与播放结论分开；xfdmnext文本边界仍仅建议及纯合成负例，未放宽门禁/新增labelHash/overlay。主目标仍未完成；十一限定可播源计数不变，新增两例后续集失败单列，五无可播与旧unknown/电视缺口保留。
+
 17:05统筹独立消费20588九源发现交付：depth-tail1-dm84-20588与depth-tail1-remaining-20588的runner快照、实际展开rules的input摘要、唯一作品/规则有效摘要/启动am白名单、9例终态及两层/final清理逐行复核通过；25road/67样本/61完整label+page hash绑定复算一致，xfdmnext六条null仍不可绑定，eligible=0，未增加播放成功计数。源列表倒序反例DM84标签2/1、ezdmw3/2/1保留，尾索引不等于最新。回执.dart_tool/depth-tail1-independent-review.json，owner停后收据确认归属launcher84012/qemu69856退出、候选0/CPU0；不是全来源或旧aafun问题已解决。
 
 已按新观察精确绑定生成并续派九例实播：.dart_tool/depth-playback-plan-20588-v1.json，SHA256 8bae8fbc6519a5000483368e18dfb0fd622a5cedca6c06c90848f236241f40f2。DM84 r0/e0标签2、akianime已成功备用r1/e2第3集、ezdmw r0/e2标签1、giri r0/e2标签03、mgnacg r0/e1第2话、moonci r0/e2第03话、mutefun/MXdm r0/e2第03集、xfdmneo已成功备用r1/e1第02集；均复算完整hash/label且不在原history/legacy已播或unknown精确剧集中。只有ezdmw/moonci/MXdm沿用已验QA单次fallback，其余默认App；每例10秒进度、70秒/九例总900秒，现成20588不重建、不重新发现/不打开media observer。先核实包及AVD归属再新包单次后台实验，challenge/unknown/environment_invalid/清理不明即停整批，不换案例/重试旧unknown。已派规则owner只读独立核对计划、更新原depth派生视图，发现错配即回报；另纯离线整理xfdmnext文本门禁缺口及最小边界建议，不新增labelHash/schema或盲造overlay。主目标未完成，17源仍11限定可播/1挑战/5无可播，正式/preview/电视/系统未动。

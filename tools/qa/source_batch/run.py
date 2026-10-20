@@ -130,7 +130,7 @@ def summarize(rows):
             if not subset:
                 continue
             invalid = [r for r in subset if classified_stage(r) == 'environment_invalid']
-            infrastructure = [r for r in subset if classified_stage(r) in ('host_error', 'host_timeout', 'interrupted')]
+            infrastructure = [r for r in subset if classified_stage(r) in ('host_error', 'host_timeout', 'interrupted', 'unknown')]
             selection = [r for r in subset if r.get('selection_only') is True and r not in invalid and r not in infrastructure]
             launch = [r for r in subset if r.get('launch_only') is True and r not in invalid and r not in infrastructure]
             eligible = [r for r in subset if r not in invalid and r not in infrastructure and r not in selection and r not in launch]
@@ -708,6 +708,9 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                                     'started_epoch': time.time()}) + '\n')
                 f.flush()
             row = device.case(config, output, key)
+            if row.get('stage') == 'sample_identity_mismatch':
+                row.update(observed_stage='sample_identity_mismatch', stage='environment_invalid',
+                           reason='episode hash or exact label gate failed before parsing')
             environment, expected = row.get('environment', {}), item['expected_environment']
             if environment and (environment.get('sdk') != expected['sdk'] or environment.get('webview') != expected['provider']):
                 row['observed_stage'] = row.get('stage')
@@ -730,16 +733,16 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                 f.flush()
             rows.append(row)
             print(json.dumps({k: row.get(k) for k in ('id', 'engine', 'stage', 'host_elapsed_ms', 'cleanup')}, ensure_ascii=False), flush=True)
-            if row.get('cleanup') == 'unconfirmed' or row.get('host_cleanup', {}).get('status') == 'unconfirmed':
+            if row.get('cleanup') != 'confirmed' or row.get('host_cleanup', {}).get('status') != 'confirmed':
                 stop_reason = 'case_cleanup_unconfirmed'
                 cleanup_errors.append({'step': 'case_cleanup', 'key': key,
                                        'app_cleanup': row.get('cleanup'), 'host_cleanup': row.get('host_cleanup')})
                 break
-            if row['stage'] in ('host_timeout', 'environment_invalid'):
+            if row['stage'] in ('host_timeout', 'environment_invalid', 'unknown'):
                 stop_reason = row['stage']
                 break
-            if row.get('selection_only') is True and row['stage'] == 'captcha':
-                stop_reason = 'selection_challenge'
+            if row['stage'] == 'captcha':
+                stop_reason = 'selection_challenge' if row.get('selection_only') is True else 'challenge'
                 break
     except BaseException as error:
         primary_error = error
