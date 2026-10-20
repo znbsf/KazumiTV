@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -104,6 +105,33 @@ Future<Map<String, Object?>> inspect(Client client, Duration budget) =>
         createHttpClient: (_) => client);
 
 void main() {
+  test('signed or ambiguous roots stop before creating a transport', () async {
+    var clientsCreated = 0;
+    for (final query in [
+      'sign=PRIVATE_SENTINEL',
+      'ToKeN=PRIVATE_SENTINEL',
+      '%73ignature=PRIVATE_SENTINEL',
+      'url=https%3A%2F%2Fexample.invalid%2FPRIVATE_SENTINEL',
+    ]) {
+      final result = await HttpOverrides.runZoned(
+          () => observeMediaRoot(
+              enabled: true,
+              debug: true,
+              packageName: 'com.znbsf.kazumi.fluttertv.parserqa',
+              mediaUrl: 'https://example.invalid/root?$query',
+              headers: {},
+              isCancelled: () => false), createHttpClient: (_) {
+        clientsCreated++;
+        throw StateError('Transport must not be created');
+      });
+      expect(result['stop_reason'],
+          query.startsWith('url=') ? 'nested_url_query' : 'signature_signal');
+      expect(result['observations'], isEmpty);
+      expect(result['outcome'], 'skipped');
+      expect(jsonEncode(result), isNot(contains('PRIVATE_SENTINEL')));
+    }
+    expect(clientsCreated, 0);
+  });
   test('oversized chunk should not copy beyond the 64KiB observation bound',
       () async {
     final bytes = CountingBytes();

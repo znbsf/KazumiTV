@@ -93,21 +93,6 @@ void main() {
     expect(paths, ['/root', '/child.ts']);
   });
 
-  test('already-resolved signed root stays in memory and is never exported',
-      () async {
-    var count = 0;
-    await fixture((request) async {
-      count++;
-      request.response.statusCode = 404;
-      await request.response.close();
-    }, (base) async {
-      final result = await inspect('$base/root?sign=ROOT_SENTINEL');
-      expect((result['observations'] as List).single['status'], 404);
-      expect(jsonEncode(result), isNot(contains('SENTINEL')));
-    });
-    expect(count, 1);
-  });
-
   test('server ignoring Range cannot cause an unbounded buffered response',
       () async {
     await fixture((request) async {
@@ -201,7 +186,7 @@ void main() {
     });
     try {
       final result = await inspect(
-          'https://127.0.0.1:${server.port}/TLS_SENTINEL?sign=QUERY_SENTINEL');
+          'https://127.0.0.1:${server.port}/TLS_SENTINEL?fixture=QUERY_SENTINEL');
       expect(result['outcome'], 'transport_error');
       expect(result['error_type'], isNotNull);
       expect(jsonEncode(result), isNot(contains('SENTINEL')));

@@ -75,8 +75,14 @@ Future<Map<String, Object?>> observeMediaRoot({
         result['stop_reason'] = 'invalid_resource';
         break;
       }
-      // The root is an already resolved playback URL, including short-lived
-      // delivery signatures. It stays in memory; signed children are not probed.
+      // The request boundary applies to the resolved root as well as children.
+      // Do not open a client for signature/authentication or ambiguous URLs.
+      final stop = mediaObservationStopReason(url);
+      if (stop != null) {
+        result['outcome'] = 'skipped';
+        result['stop_reason'] = stop;
+        break;
+      }
       final record = <String, Object?>{
         'role': index == 0 ? 'root' : 'child',
         'resource': {
