@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+21:06 d8cd781c原live2已完成交付，统筹具体续派只原20591终态失败的moonci第01话/MXdm第01集在新20592调度下各首次实播，.dart_tool/tv-live-remaining-plan-20592.json，SHAd7f7c61de24b05b581213b3978b068283aa1d55dd0a0017e852d9619c529a48b。原有效规则/作品线路/页面hash和exactlabel保持，App显式QA primary10/shared25/max1、每例70秒/10秒进度，不重复ezdmw/7sefun、不构建重装/fixture/旧unknown。新包总300秒包含身份前提与全部只读收尾，按已观察收尾成本保留末次至少60秒，每例开始前剩余须足70+60秒；不足记未尝试停止，不回溯放宽旧200秒超限。新前提是相同ARM候选fixture及ezdmw原失败样本已实际通过，不单独证明预算唯一原因。先原状态记边界、同物理身份/现装hash/保护桌面音量与归属核对，普通明确阶段失败可继续计划内独立源，challenge/unknown/envinvalid/错配/清理不明停，不换线/重试/加探针。只原唯一runner单例，结束原保护与自有进程/负载核验，不自动执行aafun或其他源。
+
 21:05统筹独立核tv20592-live2-v2原件：两个子manifest精确对应父计划、runner字节与本树一致、展开规则后input hash/physical身份/现装20592/provider/精确作品线路剧集hash和label匹配；ezdmw原电视失败例新QA primary10/shared25下，primary retired10150ms先fallback start10153ms，唯一fallback accepted23691ms<25秒，原生首帧与完整10002ms观察/位置+10281ms/采样错0；7sefun默认App同原第01集，10000ms观察/+10218ms/错0、零fallback。两单例host elapsed64375/38171ms，各层及final清理confirmed，独立subscription not_created合法。回执.dart_tool/tv20592-live2-independent-review.json。
 
 整包含只读收尾203.528秒，超过200秒上限3.528秒，保留为协议预算未通过，不能整体涂成pass；两个已完成且身份有效的播放观察仍保留，不因此重跑。原三保护包/QA meta/桌面音量/provider完全前后一致，reverse/QA进程/目标ADB/监听/自有runner空，实际负载收据已读。新结果支持该QA候选在ezdmw原失败剧集上可行，原20591失败保留；实际随机UA/时点未配对，不能归预算唯一原因或生产默认修复。当前2例结束、owner先完成交付，无追加设备操作。
