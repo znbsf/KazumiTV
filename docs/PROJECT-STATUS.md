@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+15:48统筹消费20586运行：aafun-same-dom-20586-1535为planned1/started1/completed0/unknown1，host am start -W等待20秒超时，无可用App终态，不能写同DOM比较已执行/未执行，也不能写来源或选择器通过/失败。独立复算20586 APK字节、source-digests清单字节及runner快照摘要与identity一致，安装前后摘要/保持数据来自owner回执；App/worker清理仍unknown，host单例/最终清理confirmed。owner停后收据确认本任务launcher/qemu退出、候选进程0/CPU快照2%，未操作电视/正式/preview。回执.dart_tool/chapter-runtime-unknown-independent-review.json。
+
+没有原样重试aafun。播放owner已续派离线核对旧MissingPlugin/registrant路线、本轮包/入口/日志及启动等待语义，需先说明新前提与无来源最小launch-only探针，不靠加等待掩盖unknown；未授权从本次unknown直接重开来源。规则owner同时复用固定目录/已有ledger准备11限定可播来源的未测首集/较新集覆盖与下一批仅selection候选计划，排除所有精确已完成/unknown、无联网、不改共享runner文件。现有投影只首2集，较新集契约缺口先明确，不盲造索引/URL。两个owner继续推进，阶段未完成、自动化ACTIVE。
+
 15:36统筹独立审读并集成dbc12746同响应诊断工具：仅固定aafun原q2/版本/有效规则摘要，生产traceChapters单次请求附加只读响应tap，校验唯一请求/最终URI摘要、2xx/HTML、无重定向/挑战、正文摘要一致及256KiB上限；只比较内存DOM、不追加请求/解析/媒体。独立isolate暂停启动、共享剩余最多5秒、超时/取消kill并等待exit，未确认清理向整例传播；tap在finally移除，普通运行默认关闭。19项Dart（runtime10＋helper9）及定向分析独立通过（.dart_tool/chapter-runtime-independent-{tests,analyze}.log）；真实aafun样本由唯一播放owner运行中，未将合成测试计为实际规则缺陷或修复成功。
 
 15:33统筹独立核对xfdmneo-alternate-20585-1519：runner快照与展开固定规则后的实际输入cases摘要匹配，固定规则/同q2作品及指定备用线第01集页面摘要、标签、索引全部对应；实际VideoWebviewImpl/App默认零新增fallback，原生首帧后10秒采样进度7966ms、播放器/解析器/两层及最终清理确认。回执.dart_tool/xfdmneo-alternate-independent-review.json。原首线401保留，不能说根因或全线已修复；此例证明已有备用线可播、无新增overlay需求证据。
