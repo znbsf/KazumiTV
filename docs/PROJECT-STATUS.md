@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+2026-10-21 00:16统筹独立审tv20592-aafun-first-media-v1：原base0968af…/葬送的芙莉莲/第01话页f63fd948…App实际一致，search2689ms/chapters917ms完成，VideoWebviewImpl目标load_stop之后readycomplete/frames3/videos0，15038ms明确resolve_timeout，player/subscription合法not_created、resolver/cleanup confirmed。未得媒体地址，不是open/解码/首帧失败。一个HTTP400 mainFramefalse与4非主框架reset仅线索不唯一归因；documentstartfalse/legacycompateligibletrue为运行时能力观察。48.062秒开始收尾、stop约48.857<70，全包62.687<180，原保护meta/桌面音乐8/provider/media0/reverse/自有退出confirmed、TV短CPU9.77%/host10%。回执.dart_tool/aafun-first-media-independent-review.json。旧unknown/selector差异/超限记录并列保留，原规则可选集判断不变。
+
+已具体续派唯一owner只aafun原例既有QA客户端补救一次：.dart_tool/aafun-tv-fallback-20592-v1.json SHA9b8724f39b52a8ae1d6287ef61eb3966d65dc2623a00c7d94dfa72186206763f，仅原first-media case换id tv20592-aafun-fallback-q2/group/app_gecko_fallback=true，base/作品road0ep0/expected hash标签/10秒进度全保持。明确默认终态失败+实际runtime eligible是实质变化，不是unknown重试；现装20592用既有primary10/shared25/max1不改工具/源码/构建安装/生产默认，不声称UA单变量。直接UI/safe日志，case70/全包180含60收尾，身份保护先核；primaryfresh成功记0fallback不强迫重跑，fallback先退役/最多一次/总25秒，challenge/unknown/envinvalid/错配/清理不明停，不换线/加observer console JS HTTP。成功须分native首帧/10秒采样/可见画面，内部静音不验AV，不用清理后黑底代视频，不为采集加时重跑。70到仅stop/必要收尾，原保护及自有退出/CPU8即时落盘，不自动新例或修工具；当前结果未出。
+
 规则owner d9181729已交最小独立判断，统筹读原结论与已核实际App结果一致：保持base，不改chapterRoads/chapterResult。本响应base与candidate均精确选中第01话各1次，28→56只证明集合扩大；第二路节点归属/逐集对应缺失，不能猜备用或重复并安装overlay。不解释旧时点集数0/旧unknown；保留case89.453>70协议失败。该判断不阻塞已派的沿base首次媒体阶段，当前唯一device owner61 active在执行，不再发重复催促。
 
 2026-10-21 00:03统筹独立核tv20592-aafun-adb-selector-v1：实际rule0968af…/葬送的芙莉莲/detail824283…/200唯一HTML无redirect已知challengefalse，58870B同body SHA5bd0b4d…；原规则1road28集、两字段候选2road56集，两者第01话f63fd948…精确各1次、first3样本相同，880ms worker/清理与interceptor退出confirmed；无parser/media/player。原规则本响应已能选目标，不支持以集表缺失为由改规则，额外road语义/正确性未证。回执.dart_tool/aafun-adb-selector-independent-review.json，原unknown保留；raw hash仅owner元数据/root核safeparsed。原host主动观测89.453>70超19.453秒，全包104.797<180不能整体涂pass；作者称70秒内已取得结果的原工具回执尚余14.891秒，root未额外独立核该时点，不补原判。该时限缺口如实保留，不因此重跑或改工具。
