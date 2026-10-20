@@ -1,6 +1,7 @@
 // QA entry only. Never imported by production main.dart.
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -38,34 +39,61 @@ import 'lifecycle_gate.dart';
 import 'lifecycle_host.dart';
 import 'selection_snapshot.dart';
 import 'chapter_diagnostic_runtime.dart';
+import 'launch_probe.dart';
 
 final _shaderAssets = ShaderAssetService();
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  if (!kDebugMode || (await PackageInfo.fromPlatform()).packageName !=
-      'com.znbsf.kazumi.fluttertv.parserqa') {
-    throw StateError('Isolated parserQa debug identity required');
+  if (qaLaunchOnlyBuild) {
+    HttpOverrides.global = QaNoNetworkOverrides();
+    qa_log.Logger.level = qa_log.Level.off;
   }
-  final config = jsonDecode((await qaChannel.invokeMethod<String>('config'))!)
-      as Map<String, dynamic>;
-  // QA process only: production HTTP loggers can print full request addresses.
-  if (config['selection_only'] == true) qa_log.Logger.level = qa_log.Level.off;
-  await TvMode.initialize();
-  // QA debug identity was checked above. Simulate the TV build flag while
-  // retaining the real SDK/provider/ABI detection and native MainActivity.
-  // ignore: invalid_use_of_visible_for_testing_member
-  TvMode.setEnabledForTesting(true);
-  if (config['engine'] != 'gecko') await WebViewFeatureService.initialize();
-  MediaKit.ensureInitialized();
-  final root = await getApplicationSupportDirectory();
-  await Hive.initFlutter('${root.path}/hive');
-  await GStorage.init();
-  if (config['engine'] == 'app') await _shaderAssets.copyShadersToExternalDirectory();
-  runApp(MaterialApp(home: QaLifecycleHost(config: config, channel: qaChannel,
-    pageBuilder: (c, ticket, finished, signal, disposed) => BatchCase(c,
-      key: ValueKey(ticket.generation), ticket: ticket, onFinished: finished,
-      onSignal: signal, onPageDisposed: disposed))));
+  WidgetsFlutterBinding.ensureInitialized();
+  final probe = qaLaunchOnlyBuild ? const QaLaunchProbe() : null;
+  try {
+    if (probe != null) await probe.mark('dart_binding');
+    if (!kDebugMode || (await qaBootstrapStep(probe, 'identity', PackageInfo.fromPlatform)).packageName !=
+        'com.znbsf.kazumi.fluttertv.parserqa') {
+      throw StateError('Isolated parserQa debug identity required');
+    }
+    final config = jsonDecode((await qaBootstrapStep(probe, 'config',
+        () => qaChannel.invokeMethod<String>('config')))!)
+        as Map<String, dynamic>;
+    if (!qaLaunchConfigAllowed(config, offlineBuild: qaLaunchOnlyBuild)) {
+      throw StateError('qa_launch_only_input_rejected');
+    }
+    // QA process only: production HTTP loggers can print full request addresses.
+    if (config['selection_only'] == true) qa_log.Logger.level = qa_log.Level.off;
+    await qaBootstrapStep(probe, 'tvmode', TvMode.initialize);
+    // QA debug identity was checked above. Simulate the TV build flag while
+    // retaining the real SDK/provider/ABI detection and native MainActivity.
+    // ignore: invalid_use_of_visible_for_testing_member
+    TvMode.setEnabledForTesting(true);
+    if (config['engine'] != 'gecko') await qaBootstrapStep(probe, 'webview', WebViewFeatureService.initialize);
+    await qaBootstrapStep(probe, 'mediakit', MediaKit.ensureInitialized);
+    final root = await qaBootstrapStep(probe, 'path', getApplicationSupportDirectory);
+    await qaBootstrapStep(probe, 'hive', () => Hive.initFlutter('${root.path}/hive'));
+    await qaBootstrapStep(probe, 'storage', GStorage.init);
+    if (config['engine'] == 'app') await qaBootstrapStep(probe, 'shaders', _shaderAssets.copyShadersToExternalDirectory);
+    if (probe != null) {
+      await probe.step('dio_guard', () {
+        for (final dio in [DioFactory.apiDio, DioFactory.rulesRepoDio,
+            DioFactory.pluginDio, DioFactory.downloadDio]) {
+          dio.interceptors.insert(0, QaDioNetworkDeny());
+        }
+      });
+      await probe.mark('dart_runapp');
+      runApp(MaterialApp(home: QaLaunchOnlyPage(probe: probe)));
+      return;
+    }
+    runApp(MaterialApp(home: QaLifecycleHost(config: config, channel: qaChannel,
+      pageBuilder: (c, ticket, finished, signal, disposed) => BatchCase(c,
+        key: ValueKey(ticket.generation), ticket: ticket, onFinished: finished,
+        onSignal: signal, onPageDisposed: disposed))));
+  } catch (error) {
+    await probe?.failure(error);
+    rethrow;
+  }
 }
 
 class BatchCase extends StatefulWidget {

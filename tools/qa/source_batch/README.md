@@ -12,6 +12,9 @@
 
 ## 构建及运行
 
+启动前提诊断另有显式 `build.ps1 -LaunchOnly`，仍用本运行器及相同独立QA身份，创建 `parserQaOfflineDebug`；普通构建不启用它。变体最高优先级Manifest删除INTERNET（含debug注入），构建脚本分别核验merged Manifest及APK权限，native启动还检查实际权限拒绝；Dart HttpOverrides和Dio在该模式拒绝外连。CLI必须额外传 `--aapt <aapt.exe>`，仅接受一个 `{"id":"qa-offline-launch-only-v1","group":"offline-launch","launch_only":true}` 案例、app引擎/一次/模拟器，无fixture服务；其余键除固定运行器元数据全部拒绝。普通QA拒绝launch-only配置，不回落来源路径。
+该模式只按原顺序初始化并显示本地文本，不创建BatchCase/解析器/播放器、不访问来源。原生固定阶段和Dart每一await前后/首帧写入专用原子文件，<=64条/32KiB，只含枚举、单调时间、PID、权限/注册布尔及异常类名。保持am start -W的20秒等待；超时仍保留原错误/unknown，宿主只保存白名单am字段，并独立检查专用文件真实存在性、大小、读回字节数及UTF8/JSON类型，无效字节不落盘。只有同attempt完整初始化顺序、本地首帧与native结果同时验证才记launch_ready，永不计入产品播放分母；环境无效、进程消失、unknown或清理未确认即停止，不自动重试或恢复原来源。
+
 构建前必须存在 `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`。Windows离线 `pub get` 在软链阶段失败后，即使已有package_config等依赖元数据，也不代表Android插件注册已生成；缺失会造成APK可以构建、启动却报MissingPluginException（例如package_info）。须先由固定Flutter工具的 **Android-only injectPlugins准备流程** 生成注册文件（这是Flutter工具内部API，不是CLI子命令），然后再运行本脚本。脚本在解析脚本生成、创建输出目录及构建之前检查；缺失立即失败，不自动生成、不复制该Java文件入库，也不修改系统设置。此生成文件保持忽略，但其内容哈希明确纳入source-digests.json及构建前后比较。
 
 debug parserQa准备时使用 `injectPlugins(releaseMode: false, androidPlatform: true)`；Flutter3.47.3的release模式会过滤dev_dependencies插件，不能仅凭文件存在推断已按debug插件集合生成。此次native splash差异已用原工具双模式逐字节复现，下一debug候选使用标准debug生成；生成日志、模式与注册文件摘要应随候选保存，不能手工复制注册段。

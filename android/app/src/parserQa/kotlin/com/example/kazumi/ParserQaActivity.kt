@@ -1,6 +1,7 @@
 package com.example.kazumi
 
 import android.os.Build
+import android.os.Bundle
 import android.webkit.WebView
 import android.view.KeyEvent
 import android.view.View
@@ -29,14 +30,40 @@ class ParserQaActivity : MainActivity() {
     private var resultCaseId: String? = null
     private var lifecycleSwitch = false
     private val lifecycleKeyEvents = ArrayList<Map<String, Any?>>()
+    private var launchProbe: QaLaunchProbeHost? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        if (BuildConfig.QA_LAUNCH_ONLY) {
+            launchProbe = QaLaunchProbeHost(this).also { it.begin() }
+        }
+        super.onCreate(savedInstanceState)
+        launchProbe?.record("native_create_exit")
+    }
+    override fun onResume() { super.onResume(); launchProbe?.record("native_resume") }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        launchProbe?.focus(hasFocus)
+    }
 
     override fun configureFlutterEngine(engine: FlutterEngine) {
+        launchProbe?.record("native_engine_enter")
         super.configureFlutterEngine(engine)
+        launchProbe?.registered(engine.plugins.has(dev.fluttercommunity.plus.packageinfo.PackageInfoPlugin::class.java))
+        launchProbe?.observeRenderer(engine.renderer)
         check(BuildConfig.DEBUG && packageName == "com.znbsf.kazumi.fluttertv.parserqa")
         channel = MethodChannel(engine.dartExecutor.binaryMessenger, "kazumi/parser_qa")
         channel.setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
+                    "launchProbeStage" -> {
+                        val probe = launchProbe ?: error("qa_launch_only_disabled")
+                        probe.dartStage(call.arguments as Map<*, *>)
+                        result.success(null)
+                    }
+                    "launchProbeComplete" -> {
+                        val probe = launchProbe ?: error("qa_launch_only_disabled")
+                        probe.completeWhenDisplayed(result)
+                    }
                     "config" -> {
                         val text = File(filesDir, "case.json").readText()
                         lifecycleSwitch = JSONObject(text).optJSONObject("qa_lifecycle")?.optString("action") == "switch"
@@ -148,6 +175,7 @@ class ParserQaActivity : MainActivity() {
                 result.error("qa_error", error.javaClass.simpleName, null)
             }
         }
+        launchProbe?.record("native_channel_ready")
     }
     private fun closeSession() {
         generation++
@@ -178,5 +206,8 @@ class ParserQaActivity : MainActivity() {
         }
         return super.dispatchKeyEvent(event)
     }
-    override fun onDestroy() { closeSession(); super.onDestroy() }
+    override fun onDestroy() {
+        try { runCatching { launchProbe?.record("native_destroy") }; closeSession(); super.onDestroy() }
+        finally { launchProbe?.detach() }
+    }
 }

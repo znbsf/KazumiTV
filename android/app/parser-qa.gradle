@@ -11,13 +11,38 @@ android {
             applicationId "com.znbsf.kazumi.fluttertv.parserqa"
             minSdkVersion 26
             ndk { abiFilters "x86_64" }
+            buildConfigField "boolean", "QA_LAUNCH_ONLY", "false"
+        }
+        if (project.findProperty("kazumiQaLaunchOnly") == "true") {
+            parserQaOffline {
+                dimension "device"
+                applicationId "com.znbsf.kazumi.fluttertv.parserqa"
+                minSdkVersion 26
+                ndk { abiFilters "x86_64" }
+                buildConfigField "boolean", "QA_LAUNCH_ONLY", "true"
+            }
         }
     }
     sourceSets { parserQa.java.srcDirs += 'src/parserQa/kotlin' }
+    if (project.findProperty("kazumiQaLaunchOnly") == "true") {
+        sourceSets {
+            parserQaOffline {
+                java.srcDirs += 'src/parserQa/kotlin'
+                assets.srcDirs += 'src/parserQa/assets'
+                manifest.srcFile 'src/parserQa/AndroidManifest.xml'
+            }
+            parserQaOfflineDebug {
+                manifest.srcFile 'src/parserQaOfflineDebug/AndroidManifest.xml'
+            }
+        }
+    }
     variantFilter { variant ->
         if (variant.buildType.name != 'debug') variant.setIgnore(true)
     }
 }
 dependencies {
     parserQaImplementation 'org.mozilla.geckoview:geckoview:146.0.20251217121356'
+    if (project.findProperty("kazumiQaLaunchOnly") == "true") {
+        add('parserQaOfflineImplementation', 'org.mozilla.geckoview:geckoview:146.0.20251217121356')
+    }
 }

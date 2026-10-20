@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+16:36统筹独立审读集成c0d53de7/93c57f68的launch-only工具：独立50项Python（含真实Java ledger编译/运行）、16项Dart（launch6＋runtime10）、定向分析通过。20587离线APK字节/source清单/runner快照与identity匹配，merged Manifest及aapt均无INTERNET、runtime permission DENIED；同attempt32枚举阶段/完整Dart顺序与native首帧成立，536/2314字节文件真实stat/读回UTF8及schema相符，am等待2940ms/host3485ms、20秒限额不变，单例/最终清理confirmed，产品eligible=0。回执.dart_tool/launch-probe-independent-review.json。原runner generic compatibility误称播放路径，93c57f68仅修后续宿主标签/投影，不改写旧results、不重构建；原20586原因仍unknown，不用离线pass覆盖或声称普通网络QA已验收。
+
+已续派播放owner普通网络QA新前提验证与新样本发现：仅QA默认关闭selection_tail1，在head2之外保留最后原索引且去重、每road最多3项/8road、安全label/hash、ordering=unknown，不把尾部冒称最新，不改schema。补短表/重复/逆序/隐私反例，一次正常parserQa/x64构建<=180秒，明确LaunchOnly=false及Manifest含INTERNET、签名/安装-r/摘要绑定；不能误用20587离线包。固定9例原未执行发现计划派生新文件，不覆盖原；先DM84已匹配作品一例/120秒，得到有效唯一作品结构且清理确认才同包再余8例/600秒。全部只搜索/集表、无解析/媒体/fallback；unknown/启动失败/环境无效/挑战/清理不明立即停包，不改20秒等待、不重试旧aafun/已完成案例，失败读回只核对真实file/stat/字节/类型、不存敏感原文。新hash/label须统筹复核后再选剧集实播；结束核验任务进程退出及负载。规则owner暂可等待实际数据，主目标未完成自动化ACTIVE。
+
 16:05统筹消费0fab5c82启动离线复核并独立重比20585/86源清单：仅main.dart及新增chapter_diagnostic_runtime.dart有变化，registrant/原生入口/Manifest无源差异。独立读取19次PSS采样，约+1.7秒出现QA PID3410、约+2.9秒起不再出现，支持早期进程消失观察，尚无异常/退出原因；不因静态插件类存在就声称运行时注册成功。更正此前“停后文件存在/不可解析”表述：原回执只留宿主返回0和JSONDecodeError，原始字节、大小、文件存在性均未独立证明，不能判断空/截断/非JSON或是否已请求来源。旧原记录保留，startup-offline-review.json为更正入口。
 
 已选择并交播放owner实施固定默认关闭launch-only诊断：独立QA离线变体合并Manifest/APK确认无INTERNET，固定id拒绝来源字段且绝不退回普通case，Dart拒绝外连；沿原初始化顺序显示本地页，不创WebView/解析器/播放器。新增原生/通道/初始化/首帧枚举及单调时间、异常仅类名/原handler、专用原子文件<=64条/32KiB，宿主核对真实文件/stat/字节及JSON类型。20秒am等待不改；先冻结提交/离线测试/产物身份核对，至多一次180秒构建、一次归属明确无来源冷启动（单例70秒/总120秒），错误/unknown/清理不明停，不接原aafun或新来源。新判别是启动阶段观测，不是原样重试unknown；不需用户补同一授权，正式/preview/系统不动。

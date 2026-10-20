@@ -15,6 +15,95 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PACKAGE = 'com.znbsf.kazumi.fluttertv.parserqa'
 ACTIVITY = 'com.example.kazumi.ParserQaActivity'
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+LAUNCH_ID = 'qa-offline-launch-only-v1'
+LAUNCH_KEYS = {'id', 'group', 'engine', 'launch_only', 'repeat', 'user_agent', 'launch_attempt_key'}
+LAUNCH_DART_ORDER = ['dart_binding'] + [f'dart_{s}_{edge}' for s in
+    ('identity', 'config', 'tvmode', 'webview', 'mediakit', 'path', 'hive', 'storage', 'shaders', 'dio_guard')
+    for edge in ('enter', 'exit')] + ['dart_runapp', 'dart_first_frame']
+LAUNCH_STAGES = set(LAUNCH_DART_ORDER) | {'native_create_enter', 'native_create_exit', 'native_engine_enter',
+    'native_super_engine_exit', 'native_channel_ready', 'native_resume', 'native_window_focus',
+    'native_destroy', 'native_uncaught', 'native_first_frame', 'dart_failure', 'probe_result'}
+
+def launch_only_spec(config):
+    if 'launch_only' not in config and config.get('id') != LAUNCH_ID:
+        return False
+    if (set(config) - LAUNCH_KEYS or config.get('launch_only') is not True or
+        config.get('id') != LAUNCH_ID or config.get('group') != 'offline-launch' or
+        config.get('engine', 'app') != 'app' or type(config.get('repeat', 0)) is not int or config.get('repeat', 0) != 0 or
+        not isinstance(config.get('user_agent', UA), str) or len(config.get('user_agent', UA)) > 256 or
+        ('launch_attempt_key' in config and not re.fullmatch(r'[a-f0-9]{20}', str(config['launch_attempt_key'])))):
+        raise ValueError('Invalid fixed launch-only configuration')
+    return True
+
+def launch_am_fields(raw):
+    if isinstance(raw, bytes):
+        raw = raw.decode('utf-8', 'replace')
+    output = {}
+    for line in (raw or '').splitlines():
+        match = re.fullmatch(r'\s*(ThisTime|TotalTime|WaitTime):\s*(\d+)\s*', line)
+        if match:
+            output[match[1]] = int(match[2])
+        elif line.strip() in ('Status: ok', 'Status: timeout', 'Complete'):
+            output[line.strip().split(':')[0]] = line.strip().partition(':')[2].strip() or True
+        elif line.strip() == f'Activity: {PACKAGE}/{ACTIVITY}':
+            output['expected_activity'] = True
+    return output
+
+def launch_file_decode(raw, declared):
+    meta = {'declared_bytes': declared, 'read_bytes': len(raw), 'raw_sha256': digest(raw)}
+    if len(raw) != declared or len(raw) > 32768:
+        return {**meta, 'type': 'size_mismatch_or_limit'}, None
+    if not raw:
+        return {**meta, 'type': 'empty'}, None
+    try:
+        value = json.loads(raw.decode('utf-8'))
+    except UnicodeDecodeError:
+        return {**meta, 'type': 'invalid_utf8'}, None
+    except json.JSONDecodeError as error:
+        return {**meta, 'type': 'invalid_json', 'error_type': 'JSONDecodeError', 'error_position': error.pos}, None
+    return {**meta, 'type': 'json_object' if isinstance(value, dict) else 'json_other'}, value
+
+def validate_launch_journal(value, key):
+    if (not isinstance(value, dict) or set(value) != {'schema', 'id', 'attempt_key',
+        'network_permission_denied', 'package_info_registered', 'events'} or type(value['schema']) is not int or value['schema'] != 1 or
+        value['id'] != LAUNCH_ID or value['attempt_key'] not in (key, None) or
+        type(value['network_permission_denied']) is not bool or
+        (value['package_info_registered'] is not None and type(value['package_info_registered']) is not bool) or
+        not isinstance(value['events'], list) or not 1 <= len(value['events']) <= 64):
+        return False
+    last = -1
+    for index, event in enumerate(value['events']):
+        if (not isinstance(event, dict) or set(event) - {'seq', 'stage', 'elapsed_ms', 'pid', 'error_type'} or
+            type(event.get('seq')) is not int or event.get('seq') != index or event.get('stage') not in LAUNCH_STAGES or
+            type(event.get('elapsed_ms')) is not int or event['elapsed_ms'] < max(0, last) or
+            type(event.get('pid')) is not int or event['pid'] <= 0):
+            return False
+        if 'error_type' in event and (event['stage'] not in ('native_uncaught', 'dart_failure') or
+            not isinstance(event['error_type'], str) or not re.fullmatch(r'[A-Za-z_$][A-Za-z0-9_.$]{0,159}', event['error_type'])):
+            return False
+        last = event['elapsed_ms']
+    return True
+
+def validate_launch_result(value, key):
+    expected = {'id': LAUNCH_ID, 'engine': 'app', 'launch_only': True, 'attempt_key': key, 'stage': 'launch_ready',
+        'parser': 'not_run', 'media': 'not_run', 'player_release': 'not_created', 'resolver_release': 'not_created',
+        'cleanup': 'confirmed', 'cleanup_coverage': 'no parser/player created; host verifies process exit',
+        'network_permission_denied': True, 'package_info_registered': True, 'native_first_frame': True}
+    if not isinstance(value, dict) or set(value) != set(expected) | {'environment'} or any(value.get(k) != v for k,v in expected.items()):
+        return False
+    env = value['environment']
+    return (isinstance(env, dict) and set(env) == {'sdk', 'webview', 'package'} and
+        env.get('package') == PACKAGE and type(env.get('sdk')) is int and 26 <= env['sdk'] <= 40 and
+        isinstance(env.get('webview'), str) and bool(re.fullmatch(r'[A-Za-z0-9_.]+/[A-Za-z0-9_.-]+', env['webview'])))
+
+def launch_ready_observed(journal, key):
+    if not validate_launch_journal(journal, key) or journal['attempt_key'] != key or journal['network_permission_denied'] is not True or journal['package_info_registered'] is not True:
+        return False
+    stages = [e['stage'] for e in journal['events']]
+    return ([s for s in stages if s.startswith('dart_')] == LAUNCH_DART_ORDER and
+        stages.count('probe_result') == 1 and 'native_uncaught' not in stages and
+        stages.count('native_first_frame') == 1 and
+        all(s in stages for s in ('native_create_enter','native_engine_enter','native_super_engine_exit','native_channel_ready')))
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
@@ -43,7 +132,8 @@ def summarize(rows):
             invalid = [r for r in subset if classified_stage(r) == 'environment_invalid']
             infrastructure = [r for r in subset if classified_stage(r) in ('host_error', 'host_timeout', 'interrupted')]
             selection = [r for r in subset if r.get('selection_only') is True and r not in invalid and r not in infrastructure]
-            eligible = [r for r in subset if r not in invalid and r not in infrastructure and r not in selection]
+            launch = [r for r in subset if r.get('launch_only') is True and r not in invalid and r not in infrastructure]
+            eligible = [r for r in subset if r not in invalid and r not in infrastructure and r not in selection and r not in launch]
             success = [r for r in eligible if classified_stage(r) == 'first_frame']
             resolved = [r for r in eligible if 'resolve' in r.get('timings_ms', {})]
             memory = [r['memory']['sampled_peak_pss_kib'] / 1024 for r in eligible
@@ -51,6 +141,7 @@ def summarize(rows):
             median = lambda values: round(statistics.median(values), 1) if values else None
             output.append(dict(group=group, engine=engine, attempted=len(subset),
                 invalid=len(invalid), infrastructure=len(infrastructure), selection_only_results=len(selection),
+                launch_only_results=len(launch), launch_ready=sum(r.get('stage') == 'launch_ready' for r in launch),
                 selection_completed=sum(r.get('stage') == 'selection_only' for r in selection), eligible_results=len(eligible),
                 resolved=len(resolved), first_frame=len(success),
                 resolve_median_ms=median([r['timings_ms']['resolve'] for r in resolved]),
@@ -387,8 +478,34 @@ class Device:
         return {'at': time.time(), 'processes': samples,
                 'sum_pss_kib': sum(p['pss_kib'] for p in samples)}
 
+    def launch_file(self, name, key):
+        if name not in ('qa-launch-probe.json', 'launch-only-result.json'):
+            raise ValueError('Unknown fixed QA launch file')
+        state = self.call('shell', f"run-as {PACKAGE} sh -c 'if [ -f files/{name} ]; then printf FILE:; wc -c < files/{name}; else printf MISSING; fi'", timeout=3).strip()
+        if state == 'MISSING':
+            return {'exists': False}, None
+        match = re.fullmatch(r'FILE:\s*(\d+)', state)
+        if not match:
+            return {'exists': None, 'type': 'stat_unconfirmed'}, None
+        size = int(match[1])
+        if size > 32768:
+            return {'exists': True, 'declared_bytes': size, 'type': 'size_limit'}, None
+        completed = subprocess.run([self.adb, '-s', self.serial, 'exec-out', 'run-as', PACKAGE,
+            'head', '-c', '32769', f'files/{name}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+        meta, value = launch_file_decode(completed.stdout, size)
+        meta.update(exists=True, transport_returncode=completed.returncode)
+        validator = validate_launch_journal if name == 'qa-launch-probe.json' else validate_launch_result
+        valid = completed.returncode == 0 and validator(value, key)
+        meta['schema_valid'] = valid
+        return meta, value if valid else None
+
     def case(self, config, output, key):
+        launch = launch_only_spec(config)
+        if launch and (not getattr(self, 'launch_allowed', False) or getattr(self, 'physical', False)):
+            raise ValueError('Offline launch-only artifact gate required')
         lifecycle = lifecycle_spec(config)
+        launch_evidence = {'am': {}, 'files': {}} if launch else None
+        launch_journal = None
         driver, phase_seen = None, None
         baseline = None
         samples, stop = [], threading.Event()
@@ -409,13 +526,39 @@ class Device:
             if initial['status'] != 'confirmed':
                 cleanup_errors.append({'step': 'cold_start', 'details': initial})
                 raise RuntimeError('QA cold-start process exit was not confirmed')
-            self.call('shell', f"run-as {PACKAGE} sh -c 'mkdir -p files; rm -f files/result.json files/lifecycle-state.json; cat > files/case.json'",
-                      input=json.dumps(config, ensure_ascii=False).encode())
+            launch_files = ' files/qa-launch-probe.json files/qa-launch-probe.json.tmp files/launch-only-result.json files/launch-only-result.json.tmp' if launch else ''
+            sent_config = {**config, 'launch_attempt_key': key} if launch else config
+            self.call('shell', f"run-as {PACKAGE} sh -c 'mkdir -p files; rm -f files/result.json files/lifecycle-state.json{launch_files}; cat > files/case.json'",
+                      input=json.dumps(sent_config, ensure_ascii=False).encode())
+            if launch:
+                for name in ('qa-launch-probe.json', 'launch-only-result.json'):
+                    meta, _ = self.launch_file(name, key)
+                    if meta.get('exists') is not False:
+                        raise RuntimeError('QA launch journal cold-start precondition failed')
             baseline = self.processes()
             worker.start()
             worker_started = True
-            self.call('shell', f'am start -W -n {PACKAGE}/{ACTIVITY}', timeout=20)
+            try:
+                am = self.call('shell', f'am start -W -n {PACKAGE}/{ACTIVITY}', timeout=20)
+                if launch:
+                    launch_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': False, **launch_am_fields(am)}
+            except subprocess.TimeoutExpired as error:
+                if launch:
+                    launch_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': True,
+                        **launch_am_fields(error.stdout), **launch_am_fields(error.stderr)}
+                raise
             while time.monotonic() - started < 70:
+                if launch:
+                    if not any(n == PACKAGE or n.startswith(PACKAGE + ':') for n in self.processes().values()):
+                        launch_evidence['process_exit_observed'] = True
+                        raise RuntimeError('QA launch process exited before receipt')
+                    meta, candidate = self.launch_file('launch-only-result.json', key)
+                    launch_evidence['files']['launch-only-result.json'] = meta
+                    if candidate is not None:
+                        result = candidate
+                        break
+                    time.sleep(1)
+                    continue
                 text = self.call('exec-out', 'run-as', PACKAGE, 'cat', 'files/result.json', check=False)
                 try:
                     result = json.loads(text)
@@ -458,6 +601,21 @@ class Device:
         finally:
             stop.set()
             host_cleanup = cleanup_step(cleanup_errors, 'case_stop', lambda: self.stop_and_verify(baseline))
+            if launch:
+                for name in ('qa-launch-probe.json', 'launch-only-result.json'):
+                    try:
+                        meta, value = self.launch_file(name, key)
+                        launch_evidence['files'][name] = meta
+                        if value is not None:
+                            (output / f'{key}.{name}').write_text(json.dumps(value, indent=2), encoding='utf-8')
+                            if name == 'qa-launch-probe.json':
+                                launch_journal = value
+                    except Exception as error:
+                        launch_evidence['files'][name] = {'exists': None, **error_record(error)}
+                cleanup_step(cleanup_errors, 'launch_evidence_write', lambda:
+                    (output / f'{key}.launch-evidence.json').write_text(json.dumps(launch_evidence, indent=2), encoding='utf-8'))
+                if primary_error is None and result is not None and result.get('stage') == 'launch_ready' and not launch_ready_observed(launch_journal, key):
+                    result.update(observed_stage='launch_ready', stage='environment_invalid', reason='offline_launch_checkpoints_not_confirmed')
             if worker_started:
                 cleanup_step(cleanup_errors, 'sampler_join', lambda: worker.join(timeout=30))
                 if worker.is_alive():
@@ -539,10 +697,13 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                        rule_sha256=digest(json.dumps(config['rule'], sort_keys=True).encode()) if 'rule' in config else None,
                        rule_provenance=config.get('rule_provenance', {'overlay': 'none', 'upstream_commit': None}),
                        road=config.get('road', 0), episode=config.get('episode', 0),
-                       compatibility=('production capability factory and default headers/player controller'
+                       compatibility=('offline startup only; network denied; no search/parser/player' if config.get('launch_only') is True else
+                           'production capability factory and default headers/player controller'
                            if config['engine'] == 'app' else 'controlled shared script; bounded nested HTML fallback; no WebView66 adapter'))
             if config.get('selection_only') is True:
                 row['selection_only'] = True
+            if config.get('launch_only') is True:
+                row['launch_only'] = True
             with ledger.open('a', encoding='utf-8') as f:
                 f.write(json.dumps(row, ensure_ascii=False) + '\n')
                 f.flush()
@@ -610,6 +771,7 @@ def main():
     p.add_argument('--manifest', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--fixture-media', type=Path)
+    p.add_argument('--aapt', type=Path, help='Required for offline launch-only APK permission verification')
     p.add_argument('--repeats', type=int, default=1)
     p.add_argument('--engines', default='app', help='app (production service path) or webview,gecko (controlled A/B)')
     p.add_argument('--expect-sdk', type=int)
@@ -623,6 +785,17 @@ def main():
         p.error('repeats 1..5, total budget 1..1800 seconds')
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
     cases = manifest['cases']
+    launch = any(launch_only_spec(c) for c in cases)
+    artifact = json.loads((args.apk.parent / 'artifact.json').read_text(encoding='utf-8-sig'))
+    if launch or artifact.get('launch_only_build') is True:
+        if (not launch or len(cases) != 1 or engines != ('app',) or args.repeats != 1 or args.fixture_media is not None or
+            args.allow_physical_qa or artifact.get('launch_only_build') is not True or
+            artifact.get('no_internet_permission') is not True or args.aapt is None):
+            p.error('Exactly one fixed offline launch case and verified offline artifact required')
+        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=10)
+        if (permissions.returncode != 0 or b'android.permission.INTERNET' in permissions.stdout or
+            f'package: {PACKAGE}'.encode() not in permissions.stdout):
+            p.error('Offline APK permission verification failed')
     if len(cases) * len(engines) * args.repeats > 24:
         p.error('At most 24 attempts per run')
     for c in cases:
@@ -633,6 +806,7 @@ def main():
                     allow_physical=args.allow_physical_qa,
                     expected_serial=args.expect_serial,
                     expected_fingerprint=args.expect_fingerprint)
+    device.launch_allowed = launch
     sdk = int(device.call('shell', 'getprop ro.build.version.sdk').strip())
     provider_state = device.call('shell', 'dumpsys webviewupdate')
     match = re.search(r'Current WebView package \(name, version\): \(([^,]+), ([^)]+)\)', provider_state)

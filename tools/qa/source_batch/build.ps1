@@ -8,7 +8,9 @@ param(
     [string]$BuildName = '0.4.5-parserqa.1',
     [int]$BuildNumber = 20570,
     [ValidateSet('android-x64','android-arm','android-arm64')]
-    [string]$TargetPlatform = 'android-x64'
+    [string]$TargetPlatform = 'android-x64',
+    [switch]$LaunchOnly,
+    [string]$AndroidSdkRoot = "$env:LOCALAPPDATA/Android/Sdk"
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
@@ -37,11 +39,24 @@ $env:PUB_CACHE = $PubCache
 $env:GRADLE_USER_HOME = $GradleHome
 $env:JAVA_HOME = $JavaHome
 $env:GRADLE_OPTS = '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false'
-& "$FlutterRoot/bin/flutter.bat" --no-version-check build apk --debug --no-pub --flavor parserQa --android-project-arg=kazumiParserQa=true --target-platform $TargetPlatform --target tools/qa/source_batch/main.dart "--build-name=$BuildName" "--build-number=$BuildNumber" *> "$Output/build.log"
+$qaFlavor = if ($LaunchOnly) { 'parserQaOffline' } else { 'parserQa' }
+$qaExtraArgs = if ($LaunchOnly) { @('--android-project-arg=kazumiQaLaunchOnly=true', '--dart-define=KAZUMI_QA_LAUNCH_ONLY=true') } else { @() }
+& "$FlutterRoot/bin/flutter.bat" --no-version-check build apk --debug --no-pub --flavor $qaFlavor --android-project-arg=kazumiParserQa=true @qaExtraArgs --target-platform $TargetPlatform --target tools/qa/source_batch/main.dart "--build-name=$BuildName" "--build-number=$BuildNumber" *> "$Output/build.log"
 if ($LASTEXITCODE -ne 0) { Get-Content "$Output/build.log" -Tail 40; throw 'QA build failed' }
 if ($before -ne (Source-Digests)) { throw 'Sources changed during build; refusing artifact identity' }
-$apk = Join-Path $repo 'build/app/outputs/flutter-apk/app-parserqa-debug.apk'
+$apk = Join-Path $repo "build/app/outputs/flutter-apk/app-$($qaFlavor.ToLowerInvariant())-debug.apk"
 Copy-Item -LiteralPath $apk -Destination "$Output/parserqa.apk"
+if ($LaunchOnly) {
+    $qaMerged = Join-Path $repo 'build/app/intermediates/merged_manifests/parserQaOfflineDebug/processParserQaOfflineDebugManifest/AndroidManifest.xml'
+    [xml]$qaManifest = Get-Content -LiteralPath $qaMerged -Raw
+    $qaPermissions = @($qaManifest.manifest.ChildNodes | Where-Object { $_.Name -like 'uses-permission*' } | ForEach-Object { $_.GetAttribute('name','http://schemas.android.com/apk/res/android') })
+    if ('android.permission.INTERNET' -in $qaPermissions) { throw 'Offline merged manifest still requests INTERNET' }
+    Copy-Item -LiteralPath $qaMerged -Destination "$Output/merged-manifest.xml"
+    $qaAapt = Join-Path $AndroidSdkRoot 'build-tools/36.0.0/aapt.exe'
+    $qaApkPermissions = & $qaAapt dump permissions "$Output/parserqa.apk"
+    if ($LASTEXITCODE -ne 0 -or $qaApkPermissions -match "android.permission.INTERNET") { throw 'Offline APK permission check failed' }
+    $qaApkPermissions | Set-Content -Encoding utf8NoBOM "$Output/apk-permissions.txt"
+}
 $before | Set-Content -Encoding utf8NoBOM "$Output/source-digests.json"
 @{
     code_sha = (& git rev-parse HEAD).Trim()
@@ -51,6 +66,8 @@ $before | Set-Content -Encoding utf8NoBOM "$Output/source-digests.json"
     source_digests_sha256 = (Get-FileHash "$Output/source-digests.json").Hash.ToLowerInvariant()
     gecko = '146.0.20251217121356'
     target_platform = $TargetPlatform
+    launch_only_build = [bool]$LaunchOnly
+    no_internet_permission = if ($LaunchOnly) { $true } else { $null }
     built_utc = [DateTime]::UtcNow.ToString('o')
 } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM "$Output/artifact.json"
 Get-Content "$Output/artifact.json"
