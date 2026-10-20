@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+17:05统筹独立消费20588九源发现交付：depth-tail1-dm84-20588与depth-tail1-remaining-20588的runner快照、实际展开rules的input摘要、唯一作品/规则有效摘要/启动am白名单、9例终态及两层/final清理逐行复核通过；25road/67样本/61完整label+page hash绑定复算一致，xfdmnext六条null仍不可绑定，eligible=0，未增加播放成功计数。源列表倒序反例DM84标签2/1、ezdmw3/2/1保留，尾索引不等于最新。回执.dart_tool/depth-tail1-independent-review.json，owner停后收据确认归属launcher84012/qemu69856退出、候选0/CPU0；不是全来源或旧aafun问题已解决。
+
+已按新观察精确绑定生成并续派九例实播：.dart_tool/depth-playback-plan-20588-v1.json，SHA256 8bae8fbc6519a5000483368e18dfb0fd622a5cedca6c06c90848f236241f40f2。DM84 r0/e0标签2、akianime已成功备用r1/e2第3集、ezdmw r0/e2标签1、giri r0/e2标签03、mgnacg r0/e1第2话、moonci r0/e2第03话、mutefun/MXdm r0/e2第03集、xfdmneo已成功备用r1/e1第02集；均复算完整hash/label且不在原history/legacy已播或unknown精确剧集中。只有ezdmw/moonci/MXdm沿用已验QA单次fallback，其余默认App；每例10秒进度、70秒/九例总900秒，现成20588不重建、不重新发现/不打开media observer。先核实包及AVD归属再新包单次后台实验，challenge/unknown/environment_invalid/清理不明即停整批，不换案例/重试旧unknown。已派规则owner只读独立核对计划、更新原depth派生视图，发现错配即回报；另纯离线整理xfdmnext文本门禁缺口及最小边界建议，不新增labelHash/schema或盲造overlay。主目标未完成，17源仍11限定可播/1挑战/5无可播，正式/preview/电视/系统未动。
+
 16:49统筹独立审读并集成e3c0ba90/820f8916：QA默认关闭tail1投影保留head2/原尾索引去重、每road最多3项/8road、ordering=unknown；普通head2不变，不将末项当最新，安全标签仍需可绑定。正常QA显式关闭LaunchOnly，宿主以artifact+aapt核对网络权限、am白名单及前台启动，tail发现进程早退立即停；失败result只核对真实stat/字节/UTF8-JSON类型，无效原文不保存。55项Python（含实际PowerShell XPath权限函数正反例）、14项Dart（投影8＋launch6）及定向分析独立通过。
 
 20588唯一APK构建57.6秒后，原包装器XML节点.Name被android:name属性遮蔽造成假性漏读权限，门禁失败且当时未安装/启动；不是源站或APK权限故障。820f8916改XPath取真实节点，未来构建前持久保存before清单。此次未重编译：原before/after一致门禁已通过后包装失败，作者在干净冻结e3提交恢复531项清单，不能称原before文件已保存。统筹独立逐文件核对531项，当前唯一差异为宿主build.ps1且冻结副本hash精确对应；Android/Dart编译输入未变。APK字节02e6999b7470c311ad6c68e7020e79ea0998788eade3ada0320363d1f04fac4b及清单hash匹配，merged XML与aapt实际含INTERNET；compiled SHA e3c0ba90与wrapper verification820f8916分开，恢复方法保留在artifact。回执.dart_tool/tail-discovery-build-independent-review.json。20587无INET的独立XML/aapt/runtime三层证据仍成立，不复用错误XML提取空数组为证明。
