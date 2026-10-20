@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+22:47统筹读取owner本轮实际记录：compaction后偏离原只读协议任务，重复既有media-observer离线9项测试并新增作者原状态6行dirty；无ADB/构建/来源或设备操作，预检仍未尝试，不计本轮来源/协议进展。已向唯一owner自包含重派原只读预检，明确保留dirty并更正旧状态措辞，停止重复observer工作；原120秒全包/共享10秒3调用/不启动App与不来源请求边界未变。此为任务续接偏移纠正，不是协议运行失败或来源unknown重试。
+
 统筹已实际向唯一播放owner发送上述独立只读协议预检包，固定361a2375新runner SHA1018a268e530a8150a59bc52894f851b04b8f754b26fe1d09078f4bb18e0aa10与固定ADB37.0.1二进制；全包120秒、协议命令共享10秒且单call最多3秒。仅无来源常量、已知case.json正frame和固定result_file一次，不设备写入/App启动/来源请求/其他case；旧aafun与moonci unknown不追认，待实际交付后独立review，未尝试MXdm尚未放行。
 
 22:27统筹独立审361a2375仅result_file与transport测试的最小修正，并组合后重新独立跑100项宿主检查通过（8.537秒）。exec-out传raw script由客户端唯一escape；旧手工quote/裸join测试证明撤销，修正后的真实本地安全shell按官方客户端转义模型先红后绿。固定实际ADB37.0.1-15733141/1.0.41的8273560字节二进制SHA b4a6b455702684652cccf7b46258b29e653538904359a58fd4931cf3ef286b3f及source.properties摘要已独立核；该binary到精确source tag/下载来源认证仍未证。回执.dart_tool/host-exec-out-fix-independent-review.json含新runner字节摘要。此处仅接纳模型/代码修正，不预称真机wire已通过，不从原156B/hash猜唯一原因，不追认aafun unknown。
