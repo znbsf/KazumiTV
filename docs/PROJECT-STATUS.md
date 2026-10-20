@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+18:20统筹独立审读并组合c9a4e30a QA console分类交付：64项Python、20项Dart及定向分析通过。仅固定mgnacg第2话/rule/page/exactlabel/旧API28-WebView66的默认关闭观察，订阅本controller既有onLog且在init前建立；结果只固定hint计数与限额/清理状态，无新增JS、请求或生产策略修改。LogBridge也能产生Console前缀，因此明确hints_only、来源真实性与frame origin未证；不能把syntax/cors等文本分类直接当根因。所有console-only结果排除播放分母，完成/取消await退订、晚到不写，其他case零订阅。原媒体observer代码未改，离线测试不代表现场console已观察。回执.dart_tool/console-hints-independent-review.json。
+
+现场TV正常重连一次的证据已独立读取：10:09:20Z原记录192.168.123.217:5555仍10061主动拒绝；无设备身份/ABI/包签名/前台音量读回，无发键、装卸、清数据、系统修改。旧准备问题已获人类答复，但当前连接故障未解；已询问电视当前实际IP与调试端口，等待新现场地址，不原样反复连接/扫描/reset共享ADB。此处为连接失败而非工具审批拒绝，其他模拟器工作继续。
+
+下一唯一console诊断已具体化：.dart_tool/mgnacg-console-hints-plan-v1.json，固定原已终态失败的mgnacg第2话，实质新增观察为既有onLog固定hint聚合，不重跑未知案例。授权播放owner从干净冻结c9a4e30a一次普通网络x64 QA新构建<=180秒，绑定before/after源清单、签名/APKhash与capability schema1；核实本任务API28/WebView66归属并install-r保数据后仅该例一次、原解析15秒/单例70秒/总120秒。无fallback/media observer/player，旧20588缺此capability不可代用。challenge hint/unknown/environment_invalid/清理不明停，不换案例或重试，结束核实归属进程退出与负载；尚未构建/运行，不提前归因或计可播。主目标未完成，TV路线仅等新地址，自动化持续推进。
+
 18:06最新人类现场确认：「电视已准备好，可以再次连接」。这解除旧“准备答复待收/不重连拒绝端点”的等待条件，14:00起的独立电视QA授权持续有效；并不代表工具自动审批已放行或允许改正式包/真实数据/个人preview/系统配置。已将新证据直接交唯一播放/device owner，先保存当前console离线工作/测试后，按原runbook确证端点正常连接一次，只读回实际TV serial/model/fingerprint/SDK/ABI/WebView/资源归属、正式/preview/QA包身份与升级条件、前台/音量等保护基线。不得猜IP/扫描/reset共享ADB、发键/启动App/安装/清数据；仍拒绝或身份/归属不符即停该连接路线，不反复连。
 
 旧ARM20580为5cf代码且未验收，缺后续精确集门禁/生命周期改动，不直接安装；20588仅x64不可当TV包。后续须冻结且统筹审读当前代码、按实际ABI构建新独立ARM QA，绑定源码/签名/摘要/保数据升级后再给具体TV夹具与代表源预算。当前console分类仍先离线交付，TV上不临时跑mgnacg/旧unknown、不在脏源码中构建；正常独立工作持续推进，不向用户重复索要同一授权。

@@ -24,6 +24,7 @@ import 'package:kazumi/services/source_health/source_health.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/video_source/services.dart';
 import 'package:kazumi/webview/video/impl/video_webview_android_impl.dart';
+import 'package:kazumi/webview/video/impl/video_webview_impl.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
 import 'package:kazumi/utils/http_headers.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
@@ -40,6 +41,7 @@ import 'lifecycle_host.dart';
 import 'selection_snapshot.dart';
 import 'chapter_diagnostic_runtime.dart';
 import 'launch_probe.dart';
+import 'console_hints.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -63,7 +65,9 @@ Future<void> main() async {
       throw StateError('qa_launch_only_input_rejected');
     }
     // QA process only: production HTTP loggers can print full request addresses.
-    if (config['selection_only'] == true) qa_log.Logger.level = qa_log.Level.off;
+    if (config['selection_only'] == true || config['console_hint_observer'] == true) {
+      qa_log.Logger.level = qa_log.Level.off;
+    }
     await qaBootstrapStep(probe, 'tvmode', TvMode.initialize);
     // QA debug identity was checked above. Simulate the TV build flag while
     // retaining the real SDK/provider/ABI detection and native MainActivity.
@@ -124,7 +128,13 @@ class _BatchCaseState extends State<BatchCase> {
     final watch = Stopwatch()..start();
     final run = HealthRun();
     IVideoSourceService? resolver;
-    widget.ticket.attachCancel(() { run.cancel(); resolver?.cancel(); });
+    QaConsoleHintObserver? consoleObserver;
+    Map<String, Object?>? consoleRuleIdentity;
+    bool consoleMode = false, consoleUnavailable = false, consoleChallengeHint = false;
+    widget.ticket.attachCancel(() {
+      consoleObserver?.stop(QaConsoleStop.cancelled);
+      run.cancel(); resolver?.cancel();
+    });
     final result = <String, dynamic>{
       'id': c['id'], 'engine': c['engine'], 'stage': 'starting',
       'environment': await qaChannel.invokeMethod('environment'),
@@ -138,6 +148,25 @@ class _BatchCaseState extends State<BatchCase> {
       result.addAll({'selection_only': true, 'parser': 'not_run', 'media': 'not_run',
         'player': 'not_run (selection-only)', 'source_request_logging': 'suppressed'});
     }
+    if (c['console_hint_observer'] == true) {
+      result.addAll({'console_only': true, 'media': 'not_run',
+        'player': 'not_run (console-only)', 'source_request_logging': 'suppressed'});
+    }
+    Future<void>? consoleFinished;
+    Future<void> finishConsole() => consoleFinished ??= (() async {
+      final observer = consoleObserver;
+      if (observer == null) return;
+      try {
+        final cancelled = await observer.stop().timeout(const Duration(seconds: 2));
+        result['console_subscription_release'] = observer.snapshot()['subscription_cleanup'];
+        if (!cancelled) {
+          result['diagnostic_cleanup'] = 'unconfirmed';
+        }
+      } catch (_) {
+        result['console_subscription_release'] = 'unconfirmed';
+        result['diagnostic_cleanup'] = 'unconfirmed';
+      }
+    })();
     final timings = result['timings_ms'] as Map<String, int>;
     Player? player;
     PlayerPlaybackController? appPlayback;
@@ -145,6 +174,12 @@ class _BatchCaseState extends State<BatchCase> {
     String phase = 'search';
     try {
       if (!_current) throw const VideoSourceCancelledException();
+      consoleMode = qaConsoleRequested(c);
+      if (consoleMode && (!appProfile || c['rule'] == null ||
+          WebViewFeatureService.isDocumentStartScriptSupported || !WebViewFeatureService.needsLegacyPlayerCompat)) {
+        result['console_hints'] = {'status': 'not_run', 'reason': 'profile_or_capability_binding'};
+        result['stage'] = 'console_observation_not_run'; return;
+      }
       final selectionTail = qaSelectionTailEnabled(c);
       if (selectionTail) result['selection_tail1'] = true;
       if (c['selection_only'] == true && (!appProfile || c['rule'] == null)) {
@@ -166,6 +201,12 @@ class _BatchCaseState extends State<BatchCase> {
         final plugin = snapshot.plugin;
         result['observed_rule_snapshot'] = snapshot.identity;
         result['rule_fingerprint'] = ruleFingerprint(plugin);
+        if (consoleMode && !qaMgnacgConsoleBinding(c, snapshot.identity,
+            Map<String, dynamic>.from(result['environment'] as Map))) {
+          result['console_hints'] = {'status': 'not_run', 'reason': 'fixed_case_rule_environment_binding'};
+          result['stage'] = 'console_observation_not_run'; return;
+        }
+        if (consoleMode) consoleRuleIdentity = Map<String, Object?>.from(snapshot.identity);
         if (c['chapter_selector_diagnostic'] == true && !aafunDiagnosticBinding(c, snapshot.identity)) {
           result['chapter_selector_diagnostic'] = {'status': 'not_run', 'reason': 'rule_or_case_identity'};
           result['stage'] = 'chapter_diagnostic_not_run';
@@ -179,6 +220,10 @@ class _BatchCaseState extends State<BatchCase> {
         if (match == null) {
           result['stage'] = 'no_unique_match';
           return;
+        }
+        if (consoleMode && match.name != '学生会也有洞！') {
+          result['console_hints'] = {'status': 'not_run', 'reason': 'work_binding'};
+          result['stage'] = 'console_observation_not_run'; return;
         }
         phase = 'chapters';
         final beginChapters = watch.elapsedMilliseconds;
@@ -281,6 +326,22 @@ class _BatchCaseState extends State<BatchCase> {
           result['actual_controller'] = controller.runtimeType.toString();
           result['document_start_supported'] = WebViewFeatureService.isDocumentStartScriptSupported;
           result['legacy_player_compat_eligible'] = WebViewFeatureService.needsLegacyPlayerCompat;
+          if (consoleMode) {
+            void unavailable() { consoleUnavailable = true; run.cancel(); resolver?.cancel(); }
+            if (controller is! VideoWebviewImpl || consoleObserver != null) {
+              unavailable();
+            } else {
+              consoleObserver = createBoundQaConsoleObserver(
+                config: c, rule: consoleRuleIdentity!,
+                environment: Map<String, dynamic>.from(result['environment'] as Map),
+                logs: () => controller.onLog,
+                isCurrent: () => _current && !run.cancelled,
+                onChallengeHint: () { consoleChallengeHint = true; run.cancel(); resolver?.cancel(); },
+                onUnavailable: unavailable);
+              // The service calls init only after this factory returns.
+              if (consoleObserver == null) unavailable();
+            }
+          }
           return controller;
         }
         if (c['engine'] == 'gecko') return GeckoQaController(ua);
@@ -319,8 +380,11 @@ class _BatchCaseState extends State<BatchCase> {
       }
       final cache = ResolvedSourceCache.shared;
       final cacheKey = jsonEncode([c['id'], c['rule'], c['road'] ?? 0, c['episode'] ?? 0, episodeUrl]);
-      Future<VideoSource> fresh() => resolver!.resolve(episodeUrl, useLegacyParser: legacy,
-          timeout: const Duration(seconds: 15));
+      Future<VideoSource> fresh() {
+        final future = resolver!.resolve(episodeUrl, useLegacyParser: legacy,
+            timeout: const Duration(seconds: 15));
+        return consoleMode ? future.whenComplete(finishConsole) : future;
+      }
       final attempt = appProfile ? await cache.resolve(key: cacheKey, offset: 0,
           headers: headers, fresh: fresh, isCurrent: () => _current && !run.cancelled)
           : ResolvedSourceAttempt(await fresh(), headers, fromCache: false);
@@ -328,6 +392,11 @@ class _BatchCaseState extends State<BatchCase> {
       if (!_current) throw const VideoSourceCancelledException();
       result['from_confirmed_cache'] = attempt.fromCache;
       timings['resolve'] = watch.elapsedMilliseconds - beginResolve;
+      if (consoleMode) {
+        result['parser'] = 'resolved';
+        result['stage'] = consoleObserver == null ? 'console_observation_not_run' : 'console_observation_complete';
+        return; // No native player, media-root request or cache confirmation.
+      }
       result['stage'] = 'resolved';
       // Never persist signed media URLs or query strings in exported reports.
       result['media_host'] = Uri.tryParse(source.url)?.host;
@@ -460,6 +529,22 @@ class _BatchCaseState extends State<BatchCase> {
       }
     } finally {
       timings['total_before_cleanup'] = watch.elapsedMilliseconds;
+      if (consoleMode) {
+        await finishConsole();
+        result['console_hints'] ??= consoleObserver == null
+            ? {'status': 'not_run', 'reason': 'controller_not_created'}
+            : {'status': consoleUnavailable ? 'not_run' : 'observed',
+                ...consoleObserver!.snapshot()};
+        if (consoleUnavailable) {
+          result['observed_stage'] = result['stage'];
+          result['stage'] = 'console_observation_not_run';
+        }
+        if (consoleChallengeHint) {
+          result['observed_stage'] = result['stage'];
+          result['stage'] = 'console_hint_pending_review';
+          result['challenge_confirmed'] = false;
+        }
+      }
       run.cancel();
       resolver?.cancel();
       if (mounted) setState(() => _video = null);

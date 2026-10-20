@@ -35,6 +35,20 @@ def launch_only_spec(config):
         raise ValueError('Invalid fixed launch-only configuration')
     return True
 
+def console_only_batch_spec(cases, artifact, engines, repeats, fixture_media, physical):
+    for case in cases:
+        if 'console_hint_observer' in case and type(case['console_hint_observer']) is not bool:
+            raise ValueError('QA console opt-in must be boolean')
+    if not any(c.get('console_hint_observer') is True for c in cases):
+        return False
+    if (len(cases) != 1 or cases[0].get('id') != 'qa-mgnacg-console-hints-v1' or
+        cases[0].get('group') != 'console-hints' or engines != ('app',) or repeats != 1 or
+        fixture_media is not None or physical or artifact.get('launch_only_build') is not False or
+        artifact.get('internet_permission') is not True or
+        type(artifact.get('console_hint_observer_schema')) is not int or artifact['console_hint_observer_schema'] != 1):
+        raise ValueError('Fixed console-only case and newly built capable ordinary QA required')
+    return True
+
 def launch_am_fields(raw):
     if isinstance(raw, bytes):
         raw = raw.decode('utf-8', 'replace')
@@ -133,7 +147,8 @@ def summarize(rows):
             infrastructure = [r for r in subset if classified_stage(r) in ('host_error', 'host_timeout', 'interrupted', 'unknown')]
             selection = [r for r in subset if r.get('selection_only') is True and r not in invalid and r not in infrastructure]
             launch = [r for r in subset if r.get('launch_only') is True and r not in invalid and r not in infrastructure]
-            eligible = [r for r in subset if r not in invalid and r not in infrastructure and r not in selection and r not in launch]
+            console = [r for r in subset if r.get('console_only') is True and r not in invalid and r not in infrastructure]
+            eligible = [r for r in subset if r not in invalid and r not in infrastructure and r not in selection and r not in launch and r not in console]
             success = [r for r in eligible if classified_stage(r) == 'first_frame']
             resolved = [r for r in eligible if 'resolve' in r.get('timings_ms', {})]
             memory = [r['memory']['sampled_peak_pss_kib'] / 1024 for r in eligible
@@ -142,6 +157,7 @@ def summarize(rows):
             output.append(dict(group=group, engine=engine, attempted=len(subset),
                 invalid=len(invalid), infrastructure=len(infrastructure), selection_only_results=len(selection),
                 launch_only_results=len(launch), launch_ready=sum(r.get('stage') == 'launch_ready' for r in launch),
+                console_only_results=len(console),
                 selection_completed=sum(r.get('stage') == 'selection_only' for r in selection), eligible_results=len(eligible),
                 resolved=len(resolved), first_frame=len(success),
                 resolve_median_ms=median([r['timings_ms']['resolve'] for r in resolved]),
@@ -708,9 +724,9 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                                     'started_epoch': time.time()}) + '\n')
                 f.flush()
             row = device.case(config, output, key)
-            if row.get('stage') == 'sample_identity_mismatch':
-                row.update(observed_stage='sample_identity_mismatch', stage='environment_invalid',
-                           reason='episode hash or exact label gate failed before parsing')
+            if row.get('stage') in ('sample_identity_mismatch', 'console_observation_not_run'):
+                row.update(observed_stage=row['stage'], stage='environment_invalid',
+                           reason='fixed QA observation or episode identity precondition failed')
             environment, expected = row.get('environment', {}), item['expected_environment']
             if environment and (environment.get('sdk') != expected['sdk'] or environment.get('webview') != expected['provider']):
                 row['observed_stage'] = row.get('stage')
@@ -721,13 +737,16 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                        rule_sha256=digest(json.dumps(config['rule'], sort_keys=True).encode()) if 'rule' in config else None,
                        rule_provenance=config.get('rule_provenance', {'overlay': 'none', 'upstream_commit': None}),
                        road=config.get('road', 0), episode=config.get('episode', 0),
-                       compatibility=('offline startup only; network denied; no search/parser/player' if config.get('launch_only') is True else
+                       compatibility=('console hints only; no native media player' if config.get('console_hint_observer') is True else
+                           'offline startup only; network denied; no search/parser/player' if config.get('launch_only') is True else
                            'production capability factory and default headers/player controller'
                            if config['engine'] == 'app' else 'controlled shared script; bounded nested HTML fallback; no WebView66 adapter'))
             if config.get('selection_only') is True:
                 row['selection_only'] = True
             if config.get('launch_only') is True:
                 row['launch_only'] = True
+            if config.get('console_hint_observer') is True:
+                row['console_only'] = True
             with ledger.open('a', encoding='utf-8') as f:
                 f.write(json.dumps(row, ensure_ascii=False) + '\n')
                 f.flush()
@@ -740,6 +759,9 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                 break
             if row['stage'] in ('host_timeout', 'environment_invalid', 'unknown'):
                 stop_reason = row['stage']
+                break
+            if row['stage'] == 'console_hint_pending_review':
+                stop_reason = 'console_hint_pending_review'
                 break
             if row['stage'] == 'captcha':
                 stop_reason = 'selection_challenge' if row.get('selection_only') is True else 'challenge'
@@ -811,6 +833,16 @@ def main():
     cases = manifest['cases']
     launch = any(launch_only_spec(c) for c in cases)
     artifact = json.loads((args.apk.parent / 'artifact.json').read_text(encoding='utf-8-sig'))
+    try:
+        console = console_only_batch_spec(cases, artifact, engines, args.repeats, args.fixture_media, args.allow_physical_qa)
+    except ValueError as error:
+        p.error(str(error)) # Only our fixed messages, never request data.
+    if console:
+        if args.aapt is None:
+            p.error('Console-only QA requires APK permission verification')
+        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=10)
+        if permissions.returncode != 0 or b'android.permission.INTERNET' not in permissions.stdout or f'package: {PACKAGE}'.encode() not in permissions.stdout:
+            p.error('Console-only ordinary QA APK verification failed')
     tail = any(c.get('selection_tail1') is True for c in cases)
     if tail:
         if (engines != ('app',) or args.repeats != 1 or args.fixture_media is not None or
@@ -849,6 +881,8 @@ def main():
         raise RuntimeError('Android SDK does not match the requested test environment')
     if args.expect_webview is not None and (not match or match[2] != args.expect_webview):
         raise RuntimeError('Actual selected WebView does not match the requested version')
+    if console and (sdk != 28 or provider != 'com.android.webview/66.0.3359.158'):
+        raise RuntimeError('Fixed console observation environment does not match')
     # Installation is a separate, explicit setup step. Verify the installed APK
     # bytes here; never blindly install a supplied APK with an unknown identity.
     remote = device.call('shell', f'pm path {PACKAGE}').strip().removeprefix('package:')

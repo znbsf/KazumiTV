@@ -79,6 +79,7 @@ $before | Set-Content -Encoding utf8NoBOM "$Output/source-digests.json"
     launch_only_build = [bool]$LaunchOnly
     no_internet_permission = -not $qaHasInternet
     internet_permission = $qaHasInternet
+    console_hint_observer_schema = 1
     built_utc = [DateTime]::UtcNow.ToString('o')
 } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM "$Output/artifact.json"
 Get-Content "$Output/artifact.json"

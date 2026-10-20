@@ -123,3 +123,27 @@ rule_variant默认为effective；只有带覆盖元数据时可选base，它构�
 根请求及子请求均须通过签名/认证参数和嵌套URL检查；不通过时不创建HTTP客户端。
 Dart HttpClient观察不等于native播放器的请求路径，不能据此宣称mpv传输原因已定或UA覆盖已有效。
 原始播放器仍按App路径执行；观察结果与真实首帧/进度分别记录。修改配置/代码需新输出目录和身份。
+
+## 固定单例 console 提示（离线准备，默认关闭）
+
+console_hint_observer=true 只接受 qa-mgnacg-console-hints-v1 / console-hints，
+绑定 mgnacg 1.2/API9/effective 规则、学生会也有洞！第2话的固定页面摘要，
+以及 API28/com.android.webview66/parserqa。实际规则、作品、页面与标签均在创建观察器前校验。
+只允许一次 app profile；禁止混入 selection、fallback、媒体观察、播放器或其他配置选项。
+运行器要求新构建 artifact 的 console_hint_observer_schema=1、普通 INTERNET QA 权限与实际环境匹配；
+既有20588包不含该能力，不能复用它来宣称运行过此观察器。本轮未构建或运行新包。
+
+订阅创建在真实控制器工厂返回之前、init之前；不改生产控制器、不注入JS、不新增HTTP请求。
+只暂时检查 Console 前缀，每条最多8192个UTF16 code unit、累计256KiB UTF8、最多80条；
+超限停止观察且仅输出固定overflow。输出为固定分类计数、停止原因与清理状态，
+不保存原文、堆栈、完整URL、headers、Cookie或未知字符串；该QA进程关闭生产Logger输出。
+固定分类包括syntax/reference/type/cors/csp/mixedContent/blockedResource/unclassified。
+challenge只标记待复核并取消本例、停止整批，不能据此认定验证码或失败根因。
+resolve结束、取消及finally均共用同一可等待的订阅取消，最多等待2秒；清理未确认停止整批。
+迟到事件不能再更新计数，其他配置不读取或订阅日志流。console结果不进入播放成功率分母。
+
+归属限制：onLog属于该controller，但LogBridge也能发送任意相同前缀；没有frame/origin身份。
+因此输出始终 hints_only=true / console_authenticity_verified=false / frame_origin_available=false，
+只证明收到前缀线索，不能证明真实Console异常、主文档归属或具体站点原因。
+未来最小运行建议为上述精确单例一次、host70秒/总120秒、原解析15秒、无播放器，
+身份错配、挑战线索、unknown、environment_invalid或清理未确认立即停止，不重试；此处只是离线方案。
