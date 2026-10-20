@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+18:55新ARM QA20590已独立核验并续派首次物理fixture包：编译2c35a010、APK12a34e674eba2a9150f345182fa18196c721648f5e23bbf8db596c2f0939abd9、534项源before/after/作者逐项字节匹配，registrant原前后副本相同；统筹对应仅CRLF差异。实际apksigner证书24f61454…e32aa31，aapt独立包/20590/minSDK26，ZIP libflutter仅ARMv7，libflutter/libmpv/libxul均ELF32 ARM，XML INET成立；回执.dart_tool/tv-arm20590-independent-review.json。未重复无改动代码全量测试，沿880ac317独立64Python+20Dart/分析。
+
+已给唯一device owner具体执行许可：完成构建收尾后核同现场身份/包保护基线/桌面音量和资源归属，parserqa仍未安装才装新独立包并完整读回；意外已装或错配即停。只执行原3fixture计划（SHA89dc332122fef28abb69b5c833be9a259799e3d63fbb905bbc648e32c2f3445a），每例70秒/总300秒，显式physical serial+实际fingerprint gate。reverse8769/8768和host端口必须无占用，只创建/清理自有映射；内部播放器音量0，系统音量不改。首例QA单次fallback、正常零fallback、第三例primary真实QA switch/取消后新页，保留迟到probe synthetic限制；任何unknown/envinvalid/挑战/清理不明停，不换例/重试。末次只停止parserqa并核旧三包hash/桌面/音量/media与自有fixture/采样/reverse退出和负载。尚未消费安装/fixture运行结果，不提前记通过；live4仍待统筹独立验fixture再派。
+
 18:50电视重连2c35a010已独立复核：实际MiTV-ASTP0/mulan/SDK28/ARMv7/WebView66，私有identity中本次完整fingerprint作为后续physical gate；不冒充与未读取历史fingerprint逐字匹配。三包host APK字节摘要、设备记录及归档证书/ZIP ABI逐项一致，正式/remoteqa/probe前后hash/version/UID/安装时间未变，桌面/音乐音量8/100/媒体session0/provider读回保持。仅只读盘点、不声明私有收藏/历史内容验收；回执.dart_tool/tv-inventory-independent-review.json。已交唯一owner一次当前干净冻结2c35a010普通parserqa android-arm/20590构建<=180秒，先交before/after/签名/包ABI/minSDK产物，不安装/启动，旧20580/x64不代用。
 
 首次TV验收计划已具体准备但not_run：.dart_tool/tv-fixture-plan-20590.json为modern-syntax QA fallback、正常零fallback和真实QA switch取消3个本地夹具/300秒；先核无他人reverse端口占用，只有本任务映射才可申请与移除，系统音量不改，播放器内部静音，任何unknown/环境无效/清理不明即停，生命周期前台精确门禁保留。产物核验后才给执行包，fixture验收交统筹复核后才考虑.dart_tool/tv-live-plan-20590.json四精确来源/400秒（ezdmw/moonci/MXdm显式QA补救+7sefun默认，10秒进度/每例70秒）。xfdmnext原已播标签不通过当前安全标签门禁，排除并保留缺口，不为凑第五例增labelHash/盲选或放宽schema；不能称四源电视已通过。首次电视新环境验证是实质新条件，电脑精确案例不重复运行；mgnacg/旧unknown均不在本TV包。
