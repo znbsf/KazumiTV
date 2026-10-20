@@ -28,6 +28,8 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 
 ## 清单与结果契约 v1
 
+仅App QA可用 `observe_playback_seconds: 10..15` 显式打开首帧后的500ms状态时间轴；默认仍只观察2秒。输出位置、playing/buffering/completed、buffer/duration和错误计数，不保存错误原文，不控制播放、不改变解析服务退出顺序。时间轴受App总60秒剩余预算截断，宿主单例70秒上限保留；`budget_limited`或取消必须单独处理。原生回调只证明首帧，不存在连续帧计数时不得声称视频一直渲染。
+
 - 清单 `cases[]`：`id/group` 必填；真实源使用 `rule_file/keyword/names/road/episode`，后两项零基索引。精确匹配唯一作品，不自动采用搜索第一项。规则 JSON 内联后计算摘要；目前 `overlay=none`，不修改规则/覆盖模型。
 - 固定清单中的同一例分别跑 webview/gecko，奇偶样本及重复轮交换顺序；每次 force-stop 后冷进程启动。浏览器缓存策略不同但都不复用网页会话；OS/DNS 缓存仍可能热。固定同一 UA，此结果不是各内核默认 UA 的比较。
 - `app` profile 保留App默认UA行为，记录actual_controller、能力准入、是否命中确认缓存及实际播放配置；不强制桌面UA或伪造WebView版本。`--expect-sdk/--expect-webview`先核对系统选中provider，每例再核对App实际报告，错配标为environment_invalid并停止。

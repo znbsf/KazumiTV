@@ -29,6 +29,8 @@ import 'rule_snapshot.dart';
 import 'failure_snapshot.dart';
 import 'app_fallback_service.dart';
 import 'media_root_observer.dart';
+import 'playback_observation.dart';
+import 'case_selection.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -91,6 +93,7 @@ class _BatchCaseState extends State<BatchCase> {
     StreamSubscription<String>? errors;
     String phase = 'search';
     try {
+      final observationWindow = qaPlaybackObservationWindow(c['observe_playback_seconds']);
       final ua = c['user_agent'] as String;
       String episodeUrl;
       Map<String, String> headers = {'user-agent': appProfile ? getRandomUA() : ua};
@@ -130,6 +133,12 @@ class _BatchCaseState extends State<BatchCase> {
         result['matched_title'] = match.name;
         result['road_name'] = candidate.roads[road].name;
         result['episode_label'] = candidate.roads[road].identifier[episode];
+        result['episode_page_sha256'] = sha256.convert(utf8.encode(episodeUrl)).toString();
+        if (!qaEpisodeMatches(c, url: episodeUrl,
+            label: candidate.roads[road].identifier[episode])) {
+          result['stage'] = 'sample_identity_mismatch';
+          return;
+        }
         headers = appProfile ? plugin.buildHttpHeaders() : {...plugin.buildHttpHeaders(), 'user-agent': ua};
         legacy = plugin.useLegacyParser;
         adBlocker = plugin.adBlocker || GStorage.getSetting(SettingsKeys.forceAdBlocker);
@@ -217,6 +226,7 @@ class _BatchCaseState extends State<BatchCase> {
             isLocalPlayback: () => false);
         final playback = appPlayback;
         final rendered = Completer<void>();
+        var playerErrorCount = 0;
         final disposeReaction = reaction<VideoController?>(
           (_) => playback.videoController, (video) {
             if (video == null || !mounted) return;
@@ -232,6 +242,7 @@ class _BatchCaseState extends State<BatchCase> {
           final opened = playback.createVideoController(attempt.headers, adBlocker,
             videoSourceFormat: source.format, canInstall: () => mounted && !run.cancelled,
             onPlaybackError: (_) {
+              if (observationWindow != null) playerErrorCount++;
               if (!rendered.isCompleted) rendered.completeError(StateError('production_player_error'));
             }).then((created) {
               if (created == null) throw StateError('production_player_retired');
@@ -250,7 +261,22 @@ class _BatchCaseState extends State<BatchCase> {
             'renderer_setting': GStorage.getSetting(SettingsKeys.androidVideoRenderer),
             'ad_blocker': adBlocker};
           final start = player!.state.position;
-          await Future<void>.delayed(const Duration(seconds: 2));
+          if (observationWindow == null) {
+            await Future<void>.delayed(const Duration(seconds: 2));
+          } else {
+            result['playback_observation'] = await observeQaPlayback(
+              window: observationWindow,
+              remainingBudget: const Duration(seconds: 60) - watch.elapsed,
+              isCancelled: () => run.cancelled || !mounted,
+              read: () => QaPlaybackState(
+                positionMs: player!.state.position.inMilliseconds,
+                playing: player!.state.playing, buffering: player!.state.buffering,
+                completed: player!.state.completed,
+                bufferMs: player!.state.buffer.inMilliseconds,
+                durationMs: player!.state.duration.inMilliseconds,
+                errorCount: playerErrorCount),
+            );
+          }
           result['progress_ms'] = (player!.state.position - start).inMilliseconds;
         } finally { disposeReaction(); }
         return;

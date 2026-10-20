@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+14:30新实播交付与统筹独立复核：ezdmw同规则/同作品线路剧集在20581单次15秒观测进度11157ms；2秒时position0/buffering=true，约4秒后前进，支持本次短采样落在缓冲窗口，不追溯证明上一次零进度的唯一因果。akianime既有bfzym3u8备用线路第1集在20582默认App路径10秒进度9863ms、零fallback，公开页摘要/精确集标签与门禁配对，原lzm3u8首线404保留。aafun精确q2在20582单次fallback后仍resolve_timeout，保持未解决，不重跑现代崩溃unknown。三批runner快照/身份/两层清理及ezdmw/akianime时间轴已由统筹独立读取复算，回执.dart_tool/catalog-1430-independent-review.json。
+
+当前17来源的代表样本结果应分开表述：5个原默认路径通过、4个仅QA补救策略通过（新增ezdmw），akianime仅备用线路默认路径通过，共10来源有上述限定下播放证据；LMM挑战跳过，6源未解决（AGE/sorani/dalvdm/baimao/xfdmneo/aafun）。不宣称全部线路/每源两集/生产默认策略已通过或规则覆盖已修好。新QA程序e8cc78c1（默认关闭10..15秒采样，共享剩余预算、只记录状态）和4e538dac（备用线路解析前精确episode hash/label双门禁）已在本树组合；26项相关Dart反例与定向分析独立通过，未重复无关全仓。20581/20582分别绑定作者源码/包摘要，见原app-fallback/{ezdmw-progress-20581-1422,aafun-fallback-20582-1426,akianime-alternate-20582-1427}及build产物，未安装电视。代码变更仅QA，不改普通产品策略。
+
+已继续分工：播放owner补最多3例/300秒的实际QA页面退出/取消/切换本地夹具，先补QA生命周期/晚到结果隔离，不声称完整生产TV UI验收；不拿真实源反复测试取消。规则owner仅aafun公开页面/固定规则最小分析；统筹独立发现其旧API4绝对XPath与同站moonci API9/play选择器差异，要求用现有或唯一公开详情证据验证是否错取集，不能凭同域或超时直接判外部，也不能在无反例时盲搬新规则。baimao最小内存配置观察仅先整理设计，不为填unknown重跑404。电视准备答复仍未收到，未重连拒绝端点，自动统筹持续ACTIVE。
+
 14:23规则侧新证据已独立交叉核对：5812a3f2的media-rule-pages-20261020中，akianime与xfdmneo公开剧集页摘要精确匹配运行时，对应player_aaaa.url摘要也分别等于根404/401候选；排除凭空/不同解码候选假设，仍不证明拒绝原因或native HTTP同态，不做overlay。统筹重算原运行证据/结构产物摘要及身份对应，回执.dart_tool/media-rule-pages-independent-review.json；未重访页面、未声称完整HTML重放（原响应仅内存、无完整fixture）。baimao详情301/200用满原2请求，追加精确播放页补缺包95ab8454因无法唯一找到公开页，仅0请求并保留unknown，遵守停止条件；不再要求规则侧继续网络枚举。
 
 播放侧在推进ezdmw新15秒采样，AGE静态API核对显示当前Dart/Dio不能提供完整peer-chain/选中信任锚，保持缺口，不改校验/信任或换TLS栈冒充现场。已追加最多2例/300秒的新判别：aafun旧备用作品首次应用已验证QA补救（不重跑现代崩溃unknown）；akianime同作品/集的既有bfzym3u8备用线路默认App测试（须唯一配对，保留第一线路404）。本阶段继续ACTIVE，未以规则侧一包完成收口。
