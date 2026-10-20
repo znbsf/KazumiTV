@@ -1,6 +1,11 @@
 # KazumiTV 当前状态
 
 ## 2026-10-20：全来源无验证码播放探测与修复统筹（进行中）
+本轮实际推进：首轮batch-1全部17源有终态，5源样本真实首帧/正进度；aafun/xfdmneo无匹配经既有planner各补一次备用作品，19次总尝试无unknown。现阶段5源played、12源failure_requires_diagnosis（4搜索错误、5解析超时、3媒体/首帧失败），不能将“全部触达”冒充全部已解决。私有证据source-catalog-playback-20261020/{batch-1,batch-2,coverage-after-wave-2}。
+
+现代App对照前6个有效配对中ezdmw/moonci/MXdm/xfdmnext旧解析超时→真实首帧，akianime/baimao仍媒体失败；aafun现代App启动崩溃记测试前环境无效，xfdmneo现代未执行，不自动重跑。播放会话正构建有界诊断QA以补4个搜索/3个媒体失败原因链，另仅对四个环境差异样本做旧Android Gecko功能对照，预算和停止条件记在其原PROJECT-STATUS。规则会话已收到19次账本及明确规则侧审查/fixture需求任务，避免静等或猜测overlay。
+
+统筹独立复核并集成e8cae4d5为af68c4b3，host_cleanup缺失/未确认不再隐没为played，原始播放与清理观察分别保留；本树31项Python测试通过。双方仍在执行本阶段任务，自动跟进保持ACTIVE，正式版/电视不动。
 本轮统筹检查：规则清单71315575已集成为02fabfba，固定官方ba8e10b35b0c目录17源，17份原始规则全部通过摘要及生产API预检，无缺件/废弃项、无启用验证码配置；实际challenge仍须运行判断。首批initial-app-plan/batch-1.json为17源各1例，统筹已将确切artifact路径和可复用QA包转交播放会话。播放侧上一轮仅复述旧4例未执行新任务，已明确续派首批实际执行；最新确认独立Android9/WebView66已启动，QA安装进行中。
 
 统筹独立28项Python与10项Dart检查通过，并发现source_inventory的next_plan只检查App cleanup、忽略host_cleanup的问题：首帧成功但host清理未确认仍被归played。反例已离线复现，已回派规则侧修复及兼容/负例测试；未因此重跑既有来源。自动跟进保持ACTIVE，首批结果尚未交付，不能将17源预检写成17源播放通过。
