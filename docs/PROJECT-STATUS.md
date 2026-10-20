@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:46统筹独立复核4351f461的20592部分组合包：install-r一次26.234秒成功，现场全APKhash匹配独立原件、UID10083与firstInstallTime19:22:47保持。首个modern-syntax实际fixture满足primary10000/total25000、primary retired10151ms先fallback start10153ms、一次fallback accepted18947ms、原生首帧与正进度2066ms、stop URI为空/unattributed及App/player/resolver/host/final清理。独立errors subscription为not_created是合法App路径（无独立订阅），不能被临时外层验收误判为产品失败；原记录保留。随后临时恢复包装器read_json定义顺序NameError发生在第二例启动前，修正后原180秒预算已不足，owner按停止条件收尾。原fixture计划2/启动1/终态1/unknown0/未尝试1，live2全部未尝试，不写成产品失败或新调度已修复来源。回执.dart_tool/tv20592-partial-independent-review.json；原三保护包完整元数据/桌面/系统音量/provider保持、parserqa已停保包、reverse空、自有runner/fixture/采样/目标ADB均退出及负载收据独立读取。
+
+已明确续派唯一播放owner下一独立有界包，仅原第二个未尝试正常夹具，现装20592不构建重装、不重复首例、不自动执行live：.dart_tool/tv-fixture-remaining-20592-v2.json，SHA5bbe97d7009fe7f9234531bd7ccc25f8e3c04b553191ad4fc6e7bb7f367083a3。实质前提是统筹已清除错误宿主验收并绕开非必要临时恢复包装器，直接复用原唯一runner的已测试单例入口；不是为已执行失败重置预算。固定case tv20592-normal-app-no-fallback全部字段保持，单例70秒/总120秒，真实首帧正进度/零fallback/10与25秒候选参数/两层清理必需；独立subscription允许confirmed或not_created，缺失/unconfirmed不通过。先复核同物理身份/现装hash/保护基线与资源，challenge/unknown/envinvalid/清理不明停、不重试；原状态先记预算、只交这一个结果与退出负载。两个真实源仍待统筹独立验正常夹具后具体续派；旧540秒组合包已停止，旧预审不自动恢复后续。
+
 20:25新20592一次60秒构建完成，统筹已独立验证540源原before/after/独立after/作者当前hash、root仅CRLF、ignored registrant原副本保持；编译649b30bc、APKdfcf96c3a189ed6ebc03d84d6f596012e9c0b201ac2125eea7a3948e0ed4157d/165166804字节，实际apksigner24f…e32aa31、实际20592/minSDK26/唯一ARMv7/关键ELF/INET通过。回执.dart_tool/tv-arm20592-independent-review.json，不提前声称安装或时序修复实机成功。
 
 已给唯一owner新候选有界组合复验（先原状态记预算）：完成构建收尾后核同TV/现装20591哈希同证书/UID10083与firstInstallTime/保护三包/桌面8音量/资源，正常install-r20592一次<=120秒，读回新全hash签名版本ABI且原UID/firstInstallTime保持，不卸载清数据。成功才2本地受影响fixture（.dart_tool/tv-fixture-plan-20592.json，SHA629be02363c3fa6ed70334cc1407ffea7c255ab607c6e46725474fe1374efa4f，180秒/各70秒）：QA单次fallback实际primary10000/total25000与正常零fallback、真实首帧正进度/先退役/清理、stop诊断unattributed。任一fixture失败或清理不明停后续。仅两fixture所有门禁通过并临时资源退出才2真实App原样本（.dart_tool/tv-live-plan-20592.json，SHA8811ee1c659a79ac4ae4caa613405a95d83b491912de7ae9aed005f497f6558e，200秒/各70秒/10秒状态）：ezdmw原页标签3 QA补救+7sefun默认控制。
