@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+最新直接人类现场补充：「刚才adb 关了 现在打开了、」。这是原10061拒绝连接前提的实质变化，旧等待当前地址问题已由调试开关状态回答；已交唯一播放/device owner保存离线工作后按原192.168.123.217:5555正常连接一次并只读身份/ABI/WebView/包签名与保护基线盘点。盘点前不发键/启动/安装/卸载/清数据/改系统；仍拒绝或身份归属不符则停，不扫描/猜IP/reset共享ADB。成功盘点交统筹复核后才准备实际ABI新冻结独立QA及有界验收，旧ARM20580/x64不可直接安装。当前仅已授权重连，尚无本次连接结果；正式版、真实数据、个人preview及系统保护继续。
+
 18:35统筹独立复核20589 console单例交付8ca5ed0e：新APK0e54b27bc209e803ec5a7e52970455cac6f8350853841bccb978537d0858e90e、编译2f71e687（相对c9仅状态预案）及534项原before/after清单均匹配；逐项作者源摘要匹配，本统筹对应18项仅CRLF字节差异、无非换行差异。runner与本树字节匹配，input-plan原字节、展开固定rule后的manifest、规则有效摘要/精确页hash/第2话、SDK28/provider66/actual VideoWebviewImpl全部对应。XML/aapt含INET、归档证书摘要匹配，ZIP仅lib/x86_64/libflutter.so，不能据依赖总ABI当TV候选。回执.dart_tool/console-runtime-independent-review.json。
 
 实际1计划/1终态/unknown0、eligible0；仍15秒resolve_timeout（trace15055ms），console仅一个unclassified/113字节，其余分类计数0且overflow=false。只证明收到一个不可信前缀提示，不证明真实JS错误/frame归属，也不能从零计数排除错误/挑战；没有可定位根因的新信号。原resolver、observer退订、App/host/final清理逐项confirmed，停后13996/62792及后代退出/任务候选0、CPU快照10%。原结果player字段为not_run(console-only)，不将作者acceptance中not_created写法误作真实建播/播放失败；无media/fallback/新增请求探针。不再重跑此精确案例。
