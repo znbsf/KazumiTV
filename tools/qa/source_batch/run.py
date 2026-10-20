@@ -1,4 +1,4 @@
-"""Bounded, resumable emulator-only A/B runner. No physical-device override."""
+"""Bounded QA runner; physical targets require explicit, exact identity binding."""
 import argparse
 import hashlib
 import html
@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 import statistics
+import sys
 import subprocess
 import threading
 import time
@@ -219,11 +220,27 @@ class FixtureHandler(BaseHTTPRequestHandler):
     do_HEAD = do_GET
 
 class Device:
-    def __init__(self, adb, serial):
-        if not re.fullmatch(r'emulator-\d+', serial):
+    def __init__(self, adb, serial, *, allow_physical=False,
+                 expected_serial=None, expected_fingerprint=None,
+                 package=PACKAGE):
+        if package != PACKAGE:
+            raise ValueError('Only the fixed parserqa package is permitted')
+        if allow_physical:
+            if (not expected_serial or serial != expected_serial or
+                    not expected_fingerprint or
+                    not re.fullmatch(r'[A-Za-z0-9_.:-]+', serial) or
+                    serial.startswith('emulator-')):
+                raise ValueError('Physical QA requires exact serial and fingerprint')
+        elif not re.fullmatch(r'emulator-\d+', serial):
             raise ValueError('Only an explicitly named emulator is permitted')
         self.adb, self.serial = adb, serial
-        if self.call('shell', 'getprop ro.kernel.qemu').strip() != '1':
+        self.physical = allow_physical
+        qemu = self.call('shell', 'getprop ro.kernel.qemu').strip()
+        if allow_physical:
+            actual = self.call('shell', 'getprop ro.build.fingerprint').strip()
+            if qemu == '1' or actual != expected_fingerprint:
+                raise ValueError('Physical QA target identity mismatch')
+        elif qemu != '1':
             raise ValueError('Target is not an Android emulator')
 
     def call(self, *args, input=None, timeout=15, check=True):
@@ -240,6 +257,25 @@ class Device:
             raise RuntimeError('Process inventory is missing or invalid')
         rows = lines[1:]
         return {int(parts[0]): parts[1] for row in rows if len(parts := row.split()) >= 2}
+
+    def protected_packages(self):
+        """Read APK identities only, never app data; parserqa is the sole mutation target."""
+        names = self.call('shell', 'pm list packages kazumi').splitlines()
+        snapshot = {}
+        for line in names:
+            name = line.removeprefix('package:').strip()
+            if name == PACKAGE:
+                continue
+            if not re.fullmatch(r'[A-Za-z0-9_.]+', name):
+                raise RuntimeError('Invalid protected package inventory')
+            remote = self.call('shell', f'pm path {name}').strip().removeprefix('package:')
+            if not re.fullmatch(r'/data/app/[A-Za-z0-9_./+=~-]+\.apk', remote):
+                raise RuntimeError('Protected package requires one known APK path')
+            apk_hash = self.call('shell', f'sha256sum {remote}').split()[0]
+            if not re.fullmatch(r'[a-fA-F0-9]{64}', apk_hash):
+                raise RuntimeError('Invalid protected package APK digest')
+            snapshot[name] = {'apk_path': remote, 'sha256': apk_hash.lower()}
+        return snapshot
 
     def stop_and_verify(self, baseline=None):
         errors = []
@@ -454,6 +490,9 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--adb', required=True)
     p.add_argument('--serial', required=True)
+    p.add_argument('--allow-physical-qa', action='store_true')
+    p.add_argument('--expect-serial')
+    p.add_argument('--expect-fingerprint')
     p.add_argument('--apk', type=Path, required=True)
     p.add_argument('--manifest', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
@@ -477,7 +516,10 @@ def main():
         if 'rule_file' in c:
             rule_path = args.manifest.parent / c.pop('rule_file')
             c['rule'] = json.loads(rule_path.read_text(encoding='utf-8-sig'))
-    device = Device(args.adb, args.serial)
+    device = Device(args.adb, args.serial,
+                    allow_physical=args.allow_physical_qa,
+                    expected_serial=args.expect_serial,
+                    expected_fingerprint=args.expect_fingerprint)
     sdk = int(device.call('shell', 'getprop ro.build.version.sdk').strip())
     provider_state = device.call('shell', 'dumpsys webviewupdate')
     match = re.search(r'Current WebView package \(name, version\): \(([^,]+), ([^)]+)\)', provider_state)
@@ -502,7 +544,9 @@ def main():
     identity = {'apk_sha256': local_hash, 'artifact': artifact,
                 'runner_sha256': digest(Path(__file__).read_bytes()),
                 'manifest_sha256': digest(json.dumps(cases, sort_keys=True).encode()),
-                'serial': args.serial, 'build_fingerprint': device.call('shell', 'getprop ro.build.fingerprint').strip(),
+                'serial': args.serial, 'physical_qa': args.allow_physical_qa,
+                'expected_fingerprint': args.expect_fingerprint,
+                'build_fingerprint': device.call('shell', 'getprop ro.build.fingerprint').strip(),
                 'sdk': sdk, 'selected_provider': provider,
                 'ua': UA, 'cache_policy': 'process cold; WebView cache disabled; Gecko private session; OS/DNS warm',
                 'engines': list(engines), 'repeats': args.repeats,
@@ -525,8 +569,26 @@ def main():
         plan.append({'key': key, 'config': config, 'id': config['id'], 'engine': config['engine'],
                      'group': config['group'], 'repeat': config['repeat'],
                      'expected_environment': {'sdk': sdk, 'provider': provider}})
-    run_batch(device, plan, args.output, rows, fixture_media=args.fixture_media,
-              budget_seconds=args.budget_seconds)
+    protected_before = device.protected_packages() if device.physical else None
+    if device.physical:
+        (args.output / 'protected-packages-before.json').write_text(
+            json.dumps(protected_before, indent=2), encoding='utf-8')
+    try:
+        run_batch(device, plan, args.output, rows, fixture_media=args.fixture_media,
+                  budget_seconds=args.budget_seconds)
+    finally:
+        if device.physical:
+            original_error = sys.exc_info()[0]
+            try:
+                protected_after = device.protected_packages()
+                receipt = {'before': protected_before, 'after': protected_after,
+                           'unchanged': protected_before == protected_after}
+            except Exception as error:
+                receipt = {'unchanged': None, **error_record(error)}
+            (args.output / 'protected-packages-after.json').write_text(
+                json.dumps(receipt, indent=2), encoding='utf-8')
+            if receipt['unchanged'] is not True and original_error is None:
+                raise RuntimeError('Protected APK identity not confirmed unchanged')
 
 
 if __name__ == '__main__':

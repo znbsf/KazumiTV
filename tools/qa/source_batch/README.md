@@ -1,6 +1,8 @@
 # 电脑批量 App 服务路径 / GeckoView QA
 
-仅实验包 `com.znbsf.kazumi.fluttertv.parserqa`，debug/x86_64/API26+。运行器硬拒绝物理设备；不安装 APK、不改变正式包。调用者先检查 APK 包名，再明确安装到专用 emulator。Gecko 只解析地址，播放仍使用项目 media-kit 的真实首帧回调、静音软件输出。生产构建不启用 `kazumiParserQa` 时不包含依赖、Activity、扩展。
+仅实验包 `com.znbsf.kazumi.fluttertv.parserqa`，debug/API26+。默认只接受明确的模拟器；实体QA必须显式使用 `--allow-physical-qa --expect-serial <精确serial> --expect-fingerprint <精确fingerprint>`，并与 `--serial` 和现场只读查询一致，错配在任何测试写入之前拒绝。运行器不安装APK、不关闭模拟器、不卸载或清数据；只force-stop固定parserqa包。实体测试前后保存其他Kazumi包的APK路径/字节摘要，未能确认一致即报告失败，不能据此声称私有数据已逐项校验。
+
+构建默认x86_64；ARM电视必须明确传入 `build.ps1 -TargetPlatform android-arm` 或 `android-arm64` 并核对真实ABI/签名/升级条件，目标写入artifact.json。现有x64候选不能用来证明ARM可执行。调用者先检查APK包名，再明确同签名安装到已获授权的独立QA对象。Gecko只解析地址，播放仍使用项目media-kit真实首帧回调；模拟器静音软件输出不代表电视硬解验证。生产构建不启用 `kazumiParserQa` 时不包含依赖、Activity、扩展。
 
 默认 `--engines app`：搜索/集表调用现有Plugin；解析调用生产 `VideoWebviewControllerFactory`，由真实DOCUMENT_START_SCRIPT能力选择现代/legacy实现（包含WebView66的兼容准入）；媒体头使用 `Plugin.buildHttpHeaders`，确认地址缓存复用 `ResolvedSourceCache`；播放直接复用 `PlayerPlaybackController`，包含缓冲策略、广告过滤、代理、真实SDK/模拟器输出选择和错误/释放处理。QA Activity继承生产MainActivity以复用原生通道，只在debug实验身份下启用TV模式测试钩子。首帧仍须实际native回调，不能只看尺寸。
 
@@ -45,6 +47,30 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 - App的cleanup与host_cleanup分别保留。任何单例清理未确认都会停止后续案例；只有清理失败时以BatchCleanupError非零退出；已有主异常或用户中断时重新抛出原异常，清理错误不能覆盖它。`.host-error.json`、run-status.json、cleanup.json保留异常类型/超时和各步失败，不记录可能含签名地址的异常命令。因原始异常未拿到App终态的案例仍是unknown，不伪造产品失败行。cleanup.json是最终清理收据；报告可再次离线重建。
 
 ## 已知实验限制
+
+### App播放控制器的一次Gecko补救（仅QA opt-in）
+
+清单单例附加`app_gecko_fallback: true`，仍使用`--engines app`。普通清单和生产App
+行为不变。仅实际旧WebView66能力准入、非iframe-only，原解析timeout/notfound后
+尝试一次Gecko；先等待原服务退出，退出失败不切换。总解析25秒，补救只能用剩余
+预算，退出每阶段另限2秒。取消/新请求会作废旧代次。搜索、集表、媒体headers、
+PlayerPlaybackController保持App路径；Gecko浏览器UA使用媒体headers里的UA，主解析
+仍保留App默认随机UA，不能把该实验当严格的同UA纯内核性能排名。
+
+结果`fallback_policy/fallback_events/fallback_controller`记录显式开关、能力、最多一次、
+阶段/代次及墙钟毫秒。与已有PSS采样按epoch关联可观察切换前后，但service retired
+只证明原生对象dispose返回，不能代替进程/PSS释放核验。GeckoSession关闭后当前QA
+GeckoRuntime仍可驻留至QA进程退出；不得称为已实现适合生产的低内存回退。
+该策略不解决验证码；只对事先检查、未观察到实际挑战的受控样本执行，挑战即停止。
+生产默认策略、规则profile/schema和内核分发均不由此实验自动启用。
+
+QA错误快照补充：`failure_snapshot`只读记录最多5层异常类型、NetworkException/Dio原因，
+请求只保留method与host/URL摘要；响应只保留状态、content-type/server/cf-mitigated头、
+正文长度/摘要，不写Cookie、认证头或正文。明确cf-mitigated: challenge或失败响应内
+window._cf_chl_opt证据时记stage=captcha、保留observed_stage，立即结束该例；没有命中
+只表示未观察到这些标记，不证明无挑战。该观察不改变App请求或开启验证码流程。
+原生媒体原因仍查对应PlaybackTrace/本地logcat；production_player_error只是QA汇总，
+不能单独区分CDN状态、解码、媒体响应或其他失败。
 
 Gecko158实测要求 compileSdk37/AGP9.1+，本原型固定146.0.20251217121356（与现有工具链兼容的较旧稳定版），不是最新安全版本或生产推荐。系统 WebView 记录运行时实际版本。Gecko通过内置 WebExtension 在 MAIN world 注入同一解析脚本，覆盖所有 http(s) 子框架，与 Android document-start 注入范围一致（插件 forMainFrameOnly 仅对 iOS/macOS 生效）。内容桥接是只读候选输入，并由当前 session/generation 和生产 URL 校验隔离。尚不支持 `useLegacyParser=true` 的 iframe-only 模式，显式失败，不悄悄改变规则。
 

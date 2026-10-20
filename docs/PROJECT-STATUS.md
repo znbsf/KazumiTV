@@ -2,6 +2,14 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+14:15统筹独立复核与继续推进：fixture3/live5/media3共11例有终态和清理，不是11例全通过。逐项重比live五例的rule_sha256/fingerprint、作品/线路/集标签/剧集页摘要，全部与batch-1原案例一致；fallback均单次且原服务retired先于fallback开始。moonci/MXdm/xfdmnext在20579 QA补救下首帧+正进度，ezdmw仅首帧进度0仍inconclusive，正常7sefun零fallback。原5个默认路径成功与3个QA策略验证分开，未改产品默认内核/规则，仍有8源未完成有效修复。独立回执.dart_tool/catalog-1415-independent-review.json，不由作者acceptance-review替代统筹验证。
+
+媒体真实新增证据：akianime/baimao同host+hash的根404（HTML881字节），xfdmneo根401（空正文）；三例都仅一次根观察，无子项、无原值落盘，不推断native请求逐包行为。已将这三例规则/公开页面最小判别任务派回规则owner（至多各2页、10秒/256KiB、总5分钟，签名/挑战停止），播放owner续查ezdmw先读日志再一次延长进度/状态观察及AGE实际链可观测性，禁止原样两秒重跑。电视准备问题仍待人类答复，不原样重连拒绝端点；可独立模拟器工作继续，自动化ACTIVE。
+
+本树集成f26bd0a0工具适配（保留作者原树与状态文档）：显式physical serial/fingerprint和固定QA包、其他Kazumi APK前后摘要、显式构建ABI；默认模拟器行为不变。27项Python测试独立通过，diff干净，三批runner.py快照与identity及本树run.py摘要全匹配。README同步保留原QA fallback/资源驻留限制，不将service dispose等同GeckoRuntime进程退出。
+
+ARMv7 20580准备件：源码5cf5352090389981cdc3105ea9d058a3444ab728，APK ed9029911b46122226eb6eb72ad1c025754e02a60bde04c59a4b7acd9571e853，dirty=false、android-arm，未安装/实播。统筹独立核对APK字节hash与515项manifest时发现9项与本树字节不同：7项仅CRLF、README额外QA说明已保留、ignored registrant少FlutterNativeSplash注册段。已要求作者解释生成来源及QA实际相关性，不因此重构建或直接抄删插件注册；不得声称源字节完全一致。20579原x64产物身份不变。owner停后回执runtime-20579-1400-closeout.json记录本轮模拟器/构建退出，电视仍ADB拒绝且未操作正式包/preview。
+
 本轮最新设备进展：播放owner尝试既有电视端点返回连接被拒绝，尚未核实电视当前包身份；已停止该连接路线并向人类询问电视准备状态，不扫描/猜新端点。独立模拟器已经启动并核实Android9/WebView66.0.3359.158，准备安装核对20579后执行3夹具。电视单点阻塞不暂停模拟器推进。统筹只读初审owner的run.py显式physical身份绑定、protected包摘要前后核对及build.ps1显式ABI参数；尚未交付提交、未独立运行其25项测试，不提前记集成通过。正式版/preview未操作。
 
 14:00:28（UTC06:00:28）已核对到达授权时间，同一kazumi heartbeat已恢复ACTIVE/每15分钟。播放会话收到新直接人类授权与原计划，作为唯一设备owner正在核对runbook/电视/包身份；统筹本轮未连接设备。统筹只读发现run.py:223-227现有emulator-only检查，已明确交其在自有树做最小显式物理QA入口（默认仍拒绝、绑定serial与预期机型/fingerprint、固定QA包、正反例），不绕过/猴补丁/复制第二运行器。此为新授权真机测试的必要工具适配，不改默认产品策略；后续交付仍须独立审查和原案例验收。
