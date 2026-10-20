@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+16:05统筹消费0fab5c82启动离线复核并独立重比20585/86源清单：仅main.dart及新增chapter_diagnostic_runtime.dart有变化，registrant/原生入口/Manifest无源差异。独立读取19次PSS采样，约+1.7秒出现QA PID3410、约+2.9秒起不再出现，支持早期进程消失观察，尚无异常/退出原因；不因静态插件类存在就声称运行时注册成功。更正此前“停后文件存在/不可解析”表述：原回执只留宿主返回0和JSONDecodeError，原始字节、大小、文件存在性均未独立证明，不能判断空/截断/非JSON或是否已请求来源。旧原记录保留，startup-offline-review.json为更正入口。
+
+已选择并交播放owner实施固定默认关闭launch-only诊断：独立QA离线变体合并Manifest/APK确认无INTERNET，固定id拒绝来源字段且绝不退回普通case，Dart拒绝外连；沿原初始化顺序显示本地页，不创WebView/解析器/播放器。新增原生/通道/初始化/首帧枚举及单调时间、异常仅类名/原handler、专用原子文件<=64条/32KiB，宿主核对真实文件/stat/字节及JSON类型。20秒am等待不改；先冻结提交/离线测试/产物身份核对，至多一次180秒构建、一次归属明确无来源冷启动（单例70秒/总120秒），错误/unknown/清理不明停，不接原aafun或新来源。新判别是启动阶段观测，不是原样重试unknown；不需用户补同一授权，正式/preview/系统不动。
+
+规则25b94a13深度产物已独立复核：depth-coverage-20261020的65项输入文件摘要匹配，17源/11受限样本逐行对应原结果、规则有效摘要/正进度/两层清理确认；原首线404/401与旧缺host清理历史、aafun无终态unknown保留。selection-only-reviewed.json为9个未执行发现例（排除已发现xfdmneo、7sefun已观察head2及所有无可播/unknown来源），没有URL/road/episode盲选，默认App、无fallback、仅发现。回执.dart_tool/depth-coverage-independent-review.json。现投影仅head2不足以认定较新集，tail1/ordering=unknown只是QA接口建议未实现；环境启动恢复前不运行这批。原逐源覆盖仍为派生视图不替代ledger。
+
 15:48统筹消费20586运行：aafun-same-dom-20586-1535为planned1/started1/completed0/unknown1，host am start -W等待20秒超时，无可用App终态，不能写同DOM比较已执行/未执行，也不能写来源或选择器通过/失败。独立复算20586 APK字节、source-digests清单字节及runner快照摘要与identity一致，安装前后摘要/保持数据来自owner回执；App/worker清理仍unknown，host单例/最终清理confirmed。owner停后收据确认本任务launcher/qemu退出、候选进程0/CPU快照2%，未操作电视/正式/preview。回执.dart_tool/chapter-runtime-unknown-independent-review.json。
 
 没有原样重试aafun。播放owner已续派离线核对旧MissingPlugin/registrant路线、本轮包/入口/日志及启动等待语义，需先说明新前提与无来源最小launch-only探针，不靠加等待掩盖unknown；未授权从本次unknown直接重开来源。规则owner同时复用固定目录/已有ledger准备11限定可播来源的未测首集/较新集覆盖与下一批仅selection候选计划，排除所有精确已完成/unknown、无联网、不改共享runner文件。现有投影只首2集，较新集契约缺口先明确，不盲造索引/URL。两个owner继续推进，阶段未完成、自动化ACTIVE。
