@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+最新人类质问“所以为什么等待？就简单的测试 为什么这么多问题呢？”统筹已撤回“缺人类新授权才可继续”的停顿判断：原独立QA排障授权仍在，不能让用户重复选择。当前只收窄读取已有失败启动证据/一次有界旧日志，不重跑来源或改批测工具。root静态确认QA普通main在runApp前串行初始化identity/config/TvMode/WebView/MediaKit/path/Hive/storage/shaders，probe仅离线build启用，普通启动catch只有rethrow不写失败回执；故无result本身不能分辨初始化还是来源阶段，不当实际根因已定。
+
+已派唯一device owner仅离线核原MXdm PID3466/15:11:27–15:12:24Z窗口及已有原件，若原件无异常解释可一次<=60秒只读该PID严格时间窗既有系统日志、<=100条或256KiB，原文仅内存只留受限元数据/白名单异常类与阶段计数，不日志清空/级别改动/App启动/来源网络/设备写入/构建安装/旧156B读取；无法精确安全配对就交缺口，不为日志新增工具框架、换命令重试。保护身份先核、旧unknown不追认、采集进程退出，共享ADB不动。此为新只读旧记录诊断，不用来源当启动探针，不回到observer/负载/协议修补循环。
+
 23:35统筹独立审规则1d50be22派生v10：266输入hash/87原包文件逐项重核，17源/三新attempt三unknown/TV2与模拟器11源19页计数不变；45个现成绑定逐一重比原selection_snapshot的规则effective归一化摘要/作品详情/road/episode/label/pagehash，和已审inputs内68 started id/32观察或已启动页摘要交叉排除无冲突。row.rule_sha256是另一序列化摘要，不与effective_sha256混用。回执.dart_tool/depth-v10-independent-review.json，原覆盖视图[C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/depth-coverage-20261020/sample-depth-coverage-v10.json](C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/depth-coverage-20261020/sample-depth-coverage-v10.json)。本轮仅既存证据审读，不运行播放/测试工具/来源或设备。
 
 当前阶段未完成，但可在现有证据和用户最新边界内独立推进的整理已完成：没有真实响应反例可支持新的overlay；45个其它集/线路仅可选深度，不会补足5个无可播源或TV启动链缺口。AGE/sorani/dalvdm/baimao/aafun仍分别缺TLS信任与HTTP配对、有效TLS/API、拒绝类型/有效响应、候选请求上下文、同DOM比较；mgnacg后续集仍缺候选/iframe阶段证据；TV moonci/MXdm/aafun原unknown不可重试追认，普通默认策略未改，完整TV UI/AV/长稳未验收。原始401/404、实际AppUA未记、xfdmnext空label门禁均保留。
