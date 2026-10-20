@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+18:35统筹独立复核20589 console单例交付8ca5ed0e：新APK0e54b27bc209e803ec5a7e52970455cac6f8350853841bccb978537d0858e90e、编译2f71e687（相对c9仅状态预案）及534项原before/after清单均匹配；逐项作者源摘要匹配，本统筹对应18项仅CRLF字节差异、无非换行差异。runner与本树字节匹配，input-plan原字节、展开固定rule后的manifest、规则有效摘要/精确页hash/第2话、SDK28/provider66/actual VideoWebviewImpl全部对应。XML/aapt含INET、归档证书摘要匹配，ZIP仅lib/x86_64/libflutter.so，不能据依赖总ABI当TV候选。回执.dart_tool/console-runtime-independent-review.json。
+
+实际1计划/1终态/unknown0、eligible0；仍15秒resolve_timeout（trace15055ms），console仅一个unclassified/113字节，其余分类计数0且overflow=false。只证明收到一个不可信前缀提示，不证明真实JS错误/frame归属，也不能从零计数排除错误/挑战；没有可定位根因的新信号。原resolver、observer退订、App/host/final清理逐项confirmed，停后13996/62792及后代退出/任务候选0、CPU快照10%。原结果player字段为not_run(console-only)，不将作者acceptance中not_created写法误作真实建播/播放失败；无media/fallback/新增请求探针。不再重跑此精确案例。
+
+已续派两个独立离线包而非继续实测循环：播放owner沿初始正例与第2话多引擎失败审查生产factory/iframe候选/回调归属/取消链，只有明确代码反例才离线fixture及最小修复，否则交具体缺失观察及有界判别设计，不能自行构建/联网/启动。规则owner复用原depth派生v6增量归并现代/新fallback/console数据与逐源code/overlay/external/unknown矩阵，检查五无可播及mgnacg后续集有什么规则可表达反例/具体证据缺口；不重写ledger、不猜URL或无反例overlay。TV仍等当前地址/端口人类答复，不再原样连接；全部旧正反例/401/404/20586 unknown与实际UA限制保留，阶段未完成自动化持续ACTIVE。
+
 18:20统筹独立审读并组合c9a4e30a QA console分类交付：64项Python、20项Dart及定向分析通过。仅固定mgnacg第2话/rule/page/exactlabel/旧API28-WebView66的默认关闭观察，订阅本controller既有onLog且在init前建立；结果只固定hint计数与限额/清理状态，无新增JS、请求或生产策略修改。LogBridge也能产生Console前缀，因此明确hints_only、来源真实性与frame origin未证；不能把syntax/cors等文本分类直接当根因。所有console-only结果排除播放分母，完成/取消await退订、晚到不写，其他case零订阅。原媒体observer代码未改，离线测试不代表现场console已观察。回执.dart_tool/console-hints-independent-review.json。
 
 现场TV正常重连一次的证据已独立读取：10:09:20Z原记录192.168.123.217:5555仍10061主动拒绝；无设备身份/ABI/包签名/前台音量读回，无发键、装卸、清数据、系统修改。旧准备问题已获人类答复，但当前连接故障未解；已询问电视当前实际IP与调试端口，等待新现场地址，不原样反复连接/扫描/reset共享ADB。此处为连接失败而非工具审批拒绝，其他模拟器工作继续。
