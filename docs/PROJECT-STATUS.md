@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+21:35统筹审26924618宿主修正方案，并独立执行保存的原run.py实际Device.case/run_batch的6项fake clock/device反例，全部复现旧缺口；不是已修复或真实来源测试。第64秒15秒读回到79秒仍接受、准备53秒后20秒am可到73秒、55秒结果后stop3+join30返回88秒、200/300父预算未预留final可到203/303秒，以及坏字节/tuple契约均已核；未确认原moonci具体被杀步骤。回执.dart_tool/host-deadline-proposal-independent-review.json。
+
+现已具体授权唯一播放owner只实施原host run.py及针对性测试的最小修正：CLI设备IO前绝对父截止与首case70包含前提、阻塞cap夹剩余/返回后验、必要清理和不可变sampler deadline、已有规则/设备/生命周期门禁保持；原子保存provisional观察不追认terminal，保护/清理或期限不足仍unknown/未尝试，父末恢复也不改写按时通过。15秒case清理预留只是保守策略不保证清完，70与200/300总上限不增加，多例60秒末预留不得泛套使单例120秒永不准入。normal/selection固定文件真实长度/有界字节/UTF8JSON类型/hash与当前case校验，launch既有32768契约不变、超限不截断或保存敏感原文；派生报告让位必要证据，不删保护/共享ADB隔离或primary错误。Windows调度/文件IO超限必须如实记录，不冒称硬实时保证；若需广泛重写先缩小报缺口。先交提交/新旧75宿主定向测试及有意义反例供统筹review，无构建/连接/启动/真实来源，包括未尝试MXdm/aafun均尚不执行，moonci/旧unknown不重跑。
+
 21:20统筹独立审32591da3 tv20592-moonci-mxdm-v1：父plan/唯一实际子case展开规则后hash、runner、physical身份/现装20592/provider与精确moonci原页/第01话匹配；外层完整CLI70.016秒exit124，原results/cleanup均缺失，journal仅started1/unknown1，MXdm无invocation未尝试。事后只读解析App记录同当前case/rule/page/label、fresh、一次QA fallback/21334ms accepted、原生首帧与10007ms窗口/+10135ms/错0、自身清理confirmed；未获原文件准确发布时间，不能证明宿主限时内完成，不改写原unknown。原采样缺失不补PSS；8785字节/hash来自owner固定文件元数据，统筹独立读解析文件绑定，未假称重新hash原始字节。恢复stop与原完整保护meta/桌面音量/provider、reverse/QA/自有runner/目标ADB/监听退出及227.975秒<300收尾独立核对；回执.dart_tool/tv20592-moonci-unknown-independent-review.json。
 
 已续派唯一播放owner仅纯离线核单例/整包计时覆盖与最小宿主修正，先交方案或小提交+有意义fake-clock/device反例，不构建/连接/启动/HTTP或重跑moonci/旧unknown，不自动跑未尝试MXdm/aafun。严守原70秒/整包上限，不靠加timeout/换wrapper/重置钟/删身份清理掩盖。统筹静态更正计时描述：Device.case的started在冷停/config/baseline/am之前，while的70秒已包含这些，不是am后再给70秒；真实静态缺口为外层CLI还含main预检，finally stop/文件读回/sampler join最多30秒与写盘等不受active while统一截止，独立call timeout也未夹剩余，实际被中断具体步骤仍未知。已通知owner精确区别，避免围绕未经证明的重复起点重构。当前先离线修可验证预算终态/必要清理，TV关停保包且保护不动。
