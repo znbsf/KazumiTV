@@ -111,7 +111,6 @@ void main() {
     final result = await inspect(client, const Duration(seconds: 1));
     expect(client.requests, 1);
     expect((result['observations'] as List).single['buffered_bytes'], 65536);
-    print('synthetic_chunk_elements_read=${bytes.reads}');
     expect(bytes.reads, lessThanOrEqualTo(65536));
   });
   test(
@@ -128,8 +127,6 @@ void main() {
     final watch = Stopwatch()..start();
     try {
       final result = await inspect(client, const Duration(milliseconds: 40));
-      print(
-          'reported_elapsed_ms=${result['elapsed_ms']} actual_elapsed_ms=${watch.elapsedMilliseconds}');
       expect(client.requests, 1);
       expect(result['outcome'], 'cleanup_unconfirmed');
       expect((result['observations'] as List).single['status'], 200);
