@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+14:23规则侧新证据已独立交叉核对：5812a3f2的media-rule-pages-20261020中，akianime与xfdmneo公开剧集页摘要精确匹配运行时，对应player_aaaa.url摘要也分别等于根404/401候选；排除凭空/不同解码候选假设，仍不证明拒绝原因或native HTTP同态，不做overlay。统筹重算原运行证据/结构产物摘要及身份对应，回执.dart_tool/media-rule-pages-independent-review.json；未重访页面、未声称完整HTML重放（原响应仅内存、无完整fixture）。baimao详情301/200用满原2请求，追加精确播放页补缺包95ab8454因无法唯一找到公开页，仅0请求并保留unknown，遵守停止条件；不再要求规则侧继续网络枚举。
+
+播放侧在推进ezdmw新15秒采样，AGE静态API核对显示当前Dart/Dio不能提供完整peer-chain/选中信任锚，保持缺口，不改校验/信任或换TLS栈冒充现场。已追加最多2例/300秒的新判别：aafun旧备用作品首次应用已验证QA补救（不重跑现代崩溃unknown）；akianime同作品/集的既有bfzym3u8备用线路默认App测试（须唯一配对，保留第一线路404）。本阶段继续ACTIVE，未以规则侧一包完成收口。
+
+registrant差异复核更新：plugin-registration-review/review.json及双模式生成产物显示固定Flutter3.47.3的release过滤结果字节精确重现20580，debug多dev_dependency native_splash注册；原生成调用参数尚未恢复。统筹在本树pubspec确认dev_dependency且lib与QA入口无该插件调用，暂无QA MissingPlugin证据；不将差异写成已确认合理生成来源或要求手改注册。后续debug候选使用固定工具Android-only debug生成，旧20580证据不覆盖。
+
 14:15统筹独立复核与继续推进：fixture3/live5/media3共11例有终态和清理，不是11例全通过。逐项重比live五例的rule_sha256/fingerprint、作品/线路/集标签/剧集页摘要，全部与batch-1原案例一致；fallback均单次且原服务retired先于fallback开始。moonci/MXdm/xfdmnext在20579 QA补救下首帧+正进度，ezdmw仅首帧进度0仍inconclusive，正常7sefun零fallback。原5个默认路径成功与3个QA策略验证分开，未改产品默认内核/规则，仍有8源未完成有效修复。独立回执.dart_tool/catalog-1415-independent-review.json，不由作者acceptance-review替代统筹验证。
 
 媒体真实新增证据：akianime/baimao同host+hash的根404（HTML881字节），xfdmneo根401（空正文）；三例都仅一次根观察，无子项、无原值落盘，不推断native请求逐包行为。已将这三例规则/公开页面最小判别任务派回规则owner（至多各2页、10秒/256KiB、总5分钟，签名/挑战停止），播放owner续查ezdmw先读日志再一次延长进度/状态观察及AGE实际链可观测性，禁止原样两秒重跑。电视准备问题仍待人类答复，不原样重连拒绝端点；可独立模拟器工作继续，自动化ACTIVE。
