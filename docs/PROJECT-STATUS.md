@@ -12,6 +12,38 @@
 
 已完成案例按身份复用，unknown不自动重跑。修复有基线/修复对照，统筹独立复核并集成验证。有实质变化才重开旧实验，先记区分观察和预算；不为消灭失败项原样循环。资源无效或清理失败停止该批并推进不依赖它的工作，结束核对本任务进程退出及负载。最终收口是当前近乎全部实际无需验证码来源都有代表性结果或清楚排除/覆盖不足理由，code/overlay/external/unknown归因与可修问题复验完成；不在单个批次交付后提前结束。
 
+## 2026-10-20：官方目录快照及规则侧清单（独立分支，未执行播放）
+
+用户授权当前几乎全部无需验证码来源的模拟器快速探测与规则/客户端归因；本会话只拥有
+来源清单、规范化预检、条件计划及规则侧修复，唯一播放运行器由另一会话执行。
+本工作树 kazumi-rules-overlay/Kazumi 已从干净旧分支另建
+codex/source-inventory-20261020，基于集成6a7a31d173e936403333c4c65bc4e6a907e845d8；
+旧64b37ced成果保留。不改integration/播放工作树或run.py/main.dart/build.ps1/report.py，
+不扩规则schema，不操作正式版、实体设备或模拟器，不推送/发布。
+
+已联网核对官方Predidit/KazumiRules默认分支main，固定提交
+ba8e10b35b0c3a56bbb6032a12356b0473844c64（2026-10-19提交）。
+私有快照 C:/Users/hentai/Documents/Kazumi/artifacts/source-inventory-20261020-ba8e10b35b0c
+保存index、元数据及当前目录17条规则原始字节；Git blob逐项校验，不扫描历史废弃JSON。
+source_inventory_download.json记录下载状态，source_inventory.json复用生产PluginImportParser、
+Plugin及RuleOverlay计算准入/规范化摘要，原文件SHA256与规范化SHA256分开。
+目录17、下载17、合格17、无效/缺件0、deprecated排除0；当前没有启用验证码配置的规则，
+17条都可尝试，但实际挑战状态仍17未知，未播放17，实际挑战后跳过0。预检不算可播。
+
+initial-app-plan/batch-1.json为首轮17例，交既有运行器时限App/default单内核、repeat=1；
+每源另有2个明确作品备用，UBW不与Fate2006混用，未核实Bangumi ID保持null。
+后续必须经source_inventory.py结合results及attempts账本筛选；有验证码声明仍可首试，
+实际captcha才跳过；未知/清理异常/启动无终态不重排，播放/解析失败转诊断，
+仅无匹配/无唯一匹配/缺集尝试后续题名，三候选用完只算覆盖不足。
+工具使用说明见tools/qa/source_batch/source_inventory_README.md。
+
+首轮针对性检查：9项Python及10项Dart（包含已有快照契约回归）通过；定向静态分析无问题。
+一个重复名称夹具首轮在Windows因大小写同名文件覆盖失败，已按真实下载器“重复先拒绝”
+修正夹具后通过，没有为该夹具改生产规则归一化行为。
+已只读定位旧DM84/Frieren第1集：App/WebView66解析超时，Gecko同剧集页摘要成功；
+旧记录的rule_fingerprint算法须与新增app_rule_fingerprint对应，不能拿它直接比规范化摘要。
+仍缺该失败解析请求/响应fixture，未证实选择器或接口模板缺陷，因此不捏造overlay修复。
+
 ## 2026-10-20：规则与批测独立集成审查（已完成，未发布）
 
 用户授权无人值守统筹、独立审查和集成验证，发现问题交原会话修复；正式包与实体电视不动。
