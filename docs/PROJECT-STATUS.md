@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+14:55统筹实证复核：仅重验switch的20584结果在lifecycle-switch-20584-1452，原两BACK仍复用20583，初次switch environment_invalid保留。统筹独立按plan重算新目标页面及fixture.mp4?episode=next媒体摘要，与返回行一致；旧代次cancelled/不允许正常发布，旧service cleanup与page_disposed均先于新代次started，新目标首帧/7933ms正进度、两层及最终cleanup成立，runner快照hash匹配identity。旧native写入探针是显式synthetic，非捕获到的真实晚到媒体回调。原生按键前后皆FlutterView，不能据此说Android前台丢失；修复对象为QA控件焦点及独立增加的前台安全门禁。回执.dart_tool/lifecycle-independent-review.json，仍不覆盖完整产品TV UI/实体电视。
+
+规则bf516857新ChapterSelectorDiagnostic已离线审读并独立9项Dart/定向分析通过：同一调用者HTML最多256KiB，复用Plugin.fromJson/生产XPathRuleStrategy，仅换两个集表字段，输出最多每侧6条label/hash和计数/差异，schema/异常/敏感文本不回显，不改输入规则、不生成overlay、不联网。目前尚未接main/runner，也未用真实aafun DOM验收；后续接入必须默认关闭并绑定已有成功App详情响应，不能重复fetch或声称合成测试等于站点修复。
+
 14:45阶段统筹审查：509b4b5a/d0e4768e的QA页面/原生result代次门禁及退场清理已读；原lifecycle-20583-1444的两BACK例实际页面disposal/旧结果抑制/清理成立，第三switch虽发SELECT却未disposal，原行environment_invalid、observed_stage=first_frame保留，批次确实停止，不能把旧页成功当新目标验收。统筹独立重算runner快照与identity，读取事件与两层/最终cleanup。注意实际旧service退役与widget disposal先后不固定，两者都完成后才能切新目标；native旧代次探针标synthetic，不冒称真实晚到媒体回调。
 
 统筹另发现旧host在读到phase文件后直接发全设备key，未核对当前前台。已回派并复核74d5db6a：每次BACK/SELECT前精确核对固定QA Activity，未知/其他包/畸形/查询失败不发键、不切回、记environment_invalid。新fixture焦点修复只在显式switch QA中恢复FlutterView/按钮焦点，激活仍通过真实键事件，不影响产品UI。三提交工具代码已在本树组成独立候选，37项Python门禁/运行器测试、29项Dart生命周期widget/代次/清理/补救反例独立通过，定向分析无问题。20584构建/仅未通过switch复验由唯一播放owner执行中，尚未把新代码计为真实切换已通过；原两BACK不重跑，正式包/preview不操作。
