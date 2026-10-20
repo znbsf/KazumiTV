@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+22:21统筹独立核9cbbfda7 tv20592-aafun-same-response-v1：input原字节/展开rule后manifest/新host runner bcc37bec…/同physical身份与现装20592hash/provider对应。CLI14.971秒在固定文件协议RuntimeError退出；元数据仅rc0、exists未知、invalid_file_marker、156字节及hash，无App诊断终态，planned1/started1/completed0/unknown1/eligible0。不能判断搜索/详情/双XPath比较是否实际执行，也不能由无效marker断文件空/不存在/HTTP或来源错误；Android am Status timeout/Wait10155且expected activity为真亦非正常启动成功证明。无效原文未保存/追加回读，App tap/worker自身ack未观测，进程级case/host/final退出与完整保护meta/桌面音乐8/media0/provider/QA包保持、自有runner目标ADB/监听/reverse空已独立核；全包131.824秒<180。回执.dart_tool/aafun-tv-unknown-independent-review.json，原App和x64两个unknown均保留，不自动重跑或扩MXdm。
+
+撤销前轮transport测试的适用结论：原本地真实shell用裸join模拟ADB argv，统筹提出手工quote并接受该测试均未核真实客户端边界。现核[官方platform-tools34客户端源码](https://android.googlesource.com/platform/packages/modules/adb/+/refs/tags/platform-tools-34.0.0/client/commandline.cpp)：exec-out首命令后逐参数escape_arg，不是裸join；主线同样。统筹独立按该转义模型在本地安全shell复现：当前手工quote再经客户端escape不能产生正确frame，raw script argv经客户端escape可完整输出。回执.dart_tool/adb-exec-argv-model-independent.json。仍未核本次固定binary具体版本或真机协议，不用156B/hash猜错误文本/唯一原因；100离线测试通过只保留其逻辑覆盖，原“已证明实际ADB wire”结论明确撤回，不能当现场可用保证。
+
+已通知唯一owner先完成本包原收尾，随后仅离线从原记录核固定ADB版本/真实escape_arg边界并做result_file与transport测试最小修正，不连接/启动/App或来源请求/原无效字节回读，不旧命令绕过重跑aafun。后续须统筹review后单独有界只读固定协议预检，先证真实传输再考虑未尝试MXdm；当前不自动重开任何unknown。root现有宿主deadline/终态门禁仍在原集成提交，transport适用性待修，正式/preview/系统持续保护。
+
 22:13组合cf748371后已具体续派唯一owner首次ARM aafun selection-only同响应诊断，仅现装20592/新host run.py（实际SHA bcc37bece732be1aa289613bb49dde759eea7d1b2f721d04fc8aa62a17a18682），计划.dart_tool/aafun-tv-same-dom-20592-v1.json SHA b2e6d0e9b5fd26f0088df4133f3dc6bd4b1867496485e70dd4f11636ad8d839d，固定原q2id/rule/work/detail/expected剧集hash标签与123a1667已审提议相同；不重建安装，不重跑moonci或旧x64 unknown，不执行MXdm。新前提为已验证真实ARM初始化与新host证据门禁；CLI完整70秒内含case清理预留，包总180秒含前后全部只读保护/资源核对，不加等待或wrapper。先原状态记边界与新前提、核同物理身份/现装包hash/UID首次安装/三保护包/桌面音乐8及无其他使用，only App repeat1/fallbackfalse/eligible0。
 
 仅正常一次搜索+唯一detail trace，同一已成功响应满足原2xxHTML/无redirect或已知challenge/请求finalURIbody绑定/256KiB准入，才共享剩余<=5秒可终止worker比较两XPath；失败明确comparison not_run，不追加fetch/UA别名URL或页面、媒体、player、JS、overlay。5秒/256KiB不当网络硬限；选择器差异不自动正确或overlay、相同正确则撤回此响应假设。诊断分支player/resolver/subscription的not_created合法，不套实播验收误判；expected_episode是比较绑定，不声称实际加载媒体页。valid终态可observed或not_run原因，HTTP403不假判挑战，实际挑战/身份环境错配/unknown/tap或worker清理不明即停不重试。末次只停parserqa保包QA数据、原保护桌面音量/provider/media与自有进程监听/反向映射退出及负载交统筹，不自动扩其他源；结果尚未出不提前分类。
