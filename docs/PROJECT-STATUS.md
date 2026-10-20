@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:20统筹独立审读并组合f128e96c/649b30bc：75项Python（含真实Kotlin回调体+Java helper编译执行）、24项Dart服务反例及main/service/test定向分析通过。QA onPageStop无实际URI即空值/unattributed，start仍保留真实URI/session守卫，无新媒体请求；controlled软件player文案修正且actual_controller取真实构造类型，不猜运行时版本。新QA main显式opt-in传primary10/shared25/max1，服务默认仍15/25，普通无opt-in和产品路径不变，取消/先退役/慢清理/晚到隔离保持；当前实机候选仅验eligible=true的旧SDK28/WebView66/非iframe-only，不外推现代或不准入规则。回执.dart_tool/qa-primary10-native-independent-review.json。
+
+发现拟20592构建计划误用powershell.exe，而现builder依赖PowerShell7 utf8NoBOM，已要求作者纠正派生计划为原验证pwsh流程并读回确认；非改源码绕过失败。已续派干净冻结649b30bc普通单ARMv7 parserQa20592/0.4.5-parserqa.arm.4一次构建<=180秒，原before/after/ignored registrant/实际APK版本ABI ELF签名与hash均须保存，先交产物，不连接/安装/实跑。新候选物理复验将在独立读回后仅覆盖受影响预算/诊断fixture及ezdmw原例+正常来源控制，不重跑整批或旧unknown；尚未构建或验收，不预写修复成功。
+
 20:05统筹独立核tv-gecko-phase-control-20591-v1（3aa65895运行交付）：同现装APK/physical identity/provider/runner/展开rule输入、ezdmw页hash+标签3一致，trace12713ms解析成功，target load_start7317→resolved12699，目标后5382ms取得媒体/native首帧；2秒进度0，仍仅解析/首帧可行，不计完整短播通过。受控UA与软件播放器不同于App默认，不能断纯预算单变量/正式默认修复；原各层清理/原三包前后hash和自有runner退出已核，回执.dart_tool/tv-gecko-phase-independent-review.json。未追加同包重试或延长等待。
 
 规则ac473982 v8已独立重算43输入hash/17源分环境清单，TV1短播+3解析超时、不撤销x64原11限定样本且未纳入这次controlled首帧；回执.dart_tool/depth-v8-independent-review.json。实际Gecko环境字段仍构建依赖常量，不冒称runtime API查询，App实际随机UA缺失保留。

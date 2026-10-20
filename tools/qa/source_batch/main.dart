@@ -139,7 +139,7 @@ class _BatchCaseState extends State<BatchCase> {
       'id': c['id'], 'engine': c['engine'], 'stage': 'starting',
       'environment': await qaChannel.invokeMethod('environment'),
       'timings_ms': <String, int>{},
-      'player': appProfile ? 'production PlayerPlaybackController/TV defaults' : 'media_kit/emulator/gpu/software/muted',
+      'player': appProfile ? 'production PlayerPlaybackController/TV defaults' : 'media_kit/controlled/gpu/software/muted',
       'parser_profile': appProfile ? 'production factory/default UA/legacy capability detection' : 'shared-script/document-start/all-frames/fixed-UA',
       'coverage': appProfile ? 'service path; no TV UI navigation/history/danmaku' : 'controlled engine comparison',
       'diagnostics': <String>[],
@@ -344,18 +344,30 @@ class _BatchCaseState extends State<BatchCase> {
           }
           return controller;
         }
-        if (c['engine'] == 'gecko') return GeckoQaController(ua);
-        return VideoWebviewAndroidImpl(userAgent: ua);
+        final VideoWebviewController<dynamic> controller;
+        if (c['engine'] == 'gecko') {
+          controller = GeckoQaController(ua);
+        } else {
+          controller = VideoWebviewAndroidImpl(userAgent: ua);
+        }
+        result['actual_controller'] = controller.runtimeType.toString();
+        return controller;
       });
       if (appProfile && c['app_gecko_fallback'] == true) {
         final primary = resolver;
+        // QA candidate only: leave more of the same 25s for cold Gecko startup.
+        // The service's historical default and ordinary App path stay intact.
+        const primaryBudget = Duration(seconds: 10);
+        const totalBudget = Duration(seconds: 25);
         final eligible = WebViewFeatureService.needsLegacyPlayerCompat &&
             !WebViewFeatureService.isDocumentStartScriptSupported && !legacy;
         final events = <Map<String, Object?>>[];
         result['fallback_events'] = events;
         result['fallback_policy'] = {
           'explicit_qa_opt_in': true, 'eligible': eligible,
-          'total_resolution_budget_ms': 25000, 'max_fallbacks': 1,
+          'primary_resolution_budget_ms': primaryBudget.inMilliseconds,
+          'total_resolution_budget_ms': totalBudget.inMilliseconds, 'max_fallbacks': 1,
+          'budget_source': 'QA main explicit opt-in candidate; service default remains primary 15s',
           'media_headers': 'unchanged production Plugin.buildHttpHeaders',
           'gecko_ua': 'same UA as media headers; primary keeps App default UA',
         };
@@ -372,6 +384,7 @@ class _BatchCaseState extends State<BatchCase> {
             });
           },
           enabled: true, eligible: eligible,
+          primaryBudget: primaryBudget, totalBudget: totalBudget,
           onEvent: (event) {
             if (events.length < 32) events.add(event);
             widget.onSignal(event);

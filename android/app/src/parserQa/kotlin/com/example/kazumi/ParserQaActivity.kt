@@ -136,7 +136,8 @@ class ParserQaActivity : MainActivity() {
                                 diagnostic("load_start", uri, "")
                             }
                             override fun onPageStop(session: GeckoSession, success: Boolean) {
-                                diagnostic("load_stop", url, "success=$success")
+                                val stop = QaGeckoPageStop.fromCallback(success)
+                                diagnostic("load_stop", stop.uri, stop.detail)
                             }
                         }
                         s.navigationDelegate = object : GeckoSession.NavigationDelegate {

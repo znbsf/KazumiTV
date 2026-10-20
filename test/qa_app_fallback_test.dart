@@ -41,6 +41,188 @@ Future<VideoSource> fail(Duration _) async =>
     throw const VideoSourceTimeoutException(Duration(seconds: 15));
 
 void main() {
+  test('historical service defaults remain primary 15s and shared 25s', () async {
+    final service = QaAppFallbackService(
+        primaryFactory: () => FakeService((_) async => source),
+        fallbackFactory: () => FakeService(fail),
+        enabled: true,
+        eligible: true);
+    expect(service.primaryBudget, const Duration(seconds: 15));
+    expect(service.totalBudget, const Duration(seconds: 25));
+    await service.dispose();
+  });
+
+  test('10s candidate accepts normal primary without constructing fallback',
+      () async {
+    var fallbackCount = 0;
+    Duration? actualPrimaryBudget;
+    final service = QaAppFallbackService(
+        primaryFactory: () => FakeService((budget) async {
+              actualPrimaryBudget = budget;
+              return source;
+            }),
+        fallbackFactory: () {
+          fallbackCount++;
+          return FakeService(fail);
+        },
+        enabled: true,
+        eligible: true,
+        primaryBudget: const Duration(seconds: 10),
+        totalBudget: const Duration(seconds: 25));
+    expect(await service.resolve('https://page.test', useLegacyParser: false),
+        same(source));
+    expect(actualPrimaryBudget, const Duration(seconds: 10));
+    expect(fallbackCount, 0);
+    await service.dispose();
+  });
+
+  test('scaled 10/25 candidate leaves room that historical 15/25 cannot',
+      () async {
+    // Scale seconds by 20ms. Same total and same cold-engine work in both
+    // runs; only primaryBudget differs. This proves scheduling, not site cause.
+    for (final primaryMs in [300, 200]) {
+      final latePrimary = Completer<VideoSource>();
+      final events = <Map<String, Object?>>[];
+      var fallbackCount = 0;
+      Duration? backupBudget;
+      final service = QaAppFallbackService(
+          primaryFactory: () => FakeService((_) => latePrimary.future),
+          fallbackFactory: () {
+            fallbackCount++;
+            return FakeService((budget) {
+              backupBudget = budget;
+              return Future<VideoSource>.delayed(
+                  const Duration(milliseconds: 240), () => source);
+            });
+          },
+          enabled: true,
+          eligible: true,
+          primaryBudget: Duration(milliseconds: primaryMs),
+          totalBudget: const Duration(milliseconds: 500),
+          onEvent: events.add);
+      final request =
+          service.resolve('https://page.test', useLegacyParser: false);
+      if (primaryMs == 300) {
+        await expectLater(request, throwsA(isA<VideoSourceTimeoutException>()));
+        expect(backupBudget, lessThan(const Duration(milliseconds: 250)));
+      } else {
+        expect(await request, same(source));
+        expect(backupBudget, greaterThan(const Duration(milliseconds: 250)));
+      }
+      latePrimary.complete(source);
+      await service.dispose();
+      expect(fallbackCount, 1);
+      expect(events.where((x) => x['phase'] == 'primary' && x['stage'] == 'accepted'), isEmpty);
+      expect(events.indexWhere((x) => x['phase'] == 'primary' && x['stage'] == 'retired'),
+          lessThan(events.indexWhere((x) => x['phase'] == 'fallback' && x['stage'] == 'started')));
+      expect(events.where((x) => x['stage'] == 'accepted'),
+          hasLength(primaryMs == 200 ? 1 : 0));
+    }
+  });
+
+  test('scaled 10/25 shared deadline stops one ignoring fallback and late media',
+      () async {
+    final latePrimary = Completer<VideoSource>();
+    final lateBackup = Completer<VideoSource>();
+    final events = <Map<String, Object?>>[];
+    var fallbackCount = 0;
+    Duration? backupBudget;
+    final service = QaAppFallbackService(
+        primaryFactory: () => FakeService((_) => latePrimary.future),
+        fallbackFactory: () {
+          fallbackCount++;
+          return FakeService((budget) {
+            backupBudget = budget;
+            return lateBackup.future;
+          });
+        },
+        enabled: true,
+        eligible: true,
+        primaryBudget: const Duration(milliseconds: 40),
+        totalBudget: const Duration(milliseconds: 100),
+        onEvent: events.add);
+    final clock = Stopwatch()..start();
+    await expectLater(service.resolve('https://page.test', useLegacyParser: false),
+        throwsA(isA<VideoSourceTimeoutException>()));
+    expect(clock.elapsedMilliseconds, lessThan(600));
+    expect(backupBudget, lessThanOrEqualTo(const Duration(milliseconds: 60)));
+    expect(fallbackCount, 1);
+    latePrimary.complete(source);
+    lateBackup.complete(source);
+    await service.dispose();
+    expect(events.where((x) => x['stage'] == 'accepted'), isEmpty);
+  });
+
+  for (final switchEpisode in [false, true]) {
+    test('candidate timeout retirement rejects ${switchEpisode ? 'switch' : 'cancel'} before fallback',
+        () async {
+      final retiring = Completer<void>(), released = Completer<void>();
+      final late = Completer<VideoSource>();
+      final events = <Map<String, Object?>>[];
+      var primaryCount = 0, fallbackCount = 0;
+      final service = QaAppFallbackService(
+          primaryFactory: () => ++primaryCount == 1
+              ? FakeService((_) => late.future, close: () {
+                  retiring.complete();
+                  return released.future;
+                })
+              : FakeService((_) async => source),
+          fallbackFactory: () {
+            fallbackCount++;
+            return FakeService(fail);
+          },
+          enabled: true,
+          eligible: true,
+          primaryBudget: const Duration(milliseconds: 40),
+          totalBudget: const Duration(milliseconds: 100),
+          onEvent: events.add);
+      final old = expectLater(
+          service.resolve('https://page.test/old', useLegacyParser: false),
+          throwsA(isA<VideoSourceCancelledException>()));
+      await retiring.future;
+      expect(fallbackCount, 0);
+      Future<VideoSource>? next;
+      if (switchEpisode) {
+        next = service.resolve('https://page.test/new', useLegacyParser: false);
+      } else {
+        service.cancel();
+      }
+      released.complete();
+      await old;
+      if (next != null) expect(await next, same(source));
+      late.complete(source);
+      await service.dispose();
+      expect(fallbackCount, 0);
+      expect(events.where((x) => x['generation'] == 1 && x['stage'] == 'accepted'), isEmpty);
+    });
+  }
+
+  test('candidate slow unconfirmed retirement never starts fallback', () async {
+    final released = Completer<void>(), late = Completer<VideoSource>();
+    var fallbackCount = 0;
+    final events = <Map<String, Object?>>[];
+    final service = QaAppFallbackService(
+        primaryFactory: () => FakeService((_) => late.future, close: () => released.future),
+        fallbackFactory: () {
+          fallbackCount++;
+          return FakeService(fail);
+        },
+        enabled: true,
+        eligible: true,
+        primaryBudget: const Duration(milliseconds: 40),
+        totalBudget: const Duration(milliseconds: 100),
+        cleanupBudget: const Duration(milliseconds: 120),
+        onEvent: events.add);
+    await expectLater(service.resolve('https://page.test', useLegacyParser: false),
+        throwsA(isA<TimeoutException>()));
+    expect(fallbackCount, 0);
+    expect(events.where((x) => x['stage'] == 'cleanup_unconfirmed'), hasLength(1));
+    released.complete();
+    late.complete(source);
+    await expectLater(service.dispose(), throwsStateError);
+    expect(events.where((x) => x['stage'] == 'accepted'), isEmpty);
+  });
+
   for (final fallback in [false, true]) {
     for (final action in ['cancel', 'switch', 'dispose']) {
       test(

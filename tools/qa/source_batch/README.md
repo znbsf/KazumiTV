@@ -83,7 +83,10 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 清单单例附加`app_gecko_fallback: true`，仍使用`--engines app`。普通清单和生产App
 行为不变。仅实际旧WebView66能力准入、非iframe-only，原解析timeout/notfound后
 尝试一次Gecko；先等待原服务退出，退出失败不切换。总解析25秒，补救只能用剩余
-预算，退出每阶段另限2秒。取消/新请求会作废旧代次。搜索、集表、媒体headers、
+预算，退出每阶段另限2秒。当前QA main仅在此显式开关分支传入primary 10秒/total 25秒：
+primary用尽10秒后剩余最多15秒且须扣除退役耗时，提前失败仍沿用剩余总预算；不另续期。
+QaAppFallbackService本身的历史默认仍为primary 15秒/total 25秒，旧结果原件不改写。
+取消/新请求会作废旧代次。搜索、集表、媒体headers、
 PlayerPlaybackController保持App路径；Gecko浏览器UA使用媒体headers里的UA，主解析
 仍保留App默认随机UA，不能把该实验当严格的同UA纯内核性能排名。
 
@@ -93,6 +96,9 @@ PlayerPlaybackController保持App路径；Gecko浏览器UA使用媒体headers里
 GeckoRuntime仍可驻留至QA进程退出；不得称为已实现适合生产的低内存回退。
 该策略不解决验证码；只对事先检查、未观察到实际挑战的受控样本执行，挑战即停止。
 生产默认策略、规则profile/schema和内核分发均不由此实验自动启用。
+fallback_policy明确记录primary_resolution_budget_ms、total_resolution_budget_ms及budget_source；
+当前10/25只是待实机验证的QA调度候选，不是来源修复结论。受控软件player标签改为controlled，
+actual_controller从构造对象直接导出；该类型名不代表另行查询了GeckoRuntime版本API。
 
 QA错误快照补充：`failure_snapshot`只读记录最多5层异常类型、NetworkException/Dio原因，
 请求只保留method与host/URL摘要；响应只保留状态、content-type/server/cf-mitigated头、
@@ -128,6 +134,10 @@ rule_variant默认为effective；只有带覆盖元数据时可选base，它构�
 仍单独保存，不能代替运行时测量。这不新增播放profile或改变默认内核、网页fetch请求头。
 
 ## 可选媒体响应观察（仅集成 QA）
+
+Gecko native诊断的load_start使用回调实际URI；onPageStop本身没有URI，因此load_stop输出空URI及
+`uri=unattributed`，不从请求地址或上一次start推断页面归属。既有snapshot没有sender frame身份，
+不能仅凭stop success或snapshot判定目标主文档已经完成。此修正仅QA日志，不改变解析策略。
 
 单例显式 observe_media_root=true 才会在解析到候选后、原生播放前执行。
 默认不请求。入口核对debug及parserqa身份，只取现有URL于内存，不保存URL/query/fragment、
