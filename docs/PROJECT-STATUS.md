@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+现代对照设置边界补充：统筹撤销自己刚加的“现代缺包就不能安装”过严限制。只读AVD退出可能不保留此前20588，已有签名/源码绑定的现成x64 QA可在已核归属同一现代AVD内常规install-r一次<=45秒：缺包或旧版<=20588且真实签名兼容才可，旧包meta先保留、升级后全hash/版本/签名/ABI/UID首次安装核对；不卸载清数据/降级，签名或版本不满足就停。启动+安装+身份设置合计<=120秒、原总300不扩，余不足70+60不启来源。已装匹配20588不重复安装，TV20592不动、不新构建或修工具；其他唯一案例边界原样。
+
 2026-10-21 00:34统筹独立审tv20592-aafun-fallback-v1：原base/作品/第01话页运行时精确，primary10019ms超时/10101retired先唯一Gecko10103start，共享25001ms明确timeout、25013retired，无resolved/accepted/player；App28648ms，既有10/25/max1策略未补救此TV例。snapshot readycomplete frames3/videos0缺senderframe，stopURIunattributed不当目标完成证明；原非主框架400/reset线索不唯一外因。case64.657秒收尾/stop65.634<70、全包80.547<180，完整保护QAmeta桌面音乐8/provider/media0/reverse与自有退出confirmed、TV短CPU12.68%/host8%。回执.dart_tool/aafun-fallback-independent-review.json，原默认失败与旧unknown保持，不再同TV同策略重试或工具修复。静态亦核adBlocker只在播放器构造使用，当前未建player，不以该字段猜解析失败或做无依据开关试验。
 
 下一仅一例新现代环境默认App判别已具体交唯一owner，.dart_tool/aafun-modern-default-20588-v1.json SHA68a9290d4d0821b822c44c74187ea0cdbf2ff335f351f8126168cf228d405094，原first-media仅id/group变更，base/Frieren/road0ep0/第01话hash/10s/fallbackfalse保持。复用原depth-modern-control-20588-v1已验证GoogleTV API36/x64/provider143.0.7499.24/emulator5588现装20588 SHA02e6999b…compiled e3c0ba90；root git diff e3..649 --lib android/app/src/main为空，同生产代码/默认策略但实际随机UA未配对，不称单变量/TV验收。旧20586x64unknown保留，新前提为当前实际集表/TV失败与可靠直接UI观察，现代原例来源阶段尚未证。
