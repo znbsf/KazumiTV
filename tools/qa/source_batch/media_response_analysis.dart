@@ -29,7 +29,10 @@ String? mediaObservationStopReason(String value) {
     'access_token',
     'auth',
     'authorization',
+    'auth_key',
+    'authkey',
     'sign',
+    'sig',
     'signature',
     'dis_k',
     'dis_t',
@@ -38,7 +41,14 @@ String? mediaObservationStopReason(String value) {
     'exp',
     'policy',
     'key-pair-id',
-    'x-amz-signature'
+    'x-amz-signature',
+    'x-amz-credential',
+    'x-goog-signature',
+    'x-goog-credential',
+    'hdnts',
+    'hdnea',
+    'wssecret',
+    'wstime'
   };
   if (RegExp(r'https?(?::|%3a|%253a)(?://|%2f%2f|%252f%252f)',
           caseSensitive: false)

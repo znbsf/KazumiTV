@@ -111,6 +111,16 @@ void main() {
       'sign=PRIVATE_SENTINEL',
       'ToKeN=PRIVATE_SENTINEL',
       '%73ignature=PRIVATE_SENTINEL',
+      'X-Goog-Signature=PRIVATE_SENTINEL',
+      'auth_key=PRIVATE_SENTINEL',
+      'sig=PRIVATE_SENTINEL',
+      'X-Amz-Credential=PRIVATE_SENTINEL',
+      'X-Goog-Credential=PRIVATE_SENTINEL',
+      'authkey=PRIVATE_SENTINEL',
+      'hdnts=PRIVATE_SENTINEL',
+      'hdnea=PRIVATE_SENTINEL',
+      'wsSecret=PRIVATE_SENTINEL',
+      'wsTime=PRIVATE_SENTINEL',
       'url=https%3A%2F%2Fexample.invalid%2FPRIVATE_SENTINEL',
     ]) {
       final result = await HttpOverrides.runZoned(

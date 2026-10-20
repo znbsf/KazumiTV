@@ -85,6 +85,8 @@ void main() {
       () {
     for (final value in [
       analyze('#EXTM3U\nchild.ts?sign=SIGNED_SENTINEL'),
+      analyze('#EXTM3U\nchild.ts?X-Goog-Signature=SIGNED_SENTINEL'),
+      analyze('#EXTM3U\nchild.ts?auth_key=SIGNED_SENTINEL'),
       analyze('<html><title>Just a moment</title>SECRET_SENTINEL</html>'),
       analyze('<html>PRIVATE_SENTINEL</html>'),
       analyze(
