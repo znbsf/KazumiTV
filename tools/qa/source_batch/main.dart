@@ -31,6 +31,8 @@ import 'app_fallback_service.dart';
 import 'media_root_observer.dart';
 import 'playback_observation.dart';
 import 'case_selection.dart';
+import 'lifecycle_gate.dart';
+import 'lifecycle_host.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -53,12 +55,20 @@ Future<void> main() async {
   await Hive.initFlutter('${root.path}/hive');
   await GStorage.init();
   if (config['engine'] == 'app') await _shaderAssets.copyShadersToExternalDirectory();
-  runApp(MaterialApp(home: BatchCase(config)));
+  runApp(MaterialApp(home: QaLifecycleHost(config: config, channel: qaChannel,
+    pageBuilder: (c, ticket, finished, signal, disposed) => BatchCase(c,
+      key: ValueKey(ticket.generation), ticket: ticket, onFinished: finished,
+      onSignal: signal, onPageDisposed: disposed))));
 }
 
 class BatchCase extends StatefulWidget {
-  const BatchCase(this.config, {super.key});
+  const BatchCase(this.config, {required this.ticket, required this.onFinished,
+    required this.onSignal, required this.onPageDisposed, super.key});
   final Map<String, dynamic> config;
+  final QaCaseTicket ticket;
+  final void Function(Map<String, dynamic>) onFinished;
+  final void Function(Map<String, Object?>) onSignal;
+  final VoidCallback onPageDisposed;
   @override
   State<BatchCase> createState() => _BatchCaseState();
 }
@@ -66,6 +76,7 @@ class BatchCase extends StatefulWidget {
 class _BatchCaseState extends State<BatchCase> {
   VideoController? _video;
   String _stage = 'starting';
+  bool get _current => mounted && !widget.ticket.cancelled;
   @override
   void initState() {
     super.initState();
@@ -76,6 +87,9 @@ class _BatchCaseState extends State<BatchCase> {
     final c = widget.config;
     final appProfile = c['engine'] == 'app';
     final watch = Stopwatch()..start();
+    final run = HealthRun();
+    IVideoSourceService? resolver;
+    widget.ticket.attachCancel(() { run.cancel(); resolver?.cancel(); });
     final result = <String, dynamic>{
       'id': c['id'], 'engine': c['engine'], 'stage': 'starting',
       'environment': await qaChannel.invokeMethod('environment'),
@@ -86,13 +100,12 @@ class _BatchCaseState extends State<BatchCase> {
       'diagnostics': <String>[],
     };
     final timings = result['timings_ms'] as Map<String, int>;
-    final run = HealthRun();
-    IVideoSourceService? resolver;
     Player? player;
     PlayerPlaybackController? appPlayback;
     StreamSubscription<String>? errors;
     String phase = 'search';
     try {
+      if (!_current) throw const VideoSourceCancelledException();
       final observationWindow = qaPlaybackObservationWindow(c['observe_playback_seconds']);
       final ua = c['user_agent'] as String;
       String episodeUrl;
@@ -148,7 +161,7 @@ class _BatchCaseState extends State<BatchCase> {
       timings['search_chapters'] = watch.elapsedMilliseconds;
       result['episode_page_sha256'] = sha256.convert(utf8.encode(episodeUrl)).toString();
       phase = 'resolve';
-      setState(() => _stage = phase);
+      if (_current) setState(() => _stage = phase);
       final beginResolve = watch.elapsedMilliseconds;
       resolver = WebViewVideoSourceService(diagnosticSink: (record) {
         final diagnostics = result['diagnostics'] as List<String>;
@@ -189,7 +202,10 @@ class _BatchCaseState extends State<BatchCase> {
             });
           },
           enabled: true, eligible: eligible,
-          onEvent: (event) { if (events.length < 32) events.add(event); },
+          onEvent: (event) {
+            if (events.length < 32) events.add(event);
+            widget.onSignal(event);
+          },
         );
       }
       final cache = ResolvedSourceCache.shared;
@@ -197,14 +213,16 @@ class _BatchCaseState extends State<BatchCase> {
       Future<VideoSource> fresh() => resolver!.resolve(episodeUrl, useLegacyParser: legacy,
           timeout: const Duration(seconds: 15));
       final attempt = appProfile ? await cache.resolve(key: cacheKey, offset: 0,
-          headers: headers, fresh: fresh, isCurrent: () => !run.cancelled)
+          headers: headers, fresh: fresh, isCurrent: () => _current && !run.cancelled)
           : ResolvedSourceAttempt(await fresh(), headers, fromCache: false);
       final source = attempt.source;
+      if (!_current) throw const VideoSourceCancelledException();
       result['from_confirmed_cache'] = attempt.fromCache;
       timings['resolve'] = watch.elapsedMilliseconds - beginResolve;
       result['stage'] = 'resolved';
       // Never persist signed media URLs or query strings in exported reports.
       result['media_host'] = Uri.tryParse(source.url)?.host;
+      result['media_sha256'] = sha256.convert(utf8.encode(source.url)).toString();
       if (c['observe_media_root'] == true) {
         final available = const Duration(seconds: 35) - watch.elapsed;
         result['media_root_observation'] = await observeMediaRoot(
@@ -213,12 +231,12 @@ class _BatchCaseState extends State<BatchCase> {
           packageName: (await PackageInfo.fromPlatform()).packageName,
           mediaUrl: source.url,
           headers: attempt.headers,
-          isCancelled: () => run.cancelled || !mounted,
+          isCancelled: () => run.cancelled || !_current,
           budget: available,
         );
       }
       phase = 'first_frame';
-      setState(() => _stage = phase);
+      if (_current) setState(() => _stage = phase);
       final beginPlay = watch.elapsedMilliseconds;
       if (appProfile) {
         appPlayback = PlayerPlaybackController(shaderAssetService: _shaderAssets,
@@ -229,7 +247,7 @@ class _BatchCaseState extends State<BatchCase> {
         var playerErrorCount = 0;
         final disposeReaction = reaction<VideoController?>(
           (_) => playback.videoController, (video) {
-            if (video == null || !mounted) return;
+            if (video == null || !_current) return;
             setState(() => _video = video);
             video.waitUntilFirstFrameRendered.then((_) {
               if (!rendered.isCompleted) rendered.complete();
@@ -240,7 +258,7 @@ class _BatchCaseState extends State<BatchCase> {
         try {
           final frame = rendered.future.timeout(const Duration(seconds: 20));
           final opened = playback.createVideoController(attempt.headers, adBlocker,
-            videoSourceFormat: source.format, canInstall: () => mounted && !run.cancelled,
+            videoSourceFormat: source.format, canInstall: () => _current && !run.cancelled,
             onPlaybackError: (_) {
               if (observationWindow != null) playerErrorCount++;
               if (!rendered.isCompleted) rendered.completeError(StateError('production_player_error'));
@@ -254,7 +272,7 @@ class _BatchCaseState extends State<BatchCase> {
           timings['first_frame'] = watch.elapsedMilliseconds - beginPlay;
           result['stage'] = 'first_frame';
           await cache.rememberAfterFirstFrame(key: cacheKey, attempt: attempt,
-              firstFrame: rendered.future, isCurrent: () => !run.cancelled);
+              firstFrame: rendered.future, isCurrent: () => _current && !run.cancelled);
           result['player_settings'] = {'tv': TvMode.enabled,
             'emulator': playback.androidEmulator, 'hwdec': playback.hardwareDecoder,
             'hardware_acceleration': playback.hAenable,
@@ -267,7 +285,7 @@ class _BatchCaseState extends State<BatchCase> {
             result['playback_observation'] = await observeQaPlayback(
               window: observationWindow,
               remainingBudget: const Duration(seconds: 60) - watch.elapsed,
-              isCancelled: () => run.cancelled || !mounted,
+              isCancelled: () => run.cancelled || !_current,
               read: () => QaPlaybackState(
                 positionMs: player!.state.position.inMilliseconds,
                 playing: player!.state.playing, buffering: player!.state.buffering,
@@ -295,8 +313,9 @@ class _BatchCaseState extends State<BatchCase> {
         vo: 'gpu', hwdec: 'no', enableHardwareAcceleration: false,
         enableAndroidSurfaceProducer: false, androidAttachSurfaceAfterVideoParameters: false,
       ));
-      setState(() => _video = video);
+      if (_current) setState(() => _video = video);
       await WidgetsBinding.instance.endOfFrame;
+      if (!_current) throw const VideoSourceCancelledException();
       await player.setVolume(0);
       // Subscribe before opening so early errors are handled.
       final frame = Future.any<void>([
@@ -311,6 +330,8 @@ class _BatchCaseState extends State<BatchCase> {
       final start = player.state.position;
       await Future<void>.delayed(const Duration(seconds: 2));
       result['progress_ms'] = (player.state.position - start).inMilliseconds;
+    } on VideoSourceCancelledException {
+      result['stage'] = 'cancelled';
     } on VideoSourceTimeoutException {
       result['stage'] = 'resolve_timeout';
     } on TimeoutException {
@@ -332,22 +353,30 @@ class _BatchCaseState extends State<BatchCase> {
       timings['total_before_cleanup'] = watch.elapsedMilliseconds;
       run.cancel();
       resolver?.cancel();
-      setState(() => _video = null);
-      try {
-        await errors?.cancel();
-        if (appPlayback != null) {
-          await appPlayback.stop().timeout(const Duration(seconds: 4));
-          if (!appPlayback.lastReleaseSucceeded) throw StateError('production_player_release_failed');
-        } else {
-          await player?.dispose().timeout(const Duration(seconds: 4));
-        }
-        await resolver?.dispose().timeout(const Duration(seconds: 4));
-        result['cleanup'] = 'confirmed';
-      } catch (_) { result['cleanup'] = 'unconfirmed'; }
+      if (mounted) setState(() => _video = null);
+      final retiringPlayback = appPlayback;
+      final retiringPlayer = player;
+      final retiringResolver = resolver;
+      final retiringErrors = errors;
+      result.addAll(await retireQaResources(
+        subscription: retiringErrors == null ? null : () => retiringErrors.cancel(),
+        player: retiringPlayback != null ? () async {
+          await retiringPlayback.stop();
+          if (!retiringPlayback.lastReleaseSucceeded) throw StateError('production_player_release_failed');
+        } : retiringPlayer == null ? null : () => retiringPlayer.dispose(),
+        resolver: retiringResolver == null ? null : () => retiringResolver.dispose(),
+      ));
       timings['total'] = watch.elapsedMilliseconds;
-      await qaChannel.invokeMethod<void>('result', jsonEncode(result));
-      if (mounted) setState(() => _stage = result['stage'] as String);
+      widget.onFinished(result);
+      if (_current) setState(() => _stage = result['stage'] as String);
     }
+  }
+
+  @override
+  void dispose() {
+    widget.ticket.cancel();
+    widget.onPageDisposed();
+    super.dispose();
   }
 
   @override

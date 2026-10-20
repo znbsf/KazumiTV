@@ -2,6 +2,10 @@ package com.example.kazumi
 
 import android.os.Build
 import android.webkit.WebView
+import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
@@ -14,13 +18,17 @@ import org.mozilla.geckoview.WebExtension
 import org.mozilla.geckoview.WebRequestError
 import java.io.File
 
-/** Loaded only by the opt-in parserQa/debug variant. One case per process. */
+/** Opt-in parserQa/debug only. One experiment, optionally serial fixture generations. */
 class ParserQaActivity : MainActivity() {
     private lateinit var channel: MethodChannel
     private var runtime: GeckoRuntime? = null
     private var session: GeckoSession? = null
     private var extension: WebExtension? = null
     private var generation = 0
+    private var resultGeneration = 0
+    private var resultCaseId: String? = null
+    private var lifecycleSwitch = false
+    private val lifecycleKeyEvents = ArrayList<Map<String, Any?>>()
 
     override fun configureFlutterEngine(engine: FlutterEngine) {
         super.configureFlutterEngine(engine)
@@ -29,7 +37,12 @@ class ParserQaActivity : MainActivity() {
         channel.setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
-                    "config" -> result.success(File(filesDir, "case.json").readText())
+                    "config" -> {
+                        val text = File(filesDir, "case.json").readText()
+                        lifecycleSwitch = JSONObject(text).optJSONObject("qa_lifecycle")?.optString("action") == "switch"
+                        result.success(text)
+                    }
+                    "qaKeyState" -> result.success(lifecycleKeyEvents)
                     "environment" -> {
                         val provider = WebView.getCurrentWebViewPackage()
                         result.success(mapOf("sdk" to Build.VERSION.SDK_INT,
@@ -37,13 +50,38 @@ class ParserQaActivity : MainActivity() {
                             "webview" to "${provider?.packageName}/${provider?.versionName}",
                             "gecko" to "146.0.20251217121356", "package" to packageName))
                     }
+                    "qaBegin" -> {
+                        val args = call.arguments as Map<*, *>
+                        val epoch = (args["generation"] as Number).toInt()
+                        val id = args["case_id"] as String
+                        require(epoch > resultGeneration && id.length in 1..100)
+                        resultGeneration = epoch
+                        resultCaseId = id
+                        result.success(null)
+                    }
+                    "qaInvalidate" -> {
+                        val args = call.arguments as Map<*, *>
+                        if ((args["generation"] as Number).toInt() == resultGeneration) resultCaseId = null
+                        result.success(null)
+                    }
+                    "qaState" -> {
+                        val args = call.arguments as Map<*, *>
+                        if ((args["generation"] as Number).toInt() == resultGeneration && args["case_id"] == resultCaseId) {
+                            File(filesDir, "lifecycle-state.json").writeText(JSONObject(args).toString())
+                        }
+                        result.success(null)
+                    }
                     "result" -> {
                         val text = call.arguments as String
-                        JSONObject(text) // Reject malformed output before atomic replacement.
+                        val row = JSONObject(text)
+                        if (row.optInt("qa_generation") != resultGeneration || row.optString("qa_case_id") != resultCaseId) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
                         val temporary = File(filesDir, "result.tmp")
                         temporary.writeText(text)
                         check(temporary.renameTo(File(filesDir, "result.json")))
-                        result.success(null)
+                        result.success(true)
                     }
                     "geckoInit" -> {
                         val rt = runtime ?: GeckoRuntime.create(applicationContext,
@@ -115,6 +153,30 @@ class ParserQaActivity : MainActivity() {
         generation++
         session?.let { it.stop(); it.close() }
         session = null
+    }
+    private fun findQaFlutterView(view: View): FlutterView? {
+        if (view is FlutterView) return view
+        if (view is ViewGroup) for (i in 0 until view.childCount) {
+            findQaFlutterView(view.getChildAt(i))?.let { return it }
+        }
+        return null
+    }
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Only the explicitly enabled QA fixture switch restores focus from a
+        // headless platform view. Activation still goes through the real key
+        // event, Flutter focus/shortcuts and the visible fixture button.
+        if (lifecycleSwitch && resultGeneration == 1 && resultCaseId != null &&
+            event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER && event.action == KeyEvent.ACTION_DOWN) {
+            val before = currentFocus?.javaClass?.simpleName
+            val target = findQaFlutterView(window.decorView)
+            target?.isFocusableInTouchMode = true
+            val focused = target?.requestFocus() == true
+            if (lifecycleKeyEvents.size < 4) lifecycleKeyEvents.add(mapOf(
+                "keycode" to event.keyCode, "generation" to resultGeneration,
+                "before_focus_class" to before, "after_focus_class" to currentFocus?.javaClass?.simpleName,
+                "flutter_focus_requested" to focused, "epoch_ms" to System.currentTimeMillis()))
+        }
+        return super.dispatchKeyEvent(event)
     }
     override fun onDestroy() { closeSession(); super.onDestroy() }
 }

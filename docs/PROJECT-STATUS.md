@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+14:45阶段统筹审查：509b4b5a/d0e4768e的QA页面/原生result代次门禁及退场清理已读；原lifecycle-20583-1444的两BACK例实际页面disposal/旧结果抑制/清理成立，第三switch虽发SELECT却未disposal，原行environment_invalid、observed_stage=first_frame保留，批次确实停止，不能把旧页成功当新目标验收。统筹独立重算runner快照与identity，读取事件与两层/最终cleanup。注意实际旧service退役与widget disposal先后不固定，两者都完成后才能切新目标；native旧代次探针标synthetic，不冒称真实晚到媒体回调。
+
+统筹另发现旧host在读到phase文件后直接发全设备key，未核对当前前台。已回派并复核74d5db6a：每次BACK/SELECT前精确核对固定QA Activity，未知/其他包/畸形/查询失败不发键、不切回、记environment_invalid。新fixture焦点修复只在显式switch QA中恢复FlutterView/按钮焦点，激活仍通过真实键事件，不影响产品UI。三提交工具代码已在本树组成独立候选，37项Python门禁/运行器测试、29项Dart生命周期widget/代次/清理/补救反例独立通过，定向分析无问题。20584构建/仅未通过switch复验由唯一播放owner执行中，尚未把新代码计为真实切换已通过；原两BACK不重跑，正式包/preview不操作。
+
+aafun规则f09cc839复核：旧API4固定div/ul[1]与同站moonci语义选择器的错选假设尚未证实；唯一同作品公开详情本次403/124字节阻止取得DOM，此403不能倒推之前详情200后解析超时原因。已停止该桌面网络路线，规则owner转为纯离线同一raw DOM双选择器比较helper及合成测试，之后再交播放owner在已有App响应内存中使用；无新增抓取、无真实overlay、无schema/信任变更。
+
 14:30新实播交付与统筹独立复核：ezdmw同规则/同作品线路剧集在20581单次15秒观测进度11157ms；2秒时position0/buffering=true，约4秒后前进，支持本次短采样落在缓冲窗口，不追溯证明上一次零进度的唯一因果。akianime既有bfzym3u8备用线路第1集在20582默认App路径10秒进度9863ms、零fallback，公开页摘要/精确集标签与门禁配对，原lzm3u8首线404保留。aafun精确q2在20582单次fallback后仍resolve_timeout，保持未解决，不重跑现代崩溃unknown。三批runner快照/身份/两层清理及ezdmw/akianime时间轴已由统筹独立读取复算，回执.dart_tool/catalog-1430-independent-review.json。
 
 当前17来源的代表样本结果应分开表述：5个原默认路径通过、4个仅QA补救策略通过（新增ezdmw），akianime仅备用线路默认路径通过，共10来源有上述限定下播放证据；LMM挑战跳过，6源未解决（AGE/sorani/dalvdm/baimao/xfdmneo/aafun）。不宣称全部线路/每源两集/生产默认策略已通过或规则覆盖已修好。新QA程序e8cc78c1（默认关闭10..15秒采样，共享剩余预算、只记录状态）和4e538dac（备用线路解析前精确episode hash/label双门禁）已在本树组合；26项相关Dart反例与定向分析独立通过，未重复无关全仓。20581/20582分别绑定作者源码/包摘要，见原app-fallback/{ezdmw-progress-20581-1422,aafun-fallback-20582-1426,akianime-alternate-20582-1427}及build产物，未安装电视。代码变更仅QA，不改普通产品策略。

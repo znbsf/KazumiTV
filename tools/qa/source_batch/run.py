@@ -170,6 +170,12 @@ class FixtureHandler(BaseHTTPRequestHandler):
             body, kind = self.media, 'video/mp4'
         elif path == '/video':
             body = b'<video preload="none" src="/fixture.mp4"></video>'
+        elif path == '/video-next':
+            body = b'<video preload="none" src="/fixture.mp4?episode=next"></video>'
+        elif path == '/lifecycle-slow':
+            body = b'<script>setTimeout(()=>{document.body.innerHTML=\'<video preload="none" src="/fixture.mp4?episode=old"></video>\'},8000)</script>'
+        elif path == '/modern-syntax-slow':
+            body = b'<script>var state={};var required=state?.value;setTimeout(()=>{document.body.innerHTML=\'<video preload="none" src="/fixture.mp4?episode=old"></video>\'},8000)</script>'
         elif path == '/delayed':
             body = b'<script>setTimeout(()=>{document.body.innerHTML=\'<video src="/fixture.mp4" preload="none"></video>\'},700)</script>'
         elif path == '/nested':
@@ -218,6 +224,64 @@ class FixtureHandler(BaseHTTPRequestHandler):
             pass
 
     do_HEAD = do_GET
+
+def lifecycle_spec(config):
+    spec = config.get('qa_lifecycle')
+    if spec is None:
+        return None
+    def local(url):
+        return isinstance(url, str) and url.startswith('http://127.0.0.1:8769/')
+    if (not isinstance(spec, dict) or config.get('engine') != 'app' or
+            config.get('app_gecko_fallback') is not True or 'rule' in config or
+            'rule_file' in config or not local(config.get('url')) or
+            spec.get('action') not in ('exit', 'switch') or
+            spec.get('trigger_phase') not in ('primary', 'fallback')):
+        raise ValueError('Lifecycle actions require an explicit local App fixture')
+    if spec['action'] == 'switch':
+        target = spec.get('target')
+        if (not isinstance(target, dict) or not local(target.get('url')) or
+                not isinstance(target.get('id'), str) or not target['id'] or
+                target.get('id') == config.get('id') or
+                target.get('url') == config.get('url') or
+                set(target) - {'id', 'url', 'observe_playback_seconds'}):
+            raise ValueError('Switch target must be a different local fixture')
+    return spec
+
+
+def lifecycle_result_observed(config, row, driver):
+    spec = lifecycle_spec(config)
+    if spec is None:
+        return True
+    state = row.get('lifecycle')
+    if not driver or not isinstance(state, dict) or state.get('actual_page_disposals', 0) < 1:
+        return False
+    events, children = state.get('events', []), state.get('children', [])
+    if (not any(e.get('stage') == 'ui_transition' and e.get('generation') == 1 for e in events) or
+            not any(e.get('stage') == 'native_stale_result_probe' and e.get('accepted') is False for e in events) or
+            not children or children[0].get('cancelled_by_ui') is not True or
+            children[0].get('normal_publication_allowed') is not False):
+        return False
+    if spec['action'] == 'switch':
+        return (row.get('qa_case_id') == spec['target']['id'] and
+                row.get('episode_page_sha256') == digest(spec['target']['url'].encode()) and
+                len(children) == 2 and children[-1].get('normal_publication_allowed') is True)
+    return row.get('stage') == 'lifecycle_cancelled' and row.get('old_result_suppressed') is True
+
+
+def expected_qa_foreground(text):
+    components = set()
+    for line in text.splitlines():
+        if not re.match(r'^\s*(?:mResumedActivity|topResumedActivity)\s*[:=]', line):
+            continue
+        component = re.search(r'\b([A-Za-z_][\w.]*)/([A-Za-z_.$][\w.$]*)\b', line)
+        if component is None:
+            return False
+        package, activity = component.groups()
+        if activity.startswith('.'):
+            activity = package + activity
+        components.add(f'{package}/{activity}')
+    return components == {f'{PACKAGE}/{ACTIVITY}'}
+
 
 class Device:
     def __init__(self, adb, serial, *, allow_physical=False,
@@ -277,6 +341,18 @@ class Device:
             snapshot[name] = {'apk_path': remote, 'sha256': apk_hash.lower()}
         return snapshot
 
+    def send_lifecycle_key(self, keycode):
+        if keycode not in ('4', '23'):
+            raise ValueError('Unsupported QA lifecycle key')
+        try:
+            foreground = self.call('shell', 'dumpsys', 'activity', 'activities', timeout=8)
+        except (RuntimeError, subprocess.TimeoutExpired):
+            return False
+        if not expected_qa_foreground(foreground):
+            return False
+        self.call('shell', 'input', 'keyevent', keycode)
+        return True
+
     def stop_and_verify(self, baseline=None):
         errors = []
         cleanup_step(errors, 'force_stop', lambda: self.call('shell', f'am force-stop {PACKAGE}', timeout=8))
@@ -310,6 +386,8 @@ class Device:
                 'sum_pss_kib': sum(p['pss_kib'] for p in samples)}
 
     def case(self, config, output, key):
+        lifecycle = lifecycle_spec(config)
+        driver, phase_seen = None, None
         baseline = None
         samples, stop = [], threading.Event()
         def monitor():
@@ -329,7 +407,7 @@ class Device:
             if initial['status'] != 'confirmed':
                 cleanup_errors.append({'step': 'cold_start', 'details': initial})
                 raise RuntimeError('QA cold-start process exit was not confirmed')
-            self.call('shell', f"run-as {PACKAGE} sh -c 'mkdir -p files; rm -f files/result.json; cat > files/case.json'",
+            self.call('shell', f"run-as {PACKAGE} sh -c 'mkdir -p files; rm -f files/result.json files/lifecycle-state.json; cat > files/case.json'",
                       input=json.dumps(config, ensure_ascii=False).encode())
             baseline = self.processes()
             worker.start()
@@ -341,9 +419,37 @@ class Device:
                     result = json.loads(text)
                     break
                 except json.JSONDecodeError:
+                    if lifecycle is not None and driver is None:
+                        state_text = self.call('exec-out', 'run-as', PACKAGE, 'cat',
+                                               'files/lifecycle-state.json', check=False)
+                        try:
+                            state = json.loads(state_text)
+                        except json.JSONDecodeError:
+                            state = {}
+                        if (state.get('generation') == 1 and state.get('case_id') == config['id'] and
+                                state.get('phase') == lifecycle['trigger_phase'] and state.get('stage') == 'started'):
+                            phase_seen = phase_seen or time.monotonic()
+                            if time.monotonic() - phase_seen >= 0.8:
+                                keycode = '4' if lifecycle['action'] == 'exit' else '23'
+                                if not self.send_lifecycle_key(keycode):
+                                    driver = {'status': 'not_sent_foreground_mismatch',
+                                              'expected_component': f'{PACKAGE}/{ACTIVITY}'}
+                                    result = {'id': config['id'], 'engine': config['engine'],
+                                              'stage': 'environment_invalid',
+                                              'reason': 'QA foreground activity not confirmed'}
+                                    break
+                                driver = {'status': 'triggered', 'action': lifecycle['action'],
+                                          'keycode': int(keycode), 'phase': state['phase'],
+                                          'generation': 1, 'triggered_epoch': time.time()}
                     time.sleep(1)
             if result is None:
                 result = {'id': config['id'], 'engine': config['engine'], 'stage': 'host_timeout'}
+            if lifecycle is not None:
+                result['lifecycle_driver'] = driver or {'status': 'not_triggered'}
+                if not lifecycle_result_observed(config, result, driver):
+                    result['observed_stage'] = result['stage']
+                    result['stage'] = 'environment_invalid'
+                    result['lifecycle_driver']['observation'] = 'UI transition or generation guard not confirmed'
             result['host_elapsed_ms'] = round((time.monotonic() - started) * 1000)
         except BaseException as error:
             primary_error = error
