@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+15:36统筹独立审读并集成dbc12746同响应诊断工具：仅固定aafun原q2/版本/有效规则摘要，生产traceChapters单次请求附加只读响应tap，校验唯一请求/最终URI摘要、2xx/HTML、无重定向/挑战、正文摘要一致及256KiB上限；只比较内存DOM、不追加请求/解析/媒体。独立isolate暂停启动、共享剩余最多5秒、超时/取消kill并等待exit，未确认清理向整例传播；tap在finally移除，普通运行默认关闭。19项Dart（runtime10＋helper9）及定向分析独立通过（.dart_tool/chapter-runtime-independent-{tests,analyze}.log）；真实aafun样本由唯一播放owner运行中，未将合成测试计为实际规则缺陷或修复成功。
+
 15:33统筹独立核对xfdmneo-alternate-20585-1519：runner快照与展开固定规则后的实际输入cases摘要匹配，固定规则/同q2作品及指定备用线第01集页面摘要、标签、索引全部对应；实际VideoWebviewImpl/App默认零新增fallback，原生首帧后10秒采样进度7966ms、播放器/解析器/两层及最终清理确认。回执.dart_tool/xfdmneo-alternate-independent-review.json。原首线401保留，不能说根因或全线已修复；此例证明已有备用线可播、无新增overlay需求证据。
 
 当前17源更新为：5原默认代表样本、4仅QA补救策略、akianime及xfdmneo仅备用线默认路径，共11源有上述限定可播样本；LMM挑战跳过，5源AGE/sorani/dalvdm/baimao/aafun仍无可播样本。此计数不把首线HTTP失败抹去，不覆盖每源首集/较新集、全线路或电视验收，生产默认仍未改。aafun同DOM诊断实现正常推进，未交付代码不提前算通过；规则owner等待实际数据。

@@ -25,6 +25,8 @@ import 'package:kazumi/services/video_source/services.dart';
 import 'package:kazumi/webview/video/impl/video_webview_android_impl.dart';
 import 'package:kazumi/webview/video/video_webview_controller.dart';
 import 'package:kazumi/utils/http_headers.dart';
+import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/services/plugin/rule_engine_models.dart' show RuleChapterTrace;
 import 'gecko_controller.dart';
 import 'rule_snapshot.dart';
 import 'failure_snapshot.dart';
@@ -35,6 +37,7 @@ import 'case_selection.dart';
 import 'lifecycle_gate.dart';
 import 'lifecycle_host.dart';
 import 'selection_snapshot.dart';
+import 'chapter_diagnostic_runtime.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -117,6 +120,9 @@ class _BatchCaseState extends State<BatchCase> {
       if (c['selection_only'] == true && (!appProfile || c['rule'] == null)) {
         throw const FormatException('Selection-only requires App profile and fixed rule');
       }
+      if (c['chapter_selector_diagnostic'] == true && c['selection_only'] != true) {
+        throw const FormatException('Chapter diagnostic is selection-only');
+      }
       final observationWindow = qaPlaybackObservationWindow(c['observe_playback_seconds']);
       final ua = c['user_agent'] as String;
       String episodeUrl;
@@ -130,6 +136,11 @@ class _BatchCaseState extends State<BatchCase> {
         final plugin = snapshot.plugin;
         result['observed_rule_snapshot'] = snapshot.identity;
         result['rule_fingerprint'] = ruleFingerprint(plugin);
+        if (c['chapter_selector_diagnostic'] == true && !aafunDiagnosticBinding(c, snapshot.identity)) {
+          result['chapter_selector_diagnostic'] = {'status': 'not_run', 'reason': 'rule_or_case_identity'};
+          result['stage'] = 'chapter_diagnostic_not_run';
+          return;
+        }
         final hits = await run.wait(plugin.queryBangumi(c['keyword'] as String,
             shouldRethrow: true, cancelToken: run.token), const Duration(seconds: 10));
         timings['search'] = watch.elapsedMilliseconds;
@@ -141,6 +152,52 @@ class _BatchCaseState extends State<BatchCase> {
         }
         phase = 'chapters';
         final beginChapters = watch.elapsedMilliseconds;
+        if (c['chapter_selector_diagnostic'] == true) {
+          result['matched_title'] = match.name;
+          final detailHash = sha256.convert(utf8.encode(plugin.buildFullUrl(match.src))).toString();
+          result['matched_detail_page_sha256'] = detailHash;
+          result['chapter_selector_diagnostic'] = <String, Object?>{
+            'status': 'not_run', 'reason': 'normal_query_failed_or_incomplete', 'worker_cleanup': 'not_created'};
+          if (match.name != '葬送的芙莉莲' || detailHash != aafunDetailSha) {
+            result['chapter_selector_diagnostic'] = {'status': 'not_run', 'reason': 'work_or_detail_identity'};
+            result['stage'] = 'chapter_diagnostic_not_run';
+            return;
+          }
+          final tap = QaChapterResponseTap(DioFactory.pluginDio, aafunDetailSha);
+          late final RuleChapterTrace trace;
+          late final bool removed;
+          try {
+            trace = await run.wait(plugin.traceChapters(match.src, cancelToken: run.token),
+                const Duration(seconds: 10));
+          } finally {
+            removed = tap.close();
+            (result['chapter_selector_diagnostic'] as Map<String, Object?>).addAll({
+              'response_metadata': Map<String, Object?>.from(tap.metadata),
+              'interceptor_removed': removed});
+            if (!removed) result['diagnostic_cleanup'] = 'unconfirmed';
+            if (tap.metadata['challenge'] == true) result['diagnostic_challenge_observed'] = true;
+          }
+          timings['chapters'] = watch.elapsedMilliseconds - beginChapters;
+          final reason = tap.rejection(trace.rawResponse);
+          Map<String, Object?> compared;
+          if (!_current || run.cancelled) {
+            compared = {'status': 'not_run', 'reason': 'cancelled', 'worker_cleanup': 'not_created'};
+          } else if (reason != null || c['chapter_diagnostic_semantic_rule'] is! Map || !removed) {
+            compared = {'status': 'not_run', 'reason': reason ?? 'semantic_input_or_interceptor', 'worker_cleanup': 'not_created'};
+          } else {
+            phase = 'chapter_diagnostic';
+            compared = await boundedQaWorker(worker: chapterSelectorWorker,
+              input: {'raw': trace.rawResponse, 'base': plugin.toJson(includeLocalMetadata: false),
+                'semantic': Map<String, dynamic>.from(c['chapter_diagnostic_semantic_rule'] as Map)},
+              remainingBudget: const Duration(seconds: 60) - watch.elapsed,
+              isCancelled: () => !_current || run.cancelled);
+          }
+          compared.addAll({'response_metadata': Map<String, Object?>.from(tap.metadata), 'interceptor_removed': removed});
+          result['chapter_selector_diagnostic'] = compared;
+          if (compared['worker_cleanup'] == 'unconfirmed') result['diagnostic_cleanup'] = 'unconfirmed';
+          result['stage'] = compared['status'] == 'observed' ? 'chapter_diagnostic' : 'chapter_diagnostic_not_run';
+          return;
+        }
         final roads = await run.wait(plugin.queryChapterRoads(match.src,
             cancelToken: run.token), const Duration(seconds: 10));
         timings['chapters'] = watch.elapsedMilliseconds - beginChapters;
@@ -388,6 +445,11 @@ class _BatchCaseState extends State<BatchCase> {
         } : retiringPlayer == null ? null : () => retiringPlayer.dispose(),
         resolver: retiringResolver == null ? null : () => retiringResolver.dispose(),
       ));
+      if (result['diagnostic_cleanup'] == 'unconfirmed') result['cleanup'] = 'unconfirmed';
+      if (result['diagnostic_challenge_observed'] == true && result['stage'] != 'captcha') {
+        result['observed_stage'] = result['stage'];
+        result['stage'] = 'captcha';
+      }
       timings['total'] = watch.elapsedMilliseconds;
       widget.onFinished(result);
       if (_current) setState(() => _stage = result['stage'] as String);
