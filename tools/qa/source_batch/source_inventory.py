@@ -1,5 +1,6 @@
 """Acquire only the current official catalog; never contacts streaming sites."""
 import argparse
+from copy import deepcopy
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
@@ -173,23 +174,39 @@ def next_plan(inventory, rows, engine="app", attempts=None):
                     r["observed_rule_snapshot"].get("effective_sha256")
                     == entry["normalized_sha256"]]
         state.update(attempts=len(observed), matching_identity_attempts=len(matching),
-                     outcomes=[r.get("stage", "unknown") for r in observed])
+                     outcomes=[r.get("stage", "unknown") for r in observed],
+                     cleanup_evidence=[
+                         {"id": r.get("id"), "key": r.get("key"),
+                          "app_cleanup": deepcopy(r.get("cleanup")),
+                          "host_cleanup": deepcopy(r.get("host_cleanup")),
+                          "host_cleanup_format": ("present" if "host_cleanup" in r
+                                                  else "legacy_missing")}
+                         for r in observed])
         if len(matching) != len(observed):
             state["status"] = "identity_unknown_or_mismatch"
-            continue
-        if any(r.get("stage") in {"environment_invalid", "host_timeout", "host_error",
-                                 "interrupted", "unknown"} or
-               r.get("cleanup") != "confirmed" for r in matching):
-            state["status"] = "infrastructure_or_cleanup_unknown"
-            continue
-        if any(r.get("stage") == "captcha" for r in matching):
-            state["status"] = "skipped_actual_challenge"
             continue
         successes = [r for r in matching if r.get("stage") == "first_frame"
                      and isinstance(r.get("progress_ms"), (int, float))
                      and not isinstance(r["progress_ms"], bool)
                      and r["progress_ms"] > 0
                      and not r.get("from_confirmed_cache", False)]
+        # Playback observation never implies either cleanup layer succeeded.
+        state["fresh_playback_observed"] = bool(successes)
+        if any(r.get("stage") in {"environment_invalid", "host_timeout", "host_error",
+                                 "interrupted", "unknown"} or
+               r.get("cleanup") != "confirmed" for r in matching):
+            state["status"] = "infrastructure_or_cleanup_unknown"
+            continue
+        if any("host_cleanup" in r and not _host_cleanup_confirmed(r["host_cleanup"])
+               for r in matching):
+            state["status"] = "infrastructure_or_cleanup_unknown"
+            continue
+        if any("host_cleanup" not in r for r in matching):
+            state["status"] = "legacy_host_cleanup_unknown"
+            continue
+        if any(r.get("stage") == "captcha" for r in matching):
+            state["status"] = "skipped_actual_challenge"
+            continue
         if successes:
             state["status"] = ("played_with_failures" if len(successes) != len(matching)
                                else "played")
@@ -214,6 +231,13 @@ def next_plan(inventory, rows, engine="app", attempts=None):
                          "inventory_commit": inventory["upstream_commit"],
                          "execution_policy": "filtered_one_candidate_per_source"}
                         for i in range(0, len(cases), 24)]}
+
+
+def _host_cleanup_confirmed(value):
+    return (isinstance(value, dict) and value.get("status") == "confirmed"
+            and isinstance(value.get("errors", []), list)
+            and not value.get("errors", [])
+            and value.get("process_exit", "confirmed") == "confirmed")
 
 
 def main():

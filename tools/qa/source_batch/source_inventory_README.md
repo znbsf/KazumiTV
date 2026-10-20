@@ -60,6 +60,11 @@ python tools/qa/source_batch/source_inventory.py --plan-from PRIVATE_DIR/source_
 可重复指定 --results/--attempts 累积已完成批次。仅 no_match/no_unique_match/
 episode_missing 自动安排下一作品；解析/媒体失败转诊断，不盲换词刷成功。
 成功需首帧、正进度、确认清理和实际规则摘要匹配；缓存成功不冒充新鲜解析通过。
+清理分App的cleanup与宿主host_cleanup两层；两者确认才归played。宿主未确认、
+字段畸形或状态自相矛盾归infrastructure_or_cleanup_unknown，不排下一候选。
+旧格式缺host_cleanup明确记legacy_host_cleanup_unknown，也不强制重跑；
+fresh_playback_observed单独保留已观察播放，cleanup_evidence保留两层原始值及格式，
+不因此改写原始账本或声称全部清理确认。
 挑战停止；环境/清理异常、身份不明、启动无终态、缺尝试账本均保留未知且不重排。
 损坏/截断账本拒绝生成，不静默忽略尾行。对照不同 engine 的覆盖各自统计。
 

@@ -1,4 +1,5 @@
 import hashlib
+from copy import deepcopy
 import json
 from pathlib import Path
 import tempfile
@@ -42,6 +43,7 @@ def inventory(count=2):
 def result(i=0, candidate=1, stage="no_match", **kwargs):
     return {"id": f"s{i}-q{candidate}", "key": f"k{i}-{candidate}", "engine": "app",
             "stage": stage, "cleanup": "confirmed",
+            "host_cleanup": {"status": "confirmed"},
             "observed_rule_snapshot": {"effective_sha256": f"hash{i}"}, **kwargs}
 
 
@@ -78,6 +80,48 @@ class SnapshotTests(unittest.TestCase):
 
 
 class PlanTests(unittest.TestCase):
+    def test_unconfirmed_host_cleanup_cannot_be_counted_as_played(self):
+        row = result(stage="first_frame", progress_ms=1500,
+                     host_cleanup={"status": "unconfirmed"})
+        before = deepcopy(row)
+        plan = inv.next_plan(inventory(1), [row], attempts=[])
+        self.assertEqual(plan["counts"], {"infrastructure_or_cleanup_unknown": 1})
+        self.assertEqual(plan["batches"], [])
+        state = plan["coverage"][0]
+        self.assertTrue(state["fresh_playback_observed"])
+        self.assertEqual(state["cleanup_evidence"][0]["app_cleanup"], "confirmed")
+        self.assertEqual(state["cleanup_evidence"][0]["host_cleanup"],
+                         {"status": "unconfirmed"})
+        self.assertEqual(row, before)
+
+    def test_legacy_missing_host_cleanup_stays_unknown_without_forced_retry(self):
+        for stage in ["first_frame", "no_match"]:
+            with self.subTest(stage=stage):
+                row = result(stage=stage, progress_ms=1500)
+                del row["host_cleanup"]
+                before = deepcopy(row)
+                plan = inv.next_plan(inventory(1), [row], attempts=[])
+                self.assertEqual(plan["counts"], {"legacy_host_cleanup_unknown": 1})
+                self.assertEqual(plan["batches"], [])
+                state = plan["coverage"][0]
+                self.assertEqual(state["fresh_playback_observed"], stage == "first_frame")
+                self.assertEqual(state["cleanup_evidence"][0]["host_cleanup_format"],
+                                 "legacy_missing")
+                self.assertEqual(row, before)
+
+    def test_host_cleanup_null_malformed_or_contradictory_is_unknown(self):
+        for host in [None, "confirmed", {},
+                     {"status": "confirmed", "process_exit": "unconfirmed"},
+                     {"status": "confirmed", "errors": {}},
+                     {"status": "confirmed", "errors": None},
+                     {"status": "confirmed", "errors": [{"step": "sampler_exit"}]}]:
+            with self.subTest(host=host):
+                plan = inv.next_plan(inventory(1), [
+                    result(stage="first_frame", progress_ms=1500, host_cleanup=host)
+                ], attempts=[])
+                self.assertEqual(plan["counts"], {"infrastructure_or_cleanup_unknown": 1})
+                self.assertEqual(plan["batches"], [])
+
     def test_declared_captcha_is_attempted_and_batches_are_bounded(self):
         plan = inv.next_plan(inventory(25), [])
         self.assertEqual([len(b["cases"]) for b in plan["batches"]], [24, 1])
