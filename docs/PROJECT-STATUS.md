@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+22:12统筹独立审读并组合d98be091+b1be990a，仅3个host文件，不改APK/main/规则/播放器。原96项独立通过后，统筹额外复现“新host_budget行已写但final缺失仍计完成”反例，作者小增量修复：最终收据须匹配key+内容摘要，缺失/损坏/不匹配或仅有中途run-status则raw观察保留、派生unknown，旧legacy行不重分类。组合后100项宿主检查独立通过（8.626秒），同一额外反例已变raw1/completed0/unknown1且原行未改。回执.dart_tool/host-deadline-final-independent-review.json；57项既存记录字节/hash另独立匹配，最大17892B<256KiB，仅历史范围证明。
+
+统一绝对父/首case时钟包含设备前检，第二case独立origin/70秒收据，阻塞进入夹余/返回后复查，15秒case内清理预留与不可变sampler deadline、必要保护/清理后才terminal、原子provisional先保存；新固定文件协议真实存在/长度/字节/type/hash，复合sh -c引用有本地真实shell正反例，正常/selection256KiB与launch32768分别保留。多例末60秒在父预算内、单例120不要求130准入；Windows调度/IO不硬实时保证，超限/慢清理仍unknown，既有moonci原unknown不追认。根与作者3文件源码字节配对见回执，不把旧APK构建清单内run.py当新host身份；APK20592编译649b30bc与新host提交分别记录，APK无须重建。
+
+已准备首次ARM aafun selection-only同响应单例执行manifest.dart_tool/aafun-tv-same-dom-20592-v1.json，SHAb2e6d0e9b5fd26f0088df4133f3dc6bd4b1867496485e70dd4f11636ad8d839d，case与已独立审核123a1667提议完全相同，旧固定id/rule/work/detail/episode保持。实质前提为独立ARM20591/92已多次实际初始化、现新host证据门禁经100反例验证；旧20586x64启动unknown保留，不是同一环境盲重试。下一具体单例需原现场身份/保护核对与有界预算记录；未启动前不预写诊断结论，MXdm仍未尝试，moonci/原完成样本不重跑。
+
 21:48宿主实现仍由唯一owner正常离线推进，run.py/test_runner_integrity.py与新test_host_deadline.py为作者dirty草稿，统筹未集成/验收、不运行该草稿设备入口。统筹只读初审提出两项具体检查并已送作者：HostDeadline.child继承父started导致第二case虽截止end正确但host_elapsed/limit收据使用父累计起点，须新case显式origin并用实际两case假钟覆盖；result_file含if/分号的sh -c脚本作为exec-out分散argv，须离线核实固定ADB远端拼接/引号契约并用真实安全shell反例覆盖，当前仅风险待证，不预判已复现。未要求中断正常实现或扩大修改面，原70/父预算/保护/清理/不设备不来源不构建限制继续。
 
 21:35统筹审26924618宿主修正方案，并独立执行保存的原run.py实际Device.case/run_batch的6项fake clock/device反例，全部复现旧缺口；不是已修复或真实来源测试。第64秒15秒读回到79秒仍接受、准备53秒后20秒am可到73秒、55秒结果后stop3+join30返回88秒、200/300父预算未预留final可到203/303秒，以及坏字节/tuple契约均已核；未确认原moonci具体被杀步骤。回执.dart_tool/host-deadline-proposal-independent-review.json。

@@ -1,10 +1,13 @@
 """Bounded QA runner; physical targets require explicit, exact identity binding."""
 import argparse
+from contextlib import contextmanager
 import hashlib
 import html
 import json
+import os
 from pathlib import Path
 import re
+import shlex
 import statistics
 import sys
 import subprocess
@@ -15,6 +18,63 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PACKAGE = 'com.znbsf.kazumi.fluttertv.parserqa'
 ACTIVITY = 'com.example.kazumi.ParserQaActivity'
 UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+RESULT_BYTE_LIMIT = 256 * 1024
+
+
+class HostBudgetExpired(TimeoutError):
+    """Infrastructure unknown, never a parser timeout or permission to retry."""
+
+
+class HostDeadline:
+    def __init__(self, seconds=None, *, started=None, end=None):
+        self.started = time.monotonic() if started is None else started
+        self.end = self.started + seconds if end is None else end
+
+    def remaining(self):
+        return max(0.0, self.end - time.monotonic())
+
+    def check(self):
+        if self.remaining() <= 0:
+            error = HostBudgetExpired('QA host deadline exhausted')
+            error.qa_output = getattr(self, 'output', None)
+            error.preflight_planned = getattr(self, 'planned_count', None)
+            error.host_budget = self.receipt()
+            raise error
+
+    def cap(self, seconds):
+        self.check()
+        return min(seconds, self.remaining())
+
+    def child(self, end, *, started=None):
+        child = HostDeadline(started=self.started if started is None else started,
+                             end=min(end, self.end))
+        for name in ('output', 'planned_count'):
+            if hasattr(self, name):
+                setattr(child, name, getattr(self, name))
+        return child
+
+    def receipt(self):
+        now = time.monotonic()
+        return {'elapsed_ms': round((now-self.started)*1000),
+                'started_monotonic':self.started, 'deadline_monotonic':self.end,
+                'limit_ms': round((self.end-self.started)*1000),
+                'overrun_ms': max(0, round((now-self.end)*1000)),
+                'within_deadline': now < self.end,
+                'hard_realtime_guarantee': False}
+
+
+def atomic_json(path, value, budget=None):
+    if budget is not None:
+        budget.check()
+    temporary = path.with_name(path.name + '.tmp')
+    with temporary.open('w', encoding='utf-8', newline='\n') as stream:
+        json.dump(value, stream, ensure_ascii=False)
+        stream.write('\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    if budget is not None:
+        budget.check()
 LAUNCH_ID = 'qa-offline-launch-only-v1'
 LAUNCH_KEYS = {'id', 'group', 'engine', 'launch_only', 'repeat', 'user_agent', 'launch_attempt_key'}
 LAUNCH_DART_ORDER = ['dart_binding'] + [f'dart_{s}_{edge}' for s in
@@ -203,10 +263,68 @@ def read_journal(path, issues):
     return records, complete
 
 
+def read_receipt(path, issues=None):
+    if not path.exists():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding='utf-8-sig'))
+        if not isinstance(value, dict):
+            raise ValueError('Receipt must be an object')
+        return value
+    except (OSError, UnicodeError, ValueError) as error:
+        if issues is not None:
+            issues.append({'file':path.name, 'issue':'invalid_receipt',
+                           'error_type':type(error).__name__})
+        return None
+
+
+def terminal_record_digest(row):
+    return digest(json.dumps(row, sort_keys=True, ensure_ascii=False).encode())
+
+
+def final_receipt_confirms(row, receipt):
+    if not isinstance(receipt, dict):
+        return False
+    records = receipt.get('terminal_records')
+    final = receipt.get('final_host_cleanup')
+    budget, host = row.get('host_budget'), row.get('host_cleanup')
+    if (not isinstance(records, dict) or not isinstance(final, dict) or
+            final.get('status') != 'confirmed' or
+            not isinstance(receipt.get('cleanup_errors'), list) or
+            not isinstance(budget, dict) or budget.get('within_deadline') is not True or
+            row.get('cleanup') != 'confirmed' or not isinstance(host, dict) or
+            host.get('status') != 'confirmed'):
+        return False
+    for name in ('budget_unknown_keys', 'unconfirmed_terminal_keys'):
+        keys = receipt.get(name, [])
+        if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys) or row.get('key') in keys:
+            return False
+    return isinstance(row.get('key'), str) and records.get(row['key']) == terminal_record_digest(row)
+
+
 def build_report(folder):
     """Derive coverage without modifying either append-only journal."""
     issues = []
     rows, results_intact = read_journal(folder / 'results.jsonl', issues)
+    raw_rows = rows
+    raw_result_records = len(rows)
+    checkpoint = read_receipt(folder / 'run-status.json', issues)
+    final_receipt = read_receipt(folder / 'cleanup.json', issues)
+    budget_unknown = set()
+    for receipt in (checkpoint, final_receipt):
+        for name in ('budget_unknown_keys', 'unconfirmed_terminal_keys'):
+            keys = (receipt or {}).get(name, [])
+            if isinstance(keys, list) and all(isinstance(k, str) for k in keys):
+                budget_unknown.update(keys)
+    rows = []
+    for row in raw_rows:
+        if row.get('key') in budget_unknown:
+            continue
+        if 'host_budget' in row and not final_receipt_confirms(row, final_receipt):
+            issues.append({'file':'cleanup.json', 'key':row.get('key'),
+                           'issue':'final_receipt_missing_or_unmatched'})
+            continue
+        rows.append(row)
     attempts, attempts_intact = read_journal(folder / 'attempts.jsonl', issues)
     identity_path = folder / 'identity.json'
     identity = json.loads(identity_path.read_text(encoding='utf-8-sig')) if identity_path.exists() else {}
@@ -230,12 +348,13 @@ def build_report(folder):
     if not isinstance(planned, int) or isinstance(planned, bool) or planned < 0:
         planned, planned_source = None, 'unknown'
     completed_keys = {r['key'] for r in rows if isinstance(r.get('key'), str)}
+    observed_keys = {r['key'] for r in raw_rows if isinstance(r.get('key'), str)}
     started_keys = {r['key'] for r in attempts if isinstance(r.get('key'), str)}
-    keyed = len(completed_keys) == len(rows) and len(started_keys) == len(attempts)
+    keyed = len(observed_keys) == len(raw_rows) and len(started_keys) == len(attempts)
     if not keyed:
         issues.append({'issue': 'missing_or_duplicate_journal_keys'})
-    known_started = started_keys | completed_keys
-    known_unknown = started_keys - completed_keys
+    known_started = started_keys | observed_keys
+    known_unknown = known_started - completed_keys
     coverage_known = attempts_intact and keyed and (results_intact or not (folder / 'results.jsonl').exists())
     plan_keys = {r['key'] for r in plan} if plan is not None else None
     if plan_keys is not None and (known_started - plan_keys or len(plan_keys) != len(plan)):
@@ -246,7 +365,7 @@ def build_report(folder):
         coverage_known = False
     states = []
     metadata = {r['key']: r for r in (plan or [])}
-    for record in attempts + rows:
+    for record in attempts + raw_rows:
         if isinstance(record.get('key'), str):
             metadata[record['key']] = {**metadata.get(record['key'], {}), **record}
     keys = plan_keys | known_started if plan_keys is not None else known_started
@@ -256,9 +375,9 @@ def build_report(folder):
                  else 'unattempted' if coverage_known else 'unknown')
         states.append({'key': key, 'id': source.get('id'), 'engine': source.get('engine'),
                        'repeat': source.get('repeat'), 'state': state})
-    status_path = folder / 'cleanup.json' if (folder / 'cleanup.json').exists() else folder / 'run-status.json'
-    status = json.loads(status_path.read_text(encoding='utf-8-sig')) if status_path.exists() else None
+    status = final_receipt if (folder / 'cleanup.json').exists() else checkpoint
     return {'report_schema': 2, 'planned': planned, 'planned_source': planned_source,
+            'raw_result_records': raw_result_records,
             'completed': len(rows), 'started': len(known_started) if coverage_known else None,
             'unknown': len(known_unknown) if coverage_known else None,
             'known_unknown': len(known_unknown),
@@ -395,7 +514,7 @@ def expected_qa_foreground(text):
 class Device:
     def __init__(self, adb, serial, *, allow_physical=False,
                  expected_serial=None, expected_fingerprint=None,
-                 package=PACKAGE):
+                 package=PACKAGE, budget=None):
         if package != PACKAGE:
             raise ValueError('Only the fixed parserqa package is permitted')
         if allow_physical:
@@ -407,22 +526,92 @@ class Device:
         elif not re.fullmatch(r'emulator-\d+', serial):
             raise ValueError('Only an explicitly named emulator is permitted')
         self.adb, self.serial = adb, serial
+        self._budget_local = threading.local()
+        self._parent_budget = budget
         self.physical = allow_physical
         qemu = self.call('shell', 'getprop ro.kernel.qemu').strip()
         if allow_physical:
             actual = self.call('shell', 'getprop ro.build.fingerprint').strip()
+            self.fingerprint = actual
             if qemu == '1' or actual != expected_fingerprint:
                 raise ValueError('Physical QA target identity mismatch')
         elif qemu != '1':
             raise ValueError('Target is not an Android emulator')
 
-    def call(self, *args, input=None, timeout=15, check=True):
-        completed = subprocess.run([self.adb, '-s', self.serial, *args], input=input,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+    def budget(self):
+        local = getattr(self, '_budget_local', None)
+        return getattr(local, 'value', None) or getattr(self, '_parent_budget', None)
+
+    @contextmanager
+    def deadline_scope(self, budget):
+        if not hasattr(self, '_budget_local'):
+            self._budget_local = threading.local()
+        previous = getattr(self._budget_local, 'value', None)
+        self._budget_local.value = budget
+        try:
+            yield
+        finally:
+            self._budget_local.value = previous
+
+    def call(self, *args, input=None, timeout=15, check=True, binary=False, return_completed=False):
+        budget = self.budget()
+        if budget is not None:
+            timeout = budget.cap(timeout)
+        try:
+            completed = subprocess.run([self.adb, '-s', self.serial, *args], input=input,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        except subprocess.TimeoutExpired as error:
+            if budget is not None:
+                error.qa_output = getattr(budget, 'output', None)
+                error.preflight_planned = getattr(budget, 'planned_count', None)
+                error.host_budget = budget.receipt()
+            raise
+        if budget is not None:
+            budget.check()
         if check and completed.returncode:
             # Do not include command input (may contain signed URLs) in reports.
             raise RuntimeError(f'ADB failed: {completed.stderr.decode(errors="replace")[:200]}')
-        return completed.stdout.decode('utf-8', errors='replace')
+        if return_completed:
+            return completed
+        return completed.stdout if binary else completed.stdout.decode('utf-8', errors='replace')
+
+    def result_file(self):
+        # One fixed-file roundtrip. Native publication uses atomic rename.
+        script = (f'if [ -f files/result.json ]; then printf "QA_FILE:"; '
+                  f'wc -c < files/result.json; head -c {RESULT_BYTE_LIMIT+1} files/result.json; '
+                  'else printf QA_MISSING; fi')
+        # ADB joins remote argv as shell text; host argv boundaries alone do
+        # not preserve a compound sh -c body. Match the existing quoted path.
+        completed = self.call('exec-out', 'run-as', PACKAGE, 'sh', '-c', shlex.quote(script),
+                             timeout=3, check=False, return_completed=True)
+        raw = completed.stdout
+        transport = {'transport_returncode': completed.returncode}
+        if completed.returncode != 0:
+            return {**transport, 'exists': None, 'type': 'transport_error',
+                    'read_bytes': len(raw), 'raw_sha256': digest(raw)}, None
+        if raw == b'QA_MISSING':
+            return {**transport, 'exists': False}, None
+        header, separator, body = raw.partition(b'\n')
+        match = re.fullmatch(rb'QA_FILE:\s*(\d+)\s*', header)
+        if not separator or not match:
+            return {**transport, 'exists': None, 'type': 'invalid_file_marker',
+                    'read_bytes': len(raw), 'raw_sha256': digest(raw)}, None
+        size = int(match[1])
+        metadata = {**transport, 'exists': True, 'declared_bytes': size, 'read_bytes': len(body),
+                    'raw_sha256': digest(body)}
+        if size > RESULT_BYTE_LIMIT or len(body) > RESULT_BYTE_LIMIT:
+            return {**metadata, 'type': 'size_limit'}, None
+        if size != len(body):
+            return {**metadata, 'type': 'size_mismatch'}, None
+        if not body:
+            return {**metadata, 'type': 'empty'}, None
+        try:
+            value = json.loads(body.decode('utf-8'))
+        except UnicodeDecodeError:
+            return {**metadata, 'type': 'invalid_utf8'}, None
+        except json.JSONDecodeError:
+            return {**metadata, 'type': 'invalid_json'}, None
+        return {**metadata, 'type': 'json_object' if isinstance(value, dict) else 'json_other'}, value
 
     def processes(self):
         lines = self.call('shell', 'ps -A -o PID,NAME').splitlines()
@@ -506,8 +695,12 @@ class Device:
         size = int(match[1])
         if size > 32768:
             return {'exists': True, 'declared_bytes': size, 'type': 'size_limit'}, None
+        budget = self.budget()
         completed = subprocess.run([self.adb, '-s', self.serial, 'exec-out', 'run-as', PACKAGE,
-            'head', '-c', '32769', f'files/{name}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+            'head', '-c', '32769', f'files/{name}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=3 if budget is None else budget.cap(3))
+        if budget is not None:
+            budget.check()
         meta, value = launch_file_decode(completed.stdout, size)
         meta.update(exists=True, transport_returncode=completed.returncode)
         return meta, value if completed.returncode == 0 else None
@@ -524,29 +717,45 @@ class Device:
         return meta, value if valid else None
 
     def case(self, config, output, key):
+        self._last_case_stop = self._last_protected_after = None
+        budget = getattr(self, '_next_case_budget', None)
+        if budget is None:
+            now = time.monotonic()
+            parent = getattr(self, '_parent_budget', None)
+            budget = HostDeadline(started=now, end=min(now+70, parent.end) if parent else now+70)
+        self._next_case_budget = None
+        work = budget.child(budget.end-15)  # Reserve only, not a cleanup guarantee.
+        with self.deadline_scope(work):
+            return self._case(config, output, key, budget, work)
+
+    def _case(self, config, output, key, budget, work):
         launch = launch_only_spec(config)
         if launch and (not getattr(self, 'launch_allowed', False) or getattr(self, 'physical', False)):
             raise ValueError('Offline launch-only artifact gate required')
         lifecycle = lifecycle_spec(config)
         startup_evidence = {'am': {}, 'files': {}}
         launch_evidence = startup_evidence if launch else None
-        launch_journal = None
+        launch_journal = launch_candidate = None
         driver, phase_seen = None, None
         baseline = None
         samples, stop = [], threading.Event()
         def monitor():
-            while not stop.is_set():
-                try:
-                    samples.append(self.memory(baseline))
-                except (RuntimeError, subprocess.TimeoutExpired):
-                    pass
-                stop.wait(1)
+            # This thread keeps this generation's immutable deadline even if
+            # another case is later admitted on the main thread.
+            with self.deadline_scope(work):
+                while not stop.is_set() and work.remaining() > 0:
+                    try:
+                        samples.append(self.memory(baseline))
+                    except (RuntimeError, subprocess.TimeoutExpired, HostBudgetExpired):
+                        pass
+                    stop.wait(min(1, work.remaining()))
         worker = threading.Thread(target=monitor, daemon=True)
-        started = time.monotonic()
+        started = budget.started
         worker_started = False
         result, primary_error = None, None
         cleanup_errors = []
         try:
+            work.check()
             initial = self.stop_and_verify()
             if initial['status'] != 'confirmed':
                 cleanup_errors.append({'step': 'cold_start', 'details': initial})
@@ -564,15 +773,16 @@ class Device:
             worker.start()
             worker_started = True
             try:
-                am = self.call('shell', f'am start -W -n {PACKAGE}/{ACTIVITY}', timeout=20)
-                startup_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': False, **launch_am_fields(am)}
+                am_timeout = work.cap(20)
+                am = self.call('shell', f'am start -W -n {PACKAGE}/{ACTIVITY}', timeout=am_timeout)
+                startup_evidence['am'] = {'host_wait_seconds': am_timeout, 'timed_out': False, **launch_am_fields(am)}
                 if config.get('selection_tail1') is True and (startup_evidence['am'].get('Status') != 'ok' or startup_evidence['am'].get('expected_activity') is not True):
                     raise RuntimeError('QA discovery activity start not confirmed')
             except subprocess.TimeoutExpired as error:
-                startup_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': True,
+                startup_evidence['am'] = {'host_wait_seconds': am_timeout, 'timed_out': True,
                     **launch_am_fields(error.stdout), **launch_am_fields(error.stderr)}
                 raise
-            while time.monotonic() - started < 70:
+            while work.remaining() > 0:
                 if config.get('selection_tail1') is True and not any(n == PACKAGE or n.startswith(PACKAGE + ':') for n in self.processes().values()):
                     startup_evidence['process_exit_observed'] = True
                     raise RuntimeError('QA discovery process exited before receipt')
@@ -583,15 +793,25 @@ class Device:
                     meta, candidate = self.launch_file('launch-only-result.json', key)
                     launch_evidence['files']['launch-only-result.json'] = meta
                     if candidate is not None:
-                        result = candidate
+                        launch_candidate = candidate
+                        result = dict(candidate)
                         break
-                    time.sleep(1)
+                    time.sleep(min(1, work.remaining()))
                     continue
-                text = self.call('exec-out', 'run-as', PACKAGE, 'cat', 'files/result.json', check=False)
-                try:
-                    result = json.loads(text)
+                metadata, candidate = self.result_file()
+                work.check()
+                startup_evidence['files']['result.json'] = metadata
+                if isinstance(candidate, dict):
+                    ids = {config['id']}
+                    if lifecycle and lifecycle['action'] == 'switch':
+                        ids.add(lifecycle['target']['id'])
+                    if candidate.get('id') not in ids or candidate.get('engine') != config['engine']:
+                        raise RuntimeError('QA result case identity mismatch')
+                    result = candidate
                     break
-                except json.JSONDecodeError:
+                if metadata.get('exists') is not False:
+                    raise RuntimeError('QA result file protocol invalid')
+                if candidate is None:
                     if lifecycle is not None and driver is None:
                         state_text = self.call('exec-out', 'run-as', PACKAGE, 'cat',
                                                'files/lifecycle-state.json', check=False)
@@ -614,9 +834,16 @@ class Device:
                                 driver = {'status': 'triggered', 'action': lifecycle['action'],
                                           'keycode': int(keycode), 'phase': state['phase'],
                                           'generation': 1, 'triggered_epoch': time.time()}
-                    time.sleep(1)
+                    time.sleep(min(1, work.remaining()))
             if result is None:
-                result = {'id': config['id'], 'engine': config['engine'], 'stage': 'host_timeout'}
+                raise HostBudgetExpired('QA result not received before cleanup reserve')
+            work.check()
+            result_metadata = (launch_evidence['files']['launch-only-result.json'] if launch else
+                               startup_evidence['files'].get('result.json'))
+            atomic_json(output / f'{key}.provisional.json',
+                        {'key':key, 'metadata':result_metadata, 'result':result,
+                         'budget':budget.receipt(), 'work_budget':work.receipt(),
+                         'terminal':False}, work)
             if lifecycle is not None:
                 result['lifecycle_driver'] = driver or {'status': 'not_triggered'}
                 if not lifecycle_result_observed(config, result, driver):
@@ -627,10 +854,12 @@ class Device:
         except BaseException as error:
             primary_error = error
         finally:
+            self._budget_local.value = budget
             stop.set()
             host_cleanup = cleanup_step(cleanup_errors, 'case_stop', lambda: self.stop_and_verify(baseline))
             if not launch:
-                if primary_error is not None or (result is not None and result.get('stage') == 'host_timeout'):
+                if (primary_error is not None and 'result.json' not in startup_evidence['files'] and
+                        budget.remaining() > 0):
                     try:
                         metadata, _ = self.qa_file('result.json')
                         startup_evidence['files']['result.json'] = metadata
@@ -641,7 +870,10 @@ class Device:
             if launch:
                 for name in ('qa-launch-probe.json', 'launch-only-result.json'):
                     try:
-                        meta, value = self.launch_file(name, key)
+                        if name == 'launch-only-result.json' and launch_candidate is not None:
+                            meta, value = launch_evidence['files'][name], launch_candidate
+                        else:
+                            meta, value = self.launch_file(name, key)
                         launch_evidence['files'][name] = meta
                         if value is not None:
                             (output / f'{key}.{name}').write_text(json.dumps(value, indent=2), encoding='utf-8')
@@ -654,9 +886,26 @@ class Device:
                 if primary_error is None and result is not None and result.get('stage') == 'launch_ready' and not launch_ready_observed(launch_journal, key):
                     result.update(observed_stage='launch_ready', stage='environment_invalid', reason='offline_launch_checkpoints_not_confirmed')
             if worker_started:
-                cleanup_step(cleanup_errors, 'sampler_join', lambda: worker.join(timeout=30))
+                cleanup_step(cleanup_errors, 'sampler_join', lambda: worker.join(timeout=budget.cap(30)))
                 if worker.is_alive():
                     cleanup_errors.append({'step': 'sampler_exit', 'error_type': 'SamplerStillRunning'})
+            if getattr(self, '_protected_baseline', None) is not None:
+                try:
+                    measured = self.protected_packages()
+                    budget.check()
+                    receipt = {'before':self._protected_baseline, 'after':measured,
+                               'unchanged':self._protected_baseline == measured,
+                               'measured_budget':budget.receipt()}
+                    atomic_json(output / f'{key}.protected-after.json', receipt, budget)
+                    self._last_protected_after = receipt
+                    if receipt['unchanged'] is not True:
+                        raise RuntimeError('Protected APK identity changed')
+                except BaseException as error:
+                    cleanup_errors.append({'step':'protected_after', **error_record(error)})
+            try:
+                budget.check()
+            except HostBudgetExpired as error:
+                primary_error = primary_error or error
         observed = [s['sum_pss_kib'] for s in samples if s['processes']]
         memory = {
             'sampled_peak_pss_kib': max(observed) if observed else None,
@@ -672,6 +921,8 @@ class Device:
             host_cleanup['status'] = 'unconfirmed'
         if primary_error is not None:
             primary_error.qa_cleanup = host_cleanup
+            primary_error.qa_host_budget = budget.receipt()
+            primary_error.qa_work_budget = work.receipt()
             cleanup_step(host_cleanup['errors'], 'host_error_evidence', lambda:
                 (output / f'{key}.host-error.json').write_text(json.dumps({
                     'id': config['id'], 'engine': config['engine'], 'key': key,
@@ -682,6 +933,10 @@ class Device:
             raise primary_error.with_traceback(primary_error.__traceback__)
         result['memory'] = memory
         result['host_cleanup'] = host_cleanup
+        result['host_budget'] = budget.receipt()
+        budget.check()
+        if host_cleanup['status'] == 'confirmed':
+            self._last_case_stop = host_cleanup
         return result
 
 class BatchCleanupError(RuntimeError):
@@ -689,8 +944,11 @@ class BatchCleanupError(RuntimeError):
 
 
 def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=1800,
-              server_factory=ThreadingHTTPServer):
+              server_factory=ThreadingHTTPServer, budget=None):
     """Execute a preflighted plan; every teardown action has its own guard."""
+    prior_final = read_receipt(output / 'cleanup.json')
+    terminal_records = {r['key']:terminal_record_digest(r) for r in rows
+                        if 'host_budget' in r and final_receipt_confirms(r, prior_final)}
     public_plan = [{k: item[k] for k in ('key', 'id', 'engine', 'group', 'repeat')} for item in plan]
     (output / 'plan.json').write_text(json.dumps(public_plan, indent=2), encoding='utf-8')
     attempts, ledger = output / 'attempts.jsonl', output / 'results.jsonl'
@@ -701,8 +959,14 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
     primary_error, final_stop = None, None
     cleanup_errors = []
     stop_reason = 'completed'
-    deadline = time.monotonic() + budget_seconds
+    pending = [p for p in plan if p['key'] not in completed]
+    budget = budget or HostDeadline(min(budget_seconds, 70) if len(pending) <= 1 else budget_seconds)
+    reserve = 60 if len(pending) > 1 else 0
+    budget_unknown_keys, active_key = [], None
+    if isinstance(device, Device):
+        device._parent_budget = budget
     try:
+        budget.check()
         if fixture_media is not None:
             FixtureHandler.media = fixture_media.read_bytes()
             server = server_factory(('127.0.0.1', 8769), FixtureHandler)
@@ -715,15 +979,22 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
             key, config = item['key'], item['config']
             if key in completed:
                 continue
-            if (output / 'STOP').exists() or time.monotonic() + 70 > deadline:
+            origin = budget.started if active_key is None else time.monotonic()
+            case_budget = budget.child(min(origin+70, budget.end-reserve), started=origin)
+            if ((output / 'STOP').exists() or case_budget.remaining() <= 15 or
+                    (reserve and budget.remaining() < 70+reserve)):
                 stop_reason = 'stop_requested' if (output / 'STOP').exists() else 'budget'
                 break
+            active_key = key
+            if isinstance(device, Device):
+                device._next_case_budget = case_budget
             with attempts.open('a', encoding='utf-8') as f:
                 f.write(json.dumps({'key': key, 'id': item['id'], 'engine': item['engine'],
                                     'group': item['group'], 'repeat': item['repeat'],
                                     'started_epoch': time.time()}) + '\n')
                 f.flush()
             row = device.case(config, output, key)
+            case_budget.check()
             if row.get('stage') in ('sample_identity_mismatch', 'console_observation_not_run'):
                 row.update(observed_stage=row['stage'], stage='environment_invalid',
                            reason='fixed QA observation or episode identity precondition failed')
@@ -747,16 +1018,22 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                 row['launch_only'] = True
             if config.get('console_hint_observer') is True:
                 row['console_only'] = True
-            with ledger.open('a', encoding='utf-8') as f:
-                f.write(json.dumps(row, ensure_ascii=False) + '\n')
-                f.flush()
-            rows.append(row)
-            print(json.dumps({k: row.get(k) for k in ('id', 'engine', 'stage', 'host_elapsed_ms', 'cleanup')}, ensure_ascii=False), flush=True)
             if row.get('cleanup') != 'confirmed' or row.get('host_cleanup', {}).get('status') != 'confirmed':
                 stop_reason = 'case_cleanup_unconfirmed'
                 cleanup_errors.append({'step': 'case_cleanup', 'key': key,
                                        'app_cleanup': row.get('cleanup'), 'host_cleanup': row.get('host_cleanup')})
-                break
+                atomic_json(output / f'{key}.unconfirmed.json', row)
+                break  # Preserve observation, never publish an unconfirmed terminal.
+            row['host_budget'] = case_budget.receipt()
+            atomic_json(output / f'{key}.terminal.json', row, case_budget)
+            with ledger.open('a', encoding='utf-8') as f:
+                f.write(json.dumps(row, ensure_ascii=False) + '\n')
+                f.flush()
+                os.fsync(f.fileno())
+            case_budget.check()
+            terminal_records[key] = terminal_record_digest(row)
+            rows.append(row)
+            print(json.dumps({k: row.get(k) for k in ('id', 'engine', 'stage', 'host_elapsed_ms', 'cleanup')}, ensure_ascii=False), flush=True)
             if row['stage'] in ('host_timeout', 'environment_invalid', 'unknown'):
                 stop_reason = row['stage']
                 break
@@ -768,37 +1045,73 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                 break
     except BaseException as error:
         primary_error = error
-        stop_reason = 'interrupted' if isinstance(error, KeyboardInterrupt) else 'host_error'
+        stop_reason = ('budget' if isinstance(error, HostBudgetExpired) else
+                       'interrupted' if isinstance(error, KeyboardInterrupt) else 'host_error')
+        if isinstance(error, HostBudgetExpired) and active_key is not None:
+            budget_unknown_keys.append(active_key)
     finally:
-        final_stop = cleanup_step(cleanup_errors, 'final_force_stop', device.stop_and_verify)
+        cached_stop = getattr(device, '_last_case_stop', None) if isinstance(device, Device) else None
+        final_stop = ({**cached_stop, 'reused_confirmed_case_stop':True} if cached_stop is not None
+                      else cleanup_step(cleanup_errors, 'final_force_stop', device.stop_and_verify))
         if final_stop is not None and final_stop['status'] != 'confirmed':
             cleanup_errors.append({'step': 'final_process_exit', 'details': final_stop})
         if server is not None:
             if server_thread is not None and server_thread.ident is not None:
-                cleanup_step(cleanup_errors, 'fixture_shutdown', server.shutdown)
+                def shutdown_fixture():
+                    errors = []
+                    def close():
+                        try:
+                            server.shutdown()
+                        except BaseException as error:
+                            errors.append(error)
+                    budget.check()
+                    shutdown = threading.Thread(target=close, daemon=True)
+                    shutdown.start()
+                    shutdown.join(timeout=budget.cap(2))
+                    if shutdown.is_alive():
+                        raise HostBudgetExpired('Owned fixture shutdown unconfirmed')
+                    if errors:
+                        raise errors[0]
+                    budget.check()
+                cleanup_step(cleanup_errors, 'fixture_shutdown', shutdown_fixture)
             cleanup_step(cleanup_errors, 'fixture_close', server.server_close)
         for port in reverse_ports:
             cleanup_step(cleanup_errors, f'reverse_remove_{port}', lambda port=port:
                          device.call('reverse', '--remove', f'tcp:{port}'))
         if server_thread is not None and server_thread.ident is not None:
-            cleanup_step(cleanup_errors, 'fixture_thread_join', lambda: server_thread.join(timeout=2))
+            cleanup_step(cleanup_errors, 'fixture_thread_join', lambda: server_thread.join(timeout=budget.cap(2)))
             if server_thread.is_alive():
                 cleanup_errors.append({'step': 'fixture_thread_exit', 'error_type': 'FixtureThreadStillRunning'})
         status = {'stop_reason': stop_reason,
+                  'terminal_records':terminal_records,
+                  'host_budget':budget.receipt(), 'budget_unknown_keys':budget_unknown_keys,
+                  'unconfirmed_terminal_keys': [r['key'] for r in rows if r['key'] not in completed] if cleanup_errors else [],
+                  'case_budget':getattr(primary_error, 'qa_host_budget', None),
+                  'case_work_budget':getattr(primary_error, 'qa_work_budget', None),
                   'primary_error': error_record(primary_error) if primary_error is not None else None,
                   'case_host_cleanup': getattr(primary_error, 'qa_cleanup', None),
                   'final_host_cleanup': final_stop, 'cleanup_errors': cleanup_errors}
-        cleanup_step(cleanup_errors, 'run_status_write', lambda:
-            (output / 'run-status.json').write_text(json.dumps(status, indent=2), encoding='utf-8'))
+        cleanup_step(cleanup_errors, 'run_status_write', lambda: atomic_json(output / 'run-status.json', status))
+        cleanup_step(cleanup_errors, 'cleanup_receipt_write', lambda:
+            atomic_json(output / 'cleanup.json', status))
         report = cleanup_step(cleanup_errors, 'report_rebuild', lambda: build_report(output))
         if report is not None:
             report['run_status'] = status
             cleanup_step(cleanup_errors, 'summary_write', lambda:
                 (output / 'summary.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8'))
-            cleanup_step(cleanup_errors, 'html_write', lambda:
-                (output / 'report.html').write_text('<meta charset="utf-8"><title>Parser QA</title><h1>Parser QA</h1><p>Emulator exploratory results. Environment-invalid results are excluded from product metrics; null coverage means unknown.</p><pre>' + html.escape(json.dumps(report, ensure_ascii=False, indent=2)) + '</pre>', encoding='utf-8'))
-        cleanup_step(cleanup_errors, 'cleanup_receipt_write', lambda:
-            (output / 'cleanup.json').write_text(json.dumps(status, indent=2), encoding='utf-8'))
+            if budget.remaining() > 0.25:
+                cleanup_step(cleanup_errors, 'html_write', lambda:
+                    (output / 'report.html').write_text('<meta charset="utf-8"><title>Parser QA</title><h1>Parser QA</h1><p>QA results. Environment-invalid and infrastructure results are excluded from product metrics; null coverage means unknown.</p><pre>' + html.escape(json.dumps(report, ensure_ascii=False, indent=2)) + '</pre>', encoding='utf-8'))
+        status['host_budget'] = budget.receipt()
+        if not status['host_budget']['within_deadline']:
+            status['stop_reason'] = 'budget'
+            if active_key is not None and active_key not in budget_unknown_keys:
+                budget_unknown_keys.append(active_key)
+            atomic_json(output / 'run-status.json', status)
+            atomic_json(output / 'cleanup.json', status)
+            report = build_report(output)
+            atomic_json(output / 'summary.json', report)
+            primary_error = primary_error or HostBudgetExpired('QA batch final deadline exhausted')
     if primary_error is not None:
         raise primary_error.with_traceback(primary_error.__traceback__)
     if cleanup_errors:
@@ -806,7 +1119,8 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
     return report
 
 
-def main():
+def _main():
+    cli_started = time.monotonic()
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--adb', required=True)
     p.add_argument('--serial', required=True)
@@ -824,6 +1138,8 @@ def main():
     p.add_argument('--expect-webview')
     p.add_argument('--budget-seconds', type=int, default=1800)
     args = p.parse_args()
+    budget = HostDeadline(args.budget_seconds, started=cli_started)
+    budget.output = args.output
     engines = tuple(args.engines.split(','))
     if not engines or len(set(engines)) != len(engines) or not set(engines) <= {'app', 'webview', 'gecko'}:
         p.error('Engines must be unique values from app,webview,gecko')
@@ -831,6 +1147,9 @@ def main():
         p.error('repeats 1..5, total budget 1..1800 seconds')
     manifest = json.loads(args.manifest.read_text(encoding='utf-8-sig'))
     cases = manifest['cases']
+    if len(cases) * len(engines) * args.repeats == 1:
+        budget = budget.child(cli_started+70)
+    budget.planned_count = len(cases) * len(engines) * args.repeats
     launch = any(launch_only_spec(c) for c in cases)
     artifact = json.loads((args.apk.parent / 'artifact.json').read_text(encoding='utf-8-sig'))
     try:
@@ -840,7 +1159,8 @@ def main():
     if console:
         if args.aapt is None:
             p.error('Console-only QA requires APK permission verification')
-        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=10)
+        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=budget.cap(10))
+        budget.check()
         if permissions.returncode != 0 or b'android.permission.INTERNET' not in permissions.stdout or f'package: {PACKAGE}'.encode() not in permissions.stdout:
             p.error('Console-only ordinary QA APK verification failed')
     tail = any(c.get('selection_tail1') is True for c in cases)
@@ -849,7 +1169,8 @@ def main():
             any(c.get('selection_only') is not True for c in cases) or
             artifact.get('launch_only_build') is not False or artifact.get('internet_permission') is not True or args.aapt is None):
             p.error('Tail discovery requires ordinary network QA artifact and selection-only App plan')
-        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=10)
+        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=budget.cap(10))
+        budget.check()
         if (permissions.returncode != 0 or b'android.permission.INTERNET' not in permissions.stdout or
             f'package: {PACKAGE}'.encode() not in permissions.stdout):
             p.error('Network QA APK permission verification failed')
@@ -858,7 +1179,8 @@ def main():
             args.allow_physical_qa or artifact.get('launch_only_build') is not True or
             artifact.get('no_internet_permission') is not True or args.aapt is None):
             p.error('Exactly one fixed offline launch case and verified offline artifact required')
-        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=10)
+        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=budget.cap(10))
+        budget.check()
         if (permissions.returncode != 0 or b'android.permission.INTERNET' in permissions.stdout or
             f'package: {PACKAGE}'.encode() not in permissions.stdout):
             p.error('Offline APK permission verification failed')
@@ -871,7 +1193,7 @@ def main():
     device = Device(args.adb, args.serial,
                     allow_physical=args.allow_physical_qa,
                     expected_serial=args.expect_serial,
-                    expected_fingerprint=args.expect_fingerprint)
+                    expected_fingerprint=args.expect_fingerprint, budget=budget)
     device.launch_allowed = launch
     sdk = int(device.call('shell', 'getprop ro.build.version.sdk').strip())
     provider_state = device.call('shell', 'dumpsys webviewupdate')
@@ -901,7 +1223,7 @@ def main():
                 'manifest_sha256': digest(json.dumps(cases, sort_keys=True).encode()),
                 'serial': args.serial, 'physical_qa': args.allow_physical_qa,
                 'expected_fingerprint': args.expect_fingerprint,
-                'build_fingerprint': device.call('shell', 'getprop ro.build.fingerprint').strip(),
+                'build_fingerprint': device.fingerprint if device.physical else device.call('shell', 'getprop ro.build.fingerprint').strip(),
                 'sdk': sdk, 'selected_provider': provider,
                 'ua': UA, 'cache_policy': 'process cold; WebView cache disabled; Gecko private session; OS/DNS warm',
                 'engines': list(engines), 'repeats': args.repeats,
@@ -925,25 +1247,56 @@ def main():
                      'group': config['group'], 'repeat': config['repeat'],
                      'expected_environment': {'sdk': sdk, 'provider': provider}})
     protected_before = device.protected_packages() if device.physical else None
+    device._protected_baseline = protected_before
     if device.physical:
         (args.output / 'protected-packages-before.json').write_text(
             json.dumps(protected_before, indent=2), encoding='utf-8')
     try:
         run_batch(device, plan, args.output, rows, fixture_media=args.fixture_media,
-                  budget_seconds=args.budget_seconds)
+                  budget_seconds=args.budget_seconds, budget=budget)
     finally:
         if device.physical:
             original_error = sys.exc_info()[0]
             try:
-                protected_after = device.protected_packages()
-                receipt = {'before': protected_before, 'after': protected_after,
-                           'unchanged': protected_before == protected_after}
+                receipt = getattr(device, '_last_protected_after', None)
+                if receipt is None:
+                    protected_after = device.protected_packages()
+                    budget.check()
+                    receipt = {'before': protected_before, 'after': protected_after,
+                               'unchanged': protected_before == protected_after}
+                else:
+                    receipt = {**receipt, 'reused_same_CLI_last_case_measurement':True}
             except Exception as error:
                 receipt = {'unchanged': None, **error_record(error)}
-            (args.output / 'protected-packages-after.json').write_text(
-                json.dumps(receipt, indent=2), encoding='utf-8')
+            atomic_json(args.output / 'protected-packages-after.json', receipt)
+            if budget.remaining() <= 0:
+                status_path = args.output / 'run-status.json'
+                status = json.loads(status_path.read_text()) if status_path.exists() else {}
+                unknown_keys = set(status.get('budget_unknown_keys', [])) | {
+                    r['key'] for r in rows if r['key'] not in completed}
+                status.update(stop_reason='budget', host_budget=budget.receipt(),
+                              budget_unknown_keys=sorted(unknown_keys))
+                atomic_json(status_path, status)
+                atomic_json(args.output / 'summary.json', build_report(args.output))
+                if original_error is None:
+                    raise HostBudgetExpired('QA CLI deadline exhausted')
             if receipt['unchanged'] is not True and original_error is None:
                 raise RuntimeError('Protected APK identity not confirmed unchanged')
+
+
+def main():
+    try:
+        return _main()
+    except (HostBudgetExpired, subprocess.TimeoutExpired) as error:
+        output = getattr(error, 'qa_output', None)
+        if output is not None and not (output / 'attempts.jsonl').exists():
+            output.mkdir(parents=True, exist_ok=True)
+            atomic_json(output / 'preflight-budget.json', {
+                'stage':'preflight_budget', 'started':0, 'unknown':0,
+                'unattempted':getattr(error, 'preflight_planned', None),
+                'host_budget':getattr(error, 'host_budget', None),
+                'device_launch_attempted':False})
+        raise
 
 
 if __name__ == '__main__':

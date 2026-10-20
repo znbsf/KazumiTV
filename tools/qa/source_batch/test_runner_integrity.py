@@ -48,6 +48,8 @@ class CaseDevice(Device):
         self.alive = False
 
     def call(self, *args, **kwargs):
+        if kwargs.get('input') is not None:
+            self.current_config = json.loads(kwargs['input'])
         if args[0] == 'shell' and args[1].startswith('am force-stop'):
             self.stop_calls += 1
             if self.stop_calls > 1 and self.stop_timeout:
@@ -59,7 +61,12 @@ class CaseDevice(Device):
                 raise self.primary
             self.alive = True
         if args[0] == 'exec-out':
-            return json.dumps(result())
+            row = result()
+            row['id'] = getattr(self, 'current_config', {}).get('id', row['id'])
+            raw = json.dumps(row).encode()
+            if kwargs.get('return_completed'):
+                return subprocess.CompletedProcess([], 0, b'QA_FILE:' + str(len(raw)).encode() + b'\n' + raw, b'')
+            return raw.decode()
         return ''
 
     def processes(self):
@@ -224,7 +231,9 @@ class IntegrityTests(unittest.TestCase):
                 run_batch(device, plan(2), folder, [])
             device.case.assert_called_once()
             report = json.loads((folder / 'summary.json').read_text())
-            self.assertEqual([report[k] for k in ('completed', 'unknown', 'unattempted')], [1, 0, 1])
+            self.assertEqual([report[k] for k in ('completed', 'unknown', 'unattempted')], [0, 1, 1])
+            self.assertFalse((folder / 'results.jsonl').exists())
+            self.assertTrue((folder / 'k0.unconfirmed.json').exists())
             self.assertEqual(report['run_status']['stop_reason'], 'case_cleanup_unconfirmed')
 
     def test_batch_retains_observed_stage_but_does_not_count_invalid_environment(self):
@@ -244,7 +253,7 @@ class IntegrityTests(unittest.TestCase):
             self.assertEqual(report['summary'][0]['resolve_median_ms'], None)
             device.case.assert_called_once()
 
-    def test_final_stop_failure_is_nonzero_even_after_completed_results(self):
+    def test_final_stop_failure_retains_raw_observation_but_not_terminal_pass(self):
         device = Mock()
         device.case.return_value = result()
         device.stop_and_verify.side_effect = subprocess.TimeoutExpired('fake-adb', 8)
@@ -254,7 +263,8 @@ class IntegrityTests(unittest.TestCase):
             with self.assertRaises(BatchCleanupError):
                 run_batch(device, plan(1), folder, [])
             report = json.loads((folder / 'summary.json').read_text())
-            self.assertEqual(report['completed'], 1)
+            self.assertEqual((report['raw_result_records'], report['completed'], report['unknown']), (1, 0, 1))
+            self.assertEqual(json.loads((folder / 'results.jsonl').read_text())['stage'], 'first_frame')
             self.assertIsNone(report['run_status']['primary_error'])
             self.assertEqual(report['run_status']['cleanup_errors'][0]['error_type'], 'TimeoutExpired')
 
