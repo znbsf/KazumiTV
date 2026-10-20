@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+19:35统筹已独立复核5550454f首次TV安装与3fixture：新20591一次24.75秒Success/现场完整APK摘要等同独立签名原件、版本/ARMv7/UID读回成立；原20590失败保留。3行原始identity/manifest/runner/hash、physical fingerprint/provider/实际tv=true emulator=false hwdec=mediacodec、native首帧/正进度/两层清理逐项匹配。QA fallback仅一次且primary retired先新start，正常零fallback；真实switch旧dispose/retired时间1792495595893/5955先于新start6025，目标page/media hash匹配，原生旧写入synthetic探针拒绝。10秒观测内8秒素材完成，进度7867ms/错0，不能称持续10秒画面渲染。回执.dart_tool/tv-fixture20591-independent-review.json。
+
+收尾原三包hash/桌面/音乐8/100/media0/provider保持，reverse为空、自有fixture/runner/采样退出、宿主CPU快照5%及TV一秒8.47%已读取；保留parserqa不卸载，无私有数据内容验收。debug PSS峰值仅命名进程与新命名WebView renderer、排除共享系统服务，不把不同阶段/时长差当纯Gecko资源增量或正式承诺。仅服务/QA页面通过，不替代产品完整UI/mediacodec_embed/声画同步或长稳验收。
+
+已继续续派唯一owner真实来源首批4例：.dart_tool/tv-live-plan-20591.json（由原未执行live4仅id换20591），同现装包不构建/重装、不重复fixture；ezdmw/moonci/MXdm显式QA一次fallback，7sefun默认控制，固定目录/rule/work/road/episode hash+exactlabel、每例10秒状态/70秒上限/总400秒，实际随机UA未记仍只称同默认策略。当前TV新环境首次该来源验收是实质前提；xfdmnext标签阻断仍排除、mgnacg/旧unknown/LMM不加入。先核同身份/包/桌面音量/资源，challenge/身份错配/unknown/envinvalid/清理不明即停；普通明确产品阶段失败可留证继续同一计划其余源，不追加重试/换线/observer/探针，遇新错误按owner归因。完成原保护与进程/负载收尾后交统筹独立复核。真实来源结果尚未交，不提前说四源TV通过或生产默认已改。
+
 19:25新单ABI20591已独立验证并续派安装/fixture：编译506df2bb，APK4b6c8a7a6dfbc596add0f9fbaf87e061c5f2f40b22ad9cbab85e0b6b33aa6c34、165166144字节，较原减少179780536字节/52.12%。538原before/after/独立after及作者当前字节匹配，root对应仅CRLF、registrant原前后字节保持；实际apksigner24f…e32aa31/aapt20591/minSDK26/native-code唯一armeabi-v7a/ZIP目标库ELF及INET均独立通过。回执.dart_tool/tv-arm20591-independent-review.json。实际单ABI产物是新的实质前提，但不称安装已成功或证明旧失败因果。
 
 唯一owner完成构建收尾后已获具体一次新安装许可：复核同TV身份/资源/三保护包/桌面音量/parserqa仍未装与旧会话已结束，仅正常install新20591一次/120秒，不改等待。完整hash/签名/版本/UID读回成功后才新3fixture计划.dart_tool/tv-fixture-plan-20591.json（SHA8f10fc53ded71a65646f493ece95faa82672a2ee4e8744f403d72b89767943af），较原未尝试计划仅id/targetid换20591，URL与动作不变。安装不确定或失败只读判别后停；fixture每例70秒/总300秒，失败/unknown/envinvalid/挑战/清理不明停剩余。原physical门禁、reverse自有无占用、内部静音/不改系统音量、保护三包/桌面与收尾负载检查保持。尚未消费运行结果，live4/mgnacg/旧unknown均不自动运行。
