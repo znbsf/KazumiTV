@@ -11,6 +11,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:mobx/mobx.dart' show reaction;
+import 'package:logger/logger.dart' as qa_log;
 import 'package:kazumi/pages/player/controller/player_playback_controller.dart';
 import 'package:kazumi/pages/player/controller/player_debug_controller.dart';
 import 'package:kazumi/services/shaders/shader_asset_service.dart';
@@ -33,6 +34,7 @@ import 'playback_observation.dart';
 import 'case_selection.dart';
 import 'lifecycle_gate.dart';
 import 'lifecycle_host.dart';
+import 'selection_snapshot.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -44,6 +46,8 @@ Future<void> main() async {
   }
   final config = jsonDecode((await qaChannel.invokeMethod<String>('config'))!)
       as Map<String, dynamic>;
+  // QA process only: production HTTP loggers can print full request addresses.
+  if (config['selection_only'] == true) qa_log.Logger.level = qa_log.Level.off;
   await TvMode.initialize();
   // QA debug identity was checked above. Simulate the TV build flag while
   // retaining the real SDK/provider/ABI detection and native MainActivity.
@@ -99,6 +103,10 @@ class _BatchCaseState extends State<BatchCase> {
       'coverage': appProfile ? 'service path; no TV UI navigation/history/danmaku' : 'controlled engine comparison',
       'diagnostics': <String>[],
     };
+    if (c['selection_only'] == true) {
+      result.addAll({'selection_only': true, 'parser': 'not_run', 'media': 'not_run',
+        'player': 'not_run (selection-only)', 'source_request_logging': 'suppressed'});
+    }
     final timings = result['timings_ms'] as Map<String, int>;
     Player? player;
     PlayerPlaybackController? appPlayback;
@@ -106,6 +114,9 @@ class _BatchCaseState extends State<BatchCase> {
     String phase = 'search';
     try {
       if (!_current) throw const VideoSourceCancelledException();
+      if (c['selection_only'] == true && (!appProfile || c['rule'] == null)) {
+        throw const FormatException('Selection-only requires App profile and fixed rule');
+      }
       final observationWindow = qaPlaybackObservationWindow(c['observe_playback_seconds']);
       final ua = c['user_agent'] as String;
       String episodeUrl;
@@ -135,6 +146,17 @@ class _BatchCaseState extends State<BatchCase> {
         timings['chapters'] = watch.elapsedMilliseconds - beginChapters;
         final candidate = HealthCandidate(plugin, match, roads.where((r) =>
             r.data.isNotEmpty && r.identifier.length == r.data.length).toList());
+        if (c['selection_only'] == true) {
+          result['matched_title'] = match.name;
+          result['matched_detail_page_sha256'] = sha256.convert(utf8.encode(plugin.buildFullUrl(match.src))).toString();
+          result['selection_snapshot'] = {
+            ...qaSelectionSnapshot(candidate.roads, plugin.buildFullUrl),
+            'raw_road_count': roads.length,
+            'road_index_basis': 'filtered production playback candidates',
+          };
+          result['stage'] = 'selection_only';
+          return;
+        }
         final road = (c['road'] as int? ?? 0);
         final episode = (c['episode'] as int? ?? 0);
         if (road < 0 || road >= candidate.roads.length || episode < 0 ||

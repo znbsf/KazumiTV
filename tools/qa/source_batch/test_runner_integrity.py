@@ -70,6 +70,42 @@ class CaseDevice(Device):
 
 
 class IntegrityTests(unittest.TestCase):
+    def test_selection_only_results_never_enter_playback_success_or_failure_metrics(self):
+        discovered = result('discover', stage='selection_only', selection_only=True)
+        no_sample = result('no-sample', stage='no_match', selection_only=True)
+        report = summarize([discovered, no_sample, result()])[0]
+        self.assertEqual(report['attempted'], 3)
+        self.assertEqual(report['selection_only_results'], 2)
+        self.assertEqual(report['selection_completed'], 1)
+        self.assertEqual(report['eligible_results'], 1)
+        self.assertEqual(report['resolved'], 1)
+        self.assertEqual(report['first_frame'], 1)
+
+    def test_selection_challenge_stops_before_the_other_source(self):
+        device = Mock()
+        device.case.return_value = result(stage='captcha')
+        device.stop_and_verify.return_value = {'status': 'confirmed'}
+        pending = plan(2)
+        for item in pending:
+            item['config']['selection_only'] = True
+        with tempfile.TemporaryDirectory() as temp:
+            report = run_batch(device, pending, Path(temp), [])
+            self.assertEqual(device.case.call_count, 1)
+            self.assertEqual(report['run_status']['stop_reason'], 'selection_challenge')
+
+    def test_selection_challenge_does_not_hide_case_cleanup_failure(self):
+        device = Mock()
+        device.case.return_value = result(stage='captcha', cleanup='unconfirmed')
+        device.stop_and_verify.return_value = {'status': 'confirmed'}
+        pending = plan(2)
+        for item in pending:
+            item['config']['selection_only'] = True
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(BatchCleanupError):
+                run_batch(device, pending, Path(temp), [])
+            status = json.loads((Path(temp) / 'cleanup.json').read_text())
+            self.assertEqual(status['stop_reason'], 'case_cleanup_unconfirmed')
+
     def test_environment_failure_precedes_timeout_and_is_excluded_from_metrics(self):
         invalid = result('bad', stage='environment_invalid',
                          error_type='VideoSourceTimeoutException',

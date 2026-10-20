@@ -14,6 +14,8 @@
 
 构建前必须存在 `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`。Windows离线 `pub get` 在软链阶段失败后，即使已有package_config等依赖元数据，也不代表Android插件注册已生成；缺失会造成APK可以构建、启动却报MissingPluginException（例如package_info）。须先由固定Flutter工具的 **Android-only injectPlugins准备流程** 生成注册文件（这是Flutter工具内部API，不是CLI子命令），然后再运行本脚本。脚本在解析脚本生成、创建输出目录及构建之前检查；缺失立即失败，不自动生成、不复制该Java文件入库，也不修改系统设置。此生成文件保持忽略，但其内容哈希明确纳入source-digests.json及构建前后比较。
 
+debug parserQa准备时使用 `injectPlugins(releaseMode: false, androidPlatform: true)`；Flutter3.47.3的release模式会过滤dev_dependencies插件，不能仅凭文件存在推断已按debug插件集合生成。此次native splash差异已用原工具双模式逐字节复现，下一debug候选使用标准debug生成；生成日志、模式与注册文件摘要应随候选保存，不能手工复制注册段。
+
 1. 使用项目既有 Flutter3.47.3 工具链和已解析依赖，运行 `build.ps1`，传入 `FlutterRoot/PubCache/GradleHome/JavaHome/Output/Python`。它生成与生产共用的解析脚本、构建实验 APK 并保存源码内容哈希/基线 SHA/APK 哈希。缺少 Android 插件元数据时按构建 runbook 的 Android-only 流程准备；不更改 Windows 开发者模式。
 2. 新建专用 API36 Google TV x86_64 AVD；以 `-no-window -no-audio -no-snapshot -gpu swiftshader -cores 2 -memory 2048` 后台启动，选择未占用端口。不得复用/清除他人 AVD。
 3. 用 Android SDK `aapt dump badging` 核实 APK 包名及 x86_64，再使用明确 emulator serial 安装；运行器会核对已安装 APK 与传入文件的 SHA256。
@@ -28,7 +30,13 @@ python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --mani
 
 ## 清单与结果契约 v1
 
+`selection_only: true`默认关闭，仅App+固定rule可用：只做一次原Plugin搜索及唯一作品详情/集表，输出最多8条生产有效road、每路首2集标签及页面SHA256/数量；解析器及播放器创建前返回，parser/media为not_run。发现的完整页面地址/正文不输出；标签白名单不通过保留null/不可绑定，不换选后续集。该QA进程关闭原HTTP日志输出，网络/headers/cancel保持生产方法。selection终态不进入播放eligible/成功/失败分母，挑战停批且清理失败优先；发现后必须按新hash+精确label绑定，不能盲选road index。
+
+`qa_lifecycle`仅允许无rule的本地App夹具，action为exit/switch，trigger_phase为primary/fallback，switch必须绑定不同id/URL的本地target。运行器在实际阶段后发送BACK或DPAD_CENTER，发送前精确核对前台parserqa/ParserQaActivity；空/畸形/其他组件/查询失败均不发键、不自动切回。动作后必须有页面dispose、旧发布抑制及原生旧代次写入拒绝收据，否则environment_invalid停批。目标新页面只在旧清理confirmed后创建。旧结果拒绝探针为标注的合成数据；不能当作真实媒体晚到事件。此覆盖QA页面，不能当完整产品TV UI验收。
+
 仅App QA可用 `observe_playback_seconds: 10..15` 显式打开首帧后的500ms状态时间轴；默认仍只观察2秒。输出位置、playing/buffering/completed、buffer/duration和错误计数，不保存错误原文，不控制播放、不改变解析服务退出顺序。时间轴受App总60秒剩余预算截断，宿主单例70秒上限保留；`budget_limited`或取消必须单独处理。原生回调只证明首帧，不存在连续帧计数时不得声称视频一直渲染。
+
+备用线路案例可同时传入 `expected_episode_page_sha256` 与 `expected_episode_label`。App仍按原规则查询集表，解析前校验候选完整页摘要和精确集标签；不符记 `sample_identity_mismatch` 并停止该样本。此绑定用于核对既有页面证据，不替换规则或为road index提供盲选许可；普通案例不传时保留既有行为。
 
 - 清单 `cases[]`：`id/group` 必填；真实源使用 `rule_file/keyword/names/road/episode`，后两项零基索引。精确匹配唯一作品，不自动采用搜索第一项。规则 JSON 内联后计算摘要；目前 `overlay=none`，不修改规则/覆盖模型。
 - 固定清单中的同一例分别跑 webview/gecko，奇偶样本及重复轮交换顺序；每次 force-stop 后冷进程启动。浏览器缓存策略不同但都不复用网页会话；OS/DNS 缓存仍可能热。固定同一 UA，此结果不是各内核默认 UA 的比较。

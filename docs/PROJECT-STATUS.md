@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+15:18统筹独立复核selection-only交付71bd0769：仅复用生产搜索/集表，默认关闭、只输出安全标签/摘要/计数，在解析器与播放器创建前返回；QA进程关闭来源请求日志。所有selection意图终态从播放分母排除，cleanup失败仍优先停止。40项Python、13项Dart（4投影隐私＋9同DOM helper）、定向分析独立通过，README同步保留既有QA边界；不是产品默认策略修改。回执.dart_tool/selection-only-independent-review.json。
+
+20585 selection-only两例runner快照/固定规则身份/两层及最终清理已独立复算：baimao原q1仅搜索10秒超时，没有集表/解析/媒体，不新增“播放失败”；xfdmneo原q2取得同作品两条各28集线路，只报告每线前两集标签/页面摘要，第一线第1集摘要匹配旧401案例，备用线第01集a4f26f906f47a060d504590256e9c6583830ae0ff7f59e30928362ebdf61cb86唯一绑定于本次输出，不声称全部剧集全局唯一。两例播放eligible=0，17源当前10限定可播/1挑战/6未解决计数不变。
+
+已续派唯一播放owner用现成20585仅一次xfdmneo上述备用线App默认路径实播，解析前hash/label双门禁，观测10秒、单例70秒/总150秒，保留旧首线401；不盲选其他索引、不重试unknown。同时准备aafun原q2同DOM比较：只复用正常App取得的同一详情响应，先验证请求/作品/规则及2xx HTML、无重定向/挑战、最多256KiB；生产Plugin.traceChapters与只读响应元数据配对，helper放可终止isolate，最多共享剩余5秒，取消须退出。诊断后即返回，不追加fetch/解析/媒体/overlay，403等缺口不重取。规则owner等待真实数据，无意义不催促；电视准备答复仍待、未重连。
+
 14:55统筹实证复核：仅重验switch的20584结果在lifecycle-switch-20584-1452，原两BACK仍复用20583，初次switch environment_invalid保留。统筹独立按plan重算新目标页面及fixture.mp4?episode=next媒体摘要，与返回行一致；旧代次cancelled/不允许正常发布，旧service cleanup与page_disposed均先于新代次started，新目标首帧/7933ms正进度、两层及最终cleanup成立，runner快照hash匹配identity。旧native写入探针是显式synthetic，非捕获到的真实晚到媒体回调。原生按键前后皆FlutterView，不能据此说Android前台丢失；修复对象为QA控件焦点及独立增加的前台安全门禁。回执.dart_tool/lifecycle-independent-review.json，仍不覆盖完整产品TV UI/实体电视。
 
 规则bf516857新ChapterSelectorDiagnostic已离线审读并独立9项Dart/定向分析通过：同一调用者HTML最多256KiB，复用Plugin.fromJson/生产XPathRuleStrategy，仅换两个集表字段，输出最多每侧6条label/hash和计数/差异，schema/异常/敏感文本不回显，不改输入规则、不生成overlay、不联网。目前尚未接main/runner，也未用真实aafun DOM验收；后续接入必须默认关闭并绑定已有成功App详情响应，不能重复fetch或声称合成测试等于站点修复。

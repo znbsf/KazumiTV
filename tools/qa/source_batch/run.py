@@ -42,14 +42,16 @@ def summarize(rows):
                 continue
             invalid = [r for r in subset if classified_stage(r) == 'environment_invalid']
             infrastructure = [r for r in subset if classified_stage(r) in ('host_error', 'host_timeout', 'interrupted')]
-            eligible = [r for r in subset if r not in invalid and r not in infrastructure]
+            selection = [r for r in subset if r.get('selection_only') is True and r not in invalid and r not in infrastructure]
+            eligible = [r for r in subset if r not in invalid and r not in infrastructure and r not in selection]
             success = [r for r in eligible if classified_stage(r) == 'first_frame']
             resolved = [r for r in eligible if 'resolve' in r.get('timings_ms', {})]
             memory = [r['memory']['sampled_peak_pss_kib'] / 1024 for r in eligible
                       if r.get('memory', {}).get('sampled_peak_pss_kib') is not None]
             median = lambda values: round(statistics.median(values), 1) if values else None
             output.append(dict(group=group, engine=engine, attempted=len(subset),
-                invalid=len(invalid), infrastructure=len(infrastructure), eligible_results=len(eligible),
+                invalid=len(invalid), infrastructure=len(infrastructure), selection_only_results=len(selection),
+                selection_completed=sum(r.get('stage') == 'selection_only' for r in selection), eligible_results=len(eligible),
                 resolved=len(resolved), first_frame=len(success),
                 resolve_median_ms=median([r['timings_ms']['resolve'] for r in resolved]),
                 frame_median_ms=median([r['timings_ms']['first_frame'] for r in success]),
@@ -539,6 +541,8 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                        road=config.get('road', 0), episode=config.get('episode', 0),
                        compatibility=('production capability factory and default headers/player controller'
                            if config['engine'] == 'app' else 'controlled shared script; bounded nested HTML fallback; no WebView66 adapter'))
+            if config.get('selection_only') is True:
+                row['selection_only'] = True
             with ledger.open('a', encoding='utf-8') as f:
                 f.write(json.dumps(row, ensure_ascii=False) + '\n')
                 f.flush()
@@ -551,6 +555,9 @@ def run_batch(device, plan, output, rows, *, fixture_media=None, budget_seconds=
                 break
             if row['stage'] in ('host_timeout', 'environment_invalid'):
                 stop_reason = row['stage']
+                break
+            if row.get('selection_only') is True and row['stage'] == 'captcha':
+                stop_reason = 'selection_challenge'
                 break
     except BaseException as error:
         primary_error = error
