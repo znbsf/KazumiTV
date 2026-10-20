@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:55统筹独立验03d1d099 tv20592-normal-remaining-v2：input原字节及cases摘要、父runner/physical serial与完整fingerprint/现装20592 hash/provider全部匹配，fresh primary实际VideoWebviewImpl解析2秒，原生首帧+2066ms、后备启动0，primary10000/total25000保持；App/player/resolver/host/final均清理confirmed，可选独立subscription not_created合法。设备完整身份、三保护包/QA包元数据、桌面和音量前后相同，reverse/QA进程/自有runner/目标ADB/端口均空；CLI26.829秒及全包82.990秒满足原70/120秒限制。回执.dart_tool/tv20592-normal-independent-review.json。两受影响fixture分别有原件通过，宿主临时错误不改写成产品失败。
+
+已明确续派唯一owner原尚未尝试live2（.dart_tool/tv-live-plan-20592.json，SHA8811ee1c659a79ac4ae4caa613405a95d83b491912de7ae9aed005f497f6558e），只现装20592、原唯一runner入口，ezdmw固定原页标签3 QA新10/25一次补救＋7sefun默认第01集控制，单例70秒/完整10秒进度/总200秒。先核同物理身份/包/保护桌面音量与资源，普通明确来源阶段失败可继续同计划控制，challenge/unknown/envinvalid/身份或清理不明停，不换例/追加或重试。末次仅停parserqa保留包与数据并核原保护/自有进程和负载；不再构建重装、重复fixture或使用错误临时恢复包装器。真实源结果尚未交，不提前计修复成功。用户询问实际进展已回复当前模拟器17源/11限定样本、追加9集7过2超时、TV四真实来源仅7sefun通过及工具耗时问题；后续直接按剧集成功/失败与原因是否确定汇报。
+
 20:46统筹独立复核4351f461的20592部分组合包：install-r一次26.234秒成功，现场全APKhash匹配独立原件、UID10083与firstInstallTime19:22:47保持。首个modern-syntax实际fixture满足primary10000/total25000、primary retired10151ms先fallback start10153ms、一次fallback accepted18947ms、原生首帧与正进度2066ms、stop URI为空/unattributed及App/player/resolver/host/final清理。独立errors subscription为not_created是合法App路径（无独立订阅），不能被临时外层验收误判为产品失败；原记录保留。随后临时恢复包装器read_json定义顺序NameError发生在第二例启动前，修正后原180秒预算已不足，owner按停止条件收尾。原fixture计划2/启动1/终态1/unknown0/未尝试1，live2全部未尝试，不写成产品失败或新调度已修复来源。回执.dart_tool/tv20592-partial-independent-review.json；原三保护包完整元数据/桌面/系统音量/provider保持、parserqa已停保包、reverse空、自有runner/fixture/采样/目标ADB均退出及负载收据独立读取。
 
 已明确续派唯一播放owner下一独立有界包，仅原第二个未尝试正常夹具，现装20592不构建重装、不重复首例、不自动执行live：.dart_tool/tv-fixture-remaining-20592-v2.json，SHA5bbe97d7009fe7f9234531bd7ccc25f8e3c04b553191ad4fc6e7bb7f367083a3。实质前提是统筹已清除错误宿主验收并绕开非必要临时恢复包装器，直接复用原唯一runner的已测试单例入口；不是为已执行失败重置预算。固定case tv20592-normal-app-no-fallback全部字段保持，单例70秒/总120秒，真实首帧正进度/零fallback/10与25秒候选参数/两层清理必需；独立subscription允许confirmed或not_created，缺失/unconfirmed不通过。先复核同物理身份/现装hash/保护基线与资源，challenge/unknown/envinvalid/清理不明停、不重试；原状态先记预算、只交这一个结果与退出负载。两个真实源仍待统筹独立验正常夹具后具体续派；旧540秒组合包已停止，旧预审不自动恢复后续。
