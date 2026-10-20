@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+19:50统筹独立审读62c51bcb TV真实4源：4计划/4终态/unknown0，展开rule后manifest、父runner、同20591 APK/physical identity/provider/页hash+exactlabel、各清理和三保护包/音量/资源退出逐项对应。7sefun默认native首帧、完整10秒position_delta10218ms/错0，原生设置mediacodec/非模拟器；ezdmw/moonci/MXdm共享25秒/一次fallback后仍解析超时、player未创建，不当解码失败，也不撤销模拟器正例。回执.dart_tool/tv-live20591-independent-review.json。
+
+新区别观察已经从原脱敏trace量出：三个fallback记录约9886/9791/9787ms截止，首次实际target load_start为7037/6894/6903ms，仅余2849/2897/2884ms。可支持启动/可用预算假设，不能唯一归因。独立代码检查ParserQaActivity.kt onPageStop把闭包请求url作为实际stop资源，导致aboutblank stop早于target start却标根页；这是已证诊断归属缺陷，不能用success=true声称目标加载完成/或推断失败根因。
+
+已给唯一owner下一仅1个首次TV standalone Gecko受控判别：.dart_tool/tv-gecko-phase-control-20591.json，SHAaea8f05d419c059bfe25e028ee8799b161e1f983990e2736e7fa6e29312d3f25，现装20591/ezdmw同rule/page17f895cd…/标签3，既有gecko单阶段15秒（不走primary15后剩10秒wrapper），原单例70秒/总150秒。受控UA/软件播放设置与App默认不同，成功不能直接当生产默认修复或纯时间单变量，按解析/媒体阶段分别记；不加timeout、不构建重装、不追加其他源/observer/console/JS/HTTP，challenge/错配/envinvalid/unknown/清理不明停不重试，原基线收尾不变。之后仅纯离线修QA onPageStop假归属（未知实际URI明确unattributed）、最小反例与测试，先不构建/安装/再跑，不改解析策略/25秒期限/生产代码。规则owner已续派纯离线原v7派生v8纳入这四条TV限定结果，不提前纳入尚未交付standalone对照；主目标未完成，当前11受限来源与五无可播/原401404/旧unknown/UA限制保留。
+
 19:35统筹已独立复核5550454f首次TV安装与3fixture：新20591一次24.75秒Success/现场完整APK摘要等同独立签名原件、版本/ARMv7/UID读回成立；原20590失败保留。3行原始identity/manifest/runner/hash、physical fingerprint/provider/实际tv=true emulator=false hwdec=mediacodec、native首帧/正进度/两层清理逐项匹配。QA fallback仅一次且primary retired先新start，正常零fallback；真实switch旧dispose/retired时间1792495595893/5955先于新start6025，目标page/media hash匹配，原生旧写入synthetic探针拒绝。10秒观测内8秒素材完成，进度7867ms/错0，不能称持续10秒画面渲染。回执.dart_tool/tv-fixture20591-independent-review.json。
 
 收尾原三包hash/桌面/音乐8/100/media0/provider保持，reverse为空、自有fixture/runner/采样退出、宿主CPU快照5%及TV一秒8.47%已读取；保留parserqa不卸载，无私有数据内容验收。debug PSS峰值仅命名进程与新命名WebView renderer、排除共享系统服务，不把不同阶段/时长差当纯Gecko资源增量或正式承诺。仅服务/QA页面通过，不替代产品完整UI/mediacodec_embed/声画同步或长稳验收。
