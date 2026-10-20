@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+18:06最新人类现场确认：「电视已准备好，可以再次连接」。这解除旧“准备答复待收/不重连拒绝端点”的等待条件，14:00起的独立电视QA授权持续有效；并不代表工具自动审批已放行或允许改正式包/真实数据/个人preview/系统配置。已将新证据直接交唯一播放/device owner，先保存当前console离线工作/测试后，按原runbook确证端点正常连接一次，只读回实际TV serial/model/fingerprint/SDK/ABI/WebView/资源归属、正式/preview/QA包身份与升级条件、前台/音量等保护基线。不得猜IP/扫描/reset共享ADB、发键/启动App/安装/清数据；仍拒绝或身份/归属不符即停该连接路线，不反复连。
+
+旧ARM20580为5cf代码且未验收，缺后续精确集门禁/生命周期改动，不直接安装；20588仅x64不可当TV包。后续须冻结且统筹审读当前代码、按实际ABI构建新独立ARM QA，绑定源码/签名/摘要/保数据升级后再给具体TV夹具与代表源预算。当前console分类仍先离线交付，TV上不临时跑mgnacg/旧unknown、不在脏源码中构建；正常独立工作持续推进，不向用户重复索要同一授权。
+
 17:50统筹独立复核depth-failure-fallback-20588-v1：同20588 APK、runner快照/展开输入摘要、精确rule/page/label与计划一致，2例completed/unknown0，解析/App/host/final清理confirmed，owner停后收据确认76696/87792及后代退出、候选0/CPU快照7%。DM84本次fresh primary直接resolved/accepted，零Gecko starts，原生首帧+完整10秒9759ms/采样错0；只新增本次默认primary短播/波动观察，Gecko验证为not_run_primary_succeeded，不因期待fallback重跑。mgnacg primary retired后仅一次Gecko、共享25秒仍resolve_timeout、player未创建；superseded trace来自截止退役取消，不冒称用户切集。回执.dart_tool/depth-failure-fallback-independent-review.json。DM84先前旧超时与现代正例均保留，UA/网络/时序原因仍未定；mgnacg跨当前两WebView与一次Gecko失败仍不足定外部/规则/客户端根因。
 
 已续派播放owner先仅离线补默认关闭QA console分类：固定mgnacg已失败rule/page/label门禁，在工厂创建后init前订阅既有onLog（现VideoWebviewImpl已有Console桥，非新JS），只认Console前缀、80条/8192单条/累计256KiB内存限额，输出固定hint枚举与限幅计数/overflow；原message/stack/URL/headers/认证字段及未知文本不可出结果，challenge hint停止观察但不称已确验证码。完成/取消/finally等待订阅取消、晚到不写，其他case零订阅，不改生产controller、默认策略、机器日志，不新增请求/媒体/脚本。须交隐私/超限/伪异常/晚到/取消/归属反例与精确提交；此时不构建、不启动、不重跑mgnacg，待统筹独立审读再定唯一必要诊断。实质变化是当前已有超时trace缺脚本/来源策略分类，能补code或外部归因所缺观察，不能原样再跑。DM84本包到此停止，旧aafun/五无可播/7已过均不重试。主目标未完成、自动化持续ACTIVE，正式/preview/电视/系统未动。
