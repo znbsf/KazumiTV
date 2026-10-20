@@ -1,6 +1,11 @@
 # KazumiTV 当前状态
 
 ## 2026-10-20：全来源无验证码播放探测与修复统筹（进行中）
+首轮诊断交付后继续修复推进：补充7例原因链及4例旧Android Gecko功能对照均有终态、正例均有首帧/正进度，后续派生状态为5 played、LMM实际challenge跳过、11未解决。ezdmw/moonci/MXdm/xfdmnext在现代App及旧Android Gecko均成功，旧App失败；AGE证书链失败、sorani握手中断、dalvdm403未确认挑战、akianime/baimao媒体404、xfdmneo媒体打开失败，均不能凭阶段结果编造overlay。
+
+统筹已独立阅读并组合27ab79e5为76db4445：修复PlaybackTrace对非法百分号的ArgumentError导致原生日志丢失，加入被动脱敏原因链/正面challenge证据。8项日志/持久化/QA快照反例复验通过；不将日志修复称为视频已修好。阶段报告与原证据保持宿主source-catalog-playback-20261020/{REPORT.md,diagnosis.json,validation.json,final-cleanup.json}，现代启动崩溃和未执行案例单列。
+
+两个会话已续派：客户端侧定位四个旧核差异的生产注入/监听缺口或站点JS能力，先夹具复现再最小修复；若必须新内核，只允许显式开启的隔离QA fallback对照，不更改默认产品策略。规则侧对TLS与媒体上下文做电脑有界观测、保存响应fixture，只有现有字段可表达且有反例才生成overlay。正式包、电视和系统信任/代理不动；本阶段持续ACTIVE，不能在11源仅分类后提前收口。
 本轮实际推进：首轮batch-1全部17源有终态，5源样本真实首帧/正进度；aafun/xfdmneo无匹配经既有planner各补一次备用作品，19次总尝试无unknown。现阶段5源played、12源failure_requires_diagnosis（4搜索错误、5解析超时、3媒体/首帧失败），不能将“全部触达”冒充全部已解决。私有证据source-catalog-playback-20261020/{batch-1,batch-2,coverage-after-wave-2}。
 
 现代App对照前6个有效配对中ezdmw/moonci/MXdm/xfdmnext旧解析超时→真实首帧，akianime/baimao仍媒体失败；aafun现代App启动崩溃记测试前环境无效，xfdmneo现代未执行，不自动重跑。播放会话正构建有界诊断QA以补4个搜索/3个媒体失败原因链，另仅对四个环境差异样本做旧Android Gecko功能对照，预算和停止条件记在其原PROJECT-STATUS。规则会话已收到19次账本及明确规则侧审查/fixture需求任务，避免静等或猜测overlay。
