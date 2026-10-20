@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+22:27统筹独立审361a2375仅result_file与transport测试的最小修正，并组合后重新独立跑100项宿主检查通过（8.537秒）。exec-out传raw script由客户端唯一escape；旧手工quote/裸join测试证明撤销，修正后的真实本地安全shell按官方客户端转义模型先红后绿。固定实际ADB37.0.1-15733141/1.0.41的8273560字节二进制SHA b4a6b455702684652cccf7b46258b29e653538904359a58fd4931cf3ef286b3f及source.properties摘要已独立核；该binary到精确source tag/下载来源认证仍未证。回执.dart_tool/host-exec-out-fix-independent-review.json含新runner字节摘要。此处仅接纳模型/代码修正，不预称真机wire已通过，不从原156B/hash猜唯一原因，不追认aafun unknown。
+
+下一步只允许独立有界只读协议预检：同既有物理TV/固定客户端/现装包/原保护桌面音量/QA已停与无他人占用核对后，固定无来源常量输出、固定已知QA case.json字节frame及新result_file读回验证。命令总共享10秒、全包前后读回120秒，不启动App/键控/构建安装/数据写入或来源网络，不改系统/共享ADB、不读其他文件/回读原156字节。仅记录byte/type/hash和已知case身份布尔；若合法旧结果存在，可按原已审安全helper字段另存恢复观察且绝不改原host unknown，否则只记录当前存在性/类型不追推旧时点。任何协议/身份/资源异常即停不换命令重试；该预检通过并交统筹后才考虑尚未尝试MXdm，不能拿来源当协议重试器。
+
 22:21统筹独立核9cbbfda7 tv20592-aafun-same-response-v1：input原字节/展开rule后manifest/新host runner bcc37bec…/同physical身份与现装20592hash/provider对应。CLI14.971秒在固定文件协议RuntimeError退出；元数据仅rc0、exists未知、invalid_file_marker、156字节及hash，无App诊断终态，planned1/started1/completed0/unknown1/eligible0。不能判断搜索/详情/双XPath比较是否实际执行，也不能由无效marker断文件空/不存在/HTTP或来源错误；Android am Status timeout/Wait10155且expected activity为真亦非正常启动成功证明。无效原文未保存/追加回读，App tap/worker自身ack未观测，进程级case/host/final退出与完整保护meta/桌面音乐8/media0/provider/QA包保持、自有runner目标ADB/监听/reverse空已独立核；全包131.824秒<180。回执.dart_tool/aafun-tv-unknown-independent-review.json，原App和x64两个unknown均保留，不自动重跑或扩MXdm。
 
 撤销前轮transport测试的适用结论：原本地真实shell用裸join模拟ADB argv，统筹提出手工quote并接受该测试均未核真实客户端边界。现核[官方platform-tools34客户端源码](https://android.googlesource.com/platform/packages/modules/adb/+/refs/tags/platform-tools-34.0.0/client/commandline.cpp)：exec-out首命令后逐参数escape_arg，不是裸join；主线同样。统筹独立按该转义模型在本地安全shell复现：当前手工quote再经客户端escape不能产生正确frame，raw script argv经客户端escape可完整输出。回执.dart_tool/adb-exec-argv-model-independent.json。仍未核本次固定binary具体版本或真机协议，不用156B/hash猜错误文本/唯一原因；100离线测试通过只保留其逻辑覆盖，原“已证明实际ADB wire”结论明确撤回，不能当现场可用保证。

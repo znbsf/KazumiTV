@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import shutil
+import shlex
 import tempfile
 import threading
 import unittest
@@ -402,7 +403,7 @@ class DeadlineTests(unittest.TestCase):
         self.assertEqual(meta['read_bytes'],r.RESULT_BYTE_LIMIT)
         self.assertEqual(parsed,value)
 
-    def test_remote_script_quote_boundaries_with_real_local_shell(self):
+    def test_exec_out_client_escape_model_with_real_local_shell(self):
         shell=Path(r'C:\Program Files\Git\bin\bash.exe')
         if not shell.exists():
             found=shutil.which('bash')
@@ -411,8 +412,17 @@ class DeadlineTests(unittest.TestCase):
         d=object.__new__(r.Device);d.call=Mock(return_value=subprocess.CompletedProcess([],0,b'QA_MISSING',b''));d.result_file()
         args=d.call.call_args.args
         self.assertEqual(args[:5],('exec-out','run-as',r.PACKAGE,'sh','-c'))
-        remote=' '.join(args[1:])
-        unquoted=' '.join(args[1:-1])+' '+r.shlex.split(args[-1])[0]
+        # Official exec-out client: argv[1] is the command, every later arg
+        # passes escape_arg. The old bare-join model was wrong.
+        def escape_arg(value):
+            return "'"+value.replace("'", "'\\''")+"'"
+        def wire(argv):
+            return argv[1]+''.join(' '+escape_arg(arg) for arg in argv[2:])
+        remote=wire(args)
+        # Reproduce the pre-fix manual quote in memory, then the client's
+        # second escaping layer. Never infer the real TV's156 error bytes.
+        raw_script=shlex.split(args[-1])[0] if args[-1].startswith("'") else args[-1]
+        manual_quote=wire((*args[:-1],shlex.quote(raw_script)))
         prefix='run-as() { shift; "$@"; }\n'
         with tempfile.TemporaryDirectory() as tmp:
             directory=Path(tmp);(directory/'files').mkdir()
@@ -424,8 +434,12 @@ class DeadlineTests(unittest.TestCase):
             valid=execute(remote)
             self.assertEqual(valid.returncode,0,valid.stderr)
             self.assertEqual(valid.stdout,frame(raw))
-            invalid=execute(unquoted)
+            invalid=execute(manual_quote)
             self.assertFalse(invalid.returncode==0 and invalid.stdout==frame(raw))
+            # exec-out's locally successful transport is not a file marker.
+            # Only simulated error bytes enter this decoder, never TV raw data.
+            d.call=Mock(return_value=subprocess.CompletedProcess([],0,invalid.stdout+invalid.stderr,b''))
+            self.assertEqual(d.result_file()[0]['type'],'invalid_file_marker')
             (directory/'files/result.json').unlink()
             self.assertEqual(execute(remote).stdout,b'QA_MISSING')
 

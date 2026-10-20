@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shlex
 import statistics
 import sys
 import subprocess
@@ -580,9 +579,9 @@ class Device:
         script = (f'if [ -f files/result.json ]; then printf "QA_FILE:"; '
                   f'wc -c < files/result.json; head -c {RESULT_BYTE_LIMIT+1} files/result.json; '
                   'else printf QA_MISSING; fi')
-        # ADB joins remote argv as shell text; host argv boundaries alone do
-        # not preserve a compound sh -c body. Match the existing quoted path.
-        completed = self.call('exec-out', 'run-as', PACKAGE, 'sh', '-c', shlex.quote(script),
+        # exec-out's client escapes every arg after the command. Pass the raw
+        # sh -c body; quoting it here would add a second literal quote layer.
+        completed = self.call('exec-out', 'run-as', PACKAGE, 'sh', '-c', script,
                              timeout=3, check=False, return_completed=True)
         raw = completed.stdout
         transport = {'transport_returncode': completed.returncode}
