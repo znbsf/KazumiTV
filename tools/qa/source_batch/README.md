@@ -4,6 +4,21 @@
 
 构建默认x86_64；ARM电视必须明确传入 `build.ps1 -TargetPlatform android-arm` 或 `android-arm64` 并核对真实ABI/签名/升级条件，目标写入artifact.json。现有x64候选不能用来证明ARM可执行。调用者先检查APK包名，再明确同签名安装到已获授权的独立QA对象。Gecko只解析地址，播放仍使用项目media-kit真实首帧回调；模拟器静音软件输出不代表电视硬解验证。生产构建不启用 `kazumiParserQa` 时不包含依赖、Activity、扩展。
 
+独立QA构建现在要求整个APK只含一个原生ABI。固定Flutter3.47.3在未拆包时默认将
+defaultConfig的ABI过滤重置为三架构，单独`--target-platform`不能保证过滤第三方库；旧20590因此仍有多ABI依赖。
+build.ps1仅对本QA调用传入`disable-abi-filtering=true`，QA专用Gradle策略按同一个显式target-platform
+清除defaultConfig及parserQa/parserQaOffline中的旧过滤，再设置唯一目标；不改普通TV/产品构建。
+ARMv7、ARM64、x64均显式映射，普通和LaunchOnly共用此约束；后者仍禁止INTERNET及实体启动，权限语义不变。
+
+该入口不启用`--split-per-abi`，QA策略拒绝split-per-abi=true、多个/缺失目标或缺失禁用默认过滤属性。
+因此输出仍为`build/app/outputs/flutter-apk/app-parserqa-debug.apk`，LaunchOnly为
+`app-parserqaoffline-debug.apk`；实际versionCode必须等于传入BuildNumber，不应用仓库的`base*10+ABI`或
+Flutter的`base+ABI*1000`拆包覆盖。普通产品的原版本策略保持原样。
+包装完成后保留source-digests.before/after.json，artifact_contract.py核对实际aapt包名/版本名/版本码/
+minSDK26/debug/INTERNET、aapt与ZIP唯一ABI及libflutter/libmpv/libxul的ELF class/machine，拒绝额外ABI或缺库；
+通过后才写artifact.json，新增native_abi、actual_version_code/name、min_sdk、abi_packaging及apk_relative_path。
+不通过删so、重压包或重签处理旧APK。当前只有离线契约测试，实际新单ABI APK仍待一次冻结构建核验。
+
 默认 `--engines app`：搜索/集表调用现有Plugin；解析调用生产 `VideoWebviewControllerFactory`，由真实DOCUMENT_START_SCRIPT能力选择现代/legacy实现（包含WebView66的兼容准入）；媒体头使用 `Plugin.buildHttpHeaders`，确认地址缓存复用 `ResolvedSourceCache`；播放直接复用 `PlayerPlaybackController`，包含缓冲策略、广告过滤、代理、真实SDK/模拟器输出选择和错误/释放处理。QA Activity继承生产MainActivity以复用原生通道，只在debug实验身份下启用TV模式测试钩子。首帧仍须实际native回调，不能只看尺寸。
 
 这仍是服务/播放控制器批测；它按清单选择作品/线路/剧集，未经过首页、详情、遥控焦点、切集界面、历史/弹幕等完整UI。不得将结果标记为全App端到端通过。UI遥控回归应另用正式App入口的独立测试包及真实DPAD动作。

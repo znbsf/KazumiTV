@@ -10,7 +10,6 @@ android {
             dimension "device"
             applicationId "com.znbsf.kazumi.fluttertv.parserqa"
             minSdkVersion 26
-            ndk { abiFilters "x86_64" }
             buildConfigField "boolean", "QA_LAUNCH_ONLY", "false"
         }
         if (project.findProperty("kazumiQaLaunchOnly") == "true") {
@@ -18,7 +17,6 @@ android {
                 dimension "device"
                 applicationId "com.znbsf.kazumi.fluttertv.parserqa"
                 minSdkVersion 26
-                ndk { abiFilters "x86_64" }
                 buildConfigField "boolean", "QA_LAUNCH_ONLY", "true"
             }
         }
@@ -40,6 +38,8 @@ android {
         if (variant.buildType.name != 'debug') variant.setIgnore(true)
     }
 }
+apply from: 'parser-qa-abi.gradle'
+project.ext.configureParserQaAbi.call(android)
 dependencies {
     parserQaImplementation 'org.mozilla.geckoview:geckoview:146.0.20251217121356'
     if (project.findProperty("kazumiQaLaunchOnly") == "true") {

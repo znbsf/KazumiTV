@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+19:20统筹独立审读集成506df2bb单ABI QA包装修正，74项Python（含真实PS构建参数矩阵、缓存Groovy执行策略及APK正反例）通过，旧20590 fat APK被新实际产物门禁拒绝。已在固定FlutterPlugin.kt核实非split默认重置ABI路径；新显式QA参数disable-abi-filtering=true保留defaultConfig+两QA flavor的单目标ABI，普通产品入口不应用本overlay。无split且实际版本/路径/aapt+ZIP/ELF/minSDK/debug/网络模式均核验，不靠target参数冒充产物。无解析/规则/播放器变更；回执.dart_tool/qa-single-abi-independent-review.json，测试未执行AGP构建，不提前认定新包已单ABI或安装问题解决。
+
+已给唯一owner下一build-only包：干净冻结506df2bb或仅文档等效提交，一次parserQa/android-arm/0.4.5-parserqa.arm.3/code20591构建<=180秒；原before/after及ignored registrant保留，核新target-only ZIP/实际版本/签名/hash/大小与旧包差异，保留原20590失败。不安装/连接/启动/恢复TV或模拟器、不跑来源；先交统筹独立读回具体新产物，再给有界首次安装和夹具包。不能把体积预期当作网络吞吐或安装因果证实，旧3fixture仍未尝试、live4仍未许可执行。
+
 最新安装阻塞与已续派修正（用户询问“怎么卡住了”）：20590第一次streamed新装120秒未返回，3fixture实际均unattempted，不计产品失败。统筹已独立读installation-timeout与timeout-state-readback：parserqa pm path未安装、无自有安装进程，历史session150153987 Destroyed/finalStatus=-115/Session was abandoned；不是已安装或仍有进行中会话的证明。原三包hash/桌面/系统音量与media状态保持，reverse未建、fixture/采样未启动。原包此次不重装、不延长等待；owner完成只读收尾与原始终态交付。
 
 统筹独立ZIP分组：344946680字节包压缩数据约other70.3MB、ARMv7 94.7MB、ARM64 86.1MB、x64 93.6MB，后两套依赖库并非TV所需。会话记录clientProgress约0.635但不足单独断网络/安装器根因；可先解决明确QA包装体积问题，回执.dart_tool/tv-install-timeout-independent-review.json。已给唯一owner仅离线修QA构建契约：复核固定Flutter/Gradle singleABI语义（target-platform当前只约束Flutter本体而未排额外依赖），支持目标ABI-only、实际输出路径/versionCodeOverride/artifact实值与target一致、ZIP关键库和拒额外ABI，保留普通生产及其他QA模式；不得抄删so/重新压包改签。先交最小提交/反例/拟新包版本和一次构建预算，统筹review前不构建/安装/启动/联网/加超时。TV3fixture及live4暂停在安装前，其他离线工作继续；不把此次安装障碍冒称来源失败或全部任务已完成。
