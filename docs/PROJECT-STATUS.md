@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+23:35统筹独立审规则1d50be22派生v10：266输入hash/87原包文件逐项重核，17源/三新attempt三unknown/TV2与模拟器11源19页计数不变；45个现成绑定逐一重比原selection_snapshot的规则effective归一化摘要/作品详情/road/episode/label/pagehash，和已审inputs内68 started id/32观察或已启动页摘要交叉排除无冲突。row.rule_sha256是另一序列化摘要，不与effective_sha256混用。回执.dart_tool/depth-v10-independent-review.json，原覆盖视图[C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/depth-coverage-20261020/sample-depth-coverage-v10.json](C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/depth-coverage-20261020/sample-depth-coverage-v10.json)。本轮仅既存证据审读，不运行播放/测试工具/来源或设备。
+
+当前阶段未完成，但可在现有证据和用户最新边界内独立推进的整理已完成：没有真实响应反例可支持新的overlay；45个其它集/线路仅可选深度，不会补足5个无可播源或TV启动链缺口。AGE/sorani/dalvdm/baimao/aafun仍分别缺TLS信任与HTTP配对、有效TLS/API、拒绝类型/有效响应、候选请求上下文、同DOM比较；mgnacg后续集仍缺候选/iframe阶段证据；TV moonci/MXdm/aafun原unknown不可重试追认，普通默认策略未改，完整TV UI/AV/长稳未验收。原始401/404、实际AppUA未记、xfdmnext空label门禁均保留。
+
+继续定位上述缺口需新种类诊断观测/重开门槛，与用户刚要求停止反复工具修复/重复样本的方向需要重新择定；不能用额外任选集试跑代替。已向人类给出本轮结果与具体选择：先保留本轮结果，或单独排查电视QA启动（不是重复请求既有TV操作权限）。在等待这个新方向决定期间暂停同条kazumi自动跟进，避免空跑；非标记工程已完成。规则owner已idle、device owner已idle，最后MXdm包已核自有进程/目标客户端/采样监听退出及TV17.29%/host9%存档负载，QA20592停止保包，正式/remoteqa/个人preview/桌面系统保持，不额外连接设备或恢复其他实验。人类选择新诊断后先在本原状态记录具体新门槛/范围/预算，再恢复同条automation，不新聊天。
+
 MXdm新候选已成为unknown，不再属于未尝试；按用户新方向，不从该结果进入继续修工具或换case试运行循环。统筹已向规则owner续派仅离线原v9→v10归并moonci原unknown及辅助恢复、aafun ARM无App终态unknown、MXdm启动/终态等待unknown，独立核原件而不改ledger/计数、不补缺失字段、不新fetch/设备/构建/播放工具测试。并要求在原覆盖视图收敛17源代表性结果、来源/客户端证据缺口与TV环境验收缺口，现成真实未执行绑定有则列、无则明确无，不为增加覆盖另挑剧集。待独立审核后再决定可推进的独立项，唯一设备owner目前idle，QA已停保包；当前不追加任何已测/unknown来源或工具修复。
 
 用户指定MXdm已实际单次执行并收尾，统筹独立核tv20592-mxdm-only-v1：输入原字节/展开rule后manifest hash/冻结runner1018a268…/physical身份/20592全hash/provider与原精确第01集计划一致。planned1 started1 completed0 unknown1，原始无App终态或provisional，不能假补搜索/解析/媒体进度。Android am返回Status timeout/Wait10195ms/expectedActivitytrue，宿主等候未抛20秒timeout；到55秒工作窗无result.json，HostBudgetExpired，CLI56.977秒在70秒内退出。只证明QA启动/终态等待链有缺口，无法判断是否已执行搜索/解析，不据此说MXdm来源不可播或解码失败。回执.dart_tool/tv20592-mxdm-independent-review.json。
