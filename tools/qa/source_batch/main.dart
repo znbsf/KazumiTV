@@ -145,6 +145,8 @@ class _BatchCaseState extends State<BatchCase> {
     String phase = 'search';
     try {
       if (!_current) throw const VideoSourceCancelledException();
+      final selectionTail = qaSelectionTailEnabled(c);
+      if (selectionTail) result['selection_tail1'] = true;
       if (c['selection_only'] == true && (!appProfile || c['rule'] == null)) {
         throw const FormatException('Selection-only requires App profile and fixed rule');
       }
@@ -235,7 +237,7 @@ class _BatchCaseState extends State<BatchCase> {
           result['matched_title'] = match.name;
           result['matched_detail_page_sha256'] = sha256.convert(utf8.encode(plugin.buildFullUrl(match.src))).toString();
           result['selection_snapshot'] = {
-            ...qaSelectionSnapshot(candidate.roads, plugin.buildFullUrl),
+            ...qaSelectionSnapshot(candidate.roads, plugin.buildFullUrl, tail1: selectionTail),
             'raw_road_count': roads.length,
             'road_index_basis': 'filtered production playback candidates',
           };

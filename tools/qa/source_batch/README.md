@@ -8,6 +8,8 @@
 
 这仍是服务/播放控制器批测；它按清单选择作品/线路/剧集，未经过首页、详情、遥控焦点、切集界面、历史/弹幕等完整UI。不得将结果标记为全App端到端通过。UI遥控回归应另用正式App入口的独立测试包及真实DPAD动作。
 
+`selection_only + engine=app` 可显式开启 `selection_tail1=true`：只投影每road原索引头两项加末项并去重，最多8road/各3条，标记`ordering=unknown`；末项不代表最新，标签仍走原安全白名单，不增加label hash。默认head2及普通投影不变。该计划必须使用明确LaunchOnly=false/Dart define=false且merged Manifest和APK含INTERNET的普通QA候选，运行器要求`--aapt`独立核对，不能错用离线启动包。每例保留白名单am启动字段；tail模式启动未确认或PID消失立即停止，失败时仅补专用result文件真实stat/字节数/UTF8-JSON类型，不保存无效原文或据exec-out返回0猜文件存在性。
+
 `--engines webview,gecko` 保留上一轮受控内核比较：固定浏览器/媒体UA、现代WebView控制器、8MiB缓冲和软件输出。其结果不得混入 `app` profile。app模式进程冷启，缓存代码被调用但不会凭此证明缓存失败回退或历史续播已测。
 
 ## 构建及运行

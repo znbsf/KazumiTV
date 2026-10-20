@@ -13,6 +13,13 @@ param(
     [string]$AndroidSdkRoot = "$env:LOCALAPPDATA/Android/Sdk"
 )
 $ErrorActionPreference = 'Stop'
+function Get-QaManifestPermissions {
+    param([xml]$Document)
+    # XmlNode.Name is shadowed by android:name in PowerShell's XML adapter.
+    return @($Document.SelectNodes('/manifest/*[starts-with(local-name(),"uses-permission")]') | ForEach-Object {
+        $_.GetAttribute('name', 'http://schemas.android.com/apk/res/android')
+    })
+}
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../..'))
 Set-Location -LiteralPath $repo
 $androidRegistrant = 'android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java'
@@ -35,28 +42,31 @@ function Source-Digests {
     return ($map | ConvertTo-Json -Compress)
 }
 $before = Source-Digests
+$before | Set-Content -Encoding utf8NoBOM "$Output/source-digests.before.json"
 $env:PUB_CACHE = $PubCache
 $env:GRADLE_USER_HOME = $GradleHome
 $env:JAVA_HOME = $JavaHome
 $env:GRADLE_OPTS = '-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Dorg.gradle.parallel=false'
 $qaFlavor = if ($LaunchOnly) { 'parserQaOffline' } else { 'parserQa' }
-$qaExtraArgs = if ($LaunchOnly) { @('--android-project-arg=kazumiQaLaunchOnly=true', '--dart-define=KAZUMI_QA_LAUNCH_ONLY=true') } else { @() }
+$qaExtraArgs = if ($LaunchOnly) { @('--android-project-arg=kazumiQaLaunchOnly=true', '--dart-define=KAZUMI_QA_LAUNCH_ONLY=true') } else { @('--android-project-arg=kazumiQaLaunchOnly=false', '--dart-define=KAZUMI_QA_LAUNCH_ONLY=false') }
 & "$FlutterRoot/bin/flutter.bat" --no-version-check build apk --debug --no-pub --flavor $qaFlavor --android-project-arg=kazumiParserQa=true @qaExtraArgs --target-platform $TargetPlatform --target tools/qa/source_batch/main.dart "--build-name=$BuildName" "--build-number=$BuildNumber" *> "$Output/build.log"
 if ($LASTEXITCODE -ne 0) { Get-Content "$Output/build.log" -Tail 40; throw 'QA build failed' }
 if ($before -ne (Source-Digests)) { throw 'Sources changed during build; refusing artifact identity' }
 $apk = Join-Path $repo "build/app/outputs/flutter-apk/app-$($qaFlavor.ToLowerInvariant())-debug.apk"
 Copy-Item -LiteralPath $apk -Destination "$Output/parserqa.apk"
-if ($LaunchOnly) {
-    $qaMerged = Join-Path $repo 'build/app/intermediates/merged_manifests/parserQaOfflineDebug/processParserQaOfflineDebugManifest/AndroidManifest.xml'
+$qaExpectInternet = -not [bool]$LaunchOnly
+$qaMergedRelative = if ($LaunchOnly) { 'build/app/intermediates/merged_manifests/parserQaOfflineDebug/processParserQaOfflineDebugManifest/AndroidManifest.xml' } else { 'build/app/intermediates/merged_manifests/parserQaDebug/processParserQaDebugManifest/AndroidManifest.xml' }
+    $qaMerged = Join-Path $repo $qaMergedRelative
     [xml]$qaManifest = Get-Content -LiteralPath $qaMerged -Raw
-    $qaPermissions = @($qaManifest.manifest.ChildNodes | Where-Object { $_.Name -like 'uses-permission*' } | ForEach-Object { $_.GetAttribute('name','http://schemas.android.com/apk/res/android') })
-    if ('android.permission.INTERNET' -in $qaPermissions) { throw 'Offline merged manifest still requests INTERNET' }
+    $qaPermissions = @(Get-QaManifestPermissions $qaManifest)
+    if (('android.permission.INTERNET' -in $qaPermissions) -ne $qaExpectInternet) { throw 'Merged manifest INTERNET does not match selected QA mode' }
     Copy-Item -LiteralPath $qaMerged -Destination "$Output/merged-manifest.xml"
     $qaAapt = Join-Path $AndroidSdkRoot 'build-tools/36.0.0/aapt.exe'
     $qaApkPermissions = & $qaAapt dump permissions "$Output/parserqa.apk"
-    if ($LASTEXITCODE -ne 0 -or $qaApkPermissions -match "android.permission.INTERNET") { throw 'Offline APK permission check failed' }
+    if ($LASTEXITCODE -ne 0) { throw 'QA APK permission inspection failed' }
+    $qaHasInternet = @($qaApkPermissions | Select-String -SimpleMatch 'android.permission.INTERNET').Count -gt 0
+    if ($qaHasInternet -ne $qaExpectInternet) { throw 'APK INTERNET does not match selected QA mode' }
     $qaApkPermissions | Set-Content -Encoding utf8NoBOM "$Output/apk-permissions.txt"
-}
 $before | Set-Content -Encoding utf8NoBOM "$Output/source-digests.json"
 @{
     code_sha = (& git rev-parse HEAD).Trim()
@@ -67,7 +77,8 @@ $before | Set-Content -Encoding utf8NoBOM "$Output/source-digests.json"
     gecko = '146.0.20251217121356'
     target_platform = $TargetPlatform
     launch_only_build = [bool]$LaunchOnly
-    no_internet_permission = if ($LaunchOnly) { $true } else { $null }
+    no_internet_permission = -not $qaHasInternet
+    internet_permission = $qaHasInternet
     built_utc = [DateTime]::UtcNow.ToString('o')
 } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM "$Output/artifact.json"
 Get-Content "$Output/artifact.json"

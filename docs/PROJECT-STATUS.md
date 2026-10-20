@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+16:49统筹独立审读并集成e3c0ba90/820f8916：QA默认关闭tail1投影保留head2/原尾索引去重、每road最多3项/8road、ordering=unknown；普通head2不变，不将末项当最新，安全标签仍需可绑定。正常QA显式关闭LaunchOnly，宿主以artifact+aapt核对网络权限、am白名单及前台启动，tail发现进程早退立即停；失败result只核对真实stat/字节/UTF8-JSON类型，无效原文不保存。55项Python（含实际PowerShell XPath权限函数正反例）、14项Dart（投影8＋launch6）及定向分析独立通过。
+
+20588唯一APK构建57.6秒后，原包装器XML节点.Name被android:name属性遮蔽造成假性漏读权限，门禁失败且当时未安装/启动；不是源站或APK权限故障。820f8916改XPath取真实节点，未来构建前持久保存before清单。此次未重编译：原before/after一致门禁已通过后包装失败，作者在干净冻结e3提交恢复531项清单，不能称原before文件已保存。统筹独立逐文件核对531项，当前唯一差异为宿主build.ps1且冻结副本hash精确对应；Android/Dart编译输入未变。APK字节02e6999b7470c311ad6c68e7020e79ea0998788eade3ada0320363d1f04fac4b及清单hash匹配，merged XML与aapt实际含INTERNET；compiled SHA e3c0ba90与wrapper verification820f8916分开，恢复方法保留在artifact。回执.dart_tool/tail-discovery-build-independent-review.json。20587无INET的独立XML/aapt/runtime三层证据仍成立，不复用错误XML提取空数组为证明。
+
+播放owner已核实API28/WebView66/归属，正以install-r保数据核对20588后仅执行DM84首个未执行发现例；有效唯一作品/结构/清理确认才按原条件推进其余8例，尚无新runtime交付，不提前说源通过。9例发现不计产品播放分母、无parser/media/fallback，任一unknown/挑战/无效环境/清理不明停包，旧aafun及精确完成案例不重跑。
+
 16:36统筹独立审读集成c0d53de7/93c57f68的launch-only工具：独立50项Python（含真实Java ledger编译/运行）、16项Dart（launch6＋runtime10）、定向分析通过。20587离线APK字节/source清单/runner快照与identity匹配，merged Manifest及aapt均无INTERNET、runtime permission DENIED；同attempt32枚举阶段/完整Dart顺序与native首帧成立，536/2314字节文件真实stat/读回UTF8及schema相符，am等待2940ms/host3485ms、20秒限额不变，单例/最终清理confirmed，产品eligible=0。回执.dart_tool/launch-probe-independent-review.json。原runner generic compatibility误称播放路径，93c57f68仅修后续宿主标签/投影，不改写旧results、不重构建；原20586原因仍unknown，不用离线pass覆盖或声称普通网络QA已验收。
 
 已续派播放owner普通网络QA新前提验证与新样本发现：仅QA默认关闭selection_tail1，在head2之外保留最后原索引且去重、每road最多3项/8road、安全label/hash、ordering=unknown，不把尾部冒称最新，不改schema。补短表/重复/逆序/隐私反例，一次正常parserQa/x64构建<=180秒，明确LaunchOnly=false及Manifest含INTERNET、签名/安装-r/摘要绑定；不能误用20587离线包。固定9例原未执行发现计划派生新文件，不覆盖原；先DM84已匹配作品一例/120秒，得到有效唯一作品结构且清理确认才同包再余8例/600秒。全部只搜索/集表、无解析/媒体/fallback；unknown/启动失败/环境无效/挑战/清理不明立即停包，不改20秒等待、不重试旧aafun/已完成案例，失败读回只核对真实file/stat/字节/类型、不存敏感原文。新hash/label须统筹复核后再选剧集实播；结束核验任务进程退出及负载。规则owner暂可等待实际数据，主目标未完成自动化ACTIVE。

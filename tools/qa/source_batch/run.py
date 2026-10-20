@@ -478,9 +478,9 @@ class Device:
         return {'at': time.time(), 'processes': samples,
                 'sum_pss_kib': sum(p['pss_kib'] for p in samples)}
 
-    def launch_file(self, name, key):
-        if name not in ('qa-launch-probe.json', 'launch-only-result.json'):
-            raise ValueError('Unknown fixed QA launch file')
+    def qa_file(self, name):
+        if name not in ('qa-launch-probe.json', 'launch-only-result.json', 'result.json'):
+            raise ValueError('Unknown fixed QA evidence file')
         state = self.call('shell', f"run-as {PACKAGE} sh -c 'if [ -f files/{name} ]; then printf FILE:; wc -c < files/{name}; else printf MISSING; fi'", timeout=3).strip()
         if state == 'MISSING':
             return {'exists': False}, None
@@ -494,8 +494,16 @@ class Device:
             'head', '-c', '32769', f'files/{name}'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
         meta, value = launch_file_decode(completed.stdout, size)
         meta.update(exists=True, transport_returncode=completed.returncode)
+        return meta, value if completed.returncode == 0 else None
+
+    def launch_file(self, name, key):
+        if name not in ('qa-launch-probe.json', 'launch-only-result.json'):
+            raise ValueError('Unknown fixed QA launch file')
+        meta, value = self.qa_file(name)
+        if meta.get('exists') is not True:
+            return meta, None
         validator = validate_launch_journal if name == 'qa-launch-probe.json' else validate_launch_result
-        valid = completed.returncode == 0 and validator(value, key)
+        valid = validator(value, key)
         meta['schema_valid'] = valid
         return meta, value if valid else None
 
@@ -504,7 +512,8 @@ class Device:
         if launch and (not getattr(self, 'launch_allowed', False) or getattr(self, 'physical', False)):
             raise ValueError('Offline launch-only artifact gate required')
         lifecycle = lifecycle_spec(config)
-        launch_evidence = {'am': {}, 'files': {}} if launch else None
+        startup_evidence = {'am': {}, 'files': {}}
+        launch_evidence = startup_evidence if launch else None
         launch_journal = None
         driver, phase_seen = None, None
         baseline = None
@@ -540,14 +549,17 @@ class Device:
             worker_started = True
             try:
                 am = self.call('shell', f'am start -W -n {PACKAGE}/{ACTIVITY}', timeout=20)
-                if launch:
-                    launch_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': False, **launch_am_fields(am)}
+                startup_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': False, **launch_am_fields(am)}
+                if config.get('selection_tail1') is True and (startup_evidence['am'].get('Status') != 'ok' or startup_evidence['am'].get('expected_activity') is not True):
+                    raise RuntimeError('QA discovery activity start not confirmed')
             except subprocess.TimeoutExpired as error:
-                if launch:
-                    launch_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': True,
-                        **launch_am_fields(error.stdout), **launch_am_fields(error.stderr)}
+                startup_evidence['am'] = {'host_wait_seconds': 20, 'timed_out': True,
+                    **launch_am_fields(error.stdout), **launch_am_fields(error.stderr)}
                 raise
             while time.monotonic() - started < 70:
+                if config.get('selection_tail1') is True and not any(n == PACKAGE or n.startswith(PACKAGE + ':') for n in self.processes().values()):
+                    startup_evidence['process_exit_observed'] = True
+                    raise RuntimeError('QA discovery process exited before receipt')
                 if launch:
                     if not any(n == PACKAGE or n.startswith(PACKAGE + ':') for n in self.processes().values()):
                         launch_evidence['process_exit_observed'] = True
@@ -601,6 +613,15 @@ class Device:
         finally:
             stop.set()
             host_cleanup = cleanup_step(cleanup_errors, 'case_stop', lambda: self.stop_and_verify(baseline))
+            if not launch:
+                if primary_error is not None or (result is not None and result.get('stage') == 'host_timeout'):
+                    try:
+                        metadata, _ = self.qa_file('result.json')
+                        startup_evidence['files']['result.json'] = metadata
+                    except Exception as error:
+                        startup_evidence['files']['result.json'] = {'exists': None, **error_record(error)}
+                cleanup_step(cleanup_errors, 'startup_evidence_write', lambda:
+                    (output / f'{key}.startup-evidence.json').write_text(json.dumps(startup_evidence, indent=2), encoding='utf-8'))
             if launch:
                 for name in ('qa-launch-probe.json', 'launch-only-result.json'):
                     try:
@@ -787,6 +808,16 @@ def main():
     cases = manifest['cases']
     launch = any(launch_only_spec(c) for c in cases)
     artifact = json.loads((args.apk.parent / 'artifact.json').read_text(encoding='utf-8-sig'))
+    tail = any(c.get('selection_tail1') is True for c in cases)
+    if tail:
+        if (engines != ('app',) or args.repeats != 1 or args.fixture_media is not None or
+            any(c.get('selection_only') is not True for c in cases) or
+            artifact.get('launch_only_build') is not False or artifact.get('internet_permission') is not True or args.aapt is None):
+            p.error('Tail discovery requires ordinary network QA artifact and selection-only App plan')
+        permissions = subprocess.run([str(args.aapt), 'dump', 'permissions', str(args.apk)], capture_output=True, timeout=10)
+        if (permissions.returncode != 0 or b'android.permission.INTERNET' not in permissions.stdout or
+            f'package: {PACKAGE}'.encode() not in permissions.stdout):
+            p.error('Network QA APK permission verification failed')
     if launch or artifact.get('launch_only_build') is True:
         if (not launch or len(cases) != 1 or engines != ('app',) or args.repeats != 1 or args.fixture_media is not None or
             args.allow_physical_qa or artifact.get('launch_only_build') is not True or
