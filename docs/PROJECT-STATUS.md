@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:25新20592一次60秒构建完成，统筹已独立验证540源原before/after/独立after/作者当前hash、root仅CRLF、ignored registrant原副本保持；编译649b30bc、APKdfcf96c3a189ed6ebc03d84d6f596012e9c0b201ac2125eea7a3948e0ed4157d/165166804字节，实际apksigner24f…e32aa31、实际20592/minSDK26/唯一ARMv7/关键ELF/INET通过。回执.dart_tool/tv-arm20592-independent-review.json，不提前声称安装或时序修复实机成功。
+
+已给唯一owner新候选有界组合复验（先原状态记预算）：完成构建收尾后核同TV/现装20591哈希同证书/UID10083与firstInstallTime/保护三包/桌面8音量/资源，正常install-r20592一次<=120秒，读回新全hash签名版本ABI且原UID/firstInstallTime保持，不卸载清数据。成功才2本地受影响fixture（.dart_tool/tv-fixture-plan-20592.json，SHA629be02363c3fa6ed70334cc1407ffea7c255ab607c6e46725474fe1374efa4f，180秒/各70秒）：QA单次fallback实际primary10000/total25000与正常零fallback、真实首帧正进度/先退役/清理、stop诊断unattributed。任一fixture失败或清理不明停后续。仅两fixture所有门禁通过并临时资源退出才2真实App原样本（.dart_tool/tv-live-plan-20592.json，SHA8811ee1c659a79ac4ae4caa613405a95d83b491912de7ae9aed005f497f6558e，200秒/各70秒/10秒状态）：ezdmw原页标签3 QA补救+7sefun默认控制。
+
+安装+fixture+live总540秒，普通明确live阶段失败留证可继续控制，challenge/身份错配/unknown/envinvalid/清理不明停整包不换例重试；无其他源/observer/JS/HTTP/旧unknown/全批重跑。reverse只自有无占用，内部静音不动系统音量；末次原保护基线、保留QA包/数据、各自有进程与负载收尾，等待统筹独立验收后才后续扩展。该条件组合包是已具体预审的最小受影响范围，不自动新增操作；实际随机UA缺失及普通App/正式策略未改限制保留。
+
 20:20统筹独立审读并组合f128e96c/649b30bc：75项Python（含真实Kotlin回调体+Java helper编译执行）、24项Dart服务反例及main/service/test定向分析通过。QA onPageStop无实际URI即空值/unattributed，start仍保留真实URI/session守卫，无新媒体请求；controlled软件player文案修正且actual_controller取真实构造类型，不猜运行时版本。新QA main显式opt-in传primary10/shared25/max1，服务默认仍15/25，普通无opt-in和产品路径不变，取消/先退役/慢清理/晚到隔离保持；当前实机候选仅验eligible=true的旧SDK28/WebView66/非iframe-only，不外推现代或不准入规则。回执.dart_tool/qa-primary10-native-independent-review.json。
 
 发现拟20592构建计划误用powershell.exe，而现builder依赖PowerShell7 utf8NoBOM，已要求作者纠正派生计划为原验证pwsh流程并读回确认；非改源码绕过失败。已续派干净冻结649b30bc普通单ARMv7 parserQa20592/0.4.5-parserqa.arm.4一次构建<=180秒，原before/after/ignored registrant/实际APK版本ABI ELF签名与hash均须保存，先交产物，不连接/安装/实跑。新候选物理复验将在独立读回后仅覆盖受影响预算/诊断fixture及ezdmw原例+正常来源控制，不重跑整批或旧unknown；尚未构建或验收，不预写修复成功。
