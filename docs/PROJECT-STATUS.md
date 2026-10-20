@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+用户最新临时暂停：2026-10-21香港时间，要求“先暂定你的这个事情 今天10点之后再继续吧”。本任务立即暂停，今日10:00香港时间（UTC02:00）后按同一kazumi自动化恢复，之前排队heartbeat仅静默不执行工作，不恢复其他实验。两owner当前idle；最后现代包已核自有AVD/端口/目标客户端退出及停后负载，后续只离线分析无设备/来源请求。自动化保持原线程/通知偏好/15分钟周期，首未来启动设为10:00，并加显式时间门禁。
+
+接续待审：app-fallback/aafun-page-client-analysis-v1已完成，作者原状态与source-client-review/trace-comparison真实为aafun离线链路分析；其final误重复MXdm旧结论，不能当新实测。400指纹与iframe src一致但角色未定；静态未证HTTP400直接中止解析；既存原件无法恢复完整SHA匹配公开episode地址，实际0GET/0设备/0构建/0源码修复。统筹仅初读，完整独立审查/后续区分方案留10点后，不能预写修复或重复原设备矩阵。
+
 2026-10-21 00:50统筹独立审aafun-modern-default-20588-v1：同base0968af…/葬送的芙莉莲/第01话页f63fd948…App实际一致，API36/x64/provider143.0.7499.24、VideoWebviewAndroidImpl/documentstart=true，搜索1171ms/集表481ms正常，15017ms明确resolve_timeout、无媒体/player，resolver与App清理confirmed。现成20588一次install-r6.485秒/UID10090和firstInstall保持，原20570与20588本地完整hash及兼容签名记录对应；生产lib/android-main从e3到649无diff。回执.dart_tool/aafun-modern-independent-review.json。现代默认亦失败，不能仅归电视旧WebView，也不能因跨环境失败断网站外因；实际随机UA未配对。截图独立查看只有resolve_timeout状态，不是视频验收。
 
 执行超限如实保留：QA stop75.312>70，原总300秒退出核验timeout后必要恢复核323.621秒，原overallfalse不追认；最终自有AVD/qemu/目标客户端/5588与5589端口空、共享ADB19624保持，QA/保护包meta/音乐/provider/media/reverse保持，AVD配置原hash保持、CPU短1.46%/host20%。未再操作TV、不重跑来源/修工具。aafun当前base已能选目标，TV默认、既有Gecko补救、现代默认均解析失败，当前没有依据安装overlay或调整解码；停止重复这组环境矩阵，下一步只针对已有源页面/iframe失败上下文与解析代码寻找可证修复点。
