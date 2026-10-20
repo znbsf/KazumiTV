@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+23:02统筹独立审tv20592-readonly-protocol-preflight-v1全部原件：冻结脚本d67f236c…/实际runner1018a268…/ADB b4a6…字节核对，实际3个exec-out调用125/156/109ms共406ms、printf精确10B、case2737B六身份布尔及frame/正文hash有效，result当前missing。前后完整physical/provider/三保护全meta/现装20592/桌面音乐8/media0/QA无进程/reverse/宿主自有资源/sharedADB保持。回执.dart_tool/readonly-protocol-independent-review.json；此固定client/device的wire通过，旧aafununknown不追认。
+
+原包13.610秒内随后/proc/loadavg RuntimeError，已有两次/proc/stat无错误但数值延迟写盘而丢失，TV负载仍unknown；overall_pass=false原件保留，不能猜权限/SELinux或补数。已具体续派唯一owner一个独立30秒仅负载补证包：同身份/包保护门禁与QA停止，原已成功/proc/stat两次各<=3秒/共7秒相隔1秒，每次安全CPU8整数立即原子落本机，差值和实际间隔核验；不重读loadavg/meminfo、不重复协议/case/result、App启动/来源/构建安装或系统写入，失败停不换命令重试。原包不追认通过，MXdm仍未放行，负载与退出交统筹review后才决定下一未尝试项。
+
 22:47统筹读取owner本轮实际记录：compaction后偏离原只读协议任务，重复既有media-observer离线9项测试并新增作者原状态6行dirty；无ADB/构建/来源或设备操作，预检仍未尝试，不计本轮来源/协议进展。已向唯一owner自包含重派原只读预检，明确保留dirty并更正旧状态措辞，停止重复observer工作；原120秒全包/共享10秒3调用/不启动App与不来源请求边界未变。此为任务续接偏移纠正，不是协议运行失败或来源unknown重试。
 
 统筹已实际向唯一播放owner发送上述独立只读协议预检包，固定361a2375新runner SHA1018a268e530a8150a59bc52894f851b04b8f754b26fe1d09078f4bb18e0aa10与固定ADB37.0.1二进制；全包120秒、协议命令共享10秒且单call最多3秒。仅无来源常量、已知case.json正frame和固定result_file一次，不设备写入/App启动/来源请求/其他case；旧aafun与moonci unknown不追认，待实际交付后独立review，未尝试MXdm尚未放行。
