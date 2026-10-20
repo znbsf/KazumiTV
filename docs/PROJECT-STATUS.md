@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+规则owner d9181729已交最小独立判断，统筹读原结论与已核实际App结果一致：保持base，不改chapterRoads/chapterResult。本响应base与candidate均精确选中第01话各1次，28→56只证明集合扩大；第二路节点归属/逐集对应缺失，不能猜备用或重复并安装overlay。不解释旧时点集数0/旧unknown；保留case89.453>70协议失败。该判断不阻塞已派的沿base首次媒体阶段，当前唯一device owner61 active在执行，不再发重复催促。
+
 2026-10-21 00:03统筹独立核tv20592-aafun-adb-selector-v1：实际rule0968af…/葬送的芙莉莲/detail824283…/200唯一HTML无redirect已知challengefalse，58870B同body SHA5bd0b4d…；原规则1road28集、两字段候选2road56集，两者第01话f63fd948…精确各1次、first3样本相同，880ms worker/清理与interceptor退出confirmed；无parser/media/player。原规则本响应已能选目标，不支持以集表缺失为由改规则，额外road语义/正确性未证。回执.dart_tool/aafun-adb-selector-independent-review.json，原unknown保留；raw hash仅owner元数据/root核safeparsed。原host主动观测89.453>70超19.453秒，全包104.797<180不能整体涂pass；作者称70秒内已取得结果的原工具回执尚余14.891秒，root未额外独立核该时点，不补原判。该时限缺口如实保留，不因此重跑或改工具。
 
 已派规则owner只离线原选择器/安全结果最小判读，答是否支持改两字段，不新fetch/helper/overlay或大覆盖维护。并已具体续派唯一device owner首个aafun媒体阶段：.dart_tool/aafun-tv-first-media-20592-v1.json SHA f1061577cbb20a17690000791dac2cfa2a9d36cace488606f3c768d29d75180a；复用刚实际匹配的base/作品/road0ep0/第01话hash，仅删selection/diagnostic/semantic、换caseid tv20592-aafun-first-media-q2、10s观察/fallbackfalse。新前提为本响应base已实际选准目标，进入此前未证媒体/播放器阶段，不重复比较或追认旧unknown。现装20592直接UI日志不run.py/新wrapper/构建安装/工具修改，case70/全包180含60收尾；同身份保护先核、stage失败明确记最远层、challenge/unknown/envinvalid/清理不明停不换线重试。若进入first_frame阶段可用既有短采集捕活跃画面，不把清理后黑底状态页当视频；音频内部静音不验AV，不改系统音量，不为采集加时或重跑。到70仅stop及必要收尾，后续只原保护/自有进程负载确认，不自动加例。当前播放结果尚未出。
