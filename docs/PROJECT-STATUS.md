@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+19:25新单ABI20591已独立验证并续派安装/fixture：编译506df2bb，APK4b6c8a7a6dfbc596add0f9fbaf87e061c5f2f40b22ad9cbab85e0b6b33aa6c34、165166144字节，较原减少179780536字节/52.12%。538原before/after/独立after及作者当前字节匹配，root对应仅CRLF、registrant原前后字节保持；实际apksigner24f…e32aa31/aapt20591/minSDK26/native-code唯一armeabi-v7a/ZIP目标库ELF及INET均独立通过。回执.dart_tool/tv-arm20591-independent-review.json。实际单ABI产物是新的实质前提，但不称安装已成功或证明旧失败因果。
+
+唯一owner完成构建收尾后已获具体一次新安装许可：复核同TV身份/资源/三保护包/桌面音量/parserqa仍未装与旧会话已结束，仅正常install新20591一次/120秒，不改等待。完整hash/签名/版本/UID读回成功后才新3fixture计划.dart_tool/tv-fixture-plan-20591.json（SHA8f10fc53ded71a65646f493ece95faa82672a2ee4e8744f403d72b89767943af），较原未尝试计划仅id/targetid换20591，URL与动作不变。安装不确定或失败只读判别后停；fixture每例70秒/总300秒，失败/unknown/envinvalid/挑战/清理不明停剩余。原physical门禁、reverse自有无占用、内部静音/不改系统音量、保护三包/桌面与收尾负载检查保持。尚未消费运行结果，live4/mgnacg/旧unknown均不自动运行。
+
 19:20统筹独立审读集成506df2bb单ABI QA包装修正，74项Python（含真实PS构建参数矩阵、缓存Groovy执行策略及APK正反例）通过，旧20590 fat APK被新实际产物门禁拒绝。已在固定FlutterPlugin.kt核实非split默认重置ABI路径；新显式QA参数disable-abi-filtering=true保留defaultConfig+两QA flavor的单目标ABI，普通产品入口不应用本overlay。无split且实际版本/路径/aapt+ZIP/ELF/minSDK/debug/网络模式均核验，不靠target参数冒充产物。无解析/规则/播放器变更；回执.dart_tool/qa-single-abi-independent-review.json，测试未执行AGP构建，不提前认定新包已单ABI或安装问题解决。
 
 已给唯一owner下一build-only包：干净冻结506df2bb或仅文档等效提交，一次parserQa/android-arm/0.4.5-parserqa.arm.3/code20591构建<=180秒；原before/after及ignored registrant保留，核新target-only ZIP/实际版本/签名/hash/大小与旧包差异，保留原20590失败。不安装/连接/启动/恢复TV或模拟器、不跑来源；先交统筹独立读回具体新产物，再给有界首次安装和夹具包。不能把体积预期当作网络吞吐或安装因果证实，旧3fixture仍未尝试、live4仍未许可执行。
