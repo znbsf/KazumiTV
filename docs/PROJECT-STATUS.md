@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+最新直接人类指令：补完负载立即继续尚未尝试MXdm，直接报告能否播放及失败阶段，不重复已测项。统筹已独立核tv20592-load-readback-v1原件：冻结8c20d176…/固定runner客户端、两个CPU8整数样本即时落盘/间隔1.094秒/差值418忙57=13.64%、前后保护meta与两层退出/12.360<30秒，回执.dart_tool/load-readback-independent-review.json。
+
+已具体续派唯一owner只MXdm新候选单例，.dart_tool/tv-mxdm-only-plan-20592-v1.json SHA cf81767b7ee31004f1ef0b49e8041c8da1adfd33118fad3dc8b55664e2470c93；case逐字段等于原remaining第二项，学生会也有洞第01集/road0episode0/rule78163afd…/page d766c338…、primary10/shared25/max1/10秒进度。现装20592/新runner1018a268…不构建重装/改工具，case70秒、全包含前后保护收尾180秒且预留60秒，直接原唯一CLI无新wrapper；身份保护基线先核、challenge/unknown/envinvalid/清理不明停不重试换case/加探针。末次只停QA保包，原保护及自有资源退出与已成功CPU数值即时保存；结果尚未交，不提前说能播，未到媒体不得称解码失败。不自动追加已测来源/fixture/aafun。
+
 23:02统筹独立审tv20592-readonly-protocol-preflight-v1全部原件：冻结脚本d67f236c…/实际runner1018a268…/ADB b4a6…字节核对，实际3个exec-out调用125/156/109ms共406ms、printf精确10B、case2737B六身份布尔及frame/正文hash有效，result当前missing。前后完整physical/provider/三保护全meta/现装20592/桌面音乐8/media0/QA无进程/reverse/宿主自有资源/sharedADB保持。回执.dart_tool/readonly-protocol-independent-review.json；此固定client/device的wire通过，旧aafununknown不追认。
 
 原包13.610秒内随后/proc/loadavg RuntimeError，已有两次/proc/stat无错误但数值延迟写盘而丢失，TV负载仍unknown；overall_pass=false原件保留，不能猜权限/SELinux或补数。已具体续派唯一owner一个独立30秒仅负载补证包：同身份/包保护门禁与QA停止，原已成功/proc/stat两次各<=3秒/共7秒相隔1秒，每次安全CPU8整数立即原子落本机，差值和实际间隔核验；不重读loadavg/meminfo、不重复协议/case/result、App启动/来源/构建安装或系统写入，失败停不换命令重试。原包不追认通过，MXdm仍未放行，负载与退出交统筹review后才决定下一未尝试项。
