@@ -62,6 +62,54 @@ initial-app-plan/batch-1.json为首轮17例，交既有运行器时限App/defaul
 旧记录的rule_fingerprint算法须与新增app_rule_fingerprint对应，不能拿它直接比规范化摘要。
 仍缺该失败解析请求/响应fixture，未证实选择器或接口模板缺陷，因此不捏造overlay修复。
 
+## 2026-10-20：当前官方目录17源首轮实播（执行中）
+
+本阶段新增范围是固定官方目录 ba8e10b35b0c3a56bbb6032a12356b0473844c64 的17条合格规则，
+不是重跑旧4例。复用规则侧71315575生成的私有 source-inventory-20261020-ba8e10b35b0c
+快照和 initial-app-plan/batch-1.json，不另建扫描器、不改清单生成器。
+当前干净基线6a7a31d1相对已验QA源码67071347的lib/android及Dart QA链路无差异，
+复用集成parserqa APK dc45b0b95e20dc2246b18454542444d43e973b2f1615454eb7a800ae6e251769，
+宿主使用6a7a31d1修复版run.py；首批app profile、一次、17源各1例。
+
+仅使用电脑归属明确的Android9/API28/WebView66独立模拟器，后台静音、串行请求；
+本批最多17次/30分钟、单例70秒。运行前核对真实provider、APK字节和QA包身份。
+实际验证码挑战立即记captcha并跳过，不启动验证；声明未启用不等于不会挑战。
+环境无效、清理未确认、host超时立即停批；有开始无终态记unknown，不自动重试。
+首帧、正进度、清理和规则摘要共同判定可播；无匹配/歧义/缺集交既有planner安排
+下一作品，不把它们视为来源失效，不对解析失败盲换词。失败逐阶段保留证据，现代
+对照只针对同一作品/线路/剧集的新诊断问题另排有界批次。
+产物位于宿主artifacts/source-catalog-playback-20261020，结束停止本任务AVD和采样，
+核实PID退出及负载。实体设备、正式包、默认内核、统筹集成树均不动，不推送/合并/发布。
+
+首轮已实际完成：batch-1的17次全部有终态，unknown=0、unattempted=0，首帧且正进度5源；
+2源no_match、10源阶段失败。既有planner读取原始开始/结果账本，仅为aafun/xfdmneo
+生成wave2备用作品；batch-2两次终态分别resolve_timeout与first_frame_error，清理均确认。
+目录17源均已触达；19次尝试无unknown，5源played、12源failure_requires_diagnosis，
+没有盲重试解析失败、没有第三作品待排。coverage-after-wave-2保存源侧planner派生覆盖报告。
+
+新增区分观察：akianime/baimao同一媒体摘要返回404；ezdmw/moonci/MXdm/xfdmnext/aafun
+旧环境解析超时。接下来仅用同一包、相同规则/作品/线路/剧集的App默认profile，
+对这8个解析或媒体失败做一次现代Android36/WebView143对照（最多8次/15分钟、70秒每例），
+检查剧集页摘要相同才配对。该观察只能区分软件环境差异，不能单独归因WebView版本；
+404不通过换内核假定能修好。先停旧AVD，再起专用只读现代AVD；停止条件同前。
+
+现代对照保留原包67071347：计划8、开始/终态7、unknown=0、未执行1；前6例中4个
+旧解析超时样本ezdmw/moonci/MXdm/xfdmnext均真实首帧且正进度，akianime/baimao仍媒体失败。
+第7例aafun启动3秒即SIGSEGV（栈仅anon:dart-code，尚未搜索），宿主记host_timeout并依约停批；
+另存modern-startup-crash.json将其人工分层为测试前环境无效，不算来源失败，不自动重跑，
+xfdmneo现代对照保持未执行。旧AVD/日志进程退出已核对。
+
+本轮发现独立客户端缺陷：旧xfdmneo原生错误日志的百分号让PlaybackTrace.safeDetail
+的Uri.decodeFull抛ArgumentError，脱敏只捕获FormatException，导致原错误记录丢失。
+新增反例先复现失败，再兼容ArgumentError并保留未能解码时的编码URL脱敏；
+8项脱敏/持久化/QA错误快照测试通过。不能据此称原视频修好。
+QA catch只读保存嵌套NetworkException/Dio原因、脱敏请求摘要、响应状态/白名单头/正文摘要，
+不记录响应正文或Cookie，不修改生产请求、规则、默认解析行为；明确challenge证据立即标captcha。
+新增观察预算：构建同签名隔离QA，在旧环境仅补4个搜索错误和3个媒体错误（7次/10分钟），
+利用新增原因链和修复后的原生日志区分原因；不重跑5个解析超时。另仅允许一个Gecko
+补充组，限上述现代可播的4个旧超时样本（4次/10分钟），只作功能对照，不混入App性能统计。
+构建、定向测试、运行与清理分别记身份，不将旧结果归入新包。
+
 ## 2026-10-20：规则与批测独立集成审查（已完成，未发布）
 
 用户授权无人值守统筹、独立审查和集成验证，发现问题交原会话修复；正式包与实体电视不动。

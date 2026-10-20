@@ -26,6 +26,7 @@ import 'package:kazumi/webview/video/video_webview_controller.dart';
 import 'package:kazumi/utils/http_headers.dart';
 import 'gecko_controller.dart';
 import 'rule_snapshot.dart';
+import 'failure_snapshot.dart';
 
 final _shaderAssets = ShaderAssetService();
 
@@ -253,6 +254,12 @@ class _BatchCaseState extends State<BatchCase> {
     } catch (error) {
       result['stage'] = '${phase}_error';
       result['error_type'] = error.runtimeType.toString();
+      final failure = batchFailureSnapshot(error);
+      result['failure_snapshot'] = failure;
+      if (failure['actual_challenge_observed'] == true) {
+        result['observed_stage'] = result['stage'];
+        result['stage'] = 'captcha';
+      }
     } finally {
       timings['total_before_cleanup'] = watch.elapsedMilliseconds;
       run.cancel();

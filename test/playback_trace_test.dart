@@ -62,6 +62,28 @@ void main() {
     expect(records.single.length, lessThan(10000));
   });
 
+  test('malformed percent escapes cannot interrupt native error recording', () {
+    for (final text in [
+      'buffer 50% failed',
+      'bad %GG escape',
+      'bad %E4 utf8'
+    ]) {
+      final records = <String>[];
+      final trace = PlaybackTrace('native', sink: records.add);
+      expect(
+          () => trace.event('mpv_error',
+              detail: '$text https://cdn.test/private?sign=PRIVATEVALUE '
+                  '${Uri.encodeComponent('https://cdn.test/p?sign=PRIVATEVALUE')} '
+                  'token=PRIVATEKEY'),
+          returnsNormally);
+      trace.finish('native_error');
+      final event = (jsonDecode(records.single) as Map)['events'].single as Map;
+      expect(event['detail'], contains(text));
+      expect(event['detail'], isNot(contains('PRIVATE')));
+      expect(event['detail'], isNot(contains('cdn.test')));
+    }
+  });
+
   test('a logging failure does not throw into playback and sessions differ',
       () {
     final a = PlaybackTrace('parser', sink: (_) => throw StateError('disk'));
