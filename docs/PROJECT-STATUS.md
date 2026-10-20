@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+22:13组合cf748371后已具体续派唯一owner首次ARM aafun selection-only同响应诊断，仅现装20592/新host run.py（实际SHA bcc37bece732be1aa289613bb49dde759eea7d1b2f721d04fc8aa62a17a18682），计划.dart_tool/aafun-tv-same-dom-20592-v1.json SHA b2e6d0e9b5fd26f0088df4133f3dc6bd4b1867496485e70dd4f11636ad8d839d，固定原q2id/rule/work/detail/expected剧集hash标签与123a1667已审提议相同；不重建安装，不重跑moonci或旧x64 unknown，不执行MXdm。新前提为已验证真实ARM初始化与新host证据门禁；CLI完整70秒内含case清理预留，包总180秒含前后全部只读保护/资源核对，不加等待或wrapper。先原状态记边界与新前提、核同物理身份/现装包hash/UID首次安装/三保护包/桌面音乐8及无其他使用，only App repeat1/fallbackfalse/eligible0。
+
+仅正常一次搜索+唯一detail trace，同一已成功响应满足原2xxHTML/无redirect或已知challenge/请求finalURIbody绑定/256KiB准入，才共享剩余<=5秒可终止worker比较两XPath；失败明确comparison not_run，不追加fetch/UA别名URL或页面、媒体、player、JS、overlay。5秒/256KiB不当网络硬限；选择器差异不自动正确或overlay、相同正确则撤回此响应假设。诊断分支player/resolver/subscription的not_created合法，不套实播验收误判；expected_episode是比较绑定，不声称实际加载媒体页。valid终态可observed或not_run原因，HTTP403不假判挑战，实际挑战/身份环境错配/unknown/tap或worker清理不明即停不重试。末次只停parserqa保包QA数据、原保护桌面音量/provider/media与自有进程监听/反向映射退出及负载交统筹，不自动扩其他源；结果尚未出不提前分类。
+
 22:12统筹独立审读并组合d98be091+b1be990a，仅3个host文件，不改APK/main/规则/播放器。原96项独立通过后，统筹额外复现“新host_budget行已写但final缺失仍计完成”反例，作者小增量修复：最终收据须匹配key+内容摘要，缺失/损坏/不匹配或仅有中途run-status则raw观察保留、派生unknown，旧legacy行不重分类。组合后100项宿主检查独立通过（8.626秒），同一额外反例已变raw1/completed0/unknown1且原行未改。回执.dart_tool/host-deadline-final-independent-review.json；57项既存记录字节/hash另独立匹配，最大17892B<256KiB，仅历史范围证明。
 
 统一绝对父/首case时钟包含设备前检，第二case独立origin/70秒收据，阻塞进入夹余/返回后复查，15秒case内清理预留与不可变sampler deadline、必要保护/清理后才terminal、原子provisional先保存；新固定文件协议真实存在/长度/字节/type/hash，复合sh -c引用有本地真实shell正反例，正常/selection256KiB与launch32768分别保留。多例末60秒在父预算内、单例120不要求130准入；Windows调度/IO不硬实时保证，超限/慢清理仍unknown，既有moonci原unknown不追认。根与作者3文件源码字节配对见回执，不把旧APK构建清单内run.py当新host身份；APK20592编译649b30bc与新host提交分别记录，APK无须重建。
