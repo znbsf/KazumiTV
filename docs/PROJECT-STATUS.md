@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+18:50电视重连2c35a010已独立复核：实际MiTV-ASTP0/mulan/SDK28/ARMv7/WebView66，私有identity中本次完整fingerprint作为后续physical gate；不冒充与未读取历史fingerprint逐字匹配。三包host APK字节摘要、设备记录及归档证书/ZIP ABI逐项一致，正式/remoteqa/probe前后hash/version/UID/安装时间未变，桌面/音乐音量8/100/媒体session0/provider读回保持。仅只读盘点、不声明私有收藏/历史内容验收；回执.dart_tool/tv-inventory-independent-review.json。已交唯一owner一次当前干净冻结2c35a010普通parserqa android-arm/20590构建<=180秒，先交before/after/签名/包ABI/minSDK产物，不安装/启动，旧20580/x64不代用。
+
+首次TV验收计划已具体准备但not_run：.dart_tool/tv-fixture-plan-20590.json为modern-syntax QA fallback、正常零fallback和真实QA switch取消3个本地夹具/300秒；先核无他人reverse端口占用，只有本任务映射才可申请与移除，系统音量不改，播放器内部静音，任何unknown/环境无效/清理不明即停，生命周期前台精确门禁保留。产物核验后才给执行包，fixture验收交统筹复核后才考虑.dart_tool/tv-live-plan-20590.json四精确来源/400秒（ezdmw/moonci/MXdm显式QA补救+7sefun默认，10秒进度/每例70秒）。xfdmnext原已播标签不通过当前安全标签门禁，排除并保留缺口，不为凑第五例增labelHash/盲选或放宽schema；不能称四源电视已通过。首次电视新环境验证是实质新条件，电脑精确案例不重复运行；mgnacg/旧unknown均不在本TV包。
+
+规则2551ea56离线v7已独立重算24输入hash/5原结果绑定/17源清单，19个旧App精确正页仍仅11受限样本源，不能称11已解决；回执.dart_tool/depth-v7-independent-review.json。DM84fresh primary成功波动、mgnacg多路径timeout/console无根因、五无可播及原401/404/旧unknown/UA缺口保留。播放4080b13b纯离线复核未找到第2话代码反例，不把7文件blob相同或51项fixture通过当现场根因排除；decision计数仅设计未授权执行，当前优先有界电视验收。
+
 最新直接人类现场补充：「刚才adb 关了 现在打开了、」。这是原10061拒绝连接前提的实质变化，旧等待当前地址问题已由调试开关状态回答；已交唯一播放/device owner保存离线工作后按原192.168.123.217:5555正常连接一次并只读身份/ABI/WebView/包签名与保护基线盘点。盘点前不发键/启动/安装/卸载/清数据/改系统；仍拒绝或身份归属不符则停，不扫描/猜IP/reset共享ADB。成功盘点交统筹复核后才准备实际ABI新冻结独立QA及有界验收，旧ARM20580/x64不可直接安装。当前仅已授权重连，尚无本次连接结果；正式版、真实数据、个人preview及系统保护继续。
 
 18:35统筹独立复核20589 console单例交付8ca5ed0e：新APK0e54b27bc209e803ec5a7e52970455cac6f8350853841bccb978537d0858e90e、编译2f71e687（相对c9仅状态预案）及534项原before/after清单均匹配；逐项作者源摘要匹配，本统筹对应18项仅CRLF字节差异、无非换行差异。runner与本树字节匹配，input-plan原字节、展开固定rule后的manifest、规则有效摘要/精确页hash/第2话、SDK28/provider66/actual VideoWebviewImpl全部对应。XML/aapt含INET、归档证书摘要匹配，ZIP仅lib/x86_64/libflutter.so，不能据依赖总ABI当TV候选。回执.dart_tool/console-runtime-independent-review.json。
