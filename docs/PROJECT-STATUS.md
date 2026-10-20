@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+用户明确要求继续实现全来源目标。统筹已独立核tv20592-mxdm-adb-ui-v1新原件（直接人类授权01a159ff-b3d4-72f1-950f-7b3ac5255c9e）：App实际MXdm2.4/API5/rule78163afd…/学生会也有洞第01集/page d766c338…一致，primary10019ms超时，退役10132ms先唯一fallback start10134、accepted20535<25000；native实际mediacodec_embed/mediacodec首帧，10002ms完整观察/位置+10256ms/样本错0、fresh非cache。144.657<180秒、原保护全部meta/桌面音乐8/provider/media0/reverse与自有退出confirmed；TV短CPU19.49%/host6%。回执.dart_tool/tv20592-mxdm-adb-ui-independent-review.json。截图独立查看只有QA黑底阶段字样，不能验视频画面/声音/AV或完整产品UI；result文件8916B raw hash来自owner元数据，统筹独立核parsed导出/身份，不假称重hash未留原raw。旧unknown保留；新45秒App执行耗时不能单独断旧55秒窗口唯一因果。TV受限native短播源可累计3（7sefun/ezdmw/MXdm），非3源日常可用验收。
+
+下一具体来源故障包已派唯一device owner：aafun集表缺失仅selection同body比较一次，完全复用原固定plan .dart_tool/aafun-tv-same-dom-20592-v1.json SHA b2e6d0e9…/原q2作品规则detail/expected页标签，现装20592直接UI+受限日志，不run.py/新wrapper/改工具/构建安装。重开实质前提为旧ARM受bcc协议错误未获App终态、现在固定wire与同物理App直接UI全流程成功，可独立看到实际阶段并取回结果；不是将unknown列未尝试，也不追认旧结果。唯一case70/全包180含60收尾，不加App原时限，只正常一次search+唯一detail，满足原helper有效2xxHTML等准入才同已成功body余<=5秒worker比较两XPath（256KiB仅CPU准入非网络硬cap）。无媒体/parser/player/observer/console/新JS/新UA/额外fetch/换作品URL线路；challenge/unknown/envinvalid/错配/worker清理不明停不重试，结果Observed或明确not_run合法，敏感原文不输出。原身份保护退出负载照旧；具体差异才规则owner最小分析、相同则撤此body选择器假设，不自动overlay。此包尚未交，不预判根因或能播。
+
 最新直接人类变化：统筹在read_thread独立读到播放会话当前真实userMessage 01a159ff-b3d4-72f1-950f-7b3ac5255c9e：“那你直接用 adb 操作独立 QA 测 MXdm，看界面和日志确认到底卡在哪，别再光等回执了，正式版别动。”这是真实新增观测方式与明确重开授权，优先此前仅只读旧日志/不重跑的统筹限制，不是由子会话自己推定。唯一device owner已active执行此新UI/日志包，统筹不抢设备或重复催促；保留原MXdm unknown，不把新观测追认旧结果，仍保护正式/preview/系统，当前不新建工具框架或重建包。后续先收该明确包结果并独立核实际画面/日志与精确绑定，再更新根因，不被旧checkpoint误判为未经授权重跑。
 
 此前只读旧日志包tv20592-mxdm-existing-startup-log-v1已交：仅8.125秒读原PID/失败时间窗100条，未匹配白名单异常/可信bootstrap阶段，无法锁根因；普通QA无分步启动回执是静态能力缺口，不当本次实际阻塞原因。该包无重启/新来源请求/改代码，原unknown保留。
