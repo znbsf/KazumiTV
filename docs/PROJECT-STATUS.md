@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+15:33统筹独立核对xfdmneo-alternate-20585-1519：runner快照与展开固定规则后的实际输入cases摘要匹配，固定规则/同q2作品及指定备用线第01集页面摘要、标签、索引全部对应；实际VideoWebviewImpl/App默认零新增fallback，原生首帧后10秒采样进度7966ms、播放器/解析器/两层及最终清理确认。回执.dart_tool/xfdmneo-alternate-independent-review.json。原首线401保留，不能说根因或全线已修复；此例证明已有备用线可播、无新增overlay需求证据。
+
+当前17源更新为：5原默认代表样本、4仅QA补救策略、akianime及xfdmneo仅备用线默认路径，共11源有上述限定可播样本；LMM挑战跳过，5源AGE/sorani/dalvdm/baimao/aafun仍无可播样本。此计数不把首线HTTP失败抹去，不覆盖每源首集/较新集、全线路或电视验收，生产默认仍未改。aafun同DOM诊断实现正常推进，未交付代码不提前算通过；规则owner等待实际数据。
+
 15:18统筹独立复核selection-only交付71bd0769：仅复用生产搜索/集表，默认关闭、只输出安全标签/摘要/计数，在解析器与播放器创建前返回；QA进程关闭来源请求日志。所有selection意图终态从播放分母排除，cleanup失败仍优先停止。40项Python、13项Dart（4投影隐私＋9同DOM helper）、定向分析独立通过，README同步保留既有QA边界；不是产品默认策略修改。回执.dart_tool/selection-only-independent-review.json。
 
 20585 selection-only两例runner快照/固定规则身份/两层及最终清理已独立复算：baimao原q1仅搜索10秒超时，没有集表/解析/媒体，不新增“播放失败”；xfdmneo原q2取得同作品两条各28集线路，只报告每线前两集标签/页面摘要，第一线第1集摘要匹配旧401案例，备用线第01集a4f26f906f47a060d504590256e9c6583830ae0ff7f59e30928362ebdf61cb86唯一绑定于本次输出，不声称全部剧集全局唯一。两例播放eligible=0，17源当前10限定可播/1挑战/6未解决计数不变。
