@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+17:50统筹独立复核depth-failure-fallback-20588-v1：同20588 APK、runner快照/展开输入摘要、精确rule/page/label与计划一致，2例completed/unknown0，解析/App/host/final清理confirmed，owner停后收据确认76696/87792及后代退出、候选0/CPU快照7%。DM84本次fresh primary直接resolved/accepted，零Gecko starts，原生首帧+完整10秒9759ms/采样错0；只新增本次默认primary短播/波动观察，Gecko验证为not_run_primary_succeeded，不因期待fallback重跑。mgnacg primary retired后仅一次Gecko、共享25秒仍resolve_timeout、player未创建；superseded trace来自截止退役取消，不冒称用户切集。回执.dart_tool/depth-failure-fallback-independent-review.json。DM84先前旧超时与现代正例均保留，UA/网络/时序原因仍未定；mgnacg跨当前两WebView与一次Gecko失败仍不足定外部/规则/客户端根因。
+
+已续派播放owner先仅离线补默认关闭QA console分类：固定mgnacg已失败rule/page/label门禁，在工厂创建后init前订阅既有onLog（现VideoWebviewImpl已有Console桥，非新JS），只认Console前缀、80条/8192单条/累计256KiB内存限额，输出固定hint枚举与限幅计数/overflow；原message/stack/URL/headers/认证字段及未知文本不可出结果，challenge hint停止观察但不称已确验证码。完成/取消/finally等待订阅取消、晚到不写，其他case零订阅，不改生产controller、默认策略、机器日志，不新增请求/媒体/脚本。须交隐私/超限/伪异常/晚到/取消/归属反例与精确提交；此时不构建、不启动、不重跑mgnacg，待统筹独立审读再定唯一必要诊断。实质变化是当前已有超时trace缺脚本/来源策略分类，能补code或外部归因所缺观察，不能原样再跑。DM84本包到此停止，旧aafun/五无可播/7已过均不重试。主目标未完成、自动化持续ACTIVE，正式/preview/电视/系统未动。
+
 17:35统筹独立复核depth-modern-control-20588-v1两例：runner/展开rule的manifest、同20588 APK、同rule/work/road/episode hash及exactlabel与旧失败对应，两例终态/两层及final清理confirmed。DM84标签2在API36/WebView143的实际VideoWebviewAndroidImpl首帧+完整10秒进度9551ms/采样错0；mgnacg第2话仍resolve_timeout/播放器未创建，不能据此编HTTP拒绝或整源失效。旧API28实际VideoWebviewImpl，现代ABI列含ARM64兼容但Flutter target均x64，SDK/provider/factory不同；仅支持环境表现差异，不单独证明WebView版本根因。回执.dart_tool/depth-modern-control-independent-review.json。
 
 配对证据更正：已独立审读main.dart/plugin头与两WebView controller，生产App路径getRandomUA从池抽取且原实际抽样值未记录；identity.ua只是受控profile元数据，不代表实际App UA。此前本项目App对照在缺现场UA时均只能说同默认UA策略/代码，不能说同字节UA或严格单变量对照；原数据不改写，四源QA补救实播结果保留但因果表述须带此限制，不据此修改正式默认策略。
