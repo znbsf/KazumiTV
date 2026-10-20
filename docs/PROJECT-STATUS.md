@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+MXdm新候选已成为unknown，不再属于未尝试；按用户新方向，不从该结果进入继续修工具或换case试运行循环。统筹已向规则owner续派仅离线原v9→v10归并moonci原unknown及辅助恢复、aafun ARM无App终态unknown、MXdm启动/终态等待unknown，独立核原件而不改ledger/计数、不补缺失字段、不新fetch/设备/构建/播放工具测试。并要求在原覆盖视图收敛17源代表性结果、来源/客户端证据缺口与TV环境验收缺口，现成真实未执行绑定有则列、无则明确无，不为增加覆盖另挑剧集。待独立审核后再决定可推进的独立项，唯一设备owner目前idle，QA已停保包；当前不追加任何已测/unknown来源或工具修复。
+
 用户指定MXdm已实际单次执行并收尾，统筹独立核tv20592-mxdm-only-v1：输入原字节/展开rule后manifest hash/冻结runner1018a268…/physical身份/20592全hash/provider与原精确第01集计划一致。planned1 started1 completed0 unknown1，原始无App终态或provisional，不能假补搜索/解析/媒体进度。Android am返回Status timeout/Wait10195ms/expectedActivitytrue，宿主等候未抛20秒timeout；到55秒工作窗无result.json，HostBudgetExpired，CLI56.977秒在70秒内退出。只证明QA启动/终态等待链有缺口，无法判断是否已执行搜索/解析，不据此说MXdm来源不可播或解码失败。回执.dart_tool/tv20592-mxdm-independent-review.json。
 
 全包90.625<180秒，命名QA/renderer及case/final清理confirmed，原三保护包/QA全meta/桌面音乐8/provider/media0/reverse保持，自有runner目标ADB/监听退出；TV短采样CPU17.29%/宿主9%。未重试、换源或改工具，没有再运行fixture/协议/已测源；本次已从未尝试变unknown，不能随后按未尝试重派。遵循用户新方向：直接按能否播放与实际卡点汇报，不因该unknown进入继续修测试工具循环。
