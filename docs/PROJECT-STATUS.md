@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+21:20统筹独立审32591da3 tv20592-moonci-mxdm-v1：父plan/唯一实际子case展开规则后hash、runner、physical身份/现装20592/provider与精确moonci原页/第01话匹配；外层完整CLI70.016秒exit124，原results/cleanup均缺失，journal仅started1/unknown1，MXdm无invocation未尝试。事后只读解析App记录同当前case/rule/page/label、fresh、一次QA fallback/21334ms accepted、原生首帧与10007ms窗口/+10135ms/错0、自身清理confirmed；未获原文件准确发布时间，不能证明宿主限时内完成，不改写原unknown。原采样缺失不补PSS；8785字节/hash来自owner固定文件元数据，统筹独立读解析文件绑定，未假称重新hash原始字节。恢复stop与原完整保护meta/桌面音量/provider、reverse/QA/自有runner/目标ADB/监听退出及227.975秒<300收尾独立核对；回执.dart_tool/tv20592-moonci-unknown-independent-review.json。
+
+已续派唯一播放owner仅纯离线核单例/整包计时覆盖与最小宿主修正，先交方案或小提交+有意义fake-clock/device反例，不构建/连接/启动/HTTP或重跑moonci/旧unknown，不自动跑未尝试MXdm/aafun。严守原70秒/整包上限，不靠加timeout/换wrapper/重置钟/删身份清理掩盖。统筹静态更正计时描述：Device.case的started在冷停/config/baseline/am之前，while的70秒已包含这些，不是am后再给70秒；真实静态缺口为外层CLI还含main预检，finally stop/文件读回/sampler join最多30秒与写盘等不受active while统一截止，独立call timeout也未夹剩余，实际被中断具体步骤仍未知。已通知owner精确区别，避免围绕未经证明的重复起点重构。当前先离线修可验证预算终态/必要清理，TV关停保包且保护不动。
+
+规则eb258419 v9已独立重算43输入摘要，2个TV有效短播样本与旧20591失败并列、203.528/200协议失败不被抹去，standalone解析首帧/进度0不计通过，17源/11限定模拟器来源与TV2受限来源保持；回执.dart_tool/depth-v9-independent-review.json。尚未纳入本moonci恢复观察，aafun提议仍未执行，不提前归因或overlay。
+
 21:06 d8cd781c原live2已完成交付，统筹具体续派只原20591终态失败的moonci第01话/MXdm第01集在新20592调度下各首次实播，.dart_tool/tv-live-remaining-plan-20592.json，SHAd7f7c61de24b05b581213b3978b068283aa1d55dd0a0017e852d9619c529a48b。原有效规则/作品线路/页面hash和exactlabel保持，App显式QA primary10/shared25/max1、每例70秒/10秒进度，不重复ezdmw/7sefun、不构建重装/fixture/旧unknown。新包总300秒包含身份前提与全部只读收尾，按已观察收尾成本保留末次至少60秒，每例开始前剩余须足70+60秒；不足记未尝试停止，不回溯放宽旧200秒超限。新前提是相同ARM候选fixture及ezdmw原失败样本已实际通过，不单独证明预算唯一原因。先原状态记边界、同物理身份/现装hash/保护桌面音量与归属核对，普通明确阶段失败可继续计划内独立源，challenge/unknown/envinvalid/错配/清理不明停，不换线/重试/加探针。只原唯一runner单例，结束原保护与自有进程/负载核验，不自动执行aafun或其他源。
 
 21:05统筹独立核tv20592-live2-v2原件：两个子manifest精确对应父计划、runner字节与本树一致、展开规则后input hash/physical身份/现装20592/provider/精确作品线路剧集hash和label匹配；ezdmw原电视失败例新QA primary10/shared25下，primary retired10150ms先fallback start10153ms，唯一fallback accepted23691ms<25秒，原生首帧与完整10002ms观察/位置+10281ms/采样错0；7sefun默认App同原第01集，10000ms观察/+10218ms/错0、零fallback。两单例host elapsed64375/38171ms，各层及final清理confirmed，独立subscription not_created合法。回执.dart_tool/tv20592-live2-independent-review.json。
