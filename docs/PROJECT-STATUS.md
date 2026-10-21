@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+23:00统筹独立审B源码并集成：作者761945149c8ba7d68ec50eae5ab3f4257e1018a9/root92ab9731，10文件commit/root/作者逐正文绑定；实读selected headers→optional callback→prepared→commit/rollback与Referer、缓存原头、SourceSheet中性factory和QA独立binding共享退役gate。独立重跑98相关反例7.081秒全过，9改面Dart分析7.486秒无问题；回执.dart_tool/source-switch-B-independent-review.json。此修复源码已实现，不再仅方案；普通SourceSheet30/VideoPage15、QA10/25max1与原native资格不变。未注入普通WebView UA仍不声称与native相同；不当某来源唯一根因。旧20593/20594不含B，新APK/实际换源UI/ARM/AV仍未验，正式默认内核未改。
+
+下一仅将同76194514代码构建一个独立x64 fullUI20595（0.4.5-parserqa.fullui.x64.2）供后续必要换源路径验收，仍固定target tools/qa/full_ui/main.dart/parserQa/debug/fullUi双端真offline假/单x86_64/min26/原24f签名。只版本ABI既存正常build输入变化，保旧APK/dirty docs/固定依赖；总20分钟主编译15分钟、失败准确交不盲修。核实际commit/target/profile/kernel/manifest/签名与新候选hash，旧candidate与源码依赖摘要不变，自有构建退出；无设备ADB/AVD/TV/HTTP/播放。无需重做大旧表/smoke/工具框架，新候选交审后才另定单次实际换源验收，不自动下一包。
+
 22:30统筹已独立审baimao-same-body-origin-v1：精确详情由原log3316/3317恢复、全SHA与行hash/原log实hash成立，5个生产文件root/作者实hash一致；但作者在创建一次性Dart之前发生Windows路径/多层字符串语法错误，实际GET0/设备0/Flutter未启动。同body/当前redirect/旧第1集验证均not_run，不能归来源故障或报fix，停止本路线不自动修执行器重试。原分析969.055>900超69.055秒，协议失败保留；无持久任务/HTTP客户端创建，短命准备命令已退出。回执.dart_tool/baimao-same-body-independent-review.json。
 
 下一独立源码修复为已审方案B的真实调用缺口：统筹实际读SourceSwitchResolver.prepare/PreparedSourceSwitch、SourceSheet、VideoPage._selectSource与controller提交，确认预解析结果不携请求头，提交与失败回滚重新随机UA；QA完整UI换源又未接A片中性resolver。此为源码确定的问题，不冒称baimao/任一源根因。固定 .dart_tool/qa-full-ui-source-switch-headers-plan-v1.json，仅60分钟源码与相关本地反例：selected plugin请求头冻结→header-aware resolve→prepared不可变快照→commit与rollback原头，QA-only换源binding复用同retirement gate/租约/取消迟到守卫，普通VideoPage15及SourceSheet30和HTML机制不改；不下载/pool/health、正式默认Gecko、工具框架/新依赖/schema/JS，不设备HTTP/构建安装或重播。交小代码提交供统筹独立review后才后续验收，未实现前不报修复成果。
