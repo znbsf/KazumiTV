@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+2026-10-21 16:50香港时间接续：用户约定今日10点后恢复的临时暂停已过，沿原授权与唯一设备owner继续；原保护/停止条件保持。统筹独立审核aafun-page-client-analysis-v1原7JSON与三原trace/9处代码引用，作者源码/root仅换行等价，400在TV默认和现代trace与iframe src同48位指纹、角色仍未知；HTTP回调仅诊断，未证400直接致命/订阅晚接/已接受媒体却等待load的本例反例。回执.dart_tool/aafun-client-analysis-independent-review.json。实际0HTTP/0设备/0代码变更，作者final误回MXdm不当新结论，完整播放页正文/URI未保留，不能从指纹猜路径或盲改解析/overlay。
+
+新必要观察与重开边界：旧离线检索已穷尽其限定原件，没有可重放播放页；当前三平台明确失败及静态无法定位候选门禁，需实际公开页声明以区分网页声明/候选接纳缺口。本次不是重跑播放/环境矩阵，只正常原rule一次搜索→唯一原详情→确切原集页最多3个HTML请求；每步用已核detail/episode全SHA与精确标题标签绑定、任一错配不换候选，重获公共地址来源必须真实响应，不生成猜路径。固定计划.dart_tool/aafun-public-page-declaration-20261021-v1.json SHA33abbab488c88ce6cf2c641e9ed0943528ea5cdc338269454a390e8894ecb084。总120秒/HTTP共享15秒各最多5秒/每响应256KiB/default TLS/不redirect/无Cookie Auth，固定已有公开UA Referer但不称原App实际UA匹配；非2xx非HTML/挑战/认证签名/嵌套地址请求歧义立即停。只对成功原播放页body做内存静态声明/iframe/script结构及host/hash分析，不执行JS/加载子页脚本媒体，不安装构建/设备/工具/schema/overlay/生产默认改动；媒体地址/签名参数不请求不持久化。正常搜索详情是为恢复绑定而新取证，不改变旧完成/unknown，不补可播分母。交来源反例或准确缺口后停，由统筹审核才后续。
+
 用户最新临时暂停：2026-10-21香港时间，要求“先暂定你的这个事情 今天10点之后再继续吧”。本任务立即暂停，今日10:00香港时间（UTC02:00）后按同一kazumi自动化恢复，之前排队heartbeat仅静默不执行工作，不恢复其他实验。两owner当前idle；最后现代包已核自有AVD/端口/目标客户端退出及停后负载，后续只离线分析无设备/来源请求。自动化保持原线程/通知偏好/15分钟周期，首未来启动设为10:00，并加显式时间门禁。
 
 接续待审：app-fallback/aafun-page-client-analysis-v1已完成，作者原状态与source-client-review/trace-comparison真实为aafun离线链路分析；其final误重复MXdm旧结论，不能当新实测。400指纹与iframe src一致但角色未定；静态未证HTTP400直接中止解析；既存原件无法恢复完整SHA匹配公开episode地址，实际0GET/0设备/0构建/0源码修复。统筹仅初读，完整独立审查/后续区分方案留10点后，不能预写修复或重复原设备矩阵。
