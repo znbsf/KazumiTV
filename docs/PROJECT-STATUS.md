@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+21:30统筹独立核v2：固定ADB首次正常启动并绑定PID111448/creation21:18:04，AVD实际18.953秒开机；但安装设置首次调度已到包起127秒，超过作者按包起算的setup120，故install/QA UI/source/capture仍全0。原environment_invalid保留，准确归为本任务准备/调度执行缺陷，不是App/来源或模拟器启动故障；设备身份仅cleanup观测不追认为setup通过。whole258.749<480，seed/config前后完整maps精确相同，root CIM3自有AVD PIDs均退出/5588与5589无监听，新111448/固定binary/5037当前身份独立核；该服务因未能证完全独占保留，不盲kill。回执.dart_tool/full-ui-20594-v2-independent-review.json。
+
+已续派v3（.dart_tool/full-ui-modern-20594-plan-v3.json SHA02c9687649f9176a0a0e946830830283161361333350616a7485e0060d9fdb6b）仍只原未执行完整UI源例：先在原总480内最多60秒离线备好既有正常顺序命令；setup120明确从首次现场归属检查起，紧接真实启动/身份/包签名版本/必要安装，不在中间重新读已核大材料或写工具。此为已有ADB/实际快开机新前提及执行调度纠正，不放宽保护、App/source70或总480，也不回溯修改旧v2起点。UI150从QA实际启动计，原规则单MXdm门禁/精确页/实际source70/60收尾不变；不抢TV/不新helper或改代码框架。下一真实门槛或再次执行失误即交准确层，不自动v4换探针/另例/加时。artifact full-ui-20594-modern-mxdm-v3，结果尚未交不预报成功；旧共享19624历史值已失效，当前111448保护，不能误用旧PID缺失再停。
+
 21:15原full-ui-20594-modern-mxdm-v1在任何ADB/AVD/安装/界面/来源/采集前因历史共享PID19624已不存在且无adb.exe/5037监听停止，environment_invalid、全部运行层unattempted，133.982<480；AVD config/ini/userdata seed前后hash一致，无自有进程。统筹另host CIM与5037读回也为空，回执.dart_tool/full-ui-20594-env-independent-review.json，未发设备命令。旧PID消失不是来源或UI失败，也不是原授权撤销；首计划把共享历史PID写为必须活状态过严，不让人类再授权常规ADB初始化。
 
 已实际续派同一owner v2（.dart_tool/full-ui-modern-20594-plan-v2.json SHA debb6ed68dbe7bb7aeb4ead4d40ad4ea7c4ed9634efc14b1c826e8864fac6041）只明确现场ADB所有权：有服务则核实际固定binary/PID/creation/listener并保留；完全无服务且5037空闲可正常start-server一次<=5秒、在原setup120及总480内，记录新PID归属；不换端口/kill/reset旧共享服务/Windows服务。新daemon仅确认任务归属且无其它用户资源接入才收尾，否则保留并说明新共享身份，不能盲kill。原唯一AVD/20594/rule/正常UI目的与150准备/70source/60收尾等全部不变、不重置旧钟或追认旧包；原实际来源0，属于未执行必要验收的明确设置前提变化，不是重复已测源/unknown。TV仍不访问。新artifact full-ui-20594-modern-mxdm-v2，遇另一真实阻塞仍停止如实交，不自动加时换对象或工具修复。
