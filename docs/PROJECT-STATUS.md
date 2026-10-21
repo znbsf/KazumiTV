@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+最新实播结论：人类要求直接装QA点MXdm第01集已实际完成，app-fallback/full-ui-20594-direct-mxdm-v1；统筹亲自view两张活跃截图，同《学生会也有洞！》/第01集、动画画面不同、进度00:21→01:21/24:14，图像时隔59.111秒。独立读原PID日志：13:52:08.188切第01集，13:52:15.663解析媒体（约7.474秒），13:52:16.024播放器初始化，13:52:23.802原生首帧。403明确api.dandanplay.net弹幕请求/failed to get danmaku，不是视频失败；此现代完整UI路径真实出画与正进度成立。回执.dart_tool/full-ui-20594-direct-mxdm-independent-review.json。原旧d766 episode URI未在本日志出现，不补原精确页hash或将其当旧unknown复验；这里只绑定实际UI作品/第01集/固定原rule。未做连续10秒仪表采样、音频/AV/长稳或旧ARM fallback验收，不扩大源成功计数。
+
+本包20594实际安装hash43ce167a…与原24f签名候选绑定/UIDfirstInstall保持。正常文件选择器不可用、长JSON/分享文本ADB输入未成功，均保留为真实早期界面卡点；为完成用户实播目标只备份本次QA固定files/plugins/v2/plugins.json并写原MXdm单数组，读回对象/normalized78163afd一致后正常首页进入，非直达route/VM/新helper；测试后逐字节恢复备份/删除仅本包Downloads输入。QA21:54:54.945停止，root独立CIM3自有AVD子进程均退出/5588与5589空/既存ADB111448保持，AVD config/ini/userdata seed前后hash长度mtime完全一致；TV未访问、正式/preview/其它QA/system未改。包含核验收尾936.349>900超36.349秒，整体协议不涂pass；QA停止时835.672<900、此后必要退出核验超额原样保留。当前唯一owner已idle（新补充turn01a15ec0-7754-7620-a9d1-174f3e2d1bb8，cursor86e0fe00-ab7d-40ea-b93d-63add37e744b:63），不自动重播/补拍/扩例或维护工具，后续只对剩余真实缺口另定最小工作。
+
 最新直接人类纠偏：用户明确“怎么又是准备超时？别再围着流程转了，直接把QA装上打开，实际点进MXdm第01集，告诉我有没有画面、卡在哪一步，正式版别动。”优先旧人为sole-rule/分段准备门槛。已向原唯一owner实际传达继续正常独立QA操作，不新方案等待：同已核只读API36 AVD/现成20594，正常UI最多15分钟含设置/收尾，App自身解析期限不扩；本会话引导新复制的两条内置规则可正常UI临时移除后导入固定MXdm，原seed用户数据与旧规则不清不卸，结束只读退出核seed保持。若真实旧规则则先保留/备份并可恢复准备，不因规则数量就停止源操作。无新代码/工具/构建/任意JS/探针/TV访问，实际正常VideoPage第01集/活跃画面和准确最远阶段为交付。
 
 统筹已亲自view v3旧截图：screen-home-after-onboarding.png实际首页首行第2卡/LCN2正是“学生会也有洞！”，可正常进入不必新增中文输入路线；screen-rules-tap.png才是真规则管理（全部2/7sefun），screen-rules-inventory.png仍播放设置、screen-normal-home.png是引导确认，不能按文件名补验收。此新直接执行已交owner active，正常推进勿催促或双方抢设备；旧v3来源0/准备与规则门槛停止及UI阶段超过150的事实保留，不追认成功，也不让旧计划阻断最新人类实播指令。
