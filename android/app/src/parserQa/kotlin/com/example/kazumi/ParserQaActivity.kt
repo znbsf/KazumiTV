@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.BinaryMessenger
 import org.json.JSONObject
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
@@ -18,14 +19,23 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.WebExtension
 import org.mozilla.geckoview.WebRequestError
 import java.io.File
+import java.util.IdentityHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /** Opt-in parserQa/debug only. One experiment, optionally serial fixture generations. */
 class ParserQaActivity : MainActivity() {
+    private companion object {
+        val channelOwners = IdentityHashMap<BinaryMessenger, ParserQaActivity>()
+        var geckoBridgeOwner: ParserQaActivity? = null
+        val nextGeckoOwner = AtomicLong(0)
+    }
     private lateinit var channel: MethodChannel
+    private var bridgeMessenger: BinaryMessenger? = null
     private var runtime: GeckoRuntime? = null
     private var session: GeckoSession? = null
     private var extension: WebExtension? = null
     private var generation = 0
+    private var geckoOwner: Long? = null
     private var resultGeneration = 0
     private var resultCaseId: String? = null
     private var lifecycleSwitch = false
@@ -51,10 +61,15 @@ class ParserQaActivity : MainActivity() {
         launchProbe?.registered(engine.plugins.has(dev.fluttercommunity.plus.packageinfo.PackageInfoPlugin::class.java))
         launchProbe?.observeRenderer(engine.renderer)
         check(BuildConfig.DEBUG && packageName == "com.znbsf.kazumi.fluttertv.parserqa")
-        channel = MethodChannel(engine.dartExecutor.binaryMessenger, "kazumi/parser_qa")
+        val messenger = engine.dartExecutor.binaryMessenger
+        bridgeMessenger = messenger
+        channelOwners[messenger] = this
+        channel = MethodChannel(messenger, "kazumi/parser_qa")
         channel.setMethodCallHandler { call, result ->
             try {
+                check(ownsChannel())
                 when (call.method) {
+                    "qaUiCapability" -> result.success(fullUiCapability())
                     "launchProbeStage" -> {
                         val probe = launchProbe ?: error("qa_launch_only_disabled")
                         probe.dartStage(call.arguments as Map<*, *>)
@@ -110,26 +125,50 @@ class ParserQaActivity : MainActivity() {
                         check(temporary.renameTo(File(filesDir, "result.json")))
                         result.success(true)
                     }
+                    "geckoAcquire" -> {
+                        if (geckoBridgeOwner != null || geckoOwner != null) {
+                            result.error("gecko_busy", "owner_busy", null)
+                        } else {
+                            val owner = nextGeckoOwner.incrementAndGet()
+                            geckoBridgeOwner = this@ParserQaActivity
+                            geckoOwner = owner
+                            result.success(owner)
+                        }
+                    }
                     "geckoInit" -> {
+                        val owner = (call.argument<Number>("owner") ?: error("gecko_owner_missing")).toLong()
+                        check(geckoBridgeOwner === this@ParserQaActivity && geckoOwner == owner)
                         val rt = runtime ?: GeckoRuntime.create(applicationContext,
                             GeckoRuntimeSettings.Builder().consoleOutput(false).build()).also { runtime = it }
                         rt.webExtensionController.ensureBuiltIn(
                             "resource://android/assets/parserqa/", "parserqa@kazumi.local"
-                        ).accept({ ext -> extension = ext; result.success(null) },
-                            { error -> result.error("gecko_init", error?.javaClass?.simpleName, null) })
+                        ).accept({ ext ->
+                            if (geckoOwner == owner && ownsChannel()) { extension = ext; result.success(null) }
+                            else result.error("gecko_retired", "owner_retired", null)
+                        }, { error ->
+                            if (geckoOwner == owner && session == null) {
+                                geckoOwner = null
+                                if (geckoBridgeOwner === this@ParserQaActivity) geckoBridgeOwner = null
+                            }
+                            result.error("gecko_init", error?.javaClass?.simpleName, null)
+                        })
                     }
                     "geckoLoad" -> {
+                        val args = call.arguments as Map<*, *>
+                        val owner = (args["owner"] as Number).toLong()
+                        check(geckoBridgeOwner === this@ParserQaActivity)
+                        check(geckoOwner == owner)
                         closeSession()
                         val epoch = ++generation
-                        val args = call.arguments as Map<*, *>
                         val url = args["url"] as String
                         require(url.startsWith("https://") || url.startsWith("http://"))
                         val s = GeckoSession(GeckoSessionSettings.Builder()
                             .usePrivateMode(true).userAgentOverride(args["ua"] as String).build())
                         session = s
                         fun diagnostic(stage: String, uri: String, detail: String) {
-                            if (session === s && epoch == generation) channel.invokeMethod("geckoDiagnostic",
-                                mapOf("stage" to stage, "url" to uri, "detail" to detail, "generation" to args["generation"]))
+                            if (session === s && epoch == generation && ownsChannel()) channel.invokeMethod("geckoDiagnostic",
+                                mapOf("stage" to stage, "url" to uri, "detail" to detail,
+                                    "owner" to owner, "generation" to args["generation"]))
                         }
                         s.progressDelegate = object : GeckoSession.ProgressDelegate {
                             override fun onPageStart(session: GeckoSession, uri: String) {
@@ -150,7 +189,7 @@ class ParserQaActivity : MainActivity() {
                             object : WebExtension.MessageDelegate {
                                 override fun onMessage(nativeApp: String, message: Any,
                                     sender: WebExtension.MessageSender): GeckoResult<Any>? {
-                                    if (sender.session !== s || session !== s || epoch != generation) return null
+                                    if (sender.session !== s || session !== s || epoch != generation || !ownsChannel()) return null
                                     if (message is JSONObject) {
                                         val handler = message.optString("handler")
                                         val value = message.optString("url")
@@ -158,7 +197,7 @@ class ParserQaActivity : MainActivity() {
                                             "ready=${message.optString("ready")} frames=${message.optInt("frames")} videos=${message.optInt("videos")}")
                                         if (handler in setOf("JSBridgeDebug", "VideoBridgeDebug") && value.length <= 16384) {
                                             channel.invokeMethod("geckoEvent", mapOf("handler" to handler,
-                                                "url" to value, "generation" to args["generation"]))
+                                                "url" to value, "owner" to owner, "generation" to args["generation"]))
                                         }
                                     }
                                     return null
@@ -169,7 +208,21 @@ class ParserQaActivity : MainActivity() {
                         s.loadUri(url)
                         result.success(null)
                     }
-                    "geckoClose" -> { closeSession(); result.success(null) }
+                    "geckoClose" -> {
+                        val owner = (call.argument<Number>("owner") ?: error("gecko_owner_missing")).toLong()
+                        // A stale route cannot close a newer native session.
+                        check(geckoBridgeOwner == null || geckoBridgeOwner === this@ParserQaActivity)
+                        check(geckoOwner == null || geckoOwner == owner)
+                        if (geckoOwner == owner) {
+                            closeSession()
+                            if (call.argument<Boolean>("release") == true) {
+                                geckoOwner = null
+                                if (geckoBridgeOwner === this@ParserQaActivity) geckoBridgeOwner = null
+                            }
+                        }
+                        // This acknowledges API retirement, not OS process/memory release.
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             } catch (error: Exception) {
@@ -177,11 +230,40 @@ class ParserQaActivity : MainActivity() {
             }
         }
         launchProbe?.record("native_channel_ready")
+        if (BuildConfig.QA_FULL_UI && ownsChannel()) channel.invokeMethod("qaUiReady", fullUiCapability())
     }
+    private fun fullUiCapability() = mapOf(
+        "package" to packageName, "activity" to javaClass.name,
+        "debug" to BuildConfig.DEBUG, "full_ui" to BuildConfig.QA_FULL_UI,
+        "tv" to BuildConfig.IS_TV_BUILD, "offline" to BuildConfig.QA_LAUNCH_ONLY)
     private fun closeSession() {
         generation++
         session?.let { it.stop(); it.close() }
         session = null
+    }
+    private fun ownsChannel(): Boolean {
+        val messenger = bridgeMessenger ?: return false
+        return channelOwners[messenger] === this
+    }
+    private fun retireBridge() {
+        var retired = false
+        try { closeSession(); retired = true }
+        finally {
+            if (retired) {
+                geckoOwner = null
+                if (geckoBridgeOwner === this) geckoBridgeOwner = null
+            }
+            val messenger = bridgeMessenger
+            if (messenger != null && channelOwners[messenger] === this) {
+                channel.setMethodCallHandler(null)
+                channelOwners.remove(messenger)
+            }
+            bridgeMessenger = null
+        }
+    }
+    override fun cleanUpFlutterEngine(engine: FlutterEngine) {
+        try { retireBridge() }
+        finally { super.cleanUpFlutterEngine(engine) }
     }
     private fun findQaFlutterView(view: View): FlutterView? {
         if (view is FlutterView) return view
@@ -208,7 +290,13 @@ class ParserQaActivity : MainActivity() {
         return super.dispatchKeyEvent(event)
     }
     override fun onDestroy() {
-        try { runCatching { launchProbe?.record("native_destroy") }; closeSession(); super.onDestroy() }
-        finally { launchProbe?.detach() }
+        try {
+            runCatching { launchProbe?.record("native_destroy") }
+            retireBridge()
+        }
+        finally {
+            try { super.onDestroy() }
+            finally { launchProbe?.detach() }
+        }
     }
 }

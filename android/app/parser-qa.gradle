@@ -2,6 +2,10 @@
 if (project.findProperty("kazumiTv") == "true") {
     throw new GradleException("Parser QA cannot be combined with the TV release overlay")
 }
+def fullUi = project.findProperty('kazumiQaFullUi')?.toString() == 'true'
+if (fullUi && project.findProperty('kazumiQaLaunchOnly')?.toString() == 'true') {
+    throw new GradleException('Full UI QA cannot use the offline launch profile')
+}
 repositories { maven { url 'https://maven.mozilla.org/maven2/' } }
 android {
     flavorDimensions += "device"
@@ -11,6 +15,8 @@ android {
             applicationId "com.znbsf.kazumi.fluttertv.parserqa"
             minSdkVersion 26
             buildConfigField "boolean", "QA_LAUNCH_ONLY", "false"
+            buildConfigField "boolean", "QA_FULL_UI", fullUi.toString()
+            buildConfigField "boolean", "IS_TV_BUILD", fullUi.toString()
         }
         if (project.findProperty("kazumiQaLaunchOnly") == "true") {
             parserQaOffline {
@@ -18,10 +24,19 @@ android {
                 applicationId "com.znbsf.kazumi.fluttertv.parserqa"
                 minSdkVersion 26
                 buildConfigField "boolean", "QA_LAUNCH_ONLY", "true"
+                buildConfigField "boolean", "QA_FULL_UI", "false"
             }
         }
     }
-    sourceSets { parserQa.java.srcDirs += 'src/parserQa/kotlin' }
+    sourceSets {
+        parserQa {
+            java.srcDirs += 'src/parserQa/kotlin'
+            if (fullUi) {
+                manifest.srcFile 'src/parserQaFullUi/AndroidManifest.xml'
+                res.srcDirs += 'src/tv/res'
+            }
+        }
+    }
     if (project.findProperty("kazumiQaLaunchOnly") == "true") {
         sourceSets {
             parserQaOffline {

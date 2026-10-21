@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
@@ -6,6 +7,22 @@ import 'package:kazumi/pages/route_error_page.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/video/video_page.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
+import 'package:kazumi/repositories/download_repository.dart';
+import 'package:kazumi/services/download/download_manager.dart';
+
+typedef DebugVideoPageControllerBuilder = VideoPageController Function(
+    HistoryController, IDownloadRepository, IDownloadManager);
+
+/// Explicit debug entrypoints only. Release always uses the normal constructor.
+@visibleForTesting
+DebugVideoPageControllerBuilder? debugVideoPageControllerBuilder;
+
+VideoPageController _createVideoPageController(HistoryController history,
+    IDownloadRepository downloads, IDownloadManager manager) {
+  final builder = kDebugMode ? debugVideoPageControllerBuilder : null;
+  return builder?.call(history, downloads, manager) ??
+      VideoPageController(history, downloads, manager);
+}
 
 final videoModule = createModule(
   path: '/video',
@@ -13,7 +30,7 @@ final videoModule = createModule(
     c.route(
       '/',
       provide: (s) => s
-        ..add<VideoPageController>(VideoPageController.new)
+        ..add<VideoPageController>(_createVideoPageController)
         ..add<PlayerController>(PlayerController.new),
       child: (context, state) {
         final args = state.arguments;

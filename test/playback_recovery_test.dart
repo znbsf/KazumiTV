@@ -88,6 +88,26 @@ class _Source implements WebViewVideoSourceService {
   Future<void> dispose() async {}
 }
 
+class _InterfaceSource implements IVideoSourceService {
+  Duration? receivedTimeout;
+  @override
+  Future<VideoSource> resolve(String url,
+      {required bool useLegacyParser,
+      int offset = 0,
+      Duration timeout = const Duration(seconds: 30)}) async {
+    receivedTimeout = timeout;
+    return VideoSource(
+        url: 'https://media.example.test/video.mp4',
+        offset: offset,
+        type: VideoSourceType.online);
+  }
+
+  @override
+  void cancel() {}
+  @override
+  Future<void> dispose() async {}
+}
+
 class _Output implements VideoController {
   final frame = Completer<void>();
   @override
@@ -196,6 +216,63 @@ void main() {
   tearDown(() {
     controller.dispose();
     TvMode.setEnabledForTesting(false);
+  });
+
+  test('interface injection retains ordinary page 15s instead of interface30s',
+      () async {
+    controller.dispose();
+    final injected = _InterfaceSource();
+    controller = VideoPageController(history, _Downloads(), _DownloadManager(),
+        videoSourceService: injected,
+        resolvedSourceCache: ResolvedSourceCache());
+    controller.applyPlaybackArgs(OnlineVideoPlaybackArgs(
+        bangumiItem: focusItem(1),
+        plugin: Plugin.fromJson(
+            {'name': 'fixture', 'baseURL': 'https://example.test'}),
+        title: 'fixture',
+        src: '/subject',
+        roads: [
+          Road(name: 'one', data: ['/1'], identifier: ['第1集'])
+        ]));
+    await controller.changeEpisode(1, playerController: player);
+    expect(injected.receivedTimeout, const Duration(seconds: 15));
+    expect(player.initializations, hasLength(1));
+  });
+
+  test('request hook receives exact immutable final-player headers', () async {
+    controller.dispose();
+    Map<String, String>? snapshot;
+    controller = VideoPageController(history, _Downloads(), _DownloadManager(),
+        videoSourceService: _InterfaceSource(),
+        resolvedSourceCache: ResolvedSourceCache(),
+        resolveVideoSourceWithHeaders: (url,
+            {required useLegacyParser,
+            required offset,
+            required timeout,
+            required headers}) async {
+      snapshot = headers;
+      expect(timeout, const Duration(seconds: 15));
+      expect(() => headers['user-agent'] = 'changed', throwsUnsupportedError);
+      return VideoSource(
+          url: 'https://media.example.test/video.mp4',
+          offset: offset,
+          type: VideoSourceType.online);
+    });
+    controller.applyPlaybackArgs(OnlineVideoPlaybackArgs(
+        bangumiItem: focusItem(1),
+        plugin: Plugin.fromJson({
+          'name': 'fixture',
+          'baseURL': 'https://example.test',
+          'referer': 'https://example.test/'
+        }),
+        title: 'fixture',
+        src: '/subject',
+        roads: [
+          Road(name: 'one', data: ['/1'], identifier: ['第1集'])
+        ]));
+    await controller.changeEpisode(1, playerController: player);
+    expect(snapshot, isNotNull);
+    expect(player.initializations.single.httpHeaders, snapshot);
   });
 
   PreparedSourceSwitch candidate() => PreparedSourceSwitch(

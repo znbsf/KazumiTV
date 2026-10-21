@@ -8,6 +8,7 @@ class TvMode {
   TvMode._();
 
   static bool _enabled = false;
+  static bool _debugParserQaFullUi = false;
 
   static bool get enabled => _enabled;
 
@@ -15,13 +16,27 @@ class TvMode {
     // tv.gradle defines both the tv flavor and native IS_TV_BUILD=true.
     // audio_service can start Dart before MainActivity registers its channels;
     // querying that activity here would abort startup with MissingPluginException.
-    _enabled = enabledForBuild(android: Platform.isAndroid, flavor: appFlavor);
+    _enabled = enabledForBuild(
+        android: Platform.isAndroid,
+        flavor: appFlavor,
+        parserQaFullUi: _debugParserQaFullUi);
   }
 
   @visibleForTesting
   static bool enabledForBuild(
-      {required bool android, required String? flavor}) {
-    return android && flavor == 'tv';
+      {required bool android,
+      required String? flavor,
+      bool parserQaFullUi = false}) {
+    return android &&
+        (flavor == 'tv' ||
+            (kDebugMode && parserQaFullUi && flavor == 'parserQa'));
+  }
+
+  /// Only a debug entrypoint with a positive native QA profile handshake may
+  /// install this override. Ordinary parserQa and all release builds ignore it.
+  @visibleForTesting
+  static void setDebugParserQaFullUi(bool value) {
+    if (kDebugMode) _debugParserQaFullUi = value;
   }
 
   @visibleForTesting
