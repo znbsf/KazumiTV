@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:45统筹独立核完整UI ARM20593候选，APK00eee6857c145c6e94f60d2417e943ea03ee4672e416c62e2c63bc50994078aa/172465324B；真实apksigner v2原24f…签名、aapt parserqa20593/0.4.5-parserqa.fullui.1/min26/debug/唯一ARMv7，完整UI manifest唯一ParserQaActivity TV launcher/INET与双端profile，kernel dec0dd55…实hash等compiler app.dill/full_ui与普通main存在/batchmain无。编译Activity class、固定Gecko AAR与APK omni、JS/registrant实hash已核；549源码live重hash/15旧保护APK重hash/依赖缓存前后metadata、29记录自有build PIDs root CIM均无。回执.dart_tool/full-ui-20593-artifact-independent-review.json。首次编译69.156秒/全包1081.580<1500，无修码/设备/来源HTTP或安装，原生候选通过不等真实播放；校验脚本先误要求stamp app.dill条目唯一，实际重复同一路径，已按唯一真实路径修正检查，不当产物错误。
+
+TV占用不访问。已续派同一owner仅构建同fb6d4774源码/profile的x64完整UI20594（0.4.5-parserqa.fullui.x64.1、target tools/qa/full_ui/main.dart、原24f…签名、x86_64/min26）供后续既有独立API36 AVD验证新正常首页/VideoPage层；现代不eligible，不替代旧TV fallback/AV或增加源计数，不重跑旧解析矩阵。artifact full-ui-20594-x64-build-v1，原20593及旧APK保护、固定工具链/缓存/源码/manifest/kernel/ABI/签名与退出核对复用，总20分钟/主build15分钟，不改代码工具/依赖/JS，不ADB/AVD启动安装/来源HTTP/播放。候选交审后才另定一次正常UI与原MXdm精确样本必要验收，正常单规则导入仅离线读原入口/原inventory定位，不新直达helper或改用户数据。
+
 20:15统筹已独立审并集成作者fb6d4774 A片正常首页/VideoPage QA接线，root0e0179c2；14提交文件与作者/root实际正文绑定，现有default factory、batch main/runner/build、JS/依赖、换源预解析B/下载/health未改。重读逐请求headers/cache交接、普通显式15秒、双端profile和debug route钩子、共用退役队列/排队扣时/taint、Dart/native跨实例owner/token/迟到关闭守卫。固定本地工具链统筹独立121相关反例通过（9.729秒），改动面Dart分析无问题（8.590秒）；回执.dart_tool/qa-full-ui-source-independent-review.json。这是源码和本地服务反例通过，未有Kotlin编译/合并manifest/新APK或真实完整UI播放通过。
 
 已续派原唯一owner仅构建/核独立ARM fullUi20593候选（0.4.5-parserqa.fullui.1，target tools/qa/full_ui/main.dart，双端fullUi真/offline假，parserQa/debug/单ARMv7/min26，原24f…签名），原固定工具链/缓存/生成器，明确Flutter命令不改批测构建框架、不覆盖20592或正式产物；原状态预算总25分钟/主编译20分钟，若A片本地原生小错误最多两次修正且总预算不扩。冻结全部相关源码/JS/registrant前后及实际target/profile/manifest/ABI/签名绑定，交失败或候选原件与自有进程退出负载。禁止设备/AVD/ADB连接、安装启动、来源HTTP/播放/采集；电视正式版占用现场不动/不自动轮询。统筹独立候选review后再必要下一环境包，不能将构建成功当可播或正式修复。
