@@ -2,6 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/services/video_source/video_source_service.dart';
+import 'package:kazumi/services/player/source_switch.dart';
+import 'package:kazumi/services/player/cross_source_resume.dart';
+import 'package:kazumi/pages/video/video_playback_args.dart';
+import 'package:kazumi/plugins/plugins.dart';
+import 'package:kazumi/modules/roads/road_module.dart';
+import 'support/tv_focus_fixtures.dart' show focusItem;
 import '../tools/qa/full_ui/video_source_binding.dart';
 
 const _source = VideoSource(
@@ -42,7 +48,184 @@ Future<VideoSource> _resolve(QaUiVideoSourceBinding binding,
         timeout: const Duration(seconds: 15),
         headers: headers);
 
+OnlineVideoPlaybackArgs _switchTarget() => OnlineVideoPlaybackArgs(
+    bangumiItem: focusItem(1),
+    plugin: Plugin.fromJson({
+      'name': 'selected',
+      'baseURL': 'https://selected.test',
+      'userAgent': 'selected-UA',
+      'referer': 'https://selected.test/'
+    }),
+    title: 'selected',
+    src: '/work',
+    roads: [
+      Road(name: 'one', data: ['/one'], identifier: ['第1集'])
+    ],
+    transfer: const CrossSourceResume(
+        bangumiId: 1,
+        pluginName: 'selected',
+        src: '/work',
+        road: 0,
+        episode: 1,
+        episodePageUrl: 'https://selected.test/one',
+        offset: 7));
+
 void main() {
+  test('ordinary source picker callback retains30s and never starts Gecko',
+      () async {
+    final primary = _Service((_) async => _source);
+    final binding = QaUiVideoSourceBinding(
+        gate: QaUiRetirementGate(),
+        enabled: true,
+        capabilityEligible: () => false,
+        primaryFactory: () => primary,
+        fallbackFactory: (_) => throw StateError('must not start Gecko'));
+    final picker = SourceSwitchResolver(binding,
+        resolveWithHeaders: binding.resolveWithHeaders);
+    final prepared = await picker.prepare(_switchTarget());
+    expect(primary.timeout, const Duration(seconds: 30));
+    expect(prepared.headers!['user-agent'], 'selected-UA');
+    await picker.dispose();
+  });
+
+  test('source picker cannot steal active route; queue consumes same25 budget',
+      () async {
+    final gate = QaUiRetirementGate();
+    final routeEntered = Completer<void>(),
+        routeMedia = Completer<VideoSource>();
+    final closing = Completer<void>(), release = Completer<void>();
+    final primary = _Service((_) {
+      routeEntered.complete();
+      return routeMedia.future;
+    }, close: () {
+      closing.complete();
+      return release.future;
+    });
+    final route = QaUiVideoSourceBinding(
+        gate: gate,
+        enabled: false,
+        capabilityEligible: () => false,
+        primaryFactory: () => primary,
+        fallbackFactory: (_) => throw StateError('not eligible'));
+    final routeResult = _resolve(route);
+    await routeEntered.future;
+    var starts = 0;
+    Duration? fallbackBudget;
+    Map<String, String>? seen;
+    final fallbackEntered = Completer<void>(),
+        fallbackMedia = Completer<VideoSource>();
+    final selected = QaUiVideoSourceBinding(
+        gate: gate,
+        enabled: true,
+        capabilityEligible: () => true,
+        totalBudget: const Duration(milliseconds: 700),
+        primaryBudget: const Duration(milliseconds: 100),
+        primaryFactory: () {
+          starts++;
+          return _Service(_missing);
+        },
+        fallbackFactory: (headers) {
+          seen = headers;
+          return _Service((budget) {
+            fallbackBudget = budget;
+            fallbackEntered.complete();
+            return fallbackMedia.future;
+          });
+        });
+    final picker = SourceSwitchResolver(selected,
+        resolveWithHeaders: selected.resolveWithHeaders);
+    final target = _switchTarget();
+    final preparing = picker.prepare(target);
+    target.plugin.userAgent = 'mutable-new-current-UA';
+    await Future<void>.delayed(Duration.zero);
+    expect(starts, 0);
+    expect(primary.cancellations, 0);
+    routeMedia.complete(_source);
+    await closing.future;
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(starts, 0);
+    release.complete();
+    expect(await routeResult, same(_source));
+    await fallbackEntered.future;
+    // Disposing the former route cannot cancel/wait on the picker's owner.
+    await route.dispose().timeout(const Duration(milliseconds: 100));
+    expect(fallbackBudget, lessThan(const Duration(milliseconds: 600)));
+    expect(seen!['user-agent'], 'selected-UA');
+    fallbackMedia.complete(_source);
+    final prepared = await preparing;
+    expect(prepared.headers, seen);
+    await picker.dispose();
+  });
+
+  test('cancelled queued source picker never opens a parser or cancels route',
+      () async {
+    final gate = QaUiRetirementGate();
+    final entered = Completer<void>(), media = Completer<VideoSource>();
+    final primary = _Service((_) {
+      entered.complete();
+      return media.future;
+    });
+    final route = QaUiVideoSourceBinding(
+        gate: gate,
+        enabled: false,
+        capabilityEligible: () => false,
+        primaryFactory: () => primary,
+        fallbackFactory: (_) => throw StateError('not eligible'));
+    final routeResult = _resolve(route);
+    await entered.future;
+    var starts = 0;
+    final selected = QaUiVideoSourceBinding(
+        gate: gate,
+        enabled: true,
+        capabilityEligible: () => true,
+        primaryFactory: () {
+          starts++;
+          return _Service(_missing);
+        },
+        fallbackFactory: (_) => throw StateError('cancelled'));
+    final picker = SourceSwitchResolver(selected,
+        resolveWithHeaders: selected.resolveWithHeaders);
+    final rejected = expectLater(picker.prepare(_switchTarget()),
+        throwsA(isA<VideoSourceCancelledException>()));
+    picker.cancel();
+    await rejected;
+    expect(primary.cancellations, 0);
+    media.complete(_source);
+    await routeResult;
+    await picker.dispose();
+    await route.dispose();
+    expect(starts, 0);
+  });
+
+  test('source picker refuses poisoned gate before creating any parser',
+      () async {
+    final gate = QaUiRetirementGate();
+    final route = QaUiVideoSourceBinding(
+        gate: gate,
+        enabled: false,
+        capabilityEligible: () => false,
+        primaryFactory: () => _Service((_) async => _source,
+            close: () async => throw StateError('unconfirmed')),
+        fallbackFactory: (_) => throw StateError('not eligible'));
+    await expectLater(_resolve(route), throwsStateError);
+    var starts = 0;
+    final selected = QaUiVideoSourceBinding(
+        gate: gate,
+        enabled: true,
+        capabilityEligible: () => true,
+        primaryFactory: () {
+          starts++;
+          return _Service(_missing);
+        },
+        fallbackFactory: (_) => throw StateError('must not start'));
+    final picker = SourceSwitchResolver(selected,
+        resolveWithHeaders: selected.resolveWithHeaders);
+    await expectLater(picker.prepare(_switchTarget()), throwsStateError);
+    expect(starts, 0);
+    await expectLater(picker.dispose(), throwsStateError);
+    await expectLater(route.dispose(), throwsStateError);
+  });
+
   test('each request freezes headers and creates fresh phase services',
       () async {
     final primary = <_Service>[];

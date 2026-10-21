@@ -34,16 +34,26 @@ class SourceSwitchOrigin {
 }
 
 class PreparedSourceSwitch {
-  const PreparedSourceSwitch(this.args, this.source);
+  /// Legacy callers may still construct a candidate without paired headers.
+  const PreparedSourceSwitch(this.args, this.source) : headers = null;
+
+  PreparedSourceSwitch.withHeaders(
+      this.args, this.source, Map<String, String> headers)
+      : headers = Map<String, String>.unmodifiable(headers);
+
+  const PreparedSourceSwitch._frozen(this.args, this.source, this.headers);
+
   final OnlineVideoPlaybackArgs args;
   final VideoSource source;
+  final Map<String, String>? headers;
 }
 
 /// Resolves without touching the active player, its controller, or history.
 /// Cancellation and disposal reject late results even from a faulty resolver.
 class SourceSwitchResolver {
-  SourceSwitchResolver(this.service);
+  SourceSwitchResolver(this.service, {this.resolveWithHeaders});
   final IVideoSourceService service;
+  final VideoSourceResolveWithHeaders? resolveWithHeaders;
   final _requests = AsyncSessionOwner();
 
   Future<PreparedSourceSwitch> prepare(OnlineVideoPlaybackArgs args) async {
@@ -58,14 +68,23 @@ class SourceSwitchResolver {
         )) {
       throw const VideoSourceNotFoundException('请先选择有效集数');
     }
+    final headers =
+        Map<String, String>.unmodifiable(args.plugin.buildHttpHeaders());
+    final useLegacyParser = args.plugin.useLegacyParser;
     final request = _requests.begin();
-    final source = await service.resolve(transfer.episodePageUrl,
-        useLegacyParser: args.plugin.useLegacyParser, offset: transfer.offset);
+    final source = await (resolveWithHeaders?.call(transfer.episodePageUrl,
+            useLegacyParser: useLegacyParser,
+            offset: transfer.offset,
+            // SourceSheet keeps its existing ordinary interface default.
+            timeout: const Duration(seconds: 30),
+            headers: headers) ??
+        service.resolve(transfer.episodePageUrl,
+            useLegacyParser: useLegacyParser, offset: transfer.offset));
     if (request.isStale) throw const VideoSourceCancelledException();
     if (source.url.trim().isEmpty) {
       throw const VideoSourceNotFoundException();
     }
-    return PreparedSourceSwitch(args, source);
+    return PreparedSourceSwitch._frozen(args, source, headers);
   }
 
   void cancel() {

@@ -15,11 +15,13 @@ import 'support/tv_focus_fixtures.dart' show focusItem;
 class _Resolver implements IVideoSourceService {
   final pending = <Completer<VideoSource>>[];
   int cancellations = 0;
+  Duration? receivedTimeout;
   @override
   Future<VideoSource> resolve(String url,
       {required bool useLegacyParser,
       int offset = 0,
       Duration timeout = const Duration(seconds: 30)}) {
+    receivedTimeout = timeout;
     final result = Completer<VideoSource>();
     pending.add(result);
     return result.future;
@@ -53,6 +55,112 @@ void main() {
       url: 'https://media.test/play.mp4',
       offset: 70,
       type: VideoSourceType.online);
+
+  OnlineVideoPlaybackArgs selected(Plugin plugin) => OnlineVideoPlaybackArgs(
+      bangumiItem: target.bangumiItem,
+      plugin: plugin,
+      title: target.title,
+      src: target.src,
+      roads: target.roads,
+      transfer: target.transfer);
+
+  test('selected plugin snapshot pairs prepare and result, not mutable state',
+      () async {
+    final backend = _Resolver();
+    final plugin = Plugin.fromJson({
+      'name': 'new',
+      'baseURL': 'https://new.test',
+      'userAgent': 'selected-UA',
+      'referer': 'https://selected.test/'
+    });
+    final pending = Completer<VideoSource>();
+    Map<String, String>? seen;
+    final resolver = SourceSwitchResolver(backend, resolveWithHeaders: (url,
+        {required useLegacyParser,
+        required offset,
+        required timeout,
+        required headers}) {
+      expect(url, 'https://new.test/2');
+      expect(offset, 70);
+      expect(timeout, const Duration(seconds: 30));
+      seen = headers;
+      expect(() => headers['user-agent'] = 'changed', throwsUnsupportedError);
+      return pending.future;
+    });
+    final preparing = resolver.prepare(selected(plugin));
+    plugin.userAgent = 'different-current-UA';
+    plugin.referer = 'https://changed.test/';
+    pending.complete(resolved);
+    final prepared = await preparing;
+    expect(backend.pending, isEmpty);
+    expect(prepared.headers, same(seen));
+    expect(prepared.headers,
+        {'user-agent': 'selected-UA', 'referer': 'https://selected.test/'});
+    expect(() => prepared.headers!['referer'] = 'late', throwsUnsupportedError);
+    await resolver.dispose();
+  });
+
+  test('legacy service keeps ordinary30s and receives a prepared snapshot',
+      () async {
+    final backend = _Resolver();
+    final resolver = SourceSwitchResolver(backend);
+    final pending = resolver.prepare(target);
+    expect(backend.receivedTimeout, const Duration(seconds: 30));
+    backend.pending.single.complete(resolved);
+    expect((await pending).headers!['user-agent'], isNotEmpty);
+    expect(PreparedSourceSwitch(target, resolved).headers, isNull);
+    await resolver.dispose();
+  });
+
+  test('explicit prepared headers copy caller data before future mutation', () {
+    final input = {'user-agent': 'frozen'};
+    final prepared = PreparedSourceSwitch.withHeaders(target, resolved, input);
+    input['user-agent'] = 'mutated';
+    expect(prepared.headers, {'user-agent': 'frozen'});
+    expect(() => prepared.headers!.clear(), throwsUnsupportedError);
+  });
+
+  for (final action in ['cancel', 'dispose', 'replace']) {
+    test('header-aware $action cannot commit a late selected candidate',
+        () async {
+      final backend = _Resolver();
+      final answers = <Completer<VideoSource>>[];
+      final headersSeen = <Map<String, String>>[];
+      final plugin = Plugin.fromJson({
+        'name': 'new',
+        'baseURL': 'https://new.test',
+        'userAgent': 'first-selected'
+      });
+      final resolver = SourceSwitchResolver(backend, resolveWithHeaders: (url,
+          {required useLegacyParser,
+          required offset,
+          required timeout,
+          required headers}) {
+        headersSeen.add(headers);
+        final answer = Completer<VideoSource>();
+        answers.add(answer);
+        return answer.future;
+      });
+      final first = resolver.prepare(selected(plugin));
+      final rejected =
+          expectLater(first, throwsA(isA<VideoSourceCancelledException>()));
+      Future<PreparedSourceSwitch>? next;
+      if (action == 'cancel') resolver.cancel();
+      if (action == 'dispose') await resolver.dispose();
+      if (action == 'replace') {
+        plugin.userAgent = 'second-selected';
+        next = resolver.prepare(selected(plugin));
+      }
+      answers.first.complete(resolved);
+      await rejected;
+      expect(headersSeen.first['user-agent'], 'first-selected');
+      if (next != null) {
+        answers.last.complete(resolved);
+        expect((await next).headers!['user-agent'], 'second-selected');
+      }
+      if (action != 'dispose') await resolver.dispose();
+    });
+  }
 
   test('live snapshot matches semantic episode on a reordered road', () {
     const origin = SourceSwitchOrigin(

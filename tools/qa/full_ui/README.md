@@ -23,10 +23,19 @@ not a replacement system WebView or video decoder. The native bridge issues
 process-wide monotonic owner tokens; a late route/isolate cannot close another
 session. Close acknowledgements do not prove OS processes or memory were freed.
 
-Scope A covers initial online playback, retry, same-plugin episode/road changes,
-cancel and route exit. SourceSheet's pre-resolved cross-source switch, downloads
-and health probes retain their original paths. Their successful integration is
-not implied by these tests or this entrypoint.
+Initial online playback, retry, same-plugin episode/road changes, cancel and
+route exit use the route-owned binding. SourceSheet pre-resolved source switching
+uses a separate binding with the same retirement gate: it cannot cancel another
+binding's active parser, skip unconfirmed cleanup or renew the queued25s budget.
+
+The selected plugin's headers are frozen before prepare and paired with the
+candidate through commit. Failed native initialization restores the previous
+media with its actual headers, position and paused state. Ordinary VideoPage15s
+and SourceSheet30s remain distinct; only eligible QA requests use10/shared25/max1.
+The legacy prepared-result constructor and uninjected resolver still work.
+Downloads and health probes retain their original paths. This source-switch
+wiring has local regression evidence only; existing APK20593/20594 predates it,
+and does not establish new build, device, visible-picture or audio/AV acceptance.
 
 ## Future build identity (not executed as part of this change)
 

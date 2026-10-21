@@ -11,6 +11,7 @@ import 'package:kazumi/main.dart' as app;
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/video/video_module.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/services/player/source_switch.dart';
 import 'package:kazumi/services/video_source/resolved_source_cache.dart';
 
 import '../source_batch/gecko_controller.dart' show qaChannel;
@@ -115,6 +116,13 @@ Future<void> main() async {
       manager,
       videoSourceService: resolver,
       resolveVideoSourceWithHeaders: resolver.resolveWithHeaders,
+      createSourceSwitchResolver: () {
+        // A picker gets its own sessions/cancel/dispose, but cannot overlap a
+        // route's active or unconfirmed parser retirement.
+        final selected = QaUiVideoSourceBinding.production(gate: retirement);
+        return SourceSwitchResolver(selected,
+            resolveWithHeaders: selected.resolveWithHeaders);
+      },
       videoSourceLog: resolver.onLog,
       resolvedSourceCache: ResolvedSourceCache(),
     );
