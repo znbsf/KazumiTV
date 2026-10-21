@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+下一最小区分观察已明确为同源公开播放器脚本的静态声明消费链，而非新设备/环境/播放矩阵。新证据为18:20真实原页只有纯JSON编码状声明、9外部script、无静态iframe；旧运行时有frames/400但角色未定，需该页实际邻接脚本结构才能判断是否只是网页声明到候选的客户端缺口。固定新plan.dart_tool/aafun-public-player-script-20261021-v1.json SHAbf04778049b70a2285ec780f6bd984cf04a5405b33a1a841b07b87db83384e7a，保持原同域HTTPS/最多3请求/共享15秒各5秒/256KiB/全执行120秒：只从既存日志PID6871/原detail请求12742/12746来源恢复全SHA匹配公开详情URL（不猜、不新search），1GET原详情由同版生产API得原road0ep0/第01话页hash后2GET公共页，最多3GET其唯一player JSON后第一同源.js且全SHA落在已真实发现8个同源script白名单。无精确详情URI/声明不唯一/脚本不明确或hash变化/认证签名嵌套/跳转/挑战/非有效类型即停不换对象。不新增域名/API/iframe/媒体，不执行网页/脚本/任意JS，不解码声明目标或请求签名地址，不修改工具helper框架/产品策略；静态保固定布尔/枚举/host-hash结构，原文URI/body不存。新包必须独立冻结/预算/退出交审，旧3GET不追加不追认，不能预称已有修复。
+
 2026-10-21 18:20统筹已独立审aafun-public-page-declaration-v1真实执行：冻结一次性源文件cb7fb77c…与plan33abbab4…一致，真实3GET搜索/详情/原第01话页均200 text/html，正文19063/60420/69051B，原同版Plugin/XPath、唯一title/detail824283…、road0ep0标签/页f63fd948…全部门禁通过；网络1861ms、完整宿主启动执行退出6.141<120秒，默认TLS/无redirect/Auth/Cookie/只既有公开UA/流式256KiB/15s共享与单5s主动关闭代码逐项核，0设备/0脚本执行/0iframe脚本API媒体请求。root .dart_tool/aafun-public-page-execution-independent-review.json。实际源响应不再0GET，原capability结果不覆盖；这是静态来源证据，不是可播/修复通过。
 
 新发现：播放页1个纯JSON player_声明，url为159字符非HTTP/非直接媒体路径的编码状string（仅形状，不证明具体编码/加密算法或无隐含认证）；静态HTML只有9个外部script、无iframe，未匹配旧cd97591ad835的400指纹。不能把静态体与旧不同UA/时点的运行时DOM当同一响应，尚不能断400角色/唯一外因或据此写解析修复/改overlay。原根因缺口现在收窄至该声明由网页脚本生成/加载播放器和候选URL的链条，仍需可证同源脚本结构/具体候选反例；本包未执行网页脚本/解密/追加资源。raw URL/body未留，rawbody hash不可重放，旧失败/unknown不追认。
