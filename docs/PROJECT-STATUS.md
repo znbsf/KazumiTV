@@ -2,6 +2,12 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+2026-10-21 18:20统筹已独立审aafun-public-page-declaration-v1真实执行：冻结一次性源文件cb7fb77c…与plan33abbab4…一致，真实3GET搜索/详情/原第01话页均200 text/html，正文19063/60420/69051B，原同版Plugin/XPath、唯一title/detail824283…、road0ep0标签/页f63fd948…全部门禁通过；网络1861ms、完整宿主启动执行退出6.141<120秒，默认TLS/无redirect/Auth/Cookie/只既有公开UA/流式256KiB/15s共享与单5s主动关闭代码逐项核，0设备/0脚本执行/0iframe脚本API媒体请求。root .dart_tool/aafun-public-page-execution-independent-review.json。实际源响应不再0GET，原capability结果不覆盖；这是静态来源证据，不是可播/修复通过。
+
+新发现：播放页1个纯JSON player_声明，url为159字符非HTTP/非直接媒体路径的编码状string（仅形状，不证明具体编码/加密算法或无隐含认证）；静态HTML只有9个外部script、无iframe，未匹配旧cd97591ad835的400指纹。不能把静态体与旧不同UA/时点的运行时DOM当同一响应，尚不能断400角色/唯一外因或据此写解析修复/改overlay。原根因缺口现在收窄至该声明由网页脚本生成/加载播放器和候选URL的链条，仍需可证同源脚本结构/具体候选反例；本包未执行网页脚本/解密/追加资源。raw URL/body未留，rawbody hash不可重放，旧失败/unknown不追认。
+
+退出：作者Windows专有job回执child余0/hostexit0、超时false；统筹独立CIM只读核8个记录job PIDs均无进程，没有设备或共享ADB操作。无代码/规则/工具修改或新构建。当前真实取证及回审已有终态，下一步须用这项具体源证据选择最小区分观察或修复，不再为内部入口反复停顿，也不重复旧TV/Gecko/现代矩阵。
+
 统筹已独立审核public-api-callsite-review.dart.txt/md，确认同版Plugin归一化摘要与完整RuleExecutionConfig映射、公有XPath准备/解析接口、detail/episode全SHA+标签在后请求前门禁成立。固定本地Dart静态分析No issues found，现有Flutter --no-pub宿主单例零网络smoke在首transport被显式stub阻止前通过原规则门禁，真实HttpClient构造可用并关闭；不是来源/播放通过。回执.dart_tool/aafun-public-api-callsite-independent-review.json。boundedGet/inspectInertHtml尚未实现，片段不当已具安全保证；已授权唯一owner仅在忽略的一次性来源诊断入口补齐这两个接缝并直接执行原33abbab4…固定3GET计划，不改批测runner/helper/生产代码或另建框架，不再因内部片段交付停主线。网络仅原120秒全包/HTTP共享15秒各5秒/真256KiB/绑定/无redirect与认证/挑战即停，传输与静态安全输出需交实际代码和原件供统筹回审；真实源结果仍未出。
 
 公共页取证能力预检：owner按原plan发现摘要helper只输出hash/不回真实URI，于任何HTTP前停（当前实际0GET，无设备）。统筹独立代码反证此并非生产能力缺失：既存ChapterSelectorDiagnostic._parse直接调用public XPathRuleStrategy.parseChapters返回Road.data真实链接，仅_summarize丢弃；prepareSearchRequest/parseSearch/prepareChapterRequest亦public。无需改摘要helper/更换XPath库或构建设备即可在同版生产API上内存接续正常发现。已给作者具体代码定位，要求先保原0HTTP停止结果，再交最小直接API取证调用片段供审，不请求网站/设备、不写通用框架/runner/生产代码；是否需现有Flutter tester承载须如实判断。实际网络仍未完成，不计来源新结果；统筹审核调用入口后才放行原3GET/120秒等边界，不让摘要形式的人为限制成为新工具维护主线。
