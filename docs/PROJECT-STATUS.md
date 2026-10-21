@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+21:15原full-ui-20594-modern-mxdm-v1在任何ADB/AVD/安装/界面/来源/采集前因历史共享PID19624已不存在且无adb.exe/5037监听停止，environment_invalid、全部运行层unattempted，133.982<480；AVD config/ini/userdata seed前后hash一致，无自有进程。统筹另host CIM与5037读回也为空，回执.dart_tool/full-ui-20594-env-independent-review.json，未发设备命令。旧PID消失不是来源或UI失败，也不是原授权撤销；首计划把共享历史PID写为必须活状态过严，不让人类再授权常规ADB初始化。
+
+已实际续派同一owner v2（.dart_tool/full-ui-modern-20594-plan-v2.json SHA debb6ed68dbe7bb7aeb4ead4d40ad4ea7c4ed9634efc14b1c826e8864fac6041）只明确现场ADB所有权：有服务则核实际固定binary/PID/creation/listener并保留；完全无服务且5037空闲可正常start-server一次<=5秒、在原setup120及总480内，记录新PID归属；不换端口/kill/reset旧共享服务/Windows服务。新daemon仅确认任务归属且无其它用户资源接入才收尾，否则保留并说明新共享身份，不能盲kill。原唯一AVD/20594/rule/正常UI目的与150准备/70source/60收尾等全部不变、不重置旧钟或追认旧包；原实际来源0，属于未执行必要验收的明确设置前提变化，不是重复已测源/unknown。TV仍不访问。新artifact full-ui-20594-modern-mxdm-v2，遇另一真实阻塞仍停止如实交，不自动加时换对象或工具修复。
+
 21:00统筹独立核完整UI x64候选20594，APK43ce167acdc42287a18ed528d42cced18a05393f62349cc8c7a2ccd32385ae1c/187563465B/0.4.5-parserqa.fullui.x64.1；真实v2原24f…证书、parserqa/min26/debug、19 ELF64 machine62/仅x86_64、唯一QA TV launcher/INET、kernel21d2c93d…等compiler app.dill及fullUI非batch入口、compiledActivity/Dex/固定Gecko AAR与omni均独立核。549源码及25旧APK live逐hash/缓存前后metadata/23自有build PID独立CIM全退；首次编译53.063秒/全334.942<1200。回执.dart_tool/full-ui-20594-artifact-independent-review.json。此包尚未运行，不能把产物当播放成果。
 
 已实际派唯一owner按root .dart_tool/full-ui-modern-20594-plan-v1.json SHA15d0ee80a7436882c91660a244e08488a250a6256eb718f44f45ae82c17579ca做一次新正常首页/VideoPage层验收，不访问TV或重跑解析矩阵。复用已核独立API36/x64 GoogleTV AVD/原路径归属和只读/no-snapshot，启动一次<=90/同证书原QA低版install-r20594一次<=45，设置身份合计120；新完整UI总绝对480，UI启动/规则盘点导入准备150，首次真实MXdm来源search至stop70，至少60收尾、父余不足130不启源。保既有QA数据/规则，原固定MXdm单JSON缺且无冲突才正常UI导入；SourceSheet自动queryAllSource，故来源前必须只有MXdm，否则unattempted停，不清其它规则或跑其它源。原作品/第01集/页d766…绑定、现代0Gecko、真实VideoPage首帧/10秒进度/活跃<=15秒低清最多2帧，普通metadata网络与source区分；输入导航障碍如实交，不新IME/helper/直达注入或修工具。真实挑战/unknown/错配/期限/清理不明停，不重试/补拍/别例；退出仅自有QA/AVD采集目标客户端并核端口/共享ADB/保护及负载。新UI层通过不替代ARM TV补救、AV/长稳验收，也不增加来源计数。
