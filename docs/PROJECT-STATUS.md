@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+公共页取证能力预检：owner按原plan发现摘要helper只输出hash/不回真实URI，于任何HTTP前停（当前实际0GET，无设备）。统筹独立代码反证此并非生产能力缺失：既存ChapterSelectorDiagnostic._parse直接调用public XPathRuleStrategy.parseChapters返回Road.data真实链接，仅_summarize丢弃；prepareSearchRequest/parseSearch/prepareChapterRequest亦public。无需改摘要helper/更换XPath库或构建设备即可在同版生产API上内存接续正常发现。已给作者具体代码定位，要求先保原0HTTP停止结果，再交最小直接API取证调用片段供审，不请求网站/设备、不写通用框架/runner/生产代码；是否需现有Flutter tester承载须如实判断。实际网络仍未完成，不计来源新结果；统筹审核调用入口后才放行原3GET/120秒等边界，不让摘要形式的人为限制成为新工具维护主线。
+
 容量错误续接：唯一播放owner01a15daa-21ef-7521-b795-cefd3cb916f1在任何输出/工具调用前因“Selected model is at capacity. Please try a different model.”失败，新取证目录不存在；不是HTTP/来源失败或已执行unknown。统筹保留已完成独立审核与33abbab4…固定plan，不重做；按用户继续请求在同一owner恢复原派工一次，不改模型、不另建会话或执行owner、不扩大120秒/3GET及保护边界。投递成功不算取证完成，若容量再次失败保留断点如实交付。
 
 2026-10-21 16:50香港时间接续：用户约定今日10点后恢复的临时暂停已过，沿原授权与唯一设备owner继续；原保护/停止条件保持。统筹独立审核aafun-page-client-analysis-v1原7JSON与三原trace/9处代码引用，作者源码/root仅换行等价，400在TV默认和现代trace与iframe src同48位指纹、角色仍未知；HTTP回调仅诊断，未证400直接致命/订阅晚接/已接受媒体却等待load的本例反例。回执.dart_tool/aafun-client-analysis-independent-review.json。实际0HTTP/0设备/0代码变更，作者final误回MXdm不当新结论，完整播放页正文/URI未保留，不能从指纹猜路径或盲改解析/overlay。
