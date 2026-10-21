@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+19:00统筹独立核tv20592-mxdm-active-picture-v1前检拒绝：同物理TV/QA20592 fullhash/UIDfirstInstall与三保护meta成立，但正式版实际前台/媒体会话1/音乐speaker11，不是原桌面/媒体0/音量8空闲场景。源案例unattempted、QA启动0/来源请求0/采集0/帧0，environment_invalid不是MXdm或画面播放失败，实际签名阶段未运行不补全前提。全包54.047<180秒，前后identity/QA与三保护fullmeta/前台/音乐/媒体/reverse/QA停逐字段相同，宿主所有权和共享ADB身份保持，CPU/time允许自然变化；未按键/切前台/停正式版/调音量或恢复旧8基线。回执.dart_tool/mxdm-picture-env-independent-review.json。CPU15.88%只属既存正式播放现场，不称后台全静；不自动重连轮询或抢占电视，待有实质空闲前提后才重开可见层。当前缺可见画面/声音AV完整TV UI的事实保持，已证native短播也不撤销。
+
+设备占用时继续独立客户端工作：拟由原唯一播放owner离线评估已验证QA补救到真实产品路径的具体最小集成差距（现有IVideoSourceService/工厂/生命周期、Gecko QA native通道与打包边界、可保持正式默认不变的QA-only完整UI接线），只交精确文件/可实现变更范围/已有反例可复用和所需决策；不写通用工具/大覆盖表、不设备/来源网络/构建安装/默认策略或schema变更。正式默认引入新内核仍需具体待决方案，不把QA原型当已交付正式修复；其他已授权可逆项可在独立review后推进。
+
 18:45统筹独立审aafun-public-player-script-v1：原PID6871日志0c227afe…的12742/12746两行恢复唯一detail全SHA824283…已独立重核，源07d8f425…/plan bf047780…冻结一致；真实detail/playpage/DOM第一后继同源script各GET一次均200，原rule/page/标签与script白名单cd8f1181…门禁成立。1046B application/javascript、网络2508ms、全包5.234<120、0设备/JS执行/媒体API iframe请求；回执.dart_tool/aafun-player-script-independent-review.json。encrypt枚举1仍不等编码语义；词法扫描前缀1而明确.url/解码/iframe关联0，仅本模式未检出，不能外推computed访问或脚本依赖、不能称具体消费者关系已证。原playbody SHA与前轮不同，脚本raw未留不可回放；无足够反例修代码/规则，停止继续逐个追脚本、解码声明或猜400根因。本aafun解析失败保留明确层和该缺口。宿主专有job余0/root独立CIM核8 PID均退出，未动设备/系统。
 
 下一必要真机验收是已成功原例的活跃可见画面缺层，不重跑解析矩阵或增加成功源计数：旧MXdm样本已证native首帧+10s正进度但截图晚于QA finally清_video，只黑底状态；统筹实核QA main确在first_frame阶段至finally前挂载Video，故在该窗口捕15s低清（仅视频、内部静音）可区分真实合成画面与仅native回调。新固定plan.dart_tool/tv-mxdm-active-picture-20592-v1.json SHAcc899b043e0398f9eb9c0fe15707caf4a2e8d9a0a358b438209a9e37b8479206，原MXdm作品/规则road0ep0第01集页d766…/显式10/25/max1/10s观察只id/group变更。原唯一owner执行，同physical/现装20592全hash/UID首次安装/provider/完整保护meta桌面音乐8/media0/他人使用先核；case70/全包180含60收尾，预检后剩余不足130不启case，不构建重装/改代码工具/系统音量。复用既有<=15s低清capture在first_frame等待期捕活跃窗口，主机提取至多两张实际时间可关联帧，不用cleanup后黑底代替；无音频/AV/完整TV产品UI验收承诺。任一失败unknown/envinvalid/challenge/身份或清理不明停，不重试/补拍/换源/加HTTP JS observer。结束仅停QA保包和自有capture，原保护/桌面/音量/provider/media/reverse与自有退出/CPU8读回；结果须统筹亲自view图像，才能收可见画面，不把旧未知追认。此为验收方法/层次的实质变化，非因换会话/时间重开。
