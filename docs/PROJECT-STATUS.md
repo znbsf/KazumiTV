@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+20:15统筹已独立审并集成作者fb6d4774 A片正常首页/VideoPage QA接线，root0e0179c2；14提交文件与作者/root实际正文绑定，现有default factory、batch main/runner/build、JS/依赖、换源预解析B/下载/health未改。重读逐请求headers/cache交接、普通显式15秒、双端profile和debug route钩子、共用退役队列/排队扣时/taint、Dart/native跨实例owner/token/迟到关闭守卫。固定本地工具链统筹独立121相关反例通过（9.729秒），改动面Dart分析无问题（8.590秒）；回执.dart_tool/qa-full-ui-source-independent-review.json。这是源码和本地服务反例通过，未有Kotlin编译/合并manifest/新APK或真实完整UI播放通过。
+
+已续派原唯一owner仅构建/核独立ARM fullUi20593候选（0.4.5-parserqa.fullui.1，target tools/qa/full_ui/main.dart，双端fullUi真/offline假，parserQa/debug/单ARMv7/min26，原24f…签名），原固定工具链/缓存/生成器，明确Flutter命令不改批测构建框架、不覆盖20592或正式产物；原状态预算总25分钟/主编译20分钟，若A片本地原生小错误最多两次修正且总预算不扩。冻结全部相关源码/JS/registrant前后及实际target/profile/manifest/ABI/签名绑定，交失败或候选原件与自有进程退出负载。禁止设备/AVD/ADB连接、安装启动、来源HTTP/播放/采集；电视正式版占用现场不动/不自动轮询。统筹独立候选review后再必要下一环境包，不能将构建成功当可播或正式修复。
+
 19:30统筹已独立审client-fallback-product-gap-review-20261021方案（df01d420…）：重核31源码作者/root hash及归一正文、5既有反例测试hash，并实读VideoPage具体服务/onLog耦合、接口30秒与具体15秒默认、headers/cache交接、route unawaited释放、QA wrapper退役与taint、Gecko跨实例通道和native/TV profile边界。回执.dart_tool/client-fallback-product-gap-independent-review.json。本轮只确认最小QA-only正常首页/VideoPage接线可实施，尚无源码实现、测试运行、构建或产品通过；B换源预解析/下载不在A片。
 
 已实际续派同一唯一播放owner在原作者树落实A片源码与必要本地反例，预算60分钟：中性注入保持普通显式15秒及原HTML机制，独立debug parserQa正握手完整UI，逐请求headers冻结/Gecko与player匹配，实验与普通分支共用route退役尾、排队计入同25秒，跨route通道租约/单调token及慢清理拒接管；现有fallback状态机/eligible/iframe-only/先退役/缓存守卫复用。固定工具链只做相关本地测试与静态分析，不构建APK/安装/连接设备AVD/来源HTTP/播放，不改runner/schema/规则或正式默认内核策略。交可审查小提交后由统筹独立审，不能将方案或单测当真实产品修复；实施过大时交具体已完成片与障碍不扩架构。TV仍正式版占用，不自动轮询空闲/抢占或恢复旧音量8；当前用户现场保持。
