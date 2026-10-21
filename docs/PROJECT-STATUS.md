@@ -1,5 +1,35 @@
 # KazumiTV 当前状态
 
+## 2026-10-22 两小时最终交付：QA20597 真机首次播放通过
+
+用户窗口为10月21日23:51:07至10月22日01:51:07香港时间，未重置；本轮在窗口内完成实测、可证修复和原例复验。17源逐项结果见主树[最终报告](C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/REPORT.md)：13源有有限可播样本，分别为原默认5、QA补救4、现有换线路3、原规则当前网络恢复1；AGE/dalvdm/aafun/LMM仍无可播样本。复用了既有11源，没有把浏览器200、构建或单测当播放成果。
+
+本轮新增sorani原第01集完整UI画面00:27→00:50；白猫现有第二线路第1集02:49→03:40，原线404保持。AGE当前电脑403、dalvdm明确Cloudflare封禁、aafun两条当前站内播放器均报错；无规则overlay。LMM原实际挑战未重试。B的正常同集换源在20595/API36和20596/真实电视均有新源首帧与正进度，不把仅换线算原线路修复。
+
+本次真实源码修复 `4b3ed3388faa67e5081de257ebca6fc45ead2a75`：20596电视冷首次被Gecko初始化挤占25秒解析限而失败，暖重试则成功；因此仅独立debug/fullUI/旧WebView66在正握手后提前启动runtime，先reply再post、共享进程runtime，不预开页面/租约、不扩大10/25/max1、不改正式默认内核。31项聚焦测试、定向分析、独立审阅和真实Kotlin/APK编译通过。
+
+**最终候选**：[KazumiTV-ParserQA-20597-armv7.apk](C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/two-hour-20261021/final-armv7-20597/KazumiTV-ParserQA-20597-armv7.apk)，`com.znbsf.kazumi.fluttertv.parserqa / 0.4.5-parserqa.fullui.arm.4 / 20597`，172466864 B，SHA256 `1a8948745b952308aa5b4da8ad798f9a8331a1cab1d9f3a457145641c74edb69`。签名/manifest/ARM ELF/kernel/Dart及native预热标记/zipalign、电视安装APK实hash均核对通过。20596保留为冷失败反例，不作为最终推荐。
+
+20597在实际MiTV Android9/API28/ARMv7/WebView66正常冷进程中，原MXdm《学生会也有洞！》第01集第一次进入（未按Retry）解析20.565秒，原生首帧随后到达，统筹亲自看见动画05:09→06:38/24:14，实际 `mediacodec_embed/mediacodec/hardware=true`。C完成安装启动，root接过唯一设备操作并完成原例/恢复；本进程只有一次episode-entry。进入来源前有较长导航/交接，不作快速启动性能结论；25秒为解析限，首帧等待独立。原件[最终真机结果](C:/Users/hentai/Documents/Kazumi/artifacts/source-catalog-playback-20261020/two-hour-20261021/C-TV-20597/observed-results.json)。
+
+截至00:51香港时间，临时QA规则逐字节恢复、QA及本任务logcat已停，专用AVD/构建进程无残留，保留共享ADB。电视回原正式首页/同焦点，正式APK/UID/版本/安装时间一致，实际音乐speaker音量仍11。主树dirty、作者树dirty docs、个人preview及真实数据未操作；音频听感/同步、长稳、内存和整站全部线路未验。本轮已停止扩实验；现有kazumi续跑自动化已置PAUSED并读回，原目标聊天/prompt/schedule保持，无自动续跑。
+
+## 两小时过程记录（历史阶段，以上述最终交付为准）
+
+新会话 `01a15f2b-885f-7821-a173-ecfd9e2dd147` 按用户直接授权并行执行；交接计时不重置。集成树为本树，三条同聊天子任务分别处理 AGE/sorani/dalvdm、aafun/baimao、正常 QA UI；仅 C 操作设备。沿用下文既有 11 源有限正例，不扩量重测，不维护批测框架。正式版、个人 preview、主树 dirty 保持。
+
+本次必要新增观察：20595 上次只到首页、来源根本未进入，因此继续正常 UI 找实际入口并验 7sefun→MXdm 换源；五个无可播源采用当前正常网站请求，区分传输拒绝、规则结构、实际播放器和媒体端点。旧 timeout/404/未执行原样保留；只有新响应或具体结构反例支持时才改代码或规则。各路线遇决定性拒绝、真实挑战或无新增证据即停该路线；截止前保留恢复与交付时间。
+
+00:20 真机新增冷/暖反例：电视当前正式首页/无活跃播放，独立QA20596正常覆盖及完整UI进入MXdm原第01集。冷首次WebView66失败后，Gecko runtime启动使实际PageStart迟至约20秒，25秒内无media，UI解析超时，保留fail。同进程只做一次正常重试，00:19:12.536开始→00:19:27.447解析媒体（14.9秒，不加期限）→00:19:40.744原生首帧并有动画。因此20596不能作为冷启动已通过候选。原件在 `two-hour-20261021/C-TV-20596/`。本次确切新变量为完整UI的惰性Gecko冷启动；支持QA-only提前启动runtime的最小修复，不支持扩25秒或改源。A只改QA native，B独立只读审，统筹构建后C冷进程正常首次进入复验；不打开预热页面、不预占会话/租约，现代/批测/生产保持，预算15分钟实现及一轮必要新ARM构建，决定性失败或无新证据即交准确限制。
+
+00:08 已有真实新增结果：20595/API36 完整 UI 的 7sefun《学生会也有洞！》第01集实播 00:34→00:49；正常播放设置换 MXdm 同集、确认继续255秒，旧播放器保持到新解析完成才退出，MXdm 原生首帧 UTC16:04:21.166，动画两帧 04:26→04:58/24:14 已由统筹亲自查看。B 换源路径实际通过，403 属弹幕。sorani 原规则同作品第01集也已正常搜索/集表/解析/原生首帧及动画 00:27→00:50/23:40；未改规则或代理，归旧 TLS 失败本次不复现，不归代码修复。原始日志、截图在主树 `artifacts/source-catalog-playback-20261020/two-hour-20261021/C-full-ui-20595/`。未验音频或长稳。
+
+A/B 网站新证据：AGE 当前 TLS 建立后 HTTP403，正文 `Bad gateway 502!`；dalvdm HTTP403 明确 Cloudflare 封禁页；aafun 原第01话及另一现有线路，实际站内播放器分别报“播放地址错误”与“解析出错”，均无媒体；白猫原第一线路同媒体仍404，现有第二线路浏览器已实际解码播放至55秒，Android QA 正在验。没有支持的规则 overlay；A 核官方当前三源文件与固定目录 blob 相同。精简原件索引 `.dart_tool/two-hour-A/result.json`、`.dart_tool/two-hour-B/result.json`；共享浏览器 Space3 已关闭。
+
+统筹在本集成树正常构建 ARMv7 完整 UI QA20596，89.5秒编译成功；`final-armv7-20596/KazumiTV-ParserQA-20596-armv7.apk`（上述同一 two-hour 证据根），SHA256 `cd52d2868fcc07e420553ec72418e51b9a6da9c6a374d9f79b1af39ed42fd993`，172465332 B，`0.4.5-parserqa.fullui.arm.3`。apksigner v2 原24f证书、aapt 包名/版本/min26/ARMv7、19个ARM ELF、完整UI非batch及两个B实际kernel标记、zipalign已独立读回。源码HEAD98fb254d、产品路径干净、生成注册表cc39…与已验证debug集合一致；尚未以ARM实播通过替代后续设备结论。
+
+剩余必要验证按单设备 owner 顺序执行：先完成白猫现有第二线路；电视仅一次只读确认，仍使用即不操作。若电视空闲，20596 同签覆盖独立 parserqa 并验原 MXdm；若占用，可复用已确认归属的旧 `Kazumi_App_Android9` 只读 AVD、现成20595，只验 MXdm 第01集的正常完整UI补救。后者的新变量是 A+B/fullUI 接线层，旧批测的解析成功不证明此层已通过；只区分新正常UI是否真正走10/25秒补救并到首帧，不扩旧11源。预算15分钟，身份/归属不明、决定性失败或无新证据即停，不创建新设备；结束恢复本任务QA临时规则并退出自有AVD。仿真通过仍不能冒称ARM/实体声画通过。
+
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
 最新23:41作者终态已消费（turn01a15f0b-6209-7610-b2ce-a5672bd20a14/cursor86e0fe00-ab7d-40ea-b93d-63add37e744b:76 idle）：full-ui-20595-source-switch-v1实际完成安装/两规则准备，仅到正常首页，7sefun初播和MXdm换源均not_run；23:29:43原日志Bangumi热门列表连接超时仅属于首页元数据，不当MXdm/source失败。completion1270.251>900超370.251，不能称执行达标或播放修复已验。作者交QA规则byteexact恢复/QA停/原AVD退出/seed/保护保持；统筹本轮已读completion及stop-restore，完整日志/截图/退出独立回审仍待，不能把作者恢复结论当root亲测。旧MXdm20594可见画面正例保持，B源码和20595产物通过与本次实播未运行分层。停止本包不自动重播/换探针/修工具；先回审真实卡点，保正式版/TV与原授权。

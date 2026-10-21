@@ -9,6 +9,7 @@
 - 固定UA须取自App实际配置。7sefun对手机UA跳下载页、桌面UA返回播放页；这种失败先归测试条件，不归内核。保留最终URL/页面结构的有界对照，不重新走电视403路线。
 - 不能只看跨平台参数名判断注入范围：当前inappwebview插件的 forMainFrameOnly 仅iOS/macOS有效，Android document-start注入全部匹配框架。Gecko要同等覆盖并通过跨域iframe正例后再比较来源成功率。MAIN world桥接仍按当前GeckoSession和代次隔离，候选经原URL校验。
 - 相同案例必须核对剧集页摘要、规则内容、UA与实际provider；进程冷不代表DNS/扩展安装冷。PSS要记录进程覆盖、采样间隔及缺失；debug整包峰值不能当正式版内核增量。未执行/无匹配/解析/首帧分开；本次结果与撤销假设见 [当前状态](PROJECT-STATUS.md)，复用工具契约见 [批量QA](../tools/qa/source_batch/README.md)。
+- 完整UI的惰性内核初始化也会消耗解析期限；同进程暖重试通过不能覆盖第一次冷解析失败。先分开runtime创建、异步启动完成、真实PageStart、媒体解析和原生首帧。若证据支持提前初始化，只在已明确准入的独立QA启动，先完成能力握手再post，重核Activity/通道归属，不预开页面或占租约、不延长原解析限。runtime创建返回不代表所有异步启动完成；进程复用、快速启动性能和实际播放须分别验证。原冷/暖反例、最小修复和同原例复验只保留在[当前状态](PROJECT-STATUS.md)。
 
 ## 2026-10-18 故障分路与固定测试签名
 
