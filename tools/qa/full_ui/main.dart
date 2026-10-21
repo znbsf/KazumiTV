@@ -76,6 +76,21 @@ Future<Map<Object?, Object?>> readQaFullUiCapability({
   }
 }
 
+/// Start only the eligible native runtime after the full profile handshake.
+/// No parser lease, page, headers or playback budget is created by this call.
+/// Unsupported/slow warmup must never prevent the ordinary UI from starting.
+Future<void> requestQaFullUiRuntimeWarmup({
+  required bool profileAllowed,
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  if (!profileAllowed) return;
+  try {
+    await qaChannel.invokeMethod<bool>('qaWarmRuntime').timeout(timeout);
+  } catch (_) {
+    // Native startup remains optional; the existing bounded resolver still runs.
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   var allowed = false;
@@ -106,6 +121,7 @@ Future<void> main() async {
     ));
     return;
   }
+  unawaited(requestQaFullUiRuntimeWarmup(profileAllowed: allowed));
   final retirement = QaUiRetirementGate();
   // ignore: invalid_use_of_visible_for_testing_member
   debugVideoPageControllerBuilder = (history, downloads, manager) {

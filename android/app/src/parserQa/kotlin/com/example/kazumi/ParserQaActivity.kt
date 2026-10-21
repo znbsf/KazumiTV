@@ -2,6 +2,10 @@ package com.example.kazumi
 
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.webkit.WebView
 import android.view.KeyEvent
 import android.view.View
@@ -28,10 +32,12 @@ class ParserQaActivity : MainActivity() {
         val channelOwners = IdentityHashMap<BinaryMessenger, ParserQaActivity>()
         var geckoBridgeOwner: ParserQaActivity? = null
         val nextGeckoOwner = AtomicLong(0)
+        // GeckoRuntime is process-wide; Activity recreation must reuse it.
+        var runtime: GeckoRuntime? = null
     }
     private lateinit var channel: MethodChannel
     private var bridgeMessenger: BinaryMessenger? = null
-    private var runtime: GeckoRuntime? = null
+    private var runtimePrewarmScheduled = false
     private var session: GeckoSession? = null
     private var extension: WebExtension? = null
     private var generation = 0
@@ -70,6 +76,11 @@ class ParserQaActivity : MainActivity() {
                 check(ownsChannel())
                 when (call.method) {
                     "qaUiCapability" -> result.success(fullUiCapability())
+                    "qaWarmRuntime" -> {
+                        val eligible = geckoRuntimePrewarmEligible()
+                        result.success(eligible)
+                        if (eligible) scheduleGeckoRuntimePrewarm()
+                    }
                     "launchProbeStage" -> {
                         val probe = launchProbe ?: error("qa_launch_only_disabled")
                         probe.dartStage(call.arguments as Map<*, *>)
@@ -138,8 +149,7 @@ class ParserQaActivity : MainActivity() {
                     "geckoInit" -> {
                         val owner = (call.argument<Number>("owner") ?: error("gecko_owner_missing")).toLong()
                         check(geckoBridgeOwner === this@ParserQaActivity && geckoOwner == owner)
-                        val rt = runtime ?: GeckoRuntime.create(applicationContext,
-                            GeckoRuntimeSettings.Builder().consoleOutput(false).build()).also { runtime = it }
+                        val rt = getOrCreateGeckoRuntime()
                         rt.webExtensionController.ensureBuiltIn(
                             "resource://android/assets/parserqa/", "parserqa@kazumi.local"
                         ).accept({ ext ->
@@ -236,6 +246,44 @@ class ParserQaActivity : MainActivity() {
         "package" to packageName, "activity" to javaClass.name,
         "debug" to BuildConfig.DEBUG, "full_ui" to BuildConfig.QA_FULL_UI,
         "tv" to BuildConfig.IS_TV_BUILD, "offline" to BuildConfig.QA_LAUNCH_ONLY)
+    private fun getOrCreateGeckoRuntime(): GeckoRuntime = runtime ?: GeckoRuntime.create(
+        applicationContext, GeckoRuntimeSettings.Builder().consoleOutput(false).build()
+    ).also { runtime = it }
+
+    private fun geckoRuntimePrewarmEligible(): Boolean {
+        if (!BuildConfig.DEBUG || !BuildConfig.QA_FULL_UI ||
+            !BuildConfig.IS_TV_BUILD || BuildConfig.QA_LAUNCH_ONLY ||
+            packageName != "com.znbsf.kazumi.fluttertv.parserqa" ||
+            !ownsChannel() || isFinishing || isDestroyed) return false
+        return try {
+            val provider = WebView.getCurrentWebViewPackage()
+            provider?.packageName in setOf("com.android.webview", "com.google.android.webview") &&
+                Regex("^66\\.\\d+\\.\\d+\\.\\d+$").matches(provider?.versionName ?: "")
+        } catch (error: Exception) {
+            Log.w("ParserQaGecko", "prewarm_skipped ${error.javaClass.simpleName}")
+            false
+        }
+    }
+
+    private fun scheduleGeckoRuntimePrewarm() {
+        if (runtimePrewarmScheduled) return
+        runtimePrewarmScheduled = true
+        // The explicit warm-up reply has already returned. Runtime creation
+        // opens no Session/URL and acquires no lease.
+        Handler(Looper.getMainLooper()).post {
+            if (!geckoRuntimePrewarmEligible()) return@post
+            try {
+                val started = SystemClock.elapsedRealtime()
+                val reused = runtime != null
+                Log.i("ParserQaGecko", "prewarm_start reused=$reused")
+                getOrCreateGeckoRuntime()
+                Log.i("ParserQaGecko", "prewarm_ready reused=$reused elapsed_ms=${SystemClock.elapsedRealtime() - started}")
+            } catch (error: Exception) {
+                // Prewarming is optional; keep the normal geckoInit path usable.
+                Log.w("ParserQaGecko", "prewarm_failed ${error.javaClass.simpleName}")
+            }
+        }
+    }
     private fun closeSession() {
         generation++
         session?.let { it.stop(); it.close() }

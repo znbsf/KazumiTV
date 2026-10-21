@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import '../tools/qa/full_ui/main.dart'
-    show qaFullUiProfileAllowed, readQaFullUiCapability;
+    show
+        qaFullUiProfileAllowed,
+        readQaFullUiCapability,
+        requestQaFullUiRuntimeWarmup;
 import '../tools/qa/source_batch/gecko_controller.dart' show qaChannel;
 
 const _package = 'com.znbsf.kazumi.fluttertv.parserqa';
@@ -123,5 +126,50 @@ void main() {
     final facts = await readQaFullUiCapability();
     expect(allowed(native: facts), isFalse);
     expect(reads, 1);
+  });
+
+  test('runtime warmup is requested once only after the positive handshake',
+      () async {
+    final calls = <String>[];
+    messenger.setMockMethodCallHandler(qaChannel, (call) async {
+      calls.add(call.method);
+      if (call.method == 'qaUiCapability') return _native;
+      if (call.method == 'qaWarmRuntime') return true;
+      throw StateError('Unexpected native operation');
+    });
+    await requestQaFullUiRuntimeWarmup(profileAllowed: false);
+    expect(calls, isEmpty);
+    final facts = await readQaFullUiCapability();
+    await requestQaFullUiRuntimeWarmup(profileAllowed: allowed(native: facts));
+    expect(calls, ['qaUiCapability', 'qaWarmRuntime']);
+  });
+
+  test('unsupported or failed runtime warmup cannot fail UI bootstrap',
+      () async {
+    for (final error in <Object>[
+      MissingPluginException(),
+      PlatformException(code: 'qa_error'),
+    ]) {
+      messenger.setMockMethodCallHandler(qaChannel, (_) async => throw error);
+      await expectLater(
+          requestQaFullUiRuntimeWarmup(profileAllowed: true), completes);
+    }
+  });
+
+  test('unanswered warmup is bounded and a late reply creates no new request',
+      () async {
+    var calls = 0;
+    final reply = Completer<bool>();
+    messenger.setMockMethodCallHandler(qaChannel, (_) {
+      calls++;
+      return reply.future;
+    });
+    await expectLater(
+        requestQaFullUiRuntimeWarmup(
+            profileAllowed: true, timeout: const Duration(milliseconds: 20)),
+        completes);
+    reply.complete(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 1);
   });
 }
