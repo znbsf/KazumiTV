@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+23:15统筹独立核B候选20595：APK11b844b2025e040ef9e942557b5dcef4a77a47628d77e21a887b63f3f84787b6/187563233B/0.4.5-parserqa.fullui.x64.2，独立apksigner v2原24f证书/aapt min26版本与19唯一x64 ELF；kernel dd9f4667…等真实编译app.dill含preparedHeaders/_lastResolvedHeaders等B实际标记、完整UI非batch，DEX QA协议/唯一TV QA launcher/INET/固定omni核。549源/35旧APK live重hash与cache metadata一致，21记录buildPID rootCIM为空；首次编译58.094秒/全包524.696<1200。回执.dart_tool/full-ui-20595-artifact-independent-review.json。原class路径检查误指20594未保存的.class文件，改比已独立核旧native hash，不当产物错误。新候选尚未运行。
+
+下一必要验收是B改变的正常“保留旧播放→预解析→同集换源提交”路径，不重做MXdm初次进入正例。固定 .dart_tool/full-ui-20595-source-switch-plan-v1.json，原只读API36 AVD/现成20595、原作品《学生会也有洞！》第01集：正常先7sefun播放，再一次VideoPage换源至MXdm同集承接当前进度。仅原两条pinned规则；备份QA固定plugins.json后临时准备两规则并读回、收尾逐字节恢复，不折腾文件选择器/长文本导入、不删真实用户数据或动TV。总900秒含设置/收尾，初次源70秒/打开换源起70秒，至少90秒收尾；App普通15/30不加，现代0Gecko，原源失败就停不换起点/重试，不故障注入。最多2张实际换源后活跃帧/既有15秒低清无audio，原日志与来源/作品/集数/offset/progress、最远失败层分列；缺旧URI全hash保留不阻止实际正常UI观察，不补AV/ARM/长稳。唯一owner执行，原保护/共享ADB/AVD seed与自有退出须核；不自动下一包。
+
 23:00统筹独立审B源码并集成：作者761945149c8ba7d68ec50eae5ab3f4257e1018a9/root92ab9731，10文件commit/root/作者逐正文绑定；实读selected headers→optional callback→prepared→commit/rollback与Referer、缓存原头、SourceSheet中性factory和QA独立binding共享退役gate。独立重跑98相关反例7.081秒全过，9改面Dart分析7.486秒无问题；回执.dart_tool/source-switch-B-independent-review.json。此修复源码已实现，不再仅方案；普通SourceSheet30/VideoPage15、QA10/25max1与原native资格不变。未注入普通WebView UA仍不声称与native相同；不当某来源唯一根因。旧20593/20594不含B，新APK/实际换源UI/ARM/AV仍未验，正式默认内核未改。
 
 下一仅将同76194514代码构建一个独立x64 fullUI20595（0.4.5-parserqa.fullui.x64.2）供后续必要换源路径验收，仍固定target tools/qa/full_ui/main.dart/parserQa/debug/fullUi双端真offline假/单x86_64/min26/原24f签名。只版本ABI既存正常build输入变化，保旧APK/dirty docs/固定依赖；总20分钟主编译15分钟、失败准确交不盲修。核实际commit/target/profile/kernel/manifest/签名与新候选hash，旧candidate与源码依赖摘要不变，自有构建退出；无设备ADB/AVD/TV/HTTP/播放。无需重做大旧表/smoke/工具框架，新候选交审后才另定单次实际换源验收，不自动下一包。
