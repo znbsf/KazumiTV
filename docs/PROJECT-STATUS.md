@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+最新23:41作者终态已消费（turn01a15f0b-6209-7610-b2ce-a5672bd20a14/cursor86e0fe00-ab7d-40ea-b93d-63add37e744b:76 idle）：full-ui-20595-source-switch-v1实际完成安装/两规则准备，仅到正常首页，7sefun初播和MXdm换源均not_run；23:29:43原日志Bangumi热门列表连接超时仅属于首页元数据，不当MXdm/source失败。completion1270.251>900超370.251，不能称执行达标或播放修复已验。作者交QA规则byteexact恢复/QA停/原AVD退出/seed/保护保持；统筹本轮已读completion及stop-restore，完整日志/截图/退出独立回审仍待，不能把作者恢复结论当root亲测。旧MXdm20594可见画面正例保持，B源码和20595产物通过与本次实播未运行分层。停止本包不自动重播/换探针/修工具；先回审真实卡点，保正式版/TV与原授权。
+
 23:15统筹独立核B候选20595：APK11b844b2025e040ef9e942557b5dcef4a77a47628d77e21a887b63f3f84787b6/187563233B/0.4.5-parserqa.fullui.x64.2，独立apksigner v2原24f证书/aapt min26版本与19唯一x64 ELF；kernel dd9f4667…等真实编译app.dill含preparedHeaders/_lastResolvedHeaders等B实际标记、完整UI非batch，DEX QA协议/唯一TV QA launcher/INET/固定omni核。549源/35旧APK live重hash与cache metadata一致，21记录buildPID rootCIM为空；首次编译58.094秒/全包524.696<1200。回执.dart_tool/full-ui-20595-artifact-independent-review.json。原class路径检查误指20594未保存的.class文件，改比已独立核旧native hash，不当产物错误。新候选尚未运行。
 
 下一必要验收是B改变的正常“保留旧播放→预解析→同集换源提交”路径，不重做MXdm初次进入正例。固定 .dart_tool/full-ui-20595-source-switch-plan-v1.json，原只读API36 AVD/现成20595、原作品《学生会也有洞！》第01集：正常先7sefun播放，再一次VideoPage换源至MXdm同集承接当前进度。仅原两条pinned规则；备份QA固定plugins.json后临时准备两规则并读回、收尾逐字节恢复，不折腾文件选择器/长文本导入、不删真实用户数据或动TV。总900秒含设置/收尾，初次源70秒/打开换源起70秒，至少90秒收尾；App普通15/30不加，现代0Gecko，原源失败就停不换起点/重试，不故障注入。最多2张实际换源后活跃帧/既有15秒低清无audio，原日志与来源/作品/集数/offset/progress、最远失败层分列；缺旧URI全hash保留不阻止实际正常UI观察，不补AV/ARM/长稳。唯一owner执行，原保护/共享ADB/AVD seed与自有退出须核；不自动下一包。
