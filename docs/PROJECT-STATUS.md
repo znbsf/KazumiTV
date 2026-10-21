@@ -2,6 +2,10 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+19:30统筹已独立审client-fallback-product-gap-review-20261021方案（df01d420…）：重核31源码作者/root hash及归一正文、5既有反例测试hash，并实读VideoPage具体服务/onLog耦合、接口30秒与具体15秒默认、headers/cache交接、route unawaited释放、QA wrapper退役与taint、Gecko跨实例通道和native/TV profile边界。回执.dart_tool/client-fallback-product-gap-independent-review.json。本轮只确认最小QA-only正常首页/VideoPage接线可实施，尚无源码实现、测试运行、构建或产品通过；B换源预解析/下载不在A片。
+
+已实际续派同一唯一播放owner在原作者树落实A片源码与必要本地反例，预算60分钟：中性注入保持普通显式15秒及原HTML机制，独立debug parserQa正握手完整UI，逐请求headers冻结/Gecko与player匹配，实验与普通分支共用route退役尾、排队计入同25秒，跨route通道租约/单调token及慢清理拒接管；现有fallback状态机/eligible/iframe-only/先退役/缓存守卫复用。固定工具链只做相关本地测试与静态分析，不构建APK/安装/连接设备AVD/来源HTTP/播放，不改runner/schema/规则或正式默认内核策略。交可审查小提交后由统筹独立审，不能将方案或单测当真实产品修复；实施过大时交具体已完成片与障碍不扩架构。TV仍正式版占用，不自动轮询空闲/抢占或恢复旧音量8；当前用户现场保持。
+
 19:00统筹独立核tv20592-mxdm-active-picture-v1前检拒绝：同物理TV/QA20592 fullhash/UIDfirstInstall与三保护meta成立，但正式版实际前台/媒体会话1/音乐speaker11，不是原桌面/媒体0/音量8空闲场景。源案例unattempted、QA启动0/来源请求0/采集0/帧0，environment_invalid不是MXdm或画面播放失败，实际签名阶段未运行不补全前提。全包54.047<180秒，前后identity/QA与三保护fullmeta/前台/音乐/媒体/reverse/QA停逐字段相同，宿主所有权和共享ADB身份保持，CPU/time允许自然变化；未按键/切前台/停正式版/调音量或恢复旧8基线。回执.dart_tool/mxdm-picture-env-independent-review.json。CPU15.88%只属既存正式播放现场，不称后台全静；不自动重连轮询或抢占电视，待有实质空闲前提后才重开可见层。当前缺可见画面/声音AV完整TV UI的事实保持，已证native短播也不撤销。
 
 设备占用时继续独立客户端工作：拟由原唯一播放owner离线评估已验证QA补救到真实产品路径的具体最小集成差距（现有IVideoSourceService/工厂/生命周期、Gecko QA native通道与打包边界、可保持正式默认不变的QA-only完整UI接线），只交精确文件/可实现变更范围/已有反例可复用和所需决策；不写通用工具/大覆盖表、不设备/来源网络/构建安装/默认策略或schema变更。正式默认引入新内核仍需具体待决方案，不把QA原型当已交付正式修复；其他已授权可逆项可在独立review后推进。
