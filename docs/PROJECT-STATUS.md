@@ -2,6 +2,8 @@
 
 ## 最新授权与续跑安排：2026-10-20香港时间14:00起，允许实体电视及模拟器QA
 
+统筹已独立审核public-api-callsite-review.dart.txt/md，确认同版Plugin归一化摘要与完整RuleExecutionConfig映射、公有XPath准备/解析接口、detail/episode全SHA+标签在后请求前门禁成立。固定本地Dart静态分析No issues found，现有Flutter --no-pub宿主单例零网络smoke在首transport被显式stub阻止前通过原规则门禁，真实HttpClient构造可用并关闭；不是来源/播放通过。回执.dart_tool/aafun-public-api-callsite-independent-review.json。boundedGet/inspectInertHtml尚未实现，片段不当已具安全保证；已授权唯一owner仅在忽略的一次性来源诊断入口补齐这两个接缝并直接执行原33abbab4…固定3GET计划，不改批测runner/helper/生产代码或另建框架，不再因内部片段交付停主线。网络仅原120秒全包/HTTP共享15秒各5秒/真256KiB/绑定/无redirect与认证/挑战即停，传输与静态安全输出需交实际代码和原件供统筹回审；真实源结果仍未出。
+
 公共页取证能力预检：owner按原plan发现摘要helper只输出hash/不回真实URI，于任何HTTP前停（当前实际0GET，无设备）。统筹独立代码反证此并非生产能力缺失：既存ChapterSelectorDiagnostic._parse直接调用public XPathRuleStrategy.parseChapters返回Road.data真实链接，仅_summarize丢弃；prepareSearchRequest/parseSearch/prepareChapterRequest亦public。无需改摘要helper/更换XPath库或构建设备即可在同版生产API上内存接续正常发现。已给作者具体代码定位，要求先保原0HTTP停止结果，再交最小直接API取证调用片段供审，不请求网站/设备、不写通用框架/runner/生产代码；是否需现有Flutter tester承载须如实判断。实际网络仍未完成，不计来源新结果；统筹审核调用入口后才放行原3GET/120秒等边界，不让摘要形式的人为限制成为新工具维护主线。
 
 容量错误续接：唯一播放owner01a15daa-21ef-7521-b795-cefd3cb916f1在任何输出/工具调用前因“Selected model is at capacity. Please try a different model.”失败，新取证目录不存在；不是HTTP/来源失败或已执行unknown。统筹保留已完成独立审核与33abbab4…固定plan，不重做；按用户继续请求在同一owner恢复原派工一次，不改模型、不另建会话或执行owner、不扩大120秒/3GET及保护边界。投递成功不算取证完成，若容量再次失败保留断点如实交付。
