@@ -3,7 +3,7 @@
 为 Android TV 和遥控器设计的动画浏览与播放应用。
 基于 **[Predidit/Kazumi](https://github.com/Predidit/Kazumi)**：延续上游的 Flutter/Dart 业务、规则与 media-kit 播放能力，结合本仓库原生 TV 版本的布局和交互工作，形成当前 Flutter TV 融合版。**本项目是独立衍生项目，不是上游官方 TV 版本。**
 
-[下载 0.4.4 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.4) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
+[下载 0.4.5 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.5) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
 
 维护入口：[当前项目状态](docs/PROJECT-STATUS.md) · [开发经验](docs/ENGINEERING-LESSONS.md)
 
@@ -41,6 +41,13 @@
 
 截图保留实际界面，仅压缩图片体积；[截图来源与说明](docs/screenshots/v0.4.3/README.md)。截图不代表所有来源、设备或长时间播放均已验证。
 
+## 0.4.5 播放修复
+
+- 有界跟随后续播放页，并在失败时一次复用近期首帧确认的同集地址缓存。
+- 特定 HHJX 补救按实际故障条件判断，正常解析优先，不按 Android/WebView 版本号推测。
+- 换源提交和失败回滚保持原 UA/Referer；日志容忍非法百分号编码。
+- [发布说明与已测范围](docs/RELEASE-0.4.5.md)。QA/Gecko 实验与规则 overlay 未进入本版。
+
 ## 0.4.4 新功能
 
 以下功能已随 **0.4.4** 发布。完整变化见 [0.4.4 发布说明](docs/RELEASE-0.4.4.md)。
@@ -61,15 +68,15 @@
 
 ## 下载与安装
 
-当前正式版：**0.4.4**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
+当前正式版：**0.4.5**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
 
-0.4.4 加入手机遥控、7 天配对、数字续播、实验性源健康、播放诊断与 GitHub 应用更新；完整范围和验收边界见 [0.4.4 发布说明](docs/RELEASE-0.4.4.md)。
+0.4.5 修复有界后续播放页解析、特定 HHJX 故障补救、换源请求头快照与日志容错；保留 0.4.4 的手机遥控与 GitHub 应用更新。完整范围和验收边界见 [0.4.5 发布说明](docs/RELEASE-0.4.5.md)。
 
 | 安装包 | 适用系统 |
 |---|---|
-| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.4/KazumiTV-0.4.4-armeabi-v7a.apk) | 32 位 ARM Android |
-| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.4/KazumiTV-0.4.4-arm64-v8a.apk) | 64 位 ARM Android |
-| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.4/KazumiTV-0.4.4-x86_64.apk) | x86_64 Android / 模拟器 |
+| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.5/KazumiTV-0.4.5-armeabi-v7a.apk) | 32 位 ARM Android |
+| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.5/KazumiTV-0.4.5-arm64-v8a.apk) | 64 位 ARM Android |
+| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.5/KazumiTV-0.4.5-x86_64.apk) | x86_64 Android / 模拟器 |
 
 1. 下载并侧载 APK，在启动器打开 **KazumiTV**。
 2. 首次启动按引导准备规则与播放来源，再从作品详情选择来源和剧集。
