@@ -44,12 +44,14 @@ class SourceSheet extends StatefulWidget {
       required this.infoController,
       this.autoSearchOnOpen = true,
       this.switchOrigin,
-      this.createVideoSourceService});
+      this.createVideoSourceService,
+      this.createSourceSwitchResolver});
 
   final InfoController infoController;
   final bool autoSearchOnOpen;
   final SourceSwitchOrigin? switchOrigin;
   final IVideoSourceService Function()? createVideoSourceService;
+  final SourceSwitchResolver Function()? createSourceSwitchResolver;
 
   @override
   State<SourceSheet> createState() => _SourceSheetState();
@@ -213,9 +215,10 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
           transfer: transfer,
           allowHistoryResume: false,
         );
-        final resolver = _switchResolver ??= SourceSwitchResolver(
-            widget.createVideoSourceService?.call() ??
-                WebViewVideoSourceService());
+        final resolver = _switchResolver ??=
+            widget.createSourceSwitchResolver?.call() ??
+                SourceSwitchResolver(widget.createVideoSourceService?.call() ??
+                    WebViewVideoSourceService());
         final prepared = await task.loading(
           message: '正在解析新源，原播放保持不变',
           onCancel: resolver.cancel,

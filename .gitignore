@@ -57,3 +57,6 @@ android/build/reports/problems/
 **/macos/Pods/
 **/ios/Podfile.lock
 **/macos/Podfile.lock
+
+# Generated QA parser mirrors production source.
+android/app/src/parserQa/assets/parserqa/parser.generated.js

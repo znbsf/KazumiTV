@@ -1,0 +1,8 @@
+{
+  "cases": [
+    {"id":"dm84-dark-ep2","group":"live","rule_file":"../../../assets/plugins/DM84.json","keyword":"某暗部的少女共栖","names":["某暗部的少女共栖"],"episode":1},
+    {"id":"7se-student-ep2","group":"live","rule_file":"../../../assets/plugins/7sefun.json","keyword":"学生会也有洞","names":["学生会也有洞！","学生会也有洞"],"episode":1},
+    {"id":"7se-student-ep3","group":"live","rule_file":"../../../assets/plugins/7sefun.json","keyword":"学生会也有洞","names":["学生会也有洞！","学生会也有洞"],"episode":2},
+    {"id":"dm84-frieren-ep1","group":"live","rule_file":"../../../assets/plugins/DM84.json","keyword":"葬送的芙莉莲","names":["葬送的芙莉莲"],"episode":0}
+  ]
+}

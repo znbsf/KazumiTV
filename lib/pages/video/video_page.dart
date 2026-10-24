@@ -687,6 +687,8 @@ class _VideoPageState extends State<VideoPage>
         context: context,
         builder: (_) => SourceSheet(
           infoController: info,
+          createSourceSwitchResolver:
+              videoPageController.createSourceSwitchResolver,
           switchOrigin: SourceSwitchOrigin(
             episode: episode == null
                 ? null

@@ -14,8 +14,11 @@ import 'package:kazumi/utils/http_headers.dart';
 
 class VideoWebviewAndroidImpl
     extends VideoWebviewController<PlatformInAppWebViewController> {
-  VideoWebviewAndroidImpl({LegacyPlayerCompat? playerCompat})
+  VideoWebviewAndroidImpl({this.userAgent, LegacyPlayerCompat? playerCompat})
       : _playerCompat = playerCompat ?? LegacyPlayerCompat();
+
+  /// Optional deterministic UA for controlled QA; production keeps its default.
+  final String? userAgent;
   final LegacyPlayerCompat _playerCompat;
   bool _compatInterception = false;
   static const _parserScriptGroup = 'kazumi-video-parser';
@@ -33,7 +36,7 @@ class VideoWebviewAndroidImpl
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSettings: InAppWebViewSettings(
-          userAgent: getRandomUA(),
+          userAgent: userAgent ?? getRandomUA(),
           mediaPlaybackRequiresUserGesture: true,
           cacheEnabled: false,
           // Only the scoped episode enables native observation during loading.

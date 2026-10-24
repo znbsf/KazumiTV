@@ -1,0 +1,67 @@
+import unittest
+import threading
+import urllib.request
+import urllib.error
+from http.server import ThreadingHTTPServer
+from run import paired_plan, summarize, classified_stage, Device, FixtureHandler
+
+class ReportingTests(unittest.TestCase):
+    def test_app_profile_runs_once_per_case_without_engine_substitution(self):
+        plan = list(paired_plan([{'id': 'one'}, {'id': 'two'}], 2, ('app',)))
+        self.assertEqual(len(plan), 4)
+        self.assertEqual({row['engine'] for row in plan}, {'app'})
+
+    def test_counterbalanced_pairs_use_same_case(self):
+        cases = [{'id': 'a', 'url': 'https://example.test/a'}, {'id': 'b', 'url': 'https://example.test/b'}]
+        plan = list(paired_plan(cases, 2))
+        self.assertEqual([p['engine'] for p in plan],
+            ['webview', 'gecko', 'gecko', 'webview', 'gecko', 'webview', 'webview', 'gecko'])
+        self.assertEqual(plan[0]['url'], plan[1]['url'])
+        self.assertEqual(plan[0]['user_agent'], plan[1]['user_agent'])
+
+    def test_missing_memory_is_not_zero_and_no_match_not_parse_success(self):
+        rows = [dict(group='live', engine='gecko', stage='no_match', memory={'sampled_peak_pss_kib': None}),
+                dict(group='live', engine='gecko', stage='first_frame',
+                     timings_ms={'resolve': 400, 'first_frame': 200}, memory={'sampled_peak_pss_kib': 2048})]
+        report = summarize(rows)[0]
+        self.assertEqual(report['attempted'], 2)
+        self.assertEqual(report['resolved'], 1)
+        self.assertEqual(report['first_frame'], 1)
+        self.assertEqual(report['sampled_peak_pss_median_mib'], 2)
+        self.assertEqual(report['resolve_median_ms'], 400)
+
+    def test_refuses_real_device_before_invoking_adb(self):
+        for serial in ['192.168.123.217:5555', '2G97C5ZJ0Y058Q', 'emulator-5580;echo bad']:
+            with self.assertRaises(ValueError):
+                Device('must-not-execute', serial)
+
+    def test_service_timeout_is_distinct_from_generic_parser_failure(self):
+        self.assertEqual(classified_stage({'stage': 'resolve_error',
+            'error_type': 'VideoSourceTimeoutException'}), 'resolve_timeout')
+        self.assertEqual(classified_stage({'stage': 'resolve_error',
+            'error_type': 'PlatformException'}), 'resolve_error')
+
+    def test_fixture_http_supports_real_player_range_and_head_requests(self):
+        previous = FixtureHandler.media
+        FixtureHandler.media = b'0123456789'
+        server = ThreadingHTTPServer(('127.0.0.1', 0), FixtureHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        url = f'http://127.0.0.1:{server.server_port}/fixture.mp4'
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={'Range':'bytes=3-5'})) as response:
+                self.assertEqual(response.status, 206)
+                self.assertEqual(response.headers['Content-Range'], 'bytes 3-5/10')
+                self.assertEqual(response.read(), b'345')
+            with urllib.request.urlopen(urllib.request.Request(url, method='HEAD')) as response:
+                self.assertEqual(response.headers['Accept-Ranges'], 'bytes')
+                self.assertEqual(response.headers['Content-Length'], '10')
+                self.assertEqual(response.read(), b'')
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                urllib.request.urlopen(urllib.request.Request(url, headers={'Range':'bytes=99-'}))
+            self.assertEqual(error.exception.code, 416)
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=2)
+            FixtureHandler.media = previous
+
+if __name__ == '__main__':
+    unittest.main()
