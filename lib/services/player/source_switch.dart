@@ -34,9 +34,18 @@ class SourceSwitchOrigin {
 }
 
 class PreparedSourceSwitch {
-  const PreparedSourceSwitch(this.args, this.source);
+  /// Legacy callers may still construct a candidate without paired headers.
+  const PreparedSourceSwitch(this.args, this.source) : headers = null;
+
+  PreparedSourceSwitch.withHeaders(
+      this.args, this.source, Map<String, String> headers)
+      : headers = Map<String, String>.unmodifiable(headers);
+
+  const PreparedSourceSwitch._frozen(this.args, this.source, this.headers);
+
   final OnlineVideoPlaybackArgs args;
   final VideoSource source;
+  final Map<String, String>? headers;
 }
 
 /// Resolves without touching the active player, its controller, or history.
@@ -58,14 +67,17 @@ class SourceSwitchResolver {
         )) {
       throw const VideoSourceNotFoundException('请先选择有效集数');
     }
+    final headers =
+        Map<String, String>.unmodifiable(args.plugin.buildHttpHeaders());
+    final useLegacyParser = args.plugin.useLegacyParser;
     final request = _requests.begin();
     final source = await service.resolve(transfer.episodePageUrl,
-        useLegacyParser: args.plugin.useLegacyParser, offset: transfer.offset);
+        useLegacyParser: useLegacyParser, offset: transfer.offset);
     if (request.isStale) throw const VideoSourceCancelledException();
     if (source.url.trim().isEmpty) {
       throw const VideoSourceNotFoundException();
     }
-    return PreparedSourceSwitch(args, source);
+    return PreparedSourceSwitch._frozen(args, source, headers);
   }
 
   void cancel() {

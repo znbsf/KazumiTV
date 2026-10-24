@@ -15,11 +15,13 @@ import 'support/tv_focus_fixtures.dart' show focusItem;
 class _Resolver implements IVideoSourceService {
   final pending = <Completer<VideoSource>>[];
   int cancellations = 0;
+  Duration? receivedTimeout;
   @override
   Future<VideoSource> resolve(String url,
       {required bool useLegacyParser,
       int offset = 0,
       Duration timeout = const Duration(seconds: 30)}) {
+    receivedTimeout = timeout;
     final result = Completer<VideoSource>();
     pending.add(result);
     return result.future;
@@ -53,6 +55,55 @@ void main() {
       url: 'https://media.test/play.mp4',
       offset: 70,
       type: VideoSourceType.online);
+
+  OnlineVideoPlaybackArgs selected(Plugin plugin) => OnlineVideoPlaybackArgs(
+      bangumiItem: target.bangumiItem,
+      plugin: plugin,
+      title: target.title,
+      src: target.src,
+      roads: target.roads,
+      transfer: target.transfer);
+
+  test('ordinary prepare freezes selected headers before asynchronous resolve',
+      () async {
+    final backend = _Resolver();
+    final plugin = Plugin.fromJson({
+      'name': 'new',
+      'baseURL': 'https://new.test',
+      'userAgent': 'selected-UA',
+      'referer': 'https://selected.test/'
+    });
+    final resolver = SourceSwitchResolver(backend);
+    final pending = resolver.prepare(selected(plugin));
+    plugin.userAgent = 'changed-UA';
+    plugin.referer = 'https://changed.test/';
+    backend.pending.single.complete(resolved);
+    final prepared = await pending;
+    expect(prepared.headers,
+        {'user-agent': 'selected-UA', 'referer': 'https://selected.test/'});
+    expect(() => prepared.headers!.clear(), throwsUnsupportedError);
+    await resolver.dispose();
+  });
+
+  test('legacy service keeps ordinary30s and receives a prepared snapshot',
+      () async {
+    final backend = _Resolver();
+    final resolver = SourceSwitchResolver(backend);
+    final pending = resolver.prepare(target);
+    expect(backend.receivedTimeout, const Duration(seconds: 30));
+    backend.pending.single.complete(resolved);
+    expect((await pending).headers!['user-agent'], isNotEmpty);
+    expect(PreparedSourceSwitch(target, resolved).headers, isNull);
+    await resolver.dispose();
+  });
+
+  test('explicit prepared headers copy caller data before future mutation', () {
+    final input = {'user-agent': 'frozen'};
+    final prepared = PreparedSourceSwitch.withHeaders(target, resolved, input);
+    input['user-agent'] = 'mutated';
+    expect(prepared.headers, {'user-agent': 'frozen'});
+    expect(() => prepared.headers!.clear(), throwsUnsupportedError);
+  });
 
   test('live snapshot matches semantic episode on a reordered road', () {
     const origin = SourceSwitchOrigin(
