@@ -37,6 +37,17 @@ class VideoSource {
       'VideoSource(url: $url, offset: $offset, type: $type, format: $format)';
 }
 
+/// Optional request hook shared by route playback and pre-resolved switching.
+/// The caller freezes headers before enqueueing; implementations must not read
+/// mutable current/selected plugin state while an asynchronous request runs.
+typedef VideoSourceResolveWithHeaders = Future<VideoSource> Function(
+  String url, {
+  required bool useLegacyParser,
+  required int offset,
+  required Duration timeout,
+  required Map<String, String> headers,
+});
+
 /// 视频源未找到异常
 class VideoSourceNotFoundException implements Exception {
   final String message;

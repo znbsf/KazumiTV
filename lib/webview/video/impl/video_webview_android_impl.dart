@@ -12,6 +12,10 @@ import 'package:kazumi/utils/http_headers.dart';
 
 class VideoWebviewAndroidImpl
     extends VideoWebviewController<PlatformInAppWebViewController> {
+  VideoWebviewAndroidImpl({this.userAgent});
+
+  /// Optional deterministic UA for controlled QA; production keeps its default.
+  final String? userAgent;
   static const _parserScriptGroup = 'kazumi-video-parser';
   PlatformHeadlessInAppWebView? headlessWebView;
   bool _hasRegisteredHandlers = false;
@@ -27,7 +31,7 @@ class VideoWebviewAndroidImpl
     headlessWebView ??= PlatformHeadlessInAppWebView(
       PlatformHeadlessInAppWebViewCreationParams(
         initialSettings: InAppWebViewSettings(
-          userAgent: getRandomUA(),
+          userAgent: userAgent ?? getRandomUA(),
           mediaPlaybackRequiresUserGesture: true,
           cacheEnabled: false,
           blockNetworkImage: true,

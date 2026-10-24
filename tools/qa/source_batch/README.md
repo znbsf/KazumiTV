@@ -1,0 +1,172 @@
+# 电脑批量 App 服务路径 / GeckoView QA
+
+仅实验包 `com.znbsf.kazumi.fluttertv.parserqa`，debug/API26+。默认只接受明确的模拟器；实体QA必须显式使用 `--allow-physical-qa --expect-serial <精确serial> --expect-fingerprint <精确fingerprint>`，并与 `--serial` 和现场只读查询一致，错配在任何测试写入之前拒绝。运行器不安装APK、不关闭模拟器、不卸载或清数据；只force-stop固定parserqa包。实体测试前后保存其他Kazumi包的APK路径/字节摘要，未能确认一致即报告失败，不能据此声称私有数据已逐项校验。
+
+构建默认x86_64；ARM电视必须明确传入 `build.ps1 -TargetPlatform android-arm` 或 `android-arm64` 并核对真实ABI/签名/升级条件，目标写入artifact.json。现有x64候选不能用来证明ARM可执行。调用者先检查APK包名，再明确同签名安装到已获授权的独立QA对象。Gecko只解析地址，播放仍使用项目media-kit真实首帧回调；模拟器静音软件输出不代表电视硬解验证。生产构建不启用 `kazumiParserQa` 时不包含依赖、Activity、扩展。
+
+独立QA构建现在要求整个APK只含一个原生ABI。固定Flutter3.47.3在未拆包时默认将
+defaultConfig的ABI过滤重置为三架构，单独`--target-platform`不能保证过滤第三方库；旧20590因此仍有多ABI依赖。
+build.ps1仅对本QA调用传入`disable-abi-filtering=true`，QA专用Gradle策略按同一个显式target-platform
+清除defaultConfig及parserQa/parserQaOffline中的旧过滤，再设置唯一目标；不改普通TV/产品构建。
+ARMv7、ARM64、x64均显式映射，普通和LaunchOnly共用此约束；后者仍禁止INTERNET及实体启动，权限语义不变。
+
+该入口不启用`--split-per-abi`，QA策略拒绝split-per-abi=true、多个/缺失目标或缺失禁用默认过滤属性。
+因此输出仍为`build/app/outputs/flutter-apk/app-parserqa-debug.apk`，LaunchOnly为
+`app-parserqaoffline-debug.apk`；实际versionCode必须等于传入BuildNumber，不应用仓库的`base*10+ABI`或
+Flutter的`base+ABI*1000`拆包覆盖。普通产品的原版本策略保持原样。
+包装完成后保留source-digests.before/after.json，artifact_contract.py核对实际aapt包名/版本名/版本码/
+minSDK26/debug/INTERNET、aapt与ZIP唯一ABI及libflutter/libmpv/libxul的ELF class/machine，拒绝额外ABI或缺库；
+通过后才写artifact.json，新增native_abi、actual_version_code/name、min_sdk、abi_packaging及apk_relative_path。
+不通过删so、重压包或重签处理旧APK。当前只有离线契约测试，实际新单ABI APK仍待一次冻结构建核验。
+
+默认 `--engines app`：搜索/集表调用现有Plugin；解析调用生产 `VideoWebviewControllerFactory`，由真实DOCUMENT_START_SCRIPT能力选择现代/legacy实现（包含WebView66的兼容准入）；媒体头使用 `Plugin.buildHttpHeaders`，确认地址缓存复用 `ResolvedSourceCache`；播放直接复用 `PlayerPlaybackController`，包含缓冲策略、广告过滤、代理、真实SDK/模拟器输出选择和错误/释放处理。QA Activity继承生产MainActivity以复用原生通道，只在debug实验身份下启用TV模式测试钩子。首帧仍须实际native回调，不能只看尺寸。
+
+这仍是服务/播放控制器批测；它按清单选择作品/线路/剧集，未经过首页、详情、遥控焦点、切集界面、历史/弹幕等完整UI。不得将结果标记为全App端到端通过。UI遥控回归应另用正式App入口的独立测试包及真实DPAD动作。
+
+`selection_only + engine=app` 可显式开启 `selection_tail1=true`：只投影每road原索引头两项加末项并去重，最多8road/各3条，标记`ordering=unknown`；末项不代表最新，标签仍走原安全白名单，不增加label hash。默认head2及普通投影不变。该计划必须使用明确LaunchOnly=false/Dart define=false且merged Manifest和APK含INTERNET的普通QA候选，运行器要求`--aapt`独立核对，不能错用离线启动包。每例保留白名单am启动字段；tail模式启动未确认或PID消失立即停止，失败时仅补专用result文件真实stat/字节数/UTF8-JSON类型，不保存无效原文或据exec-out返回0猜文件存在性。
+
+`--engines webview,gecko` 保留上一轮受控内核比较：固定浏览器/媒体UA、现代WebView控制器、8MiB缓冲和软件输出。其结果不得混入 `app` profile。app模式进程冷启，缓存代码被调用但不会凭此证明缓存失败回退或历史续播已测。
+
+## 构建及运行
+
+启动前提诊断另有显式 `build.ps1 -LaunchOnly`，仍用本运行器及相同独立QA身份，创建 `parserQaOfflineDebug`；普通构建不启用它。变体最高优先级Manifest删除INTERNET（含debug注入），构建脚本分别核验merged Manifest及APK权限，native启动还检查实际权限拒绝；Dart HttpOverrides和Dio在该模式拒绝外连。CLI必须额外传 `--aapt <aapt.exe>`，仅接受一个 `{"id":"qa-offline-launch-only-v1","group":"offline-launch","launch_only":true}` 案例、app引擎/一次/模拟器，无fixture服务；其余键除固定运行器元数据全部拒绝。普通QA拒绝launch-only配置，不回落来源路径。
+该模式只按原顺序初始化并显示本地文本，不创建BatchCase/解析器/播放器、不访问来源。原生固定阶段和Dart每一await前后/首帧写入专用原子文件，<=64条/32KiB，只含枚举、单调时间、PID、权限/注册布尔及异常类名。保持am start -W的20秒等待；超时仍保留原错误/unknown，宿主只保存白名单am字段，并独立检查专用文件真实存在性、大小、读回字节数及UTF8/JSON类型，无效字节不落盘。只有同attempt完整初始化顺序、本地首帧与native结果同时验证才记launch_ready，永不计入产品播放分母；环境无效、进程消失、unknown或清理未确认即停止，不自动重试或恢复原来源。
+
+构建前必须存在 `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`。Windows离线 `pub get` 在软链阶段失败后，即使已有package_config等依赖元数据，也不代表Android插件注册已生成；缺失会造成APK可以构建、启动却报MissingPluginException（例如package_info）。须先由固定Flutter工具的 **Android-only injectPlugins准备流程** 生成注册文件（这是Flutter工具内部API，不是CLI子命令），然后再运行本脚本。脚本在解析脚本生成、创建输出目录及构建之前检查；缺失立即失败，不自动生成、不复制该Java文件入库，也不修改系统设置。此生成文件保持忽略，但其内容哈希明确纳入source-digests.json及构建前后比较。
+
+debug parserQa准备时使用 `injectPlugins(releaseMode: false, androidPlatform: true)`；Flutter3.47.3的release模式会过滤dev_dependencies插件，不能仅凭文件存在推断已按debug插件集合生成。此次native splash差异已用原工具双模式逐字节复现，下一debug候选使用标准debug生成；生成日志、模式与注册文件摘要应随候选保存，不能手工复制注册段。
+
+1. 使用项目既有 Flutter3.47.3 工具链和已解析依赖，运行 `build.ps1`，传入 `FlutterRoot/PubCache/GradleHome/JavaHome/Output/Python`。它生成与生产共用的解析脚本、构建实验 APK 并保存源码内容哈希/基线 SHA/APK 哈希。缺少 Android 插件元数据时按构建 runbook 的 Android-only 流程准备；不更改 Windows 开发者模式。
+2. 新建专用 API36 Google TV x86_64 AVD；以 `-no-window -no-audio -no-snapshot -gpu swiftshader -cores 2 -memory 2048` 后台启动，选择未占用端口。不得复用/清除他人 AVD。
+3. 用 Android SDK `aapt dump badging` 核实 APK 包名及 x86_64，再使用明确 emulator serial 安装；运行器会核对已安装 APK 与传入文件的 SHA256。
+4. 自行生成 320x180 H264/MP4 测试图（例如 ffmpeg testsrc2，8秒，无音频）。运行：
+
+```text
+python run.py --adb <adb.exe> --serial emulator-5582 --apk <parserqa.apk> --manifest live.json --engines app --expect-sdk 28 --expect-webview 66.0.3359.158 --output <new-app-results>
+python run.py --adb <adb.exe> --serial emulator-5580 --apk <parserqa.apk> --manifest live.json --engines webview,gecko --output <new-controlled-results> --repeats 2
+```
+
+单例70秒；每轮最多24例/30分钟；host timeout 或清理未确认停止该轮。在输出目录创建 `STOP` 可完成当前例后停止。`attempts.jsonl` 记录开始、`results.jsonl` 记录完成；未知结果拒绝自动重试。相同输出目录只允许完全相同 APK/清单/模拟器/运行器身份，已有 ledger 行不重跑。变更样本/产物用新的目录，保留失败结果。结束运行器关闭自建服务器/采样线程并 force-stop 实验包；宿主负责关闭自己启动的 emulator 并核实退出。
+
+## 清单与结果契约 v1
+
+`selection_only: true`默认关闭，仅App+固定rule可用：只做一次原Plugin搜索及唯一作品详情/集表，输出最多8条生产有效road、每路首2集标签及页面SHA256/数量；解析器及播放器创建前返回，parser/media为not_run。发现的完整页面地址/正文不输出；标签白名单不通过保留null/不可绑定，不换选后续集。该QA进程关闭原HTTP日志输出，网络/headers/cancel保持生产方法。selection终态不进入播放eligible/成功/失败分母，挑战停批且清理失败优先；发现后必须按新hash+精确label绑定，不能盲选road index。
+
+`qa_lifecycle`仅允许无rule的本地App夹具，action为exit/switch，trigger_phase为primary/fallback，switch必须绑定不同id/URL的本地target。运行器在实际阶段后发送BACK或DPAD_CENTER，发送前精确核对前台parserqa/ParserQaActivity；空/畸形/其他组件/查询失败均不发键、不自动切回。动作后必须有页面dispose、旧发布抑制及原生旧代次写入拒绝收据，否则environment_invalid停批。目标新页面只在旧清理confirmed后创建。旧结果拒绝探针为标注的合成数据；不能当作真实媒体晚到事件。此覆盖QA页面，不能当完整产品TV UI验收。
+
+仅App QA可用 `observe_playback_seconds: 10..15` 显式打开首帧后的500ms状态时间轴；默认仍只观察2秒。输出位置、playing/buffering/completed、buffer/duration和错误计数，不保存错误原文，不控制播放、不改变解析服务退出顺序。时间轴受App总60秒剩余预算截断，宿主单例70秒上限保留；`budget_limited`或取消必须单独处理。原生回调只证明首帧，不存在连续帧计数时不得声称视频一直渲染。
+
+备用线路案例可同时传入 `expected_episode_page_sha256` 与 `expected_episode_label`。App仍按原规则查询集表，解析前校验候选完整页摘要和精确集标签；不符记 `sample_identity_mismatch` 并停止该样本。此绑定用于核对既有页面证据，不替换规则或为road index提供盲选许可；普通案例不传时保留既有行为。
+
+- 清单 `cases[]`：`id/group` 必填；真实源使用 `rule_file/keyword/names/road/episode`，后两项零基索引。精确匹配唯一作品，不自动采用搜索第一项。规则 JSON 内联后计算摘要；目前 `overlay=none`，不修改规则/覆盖模型。
+- 固定清单中的同一例分别跑 webview/gecko，奇偶样本及重复轮交换顺序；每次 force-stop 后冷进程启动。浏览器缓存策略不同但都不复用网页会话；OS/DNS 缓存仍可能热。固定同一 UA，此结果不是各内核默认 UA 的比较。
+- `app` profile 保留App默认UA行为，记录actual_controller、能力准入、是否命中确认缓存及实际播放配置；不强制桌面UA或伪造WebView版本。`--expect-sdk/--expect-webview`先核对系统选中provider，每例再核对App实际报告，错配标为environment_invalid并停止。
+- `identity.json` 关联 APK/清单哈希、Android fingerprint、serial、UA；旁边保留 `artifact.json/source-digests.json`。`results.jsonl` 是可恢复账本；`summary.json/report.html` 为派生报告，不能代替原始行。
+- 每行记录 engine/environment（实际 provider/version/SDK/ABI）、rule version/content hash/fingerprint/overlay、案例/匹配作品/线路/集标签/剧集页摘要、启用能力与结果。内部地址可写本地输入；对外报告只保留媒体 host 和摘要，不公开签名 URL/原始日志。
+- 分阶段 `search/chapters/resolve/media_open/first_frame/total` 毫秒；`progress_ms` 为首帧后2秒进度。`media_open` 是播放器 open 完成时间，不是独立 HTTP TTFB。未到达的阶段缺失，不能计失败。无匹配/歧义/缺集/验证码/阶段超时/错误分别保留。resolved 不等于可播放；首帧不等于长稳/音画同步。
+- 内存每约1秒用 `dumpsys meminfo` 采样 PSS：App 命名进程 + 专用模拟器本例新增的命名 WebView sandbox 进程。记录 PID/进程名和样本；缺失用 null，不用0；这是采样峰值，未包含共享系统服务，也不是严格完整浏览器归因。不得拿单主进程冒充全内核内存。
+- 报告先分 fixture/live/negative fixture。成功率同时保留全部尝试数、解析成功数、真实首帧数；速度中位数只针对成功阶段，失败/未执行分母单列。跨引擎需核对 `episode_page_sha256` 相同才称同集配对。小样本不外推全站成功率。
+
+### 报告/清理契约 v2
+
+- 环境错配的 `stage=environment_invalid` 优先于残留error_type；原stage保留在observed_stage。每组 `attempted` 仍是有终态记录数，另报 `invalid/infrastructure/eligible_results`；无效环境不进入解析/首帧/耗时/PSS统计，不把它归为解析失败。原始results行不改写。
+- 新批次在identity保存 `planned_attempts`，另存无URL的 `plan.json`（key、案例、engine、group、repeat）。开始日志和结果账本分别追加。报告重建输出 `report_schema=2`，同时报告planned、started、completed、unknown、unattempted及case_states；completed表示持久终态记录，不表示产品通过。
+- `unknown` 是有开始、无终态；`unattempted` 必须有可信计划和完整开始日志才计算。旧identity没计划时可使用原summary已保存的planned，但不能从结果数推断总计划。缺计划/开始日志或日志截断时，相应总数为JSON null、界面显示unknown。`known_unknown` 只是可识别的下界；`remaining_without_result` 包含unknown与unattempted，不冒充后者。旧的未保存案例清单不能追补案例名称。
+- `report.py <folder>` 只重建summary.json、comparison.md、report.html，不改identity、plan、attempts或results。CLI标准输出从旧版摘要数组改为v2完整对象，其 `summary` 字段保留原每组统计数组。消费方须按report_schema识别；跨运行器版本继续要求新的输出目录。
+- 单例和整批清理逐步独立尝试：停止QA、读取进程表、采样线程退出、fixture shutdown/close、每个已申请反向端口移除、报告写入。force-stop成功不能证明退出；named QA进程（单例另含基线之外可识别WebView renderer）必须在有效进程清单中消失，否则host_cleanup=unconfirmed。它不证明未命名共享系统服务已退出。
+- App的cleanup与host_cleanup分别保留。任何单例清理未确认都会停止后续案例；只有清理失败时以BatchCleanupError非零退出；已有主异常或用户中断时重新抛出原异常，清理错误不能覆盖它。`.host-error.json`、run-status.json、cleanup.json保留异常类型/超时和各步失败，不记录可能含签名地址的异常命令。因原始异常未拿到App终态的案例仍是unknown，不伪造产品失败行。cleanup.json是最终清理收据；报告可再次离线重建。
+
+## 已知实验限制
+
+### App播放控制器的一次Gecko补救（仅QA opt-in）
+
+清单单例附加`app_gecko_fallback: true`，仍使用`--engines app`。普通清单和生产App
+行为不变。仅实际旧WebView66能力准入、非iframe-only，原解析timeout/notfound后
+尝试一次Gecko；先等待原服务退出，退出失败不切换。总解析25秒，补救只能用剩余
+预算，退出每阶段另限2秒。当前QA main仅在此显式开关分支传入primary 10秒/total 25秒：
+primary用尽10秒后剩余最多15秒且须扣除退役耗时，提前失败仍沿用剩余总预算；不另续期。
+QaAppFallbackService本身的历史默认仍为primary 15秒/total 25秒，旧结果原件不改写。
+取消/新请求会作废旧代次。搜索、集表、媒体headers、
+PlayerPlaybackController保持App路径；Gecko浏览器UA使用媒体headers里的UA，主解析
+仍保留App默认随机UA，不能把该实验当严格的同UA纯内核性能排名。
+
+结果`fallback_policy/fallback_events/fallback_controller`记录显式开关、能力、最多一次、
+阶段/代次及墙钟毫秒。与已有PSS采样按epoch关联可观察切换前后，但service retired
+只证明原生对象dispose返回，不能代替进程/PSS释放核验。GeckoSession关闭后当前QA
+GeckoRuntime仍可驻留至QA进程退出；不得称为已实现适合生产的低内存回退。
+该策略不解决验证码；只对事先检查、未观察到实际挑战的受控样本执行，挑战即停止。
+生产默认策略、规则profile/schema和内核分发均不由此实验自动启用。
+fallback_policy明确记录primary_resolution_budget_ms、total_resolution_budget_ms及budget_source；
+当前10/25只是待实机验证的QA调度候选，不是来源修复结论。受控软件player标签改为controlled，
+actual_controller从构造对象直接导出；该类型名不代表另行查询了GeckoRuntime版本API。
+
+QA错误快照补充：`failure_snapshot`只读记录最多5层异常类型、NetworkException/Dio原因，
+请求只保留method与host/URL摘要；响应只保留状态、content-type/server/cf-mitigated头、
+正文长度/摘要，不写Cookie、认证头或正文。明确cf-mitigated: challenge或失败响应内
+window._cf_chl_opt证据时记stage=captcha、保留observed_stage，立即结束该例；没有命中
+只表示未观察到这些标记，不证明无挑战。该观察不改变App请求或开启验证码流程。
+原生媒体原因仍查对应PlaybackTrace/本地logcat；production_player_error只是QA汇总，
+不能单独区分CDN状态、解码、媒体响应或其他失败。
+
+Gecko158实测要求 compileSdk37/AGP9.1+，本原型固定146.0.20251217121356（与现有工具链兼容的较旧稳定版），不是最新安全版本或生产推荐。系统 WebView 记录运行时实际版本。Gecko通过内置 WebExtension 在 MAIN world 注入同一解析脚本，覆盖所有 http(s) 子框架，与 Android document-start 注入范围一致（插件 forMainFrameOnly 仅对 iOS/macOS 生效）。内容桥接是只读候选输入，并由当前 session/generation 和生产 URL 校验隔离。尚不支持 `useLegacyParser=true` 的 iframe-only 模式，显式失败，不悄悄改变规则。
+
+固定UA取自 App 的 `userAgentsList` 第一项，仅应用于浏览器解析和媒体请求；搜索/集表仍走原规则请求实现，空UA可能随机取桌面列表，因此另行核对两组剧集页摘要。初始手机UA实验发现7sefun跳转App下载页，已保留并排除出代表App的比较。诊断补充后必须重测跨域 iframe，用它区分桥接覆盖缺口和真实内核兼容失败。扩展脚本变化时更新 manifest version，避免复用旧内置扩展注册。
+
+两个内核都关闭网络图片；Gecko使用内置扩展阻止 image 请求。APK 为 Flutter debug 包（原生依赖可能包含其他 ABI），本轮只执行 x86_64；不可把包大小或 debug PSS 当生产开销。
+
+现代模拟器不能证明 Android9/WebView66/ARMv7 电视兼容；本轮不操作电视，不绕过站点挑战。搜索/集表失败通常先排查规则/网络；已确认同一剧集一内核失败另一成功，才是运行时差异线索。HTTP请求响应的逐包对照、热会话/长时间取消压力、最新Gecko及旧Android矩阵仍需后续独立验证。
+
+Android9对应环境：官方 `system-images/android-28/default/x86_64` revision4 自带 `com.android.webview/66.0.3359.158`，与已记录电视内核版本相同。创建专用AVD后须再次核对dumpsys和App报告，不靠镜像名称推定。SDK/内核一致仍不等于厂商系统、ARMv7、GPU/MediaCodec硬件一致；模拟器会按App已有保护选择软件输出，不能验证电视硬解路径。新Android CLI使用斜线包路径；其sdkmanager兼容包装器会把分号路径拆成多个包，可直接用 `android.exe sdk --ignore-outdated-xmls install system-images/android-28/default/x86_64`，无需改全局代理或SDK设置。
+
+规则覆盖会话负责声明式契约，本工具只消费既有 Plugin 规则，不包含第二套覆盖实现；不把 HHJX 兼容补救偷偷转成任意规则脚本。
+
+集成适配入口：清单可以直接传入 `rule: <effective plain JSON>`，无需 `rule_file`。规则候选/集成树负责调用 `plugin.toJson()`；当前分支不导入尚未合入的 RuleOverlay。可附 `rule_provenance: {overlay, base_sha256, effective_sha256, upstream_commit}`，运行器原样携带为调用者声明，同时独立记录输入 JSON SHA256 与运行时 ruleFingerprint；三种摘要算法不应混用。未知上游 commit 必须 null。基础/有效对照各自作为不同案例，禁止修改真实规则列表以构造对照。
+
+官方参考：[GeckoView WebExtensions](https://firefox-source-docs.mozilla.org/mobile/android/geckoview/consumer/web-extensions.html)、[MAIN world 支持](https://blog.mozilla.org/addons/2024/07/10/manifest-v3-updates-landed-in-firefox-128/)。
+
+## 拆分后的规则输入
+
+仅接受生产普通规则，rule_variant仅支持effective；overlay bundle、本地覆盖元数据和base模式明确拒绝。
+overlay产品功能暂缓，原实现和所有记录保存在codex/pr28-preserved-20261024分支。
+QA摘要使用QaRuleFingerprint.fingerprint，保持历史sorted-key UTF-8 JSON算法，
+不引入第二套Plugin schema或伪造上游来源。基础与候选可以显式提供两份普通规则，分别记录摘要。
+
+## 可选媒体响应观察（仅集成 QA）
+
+Gecko native诊断的load_start使用回调实际URI；onPageStop本身没有URI，因此load_stop输出空URI及
+`uri=unattributed`，不从请求地址或上一次start推断页面归属。既有snapshot没有sender frame身份，
+不能仅凭stop success或snapshot判定目标主文档已经完成。此修正仅QA日志，不改变解析策略。
+
+单例显式 observe_media_root=true 才会在解析到候选后、原生播放前执行。
+默认不请求。入口核对debug及parserqa身份，只取现有URL于内存，不保存URL/query/fragment、
+请求头值或原始响应正文；普通结果仅输出status、content-type、结构、host和摘要。
+请求保留实际生产UA/referer，不发送Cookie/Authorization，不跟随redirect，证书验证保持开启。
+总观察时间最多10秒（同时受case前35秒剩余窗口限制），每响应最多64KiB，最多根及一个唯一子项。
+超时、取消、挑战、含混、签名参数、重定向即停止；不会无限加载列表或下载整集。
+根请求及子请求均须通过签名/认证参数和嵌套URL检查；不通过时不创建HTTP客户端。
+Dart HttpClient观察不等于native播放器的请求路径，不能据此宣称mpv传输原因已定或UA覆盖已有效。
+原始播放器仍按App路径执行；观察结果与真实首帧/进度分别记录。修改配置/代码需新输出目录和身份。
+
+## 固定单例 console 提示（离线准备，默认关闭）
+
+console_hint_observer=true 只接受 qa-mgnacg-console-hints-v1 / console-hints，
+绑定 mgnacg 1.2/API9/effective 规则、学生会也有洞！第2话的固定页面摘要，
+以及 API28/com.android.webview66/parserqa。实际规则、作品、页面与标签均在创建观察器前校验。
+只允许一次 app profile；禁止混入 selection、fallback、媒体观察、播放器或其他配置选项。
+运行器要求新构建 artifact 的 console_hint_observer_schema=1、普通 INTERNET QA 权限与实际环境匹配；
+既有20588包不含该能力，不能复用它来宣称运行过此观察器。本轮未构建或运行新包。
+
+订阅创建在真实控制器工厂返回之前、init之前；不改生产控制器、不注入JS、不新增HTTP请求。
+只暂时检查 Console 前缀，每条最多8192个UTF16 code unit、累计256KiB UTF8、最多80条；
+超限停止观察且仅输出固定overflow。输出为固定分类计数、停止原因与清理状态，
+不保存原文、堆栈、完整URL、headers、Cookie或未知字符串；该QA进程关闭生产Logger输出。
+固定分类包括syntax/reference/type/cors/csp/mixedContent/blockedResource/unclassified。
+challenge只标记待复核并取消本例、停止整批，不能据此认定验证码或失败根因。
+resolve结束、取消及finally均共用同一可等待的订阅取消，最多等待2秒；清理未确认停止整批。
+迟到事件不能再更新计数，其他配置不读取或订阅日志流。console结果不进入播放成功率分母。
+
+归属限制：onLog属于该controller，但LogBridge也能发送任意相同前缀；没有frame/origin身份。
+因此输出始终 hints_only=true / console_authenticity_verified=false / frame_origin_available=false，
+只证明收到前缀线索，不能证明真实Console异常、主文档归属或具体站点原因。
+未来最小运行建议为上述精确单例一次、host70秒/总120秒、原解析15秒、无播放器，
+身份错配、挑战线索、unknown、environment_invalid或清理未确认立即停止，不重试；此处只是离线方案。

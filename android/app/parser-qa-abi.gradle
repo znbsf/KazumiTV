@@ -1,0 +1,27 @@
+import org.gradle.api.GradleException
+
+// Applied only by the explicit parserQa overlay, never normal TV/product builds.
+ext.configureParserQaAbi = { androidExtension ->
+    def abis = ['android-arm': 'armeabi-v7a', 'android-arm64': 'arm64-v8a', 'android-x64': 'x86_64']
+    def platform = project.findProperty('target-platform')?.toString()
+    def split = project.findProperty('split-per-abi')?.toString()
+    if (project.findProperty('kazumiParserQa')?.toString() != 'true' ||
+            project.findProperty('kazumiTv')?.toString() == 'true' ||
+            !abis.containsKey(platform) ||
+            project.findProperty('disable-abi-filtering')?.toString() != 'true' ||
+            (split != null && split != 'false')) {
+        throw new GradleException('Parser QA requires one explicit target-platform, disable-abi-filtering=true and no APK splits')
+    }
+    def abi = abis[platform]
+    // Flutter 3.47.3 otherwise overwrites defaultConfig with all supported ABIs
+    // in afterEvaluate. The required property above disables only that default.
+    androidExtension.defaultConfig.ndk.abiFilters.clear()
+    androidExtension.defaultConfig.ndk.abiFilters.add(abi)
+    androidExtension.productFlavors.configureEach { flavor ->
+        if (flavor.name in ['parserQa', 'parserQaOffline']) {
+            flavor.ndk.abiFilters.clear()
+            flavor.ndk.abiFilters.add(abi)
+        }
+    }
+    return abi
+}

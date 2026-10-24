@@ -31,6 +31,10 @@ import 'package:kazumi/services/player/episode_identity.dart';
 import 'package:kazumi/services/player/source_switch.dart';
 import 'package:kazumi/services/platform/display_mode_service.dart';
 
+// Preserve the previous import surface for request-hook consumers.
+export 'package:kazumi/services/video_source/video_source_service.dart'
+    show VideoSourceResolveWithHeaders;
+
 part 'video_controller.g.dart';
 
 class VideoPageController = _VideoPageController with _$VideoPageController;
@@ -65,9 +69,15 @@ abstract class _VideoPageController with Store implements Disposable {
     this.historyController,
     this.downloadRepository,
     this.downloadManager, {
-    WebViewVideoSourceService? videoSourceService,
+    IVideoSourceService? videoSourceService,
+    VideoSourceResolveWithHeaders? resolveVideoSourceWithHeaders,
+    SourceSwitchResolver Function()? createSourceSwitchResolver,
+    Stream<String>? videoSourceLog,
     ResolvedSourceCache? resolvedSourceCache,
   })  : _videoSourceService = videoSourceService,
+        _resolveVideoSourceWithHeaders = resolveVideoSourceWithHeaders,
+        _sourceSwitchResolverFactory = createSourceSwitchResolver,
+        _videoSourceLog = videoSourceLog,
         _resolvedSourceCache =
             resolvedSourceCache ?? ResolvedSourceCache.shared;
 
@@ -153,7 +163,16 @@ abstract class _VideoPageController with Store implements Disposable {
   final IDownloadRepository downloadRepository;
   final IDownloadManager downloadManager;
 
-  WebViewVideoSourceService? _videoSourceService;
+  IVideoSourceService? _videoSourceService;
+  final VideoSourceResolveWithHeaders? _resolveVideoSourceWithHeaders;
+  final SourceSwitchResolver Function()? _sourceSwitchResolverFactory;
+
+  /// The picker owns this resolver independently from the active route parser.
+  SourceSwitchResolver createSourceSwitchResolver() =>
+      _sourceSwitchResolverFactory?.call() ??
+      SourceSwitchResolver(WebViewVideoSourceService());
+
+  final Stream<String>? _videoSourceLog;
   final ResolvedSourceCache _resolvedSourceCache;
   int _requestedOffset = 0;
   int _playbackRevision = 0;
@@ -826,9 +845,13 @@ abstract class _VideoPageController with Store implements Disposable {
     required PlayerController playerController,
   }) async {
     _videoSourceService ??= WebViewVideoSourceService();
+    final resolver = _videoSourceService!;
 
     await _logSubscription?.cancel();
-    _logSubscription = _videoSourceService!.onLog.listen((log) {
+    if (session.isStale) return;
+    final logs = _videoSourceLog ??
+        (resolver is WebViewVideoSourceService ? resolver.onLog : null);
+    _logSubscription = logs?.listen((log) {
       if (!_logStreamController.isClosed) {
         _logStreamController.add(log);
       }
@@ -843,6 +866,7 @@ abstract class _VideoPageController with Store implements Disposable {
     ]);
     final requestHeaders = Map<String, String>.unmodifiable(
         preparedHeaders ?? currentPlugin.buildHttpHeaders());
+    final useLegacyParser = currentPlugin.useLegacyParser;
     try {
       final attempt = preparedSource != null
           ? ResolvedSourceAttempt(preparedSource, requestHeaders,
@@ -852,11 +876,21 @@ abstract class _VideoPageController with Store implements Disposable {
               offset: offset,
               headers: requestHeaders,
               isCurrent: () => session.isActive,
-              fresh: () => _videoSourceService!.resolve(
-                url,
-                useLegacyParser: currentPlugin.useLegacyParser,
-                offset: offset,
-              ),
+              fresh: () =>
+                  _resolveVideoSourceWithHeaders?.call(
+                    url,
+                    useLegacyParser: useLegacyParser,
+                    offset: offset,
+                    timeout: const Duration(seconds: 15),
+                    headers: requestHeaders,
+                  ) ??
+                  resolver.resolve(
+                    url,
+                    useLegacyParser: useLegacyParser,
+                    offset: offset,
+                    // The interface default is 30s; retain this page's 15s.
+                    timeout: const Duration(seconds: 15),
+                  ),
             );
       final source = attempt.source;
 
@@ -1038,7 +1072,10 @@ abstract class _VideoPageController with Store implements Disposable {
     final videoSourceService = _videoSourceService;
     _videoSourceService = null;
     if (videoSourceService != null) {
-      unawaited(videoSourceService.dispose());
+      unawaited(videoSourceService.dispose().catchError((Object error) {
+        KazumiLogger().w(
+            'VideoPageController: resolver cleanup failed (${error.runtimeType})');
+      }));
     }
   }
 

@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {"id": "dom-video", "group": "fixture", "url": "http://127.0.0.1:8769/video"},
+    {"id": "delayed-video", "group": "fixture", "url": "http://127.0.0.1:8769/delayed"},
+    {"id": "nested-page", "group": "fixture", "url": "http://127.0.0.1:8769/nested"},
+    {"id": "cross-origin-frame", "group": "fixture", "url": "http://127.0.0.1:8769/cross-frame"},
+    {"id": "empty-page", "group": "negative-fixture", "url": "http://127.0.0.1:8769/empty"}
+  ]
+}

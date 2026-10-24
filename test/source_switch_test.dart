@@ -64,6 +64,42 @@ void main() {
       roads: target.roads,
       transfer: target.transfer);
 
+  test('selected plugin snapshot pairs prepare and result, not mutable state',
+      () async {
+    final backend = _Resolver();
+    final plugin = Plugin.fromJson({
+      'name': 'new',
+      'baseURL': 'https://new.test',
+      'userAgent': 'selected-UA',
+      'referer': 'https://selected.test/'
+    });
+    final pending = Completer<VideoSource>();
+    Map<String, String>? seen;
+    final resolver = SourceSwitchResolver(backend, resolveWithHeaders: (url,
+        {required useLegacyParser,
+        required offset,
+        required timeout,
+        required headers}) {
+      expect(url, 'https://new.test/2');
+      expect(offset, 70);
+      expect(timeout, const Duration(seconds: 30));
+      seen = headers;
+      expect(() => headers['user-agent'] = 'changed', throwsUnsupportedError);
+      return pending.future;
+    });
+    final preparing = resolver.prepare(selected(plugin));
+    plugin.userAgent = 'different-current-UA';
+    plugin.referer = 'https://changed.test/';
+    pending.complete(resolved);
+    final prepared = await preparing;
+    expect(backend.pending, isEmpty);
+    expect(prepared.headers, same(seen));
+    expect(prepared.headers,
+        {'user-agent': 'selected-UA', 'referer': 'https://selected.test/'});
+    expect(() => prepared.headers!['referer'] = 'late', throwsUnsupportedError);
+    await resolver.dispose();
+  });
+
   test('ordinary prepare freezes selected headers before asynchronous resolve',
       () async {
     final backend = _Resolver();
@@ -104,6 +140,48 @@ void main() {
     expect(prepared.headers, {'user-agent': 'frozen'});
     expect(() => prepared.headers!.clear(), throwsUnsupportedError);
   });
+
+  for (final action in ['cancel', 'dispose', 'replace']) {
+    test('header-aware $action cannot commit a late selected candidate',
+        () async {
+      final backend = _Resolver();
+      final answers = <Completer<VideoSource>>[];
+      final headersSeen = <Map<String, String>>[];
+      final plugin = Plugin.fromJson({
+        'name': 'new',
+        'baseURL': 'https://new.test',
+        'userAgent': 'first-selected'
+      });
+      final resolver = SourceSwitchResolver(backend, resolveWithHeaders: (url,
+          {required useLegacyParser,
+          required offset,
+          required timeout,
+          required headers}) {
+        headersSeen.add(headers);
+        final answer = Completer<VideoSource>();
+        answers.add(answer);
+        return answer.future;
+      });
+      final first = resolver.prepare(selected(plugin));
+      final rejected =
+          expectLater(first, throwsA(isA<VideoSourceCancelledException>()));
+      Future<PreparedSourceSwitch>? next;
+      if (action == 'cancel') resolver.cancel();
+      if (action == 'dispose') await resolver.dispose();
+      if (action == 'replace') {
+        plugin.userAgent = 'second-selected';
+        next = resolver.prepare(selected(plugin));
+      }
+      answers.first.complete(resolved);
+      await rejected;
+      expect(headersSeen.first['user-agent'], 'first-selected');
+      if (next != null) {
+        answers.last.complete(resolved);
+        expect((await next).headers!['user-agent'], 'second-selected');
+      }
+      if (action != 'dispose') await resolver.dispose();
+    });
+  }
 
   test('live snapshot matches semantic episode on a reordered road', () {
     const origin = SourceSwitchOrigin(

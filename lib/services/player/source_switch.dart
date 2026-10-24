@@ -51,8 +51,9 @@ class PreparedSourceSwitch {
 /// Resolves without touching the active player, its controller, or history.
 /// Cancellation and disposal reject late results even from a faulty resolver.
 class SourceSwitchResolver {
-  SourceSwitchResolver(this.service);
+  SourceSwitchResolver(this.service, {this.resolveWithHeaders});
   final IVideoSourceService service;
+  final VideoSourceResolveWithHeaders? resolveWithHeaders;
   final _requests = AsyncSessionOwner();
 
   Future<PreparedSourceSwitch> prepare(OnlineVideoPlaybackArgs args) async {
@@ -71,8 +72,14 @@ class SourceSwitchResolver {
         Map<String, String>.unmodifiable(args.plugin.buildHttpHeaders());
     final useLegacyParser = args.plugin.useLegacyParser;
     final request = _requests.begin();
-    final source = await service.resolve(transfer.episodePageUrl,
-        useLegacyParser: useLegacyParser, offset: transfer.offset);
+    final source = await (resolveWithHeaders?.call(transfer.episodePageUrl,
+            useLegacyParser: useLegacyParser,
+            offset: transfer.offset,
+            // SourceSheet keeps its existing ordinary interface default.
+            timeout: const Duration(seconds: 30),
+            headers: headers) ??
+        service.resolve(transfer.episodePageUrl,
+            useLegacyParser: useLegacyParser, offset: transfer.offset));
     if (request.isStale) throw const VideoSourceCancelledException();
     if (source.url.trim().isEmpty) {
       throw const VideoSourceNotFoundException();
