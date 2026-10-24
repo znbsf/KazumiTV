@@ -25,7 +25,6 @@ import 'package:kazumi/request/apis/bangumi_api.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
 import 'package:kazumi/utils/episode_url.dart';
-import 'package:kazumi/utils/http_headers.dart';
 import 'package:kazumi/utils/media.dart';
 import 'package:kazumi/utils/async_session.dart';
 import 'package:kazumi/services/player/episode_identity.dart';
@@ -161,6 +160,7 @@ abstract class _VideoPageController with Store implements Disposable {
   int get playbackRevision => _playbackRevision;
   bool _switchingSource = false;
   VideoSource? _lastResolvedSource;
+  Map<String, String>? _lastResolvedHeaders;
 
   final StreamController<String> _logStreamController =
       StreamController<String>.broadcast();
@@ -563,6 +563,7 @@ abstract class _VideoPageController with Store implements Disposable {
     final previousIdentity = _playbackHistoryIdentity;
     final previousError = _errorMessage;
     final previousSource = _lastResolvedSource;
+    final previousHeaders = _lastResolvedHeaders;
     final previousOffset = recoveryOffset(playerController);
     final wasPlaying = playerController.playback.playing;
     _switchingSource = true;
@@ -574,6 +575,7 @@ abstract class _VideoPageController with Store implements Disposable {
             currentRoad: transfer.road,
             offset: transfer.offset,
             preparedSource: prepared.source,
+            preparedHeaders: prepared.headers,
             playerController: playerController);
       } catch (error) {
         if (playbackRevision == revision) _failLoading('新源加载失败：$error');
@@ -592,6 +594,7 @@ abstract class _VideoPageController with Store implements Disposable {
                   offset: previousOffset,
                   type: previousSource.type,
                   format: previousSource.format),
+              preparedHeaders: previousHeaders,
               playerController: playerController);
           if (!wasPlaying && playbackRevision == revision + 1) {
             await playerController.pause(enableSync: false);
@@ -607,6 +610,7 @@ abstract class _VideoPageController with Store implements Disposable {
         playingEpisode = previousPlaying;
         _requestedOffset = previousOffset;
         _lastResolvedSource = previousSource;
+        _lastResolvedHeaders = previousHeaders;
         _failLoading(previousError ?? '新源加载失败，请重试当前集或重新选源');
         // There was no previous media to reopen. A partially initialized target
         // must not keep playing underneath the restored error surface.
@@ -630,6 +634,7 @@ abstract class _VideoPageController with Store implements Disposable {
     int offset = 0,
     required PlayerController playerController,
     VideoSource? preparedSource,
+    Map<String, String>? preparedHeaders,
   }) async {
     _playbackRevision++;
     final session = _playbackSessions.begin();
@@ -680,6 +685,7 @@ abstract class _VideoPageController with Store implements Disposable {
       urlItem,
       offset,
       preparedSource: preparedSource,
+      preparedHeaders: preparedHeaders,
       resolvedEpisode: resolvedEpisode,
       session: session,
       playerController: playerController,
@@ -814,6 +820,7 @@ abstract class _VideoPageController with Store implements Disposable {
     String url,
     int offset, {
     VideoSource? preparedSource,
+    Map<String, String>? preparedHeaders,
     required EpisodeRef resolvedEpisode,
     required AsyncSession session,
     required PlayerController playerController,
@@ -834,12 +841,8 @@ abstract class _VideoPageController with Store implements Disposable {
       resolvedEpisode.listIndex,
       url,
     ]);
-    final requestHeaders = <String, String>{
-      'user-agent': currentPlugin.userAgent.isEmpty
-          ? getRandomUA()
-          : currentPlugin.userAgent,
-      if (currentPlugin.referer.isNotEmpty) 'referer': currentPlugin.referer,
-    };
+    final requestHeaders = Map<String, String>.unmodifiable(
+        preparedHeaders ?? currentPlugin.buildHttpHeaders());
     try {
       final attempt = preparedSource != null
           ? ResolvedSourceAttempt(preparedSource, requestHeaders,
@@ -889,7 +892,7 @@ abstract class _VideoPageController with Store implements Disposable {
         httpHeaders: attempt.headers,
         adBlockerEnabled: forceAdBlocker || currentPlugin.adBlocker,
         episodeTitle: resolvedEpisode.displayTitle,
-        referer: currentPlugin.referer,
+        referer: attempt.headers['referer'] ?? '',
         currentRoad: resolvedEpisode.roadIndex,
         coverUrl: bangumiItem.images['large'],
         bangumiName: bangumiItem.nameCn.isNotEmpty
@@ -914,6 +917,7 @@ abstract class _VideoPageController with Store implements Disposable {
       if (session.isActive && initialized) {
         historyAccepted = true;
         _lastResolvedSource = source;
+        _lastResolvedHeaders = attempt.headers;
         final output = playerController.playback.videoController;
         if (output != null && preparedSource == null) {
           unawaited(_resolvedSourceCache.rememberAfterFirstFrame(

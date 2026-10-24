@@ -45,11 +45,16 @@ class PlaybackTrace {
         text = decoded;
       } on FormatException {
         break;
+      } on ArgumentError {
+        // Native logs are arbitrary text, including literal '%' characters.
+        // Dart's URI decoder can reject these with ArgumentError as well.
+        break;
       }
     }
     text = text.replaceAll(RegExp(r'\x1b\[[0-9;]*m'), '');
     text = text.replaceAll(
-        RegExp(r'''(?:https?|file|content)://[^\s<>"']+''',
+        RegExp(
+            r'''(?:https?|file|content)(?::|%3a|%253a)(?://|%2f%2f|%252f%252f)[^\s<>"']+''',
             caseSensitive: false),
         '[resource]');
     text = text.replaceAll(

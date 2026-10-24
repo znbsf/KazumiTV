@@ -277,6 +277,92 @@ void main() {
     expect(controller.errorMessage, contains('解析超时'));
   });
 
+  test('prepared commit keeps selected headers after selected plugin changes',
+      () async {
+    await controller.changeEpisode(2, playerController: player);
+    final before = candidate();
+    final headers = {
+      'user-agent': 'UA-used-by-selected-parser',
+      'referer': 'https://new.test/parse-time/'
+    };
+    final prepared =
+        PreparedSourceSwitch.withHeaders(before.args, before.source, headers);
+    headers['user-agent'] = 'mutated-caller';
+    before.args.plugin.userAgent = 'regenerated-selected-UA';
+    before.args.plugin.referer = 'https://new.test/changed/';
+    expect(
+        await controller.switchSource(prepared,
+            expectedRevision: controller.playbackRevision,
+            playerController: player),
+        isTrue);
+    expect(player.initializations.last.httpHeaders, {
+      'user-agent': 'UA-used-by-selected-parser',
+      'referer': 'https://new.test/parse-time/'
+    });
+    expect(player.initializations.last.referer, 'https://new.test/parse-time/');
+    expect(source.requests, hasLength(1));
+  });
+
+  for (final failure in ['false', 'throw']) {
+    test('native $failure rollback reuses original actual headers and pause',
+        () async {
+      await controller.changeEpisode(2, playerController: player);
+      final original = player.initializations.single;
+      final originalHeaders = Map<String, String>.from(original.httpHeaders);
+      controller.currentPlugin.userAgent = 'must-not-regenerate-original';
+      controller.currentPlugin.referer = 'https://changed-original.test/';
+      player.playback.playerPosition = const Duration(seconds: 81);
+      player.playback.playing = false;
+      player.initialize = (params) async {
+        if (params.pluginName == 'new') {
+          if (failure == 'throw') throw StateError('native target rejected');
+          return false;
+        }
+        return true;
+      };
+      final target = candidate();
+      final prepared = PreparedSourceSwitch.withHeaders(
+          target.args, target.source, {
+        'user-agent': 'selected-exact',
+        'referer': 'https://selected.test/'
+      });
+      expect(
+          await controller.switchSource(prepared,
+              expectedRevision: controller.playbackRevision,
+              playerController: player),
+          isFalse);
+      expect(player.initializations[1].httpHeaders['user-agent'],
+          'selected-exact');
+      expect(player.initializations.last.httpHeaders, originalHeaders);
+      expect(player.initializations.last.referer, original.referer);
+      expect(player.initializations.last.offset, 81);
+      expect(player.playback.playing, isFalse);
+      expect(source.requests, hasLength(1));
+      expect(controller.currentPlugin.name, 'fixture');
+    });
+  }
+
+  test('cached playback actual headers survive failed source rollback',
+      () async {
+    final output = _Output();
+    player.playback.videoController = output;
+    await controller.changeEpisode(1, playerController: player);
+    final originalHeaders = player.initializations.single.httpHeaders;
+    output.frame.complete();
+    await Future<void>.delayed(Duration.zero);
+    source.answer = (_, __) =>
+        Future.error(const VideoSourceTimeoutException(Duration(seconds: 15)));
+    await controller.retryCurrentEpisode(playerController: player);
+    expect(player.initializations.last.httpHeaders, originalHeaders);
+    player.initialize = (params) async => params.pluginName != 'new';
+    expect(
+        await controller.switchSource(candidate(),
+            expectedRevision: controller.playbackRevision,
+            playerController: player),
+        isFalse);
+    expect(player.initializations.last.httpHeaders, originalHeaders);
+  });
+
   test('source switch commits pre-resolved media without a second parse',
       () async {
     await controller.changeEpisode(2, playerController: player);
