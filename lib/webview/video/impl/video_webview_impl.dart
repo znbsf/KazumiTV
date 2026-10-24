@@ -11,11 +11,13 @@ import 'package:flutter_inappwebview_android/flutter_inappwebview_android.dart'
     as android_webview;
 import 'package:kazumi/webview/video/video_parser_url.dart';
 import 'package:kazumi/utils/http_headers.dart';
-import 'package:kazumi/services/platform/webview_feature_service.dart';
 import 'package:kazumi/services/video_source/legacy_player_compat.dart';
 
 class VideoWebviewImpl
     extends VideoWebviewController<PlatformInAppWebViewController> {
+  VideoWebviewImpl({LegacyPlayerCompat? playerCompat})
+      : _injectedCompat = playerCompat;
+  final LegacyPlayerCompat? _injectedCompat;
   PlatformHeadlessInAppWebView? headlessWebView;
   bool hasRegisteredHandlers = false;
   bool useLegacyParser = false;
@@ -24,12 +26,13 @@ class VideoWebviewImpl
   bool _pageActive = false;
   bool _polling = false;
   bool _disposed = false;
-  late final _playerCompat = LegacyPlayerCompat(onDiagnostic: (stage) {
-    if (_pageActive && !_disposed) {
-      reportDiagnostic(
-          'legacy_player_compat', LegacyPlayerCompat.endpoint, stage);
-    }
-  });
+  late final _playerCompat = _injectedCompat ??
+      LegacyPlayerCompat(onDiagnostic: (stage) {
+        if (_pageActive && !_disposed) {
+          reportDiagnostic(
+              'legacy_player_compat', LegacyPlayerCompat.endpoint, stage);
+        }
+      });
 
   @override
   Future<void> init() async {
@@ -80,8 +83,7 @@ class VideoWebviewImpl
           if (_pageActive) {
             reportDiagnostic('http_error', request.url.toString(),
                 'status=${response.statusCode} mainFrame=${request.isForMainFrame}');
-            unawaited(
-                _tryPlayerCompat(request.url.toString(), response.statusCode));
+            unawaited(_tryPlayerCompat(request, response));
           }
         },
         onLoadStart: (controller, url) async {
@@ -126,9 +128,7 @@ class VideoWebviewImpl
     isIframeLoaded = false;
     isVideoSourceLoaded = false;
     _pageActive = true;
-    _playerCompat.begin(url,
-        enabled:
-            !useLegacyParser && WebViewFeatureService.needsLegacyPlayerCompat);
+    _playerCompat.begin(url, enabled: !useLegacyParser);
     videoLoadingEventController.add(true);
     _startVideoParserTimer();
     await webviewController?.loadUrl(urlRequest: URLRequest(url: WebUri(url)));
@@ -214,13 +214,19 @@ class VideoWebviewImpl
     );
   }
 
-  Future<void> _tryPlayerCompat(String url, int? status) async {
+  Future<void> _tryPlayerCompat(
+      WebResourceRequest request, WebResourceResponse response) async {
     final session = _session;
-    final media = await _playerCompat.onHttpError(url, status);
+    final media = await _playerCompat.onHttpError(
+        request.url.toString(), response.statusCode,
+        requestHeaders: request.headers,
+        method: request.method,
+        isForMainFrame: request.isForMainFrame);
     if (media == null || !_pageActive || _disposed || session != _session) {
       return;
     }
-    reportDiagnostic('legacy_player_compat', url, 'webview66 bounded response');
+    reportDiagnostic('legacy_player_compat', request.url.toString(),
+        'matched HHJX bounded response');
     _resolve(media, 'Legacy player response');
   }
 
