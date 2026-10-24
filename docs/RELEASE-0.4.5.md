@@ -1,6 +1,6 @@
 # KazumiTV 0.4.5 发布候选说明
 
-状态：**准备中，未合并PR28、未创建tag/Release、未生成正式签名产物**。当前正式版仍为[0.4.4](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.4)。本说明不代表已发布或所有来源已修复。
+状态：**准备中，PR28已合并、未创建tag/Release、未生成正式签名产物**。当前正式版仍为[0.4.4](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.4)。本说明不代表已发布或所有来源已修复。
 
 ## 拟发布内容
 
@@ -27,8 +27,8 @@ QA/Gecko、parserQa完整UI实验、预热与批测工具留在独立草稿PR29�
 
 ## 正式交付前剩余步骤
 
-1. 按[合并检查](MAIN-MERGE-CHECKLIST.md)核对最新head/main、保护规则和CI，另行完成PR28的正常合并；不合入PR29。
-2. 固定最终源码、版本和递增build number，拟版本0.4.5，正式build number仍待正式构建时锁定。当前pubspec和下载链接仍保持已发布0.4.4；remoteqa205591不能直接上传为正式附件。
+1. PR28已按用户授权完成正常合并，merge a3505ed30a469f769b91869b2183526f39f0994f；已核动态保护规则和全部CI。PR29仍独立Draft，不合入。
+2. 固定最终源码、版本和递增build number，版本锁定0.4.5+20562，三ABI为205621/205622/205624。pubspec已更新，下载链接在发布完成前仍指向已发布0.4.4；remoteqa205591不能直接上传为正式附件。
 3. 按[正式构建流程](TV_BUILD_AND_RELEASE.md)使用com.znbsf.kazumi.fluttertv、既有长期证书及合法配置构建三ABI。复用原签名，不重签测试包冒充正式包。
 4. 核验版本/ABI/TV入口/证书/源码关联/权限与probe缺席，准备验证JSON、SHA256SUMS、源码与许可附件；正式配置和签名材料不入包。
 5. 在明确授权范围内补同包同证书保数据升级smoke，核对收藏、历史、规则、设置与基本播放，并验证正式候选的弹幕配置。当前“正式版不动”的边界保持，本文不自动授权覆盖电视正式包。
