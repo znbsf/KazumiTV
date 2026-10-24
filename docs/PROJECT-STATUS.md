@@ -1,10 +1,24 @@
 # KazumiTV 当前状态
 
+## 2026-10-24 0.4.5已正式发布（本轮完成）
+
+[v0.4.5](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.5)已于19:54:23香港时间公开为Latest，非草稿/预发布。精确构建源码/tag57ba3a356e32721abccac0b16bb920eb5cb2f438，经PR30正常合入main3fc9f8c4399de1290f494a9a7b74a1e5c5176a99，完整tree一致；PR28 merge a3505ed3及PR30 checks/三ABI均success。PR29仍独立Draft，overlay暂缓。没有正式默认Gecko或QA实验混入。
+
+正式0.4.5+20562，ARMv7/ARM64/x64版本码205621/205622/205624，沿用3225e3b8…7ce806长期证书和原DPAPI签名流程，合法弹幕配置通过受控文件注入；无新密钥。三个APK证书、TV入口、ABI/版本、非debug、probe/内部QA标记缺席、zipalign、libmpv及签名前后payload一致均核。公开11项白名单附件均与远端digest匹配，再全部匿名实际下载核对大小/SHA256及Latest接口，源码包扫描不含私有配置值。APK SHA256：ARMv7 5ffb0eae6f766a4318f56d48f9957ad8042020602e6297ad8ffca829e1ec77a3；ARM64 135bfee1d691ac5a4deb638291636aa778f920729cefcb30e7f3bb3b17580cfa；x64 dfeaa4dc67a3625cc18f3bc2ae4bab93c42fba3fc61fa3212d222373810296c5。验证JSON为构建时快照，不回写伪造当时installed/published状态。
+
+隔离Kazumi_Update_20261018/API36/x64/WebView143.0.7499.24只读AVD，现装正式0.4.3/203934→一次normal install-r升级正式0.4.5/205624。UID10090、首次安装2026-10-18 11:36:57、dataDir保持；硬解关闭/低内存始终开启/低延迟音频开启逐项可见保持（PNG非逐字节一致，不伪称像素完全相等）。未有原收藏历史，不声称其真实内容迁移验收。正常首页/详情/来源，两原规则保留；7sefun学生会也有洞第01集4418ms解析、11:46:52.966原生首帧，亲自看见真实动画、00:32/23:40及实际弹幕。未再出现无配置CI包的弹幕403。无声音/AV/长稳、特定HHJX403二进制对照或事务换源失败回滚验收，旧边界保留；个人电视正式版/QA均未再操作。
+
+仅截图/控件树和有界App日志，不是连续录屏。停止所属App并emu kill自有97704/140804/122508，独立CIM均已退出、5588/5589无监听；AVD config/ini/userdata种子hash保持。本次Gradle74764日志唯一冻结构建及子Kotlin83792归属核清后已停止，无相应残留，共享ADB保留。初次模拟器命令误指构建SDK内不存在的emulator.exe，WinError2/实际0启动；随后从原进程证据取真实SDK路径正常启动，不隐去失败。原件在根artifacts/release-0.4.5-20261024：release-0.4.5/tv-build/candidate-verification.json、upgrade-smoke/acceptance-result.json、publication-readback.json、public-download-verification.json，私有日志/截图与配置不上传。
+
+README下载入口和CHANGELOG同步0.4.5，保留旧截图真实版本；电视首页展示仍在手机遥控介绍之前。旧自动化继续暂停，本轮发布已完成，不自动恢复多来源矩阵。
+
 ## 2026-10-24 0.4.5正式发布执行（进行中）
 
 用户明确回复“允许”，授权PR28合并及正式构建、核验和发布。已实读main经典保护404、有效ruleset25095474仅deletion/non_fast_forward、bypass为空/never，无未解决review threads；PR28 head85443289四CI全success后正常ready+expected-head merge，实际merge a3505ed30a469f769b91869b2183526f39f0994f，main程序与已验候选相同。PR29仅retarget main，仍Draft/open，未合实验。保留所有旧分支/产物，不覆盖远端旧tag。
 
-从合并main建立codex/release-045-20261024，锁定0.4.5+20562（ARM205621/ARM64205622/x64205624），只改版本元数据和发布记录，不改播放源码/依赖/QA策略。正式包必须复用长期证书3225e3b8676eed2d2f28fad6255881120f6335ade615bbb27673d974727ce806及合法弹幕构建配置，不生成替代证书。本机既有DPAPI签名/配置路径尚在定位，已向用户仅询问目录或现有脚本，禁止发送秘密。先推进独立版本CI和源码/许可准备；路径缺失时不把无签名/无合法配置的测试包发布。
+从合并main建立codex/release-045-20261024，锁定0.4.5+20562（ARM205621/ARM64205622/x64205624），只改版本元数据和发布记录，不改播放源码/依赖/QA策略。正式包必须复用长期证书3225e3b8676eed2d2f28fad6255881120f6335ade615bbb27673d974727ce806及合法弹幕构建配置，不生成替代证书。已从原发布脚本找回长期证书/DPAPI签名目录和合法构建配置，材料均存在且必需字段已核，不读取或输出秘密；采用原签名流程，不重新生成证书。
+
+正式包冻结源57ba3a356e32721abccac0b16bb920eb5cb2f438，三个ABI构建进行中。升级smoke仅复用已知隔离Kazumi_Update_20261018/API36/x64 AVD，核当前身份/旧正式证书后normal install-r本次候选，检查UID/首次安装/数据目录和已有设置/可观察首页；必要时短播检查弹幕响应。预算启动90秒、升级与界面10分钟，未知归属/身份或签名不符即停。不是新版WebView的HHJX故障复现，不操作个人电视，不清数据、不绕签名、不启动新来源矩阵。保留旧AVD及数据，收尾仅停止确认归属的模拟器/QA采集，现有ADB保留。
 
 本轮构建单次最多20分钟，签名/附件核验10分钟、必要保数据升级smoke约10分钟；来源仅基本代表样本，不恢复17源矩阵或旧copy/GPU路线。合并、签名产物、升级验收、发布分别记录；不因CI成功预写正式通过。原件在本地artifacts/release-0.4.5-20261024，正式包与个人数据继续保护，旧自动化不恢复。
 
