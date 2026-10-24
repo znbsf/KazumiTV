@@ -1,5 +1,16 @@
 # KazumiTV 当前状态
 
+## 2026-10-24 0.4.4应用内更新拒绝：真机已定位、补丁待交付
+
+用户明确授权原电视点击更新并抓ADB日志。现装正式0.4.4/205571 APK c77f598e…bb3b，UID10075/firstInstall2026-10-10保持。22:16:31实点一次复现：cache hash verified后UPDATE_REJECTED“安装包签名信息无效”，未到系统安装器。独立apksigner核现装0.4.4与公开0.4.5均v2/v3有效、单一同证书3225e3b8…7ce806，不重新签名/换key/覆盖旧Release。旧API36 adb覆盖升级没有验证Android9应用内archive签名读取。
+
+同电视只读PackageManager对照已完成：installed-modern取得单一正式证书；archive-modern返回modern=-1/legacy=-1，archive-legacy取得legacy=1且固定证书一致，archive-combined取得modern=1/legacy=1且两者均为3225e3b8…7ce806。同一0.4.5 ARM APK在设备端sha256=5ffb0eae…77a3。证明这台Android9的archive证书收集兼容缺口，不是下载/签名损坏或系统安装拒绝。仅新旧flags组合即可修复读取，不降级证书信任。两个/data/local/tmp专用文件与UI XML已删除、探针进程无残留，未安装探针或APK，未清正式数据，电视正式仍0.4.4/205571、UID10075/首次安装/更新时间保持。
+
+最小源码补丁仅TvUpdateBridge.archive查询加GET_SIGNATURES，与既有GET_SIGNING_CERTIFICATES组合；installed身份查询及certificate(current signer单一+固定SHA)/包名/非debug/hash/size/version/ABI守卫不改，不采用旧签名历史绕过。Kotlin compileTvReleaseKotlin离线通过41.156秒；3组23项Flutter更新资产、发布身份与下载对话框回归通过。实际API对照是设备原生查询，不冒称完整修复APK已装或新版WebView测试。0.4.5仍含旧更新器，未改tag/附件/证书；旧0.4.4无法通过线上说明自修，越过本次拒绝需一次同证书正常手动/ADB覆盖升级。此次用户只要求点击复现和分析，未代其执行覆盖升级。
+
+原始失败保留：初次状态插入因换行未匹配停止；首次本地补丁路径误在android目录下前缀重复，未改源码；随后Gradle属性经PowerShell拆分，Invalid kazumiTvApplicationId/11秒失败，不当补丁验证。改为明确参数数组后最小补丁实际编译成功。原件根artifacts/tv-update-045-failure-20261024：app-repro-final.log、signature-api-comparison.txt、installed-044.apk、截图、update-tests.log和native-compile-result.json；不公开私有原件。
+
+
 ## 2026-10-24 0.4.5已正式发布（本轮完成）
 
 [v0.4.5](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.5)已于19:54:23香港时间公开为Latest，非草稿/预发布。精确构建源码/tag57ba3a356e32721abccac0b16bb920eb5cb2f438，经PR30正常合入main3fc9f8c4399de1290f494a9a7b74a1e5c5176a99，完整tree一致；PR28 merge a3505ed3及PR30 checks/三ABI均success。PR29仍独立Draft，overlay暂缓。没有正式默认Gecko或QA实验混入。
