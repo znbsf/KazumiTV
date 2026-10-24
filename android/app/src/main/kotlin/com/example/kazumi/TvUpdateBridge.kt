@@ -113,7 +113,10 @@ class TvUpdateBridge(private val activity: Activity, messenger: BinaryMessenger)
             while (true) { val n = input.read(buffer); if (n < 0) break; digest.update(buffer, 0, n) }
         }
         require(hex(digest.digest()) == hash) { "文件完整性验证失败" }
-        val target = activity.packageManager.getPackageArchiveInfo(file.path, flags)
+        // Android 9 archive parsing may collect certificates only with GET_SIGNATURES.
+        // Request both fields; still require one current signer and the pinned certificate.
+        val target = activity.packageManager.getPackageArchiveInfo(
+            file.path, flags or PackageManager.GET_SIGNATURES)
             ?: throw IllegalArgumentException("无法读取安装包")
         require(target.packageName == officialPackage && certificate(target) == officialCertificate &&
             (target.applicationInfo!!.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) { "安装包身份或签名不匹配" }
