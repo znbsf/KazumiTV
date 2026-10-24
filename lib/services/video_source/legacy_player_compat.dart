@@ -5,7 +5,7 @@ import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/request/core/network_config.dart';
 import 'package:kazumi/webview/video/video_parser_url.dart';
 
-/// Narrow fallback for the reproduced WebView 66 / HHJX origin-policy failure.
+/// Narrow fallback for the observed HHJX null-Origin POST rejection.
 /// The normal WebView request runs first. No generic response scraping, script
 /// replacement, cookie access, or changes to global WebView/network settings.
 class LegacyPlayerCompat {
@@ -27,19 +27,20 @@ class LegacyPlayerCompat {
   int _generation = 0;
   CancelToken? _cancel;
 
-  void begin(String episode, {required bool enabled}) {
-    cancel();
+  static bool supportsEpisode(String episode) {
     final uri = Uri.tryParse(episode);
-    if (enabled &&
-        uri?.scheme == 'https' &&
+    return uri?.scheme == 'https' &&
         uri?.host == 'dmbus.cc' &&
         uri?.port == 443 &&
         uri!.userInfo.isEmpty &&
         uri.query.isEmpty &&
         uri.fragment.isEmpty &&
-        RegExp(r'^/p/\d+-\d+-\d+\.html$').hasMatch(uri.path)) {
-      _episode = episode;
-    }
+        RegExp(r'^/p/\d+-\d+-\d+\.html$').hasMatch(uri.path);
+  }
+
+  void begin(String episode, {required bool enabled}) {
+    cancel();
+    if (enabled && supportsEpisode(episode)) _episode = episode;
   }
 
   void observePage(String url, Map<String, String>? headers) {
@@ -73,7 +74,13 @@ class LegacyPlayerCompat {
     _userAgent = normalized['user-agent'];
   }
 
-  Future<String?> onHttpError(String url, int? status) async {
+  Future<String?> onHttpError(
+    String url,
+    int? status, {
+    Map<String, String>? requestHeaders,
+    String? method,
+    bool? isForMainFrame,
+  }) async {
     final page = _page;
     if (url != endpoint ||
         status != 403 ||
@@ -83,8 +90,26 @@ class LegacyPlayerCompat {
         _episode == null) {
       return null;
     }
+    // A 403 alone may be authentication, a challenge, or an unrelated failure.
+    // Require the observed request signature, not a provider/OS/UA version.
+    if (method != 'POST' || isForMainFrame != false || requestHeaders == null) {
+      return null;
+    }
+    final headers = <String, String>{};
+    for (final entry in requestHeaders.entries) {
+      final key = entry.key.toLowerCase();
+      if (headers.containsKey(key)) return null;
+      headers[key] = entry.value;
+    }
+    if (headers['origin'] != 'null' ||
+        headers.keys
+            .any({'authorization', 'proxy-authorization', 'cookie'}.contains) ||
+        (headers.containsKey('referer') &&
+            headers['referer'] != page.toString())) {
+      return null;
+    }
     _attempted = true;
-    onDiagnostic?.call('start webview66 source adapter');
+    onDiagnostic?.call('start observed HHJX source adapter');
     final generation = _generation;
     final token = _cancel = CancelToken();
     final dio = _client ??

@@ -8,8 +8,9 @@ class WebViewFeatureService {
   static bool? _isDocumentStartScriptSupported;
   static bool _needsLegacyPlayerCompat = false;
 
-  // Only the provider/version reproduced on the TV is enabled. Unknown and
-  // modern engines fail closed; never infer engine capabilities from a UA.
+  // QA-only eligibility for the existing Gecko experiment, not HHJX admission.
+  // Its verified provider/version scope stays unchanged in this draft.
+  // Formal HHJX matching uses the observed request failure on both pipelines.
   static bool needsPlayerCompat(String? packageName, String? versionName) =>
       const {'com.android.webview', 'com.google.android.webview'}
           .contains(packageName) &&

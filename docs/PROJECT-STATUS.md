@@ -1,5 +1,14 @@
 # KazumiTV 当前状态
 
+## 2026-10-24 HHJX故障条件判定：本地受控对照完成
+
+按用户授权，将HHJX补救从提供者/66版本号准入改为实际故障条件。原new-source-retry/webview-qa记录确认指定HHJX POST的Origin:null对应403/非法来源、同源对照200；本次不重发网站请求。正式补救只认HTTPS dmbus.cc固定剧集路径、当前剧集Referer绑定的唯一HHJX iframe、精确/api/parse的子框架POST403与Origin:null；缺失method/headers/frame信息、非null来源、认证/Cookie请求、错误Referer、冲突iframe均不启用。正常解析优先，最多一次、原8秒/响应上限/默认TLS/不跟redirect及取消代际守卫保持。现代DocumentStart路径的原生请求观察只在该剧集加载时开启，其他来源显式关闭；固定插件实现确认显式false不会因注册回调被自动改为true。控制器工厂及其他平台选择不变，不引入Gecko、规则overlay、新依赖或任意JS。
+
+先加入“单个403无来源信息不得请求”的反例，旧实现确实失败，再修改实现。新hhjx_webview_comparison_test通过实际两条生产控制器的回调，在合成native平台/HTTP响应下对照正常成功、同一故障指纹、无关错误、缺失或歧义信息、iframe-only、旧页、取消与迟到响应，并验证现代观察开关范围；对应四组44项通过。完整Flutter回归1167项通过（137秒）；按CI参数analyze退出0，无error/warning，175条info保留（10.8秒）。默认analyze首次因这175条info退出1，不隐去。日志保存在本地artifacts/pr28-split-20261024/hhjx-condition-*。
+
+以上是受控生产代码路径测试，不是WebView66/143二进制对照或新电视播放证据；原实测仍仅支持WebView66的旧案例。本次未访问来源HTTP、构建/安装APK或操作电视；新native回调若不提供足够请求信息会默认关闭补救，不能承诺原设备重新验收通过。QA实验继续独立草稿PR29，其旧WebView资格判定只留QA侧；PR28仅正式修复与对应回归，overlay暂缓，不合并、不发布、不恢复自动化。
+
+
 > 历史证据保留：以下描述对应原合集24799b1d和既有QA20597，不是拆分后新APK的验收。overlay在本分支未接入；原实现保存在codex/pr28-preserved-20261024。设备与自动续跑继续暂停。
 
 ## 2026-10-22 23:10 用户要求告一段落：已暂停

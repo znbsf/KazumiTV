@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kazumi/services/platform/webview_feature_service.dart';
 import 'package:kazumi/services/video_source/legacy_player_compat.dart';
 
 const episode = 'https://dmbus.cc/p/6330-1-2.html';
@@ -38,37 +37,14 @@ class Adapter implements HttpClientAdapter {
 }
 
 void main() {
-  test('only verified provider major 66 is admitted, never a UA', () {
-    for (final provider in [
-      'com.android.webview',
-      'com.google.android.webview'
-    ]) {
-      expect(WebViewFeatureService.needsPlayerCompat(provider, '66.0.3359.158'),
-          isTrue);
-      for (final version in [
-        null,
-        '',
-        '65.0.0.0',
-        '67.0.0.0',
-        '141.0.0.0',
-        '66.0.bad',
-        'Chrome/66.0.3359.158'
-      ]) {
-        expect(WebViewFeatureService.needsPlayerCompat(provider, version),
-            isFalse);
-      }
-    }
-    for (final provider in [null, '', 'vendor.webview', 'com.android.chrome']) {
-      expect(WebViewFeatureService.needsPlayerCompat(provider, '66.0.3359.158'),
-          isFalse);
-    }
-  });
   late Adapter adapter;
   late LegacyPlayerCompat compat;
   void observe([String? url, String referrer = episode]) => compat.observePage(
       url ?? player, {'Referer': referrer, 'User-Agent': 'fixture UA'});
-  Future<String?> fail() =>
-      compat.onHttpError(LegacyPlayerCompat.endpoint, 403);
+  Future<String?> fail() => compat.onHttpError(LegacyPlayerCompat.endpoint, 403,
+      requestHeaders: const {'Origin': 'null'},
+      method: 'POST',
+      isForMainFrame: false);
   setUp(() {
     adapter = Adapter();
     compat = LegacyPlayerCompat(client: Dio()..httpClientAdapter = adapter);
@@ -76,6 +52,12 @@ void main() {
     observe();
   });
   tearDown(() => compat.cancel());
+
+  test('bare 403 is insufficient without observed null-Origin request context',
+      () async {
+    expect(await compat.onHttpError(LegacyPlayerCompat.endpoint, 403), isNull);
+    expect(adapter.requests, isEmpty);
+  });
 
   test('fresh same-origin bootstrap yields media once, without player scripts',
       () async {

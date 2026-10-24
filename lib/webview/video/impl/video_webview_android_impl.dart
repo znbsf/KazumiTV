@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:async';
+import 'package:kazumi/services/video_source/legacy_player_compat.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -12,10 +14,13 @@ import 'package:kazumi/utils/http_headers.dart';
 
 class VideoWebviewAndroidImpl
     extends VideoWebviewController<PlatformInAppWebViewController> {
-  VideoWebviewAndroidImpl({this.userAgent});
+  VideoWebviewAndroidImpl({this.userAgent, LegacyPlayerCompat? playerCompat})
+      : _playerCompat = playerCompat ?? LegacyPlayerCompat();
 
   /// Optional deterministic UA for controlled QA; production keeps its default.
   final String? userAgent;
+  final LegacyPlayerCompat _playerCompat;
+  bool _compatInterception = false;
   static const _parserScriptGroup = 'kazumi-video-parser';
   PlatformHeadlessInAppWebView? headlessWebView;
   bool _hasRegisteredHandlers = false;
@@ -34,6 +39,8 @@ class VideoWebviewAndroidImpl
           userAgent: userAgent ?? getRandomUA(),
           mediaPlaybackRequiresUserGesture: true,
           cacheEnabled: false,
+          // Only the scoped episode enables native observation during loading.
+          useShouldInterceptRequest: false,
           blockNetworkImage: true,
           loadsImagesAutomatically: false,
           upgradeKnownHostsToHTTPS: false,
@@ -47,10 +54,17 @@ class VideoWebviewAndroidImpl
           webviewController = controller;
           initEventController.add(true);
         },
+        shouldInterceptRequest: (controller, request) async {
+          if (_pageActive && !isVideoSourceLoaded && _compatInterception) {
+            _playerCompat.observePage(request.url.toString(), request.headers);
+          }
+          return null;
+        },
         onReceivedHttpError: (controller, request, response) {
           if (_pageActive) {
             reportDiagnostic('http_error', request.url.toString(),
                 'status=${response.statusCode} mainFrame=${request.isForMainFrame}');
+            unawaited(_tryPlayerCompat(request, response));
           }
         },
         onReceivedError: (controller, request, error) {
@@ -95,6 +109,13 @@ class VideoWebviewAndroidImpl
         injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
       ),
     ]);
+    final observe = !useLegacyParser && LegacyPlayerCompat.supportsEpisode(url);
+    if (_compatInterception != observe) {
+      await webviewController?.setSettings(
+          settings: InAppWebViewSettings(useShouldInterceptRequest: observe));
+      _compatInterception = observe;
+    }
+    _playerCompat.begin(url, enabled: observe);
     count = 0;
     this.offset = offset;
     _useLegacyParser = useLegacyParser;
@@ -150,6 +171,7 @@ class VideoWebviewAndroidImpl
       args[1] == _session;
 
   void _resolve(String url) {
+    _playerCompat.cancel();
     isIframeLoaded = true;
     isVideoSourceLoaded = true;
     _pageActive = false;
@@ -160,8 +182,25 @@ class VideoWebviewAndroidImpl
     // Starting a second, unawaited about:blank here can clear the next page.
   }
 
+  Future<void> _tryPlayerCompat(
+      WebResourceRequest request, WebResourceResponse response) async {
+    final session = _session;
+    final media = await _playerCompat.onHttpError(
+        request.url.toString(), response.statusCode,
+        requestHeaders: request.headers,
+        method: request.method,
+        isForMainFrame: request.isForMainFrame);
+    if (media == null || !_pageActive || _disposed || session != _session) {
+      return;
+    }
+    reportDiagnostic('legacy_player_compat', request.url.toString(),
+        'matched HHJX bounded response');
+    _resolve(media);
+  }
+
   @override
   Future<void> unloadPage() async {
+    _playerCompat.cancel();
     _pageActive = false;
     _session++;
     await webviewController?.loadUrl(
@@ -185,6 +224,7 @@ class VideoWebviewAndroidImpl
 
   @override
   Future<void> dispose() async {
+    _playerCompat.cancel();
     _disposed = true;
     _pageActive = false;
     _session++;
