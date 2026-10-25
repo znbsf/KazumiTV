@@ -43,6 +43,9 @@ class ApiEndpoints {
   /// bangumi API
   static const String bangumiAPIDomain = 'https://api.bgm.tv';
 
+  /// Anonymous public subject search when the Kazumi mirror key is unavailable.
+  static const String bangumiSearchMirrorDomain = 'https://api.bgmapi.com';
+
   /// Bangumi 鉴权 API
   static const String bangumiAuthAPIMirrorDomain = 'https://api.bgmapi.com';
 

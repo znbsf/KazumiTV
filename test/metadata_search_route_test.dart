@@ -79,7 +79,8 @@ void main() {
     expect(adapter.requests, hasLength(1));
     final request = adapter.requests.single;
     expect(request.method, 'POST');
-    expect(request.uri.host, hasCredentials ? 'api.kazumi.fyi' : 'api.bgm.tv');
+    expect(
+        request.uri.host, hasCredentials ? 'api.kazumi.fyi' : 'api.bgmapi.com');
     expect(request.uri.scheme, 'https');
     expect(request.uri.path, '/v0/search/subjects');
     expect(request.uri.queryParameters,
@@ -93,12 +94,13 @@ void main() {
     expect(GStorage.getSetting(SettingsKeys.bangumiSyncEnable), isFalse);
   });
 
-  test('public search retains existing optional bearer token', () async {
+  test('anonymous search mirror never receives an optional account token',
+      () async {
     await GStorage.putSetting(SettingsKeys.bangumiSyncEnable, true);
     await GStorage.putSetting(SettingsKeys.bangumiAccessToken, ' saved-token ');
     await BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'});
-    expect(
-        adapter.requests.single.headers['Authorization'], 'Bearer saved-token');
+    expect(adapter.requests.single.headers['Authorization'],
+        hasCredentials ? 'Bearer saved-token' : isNull);
     expect(
         GStorage.getSetting(SettingsKeys.bangumiAccessToken), ' saved-token ');
     expect(GStorage.getSetting(SettingsKeys.bangumiSyncEnable), isTrue);
@@ -117,6 +119,31 @@ void main() {
     expect(request.uri.host, 'api.bgm.tv');
     expect(request.headers.containsKey('X-Signature'), isFalse);
     expect(GStorage.getSetting(SettingsKeys.enableBangumiProxy), isFalse);
+  });
+
+  test('mirror-disabled search preserves optional official authentication',
+      () async {
+    await GStorage.putSetting(SettingsKeys.enableBangumiProxy, false);
+    await GStorage.putSetting(SettingsKeys.bangumiSyncEnable, true);
+    await GStorage.putSetting(SettingsKeys.bangumiAccessToken, ' saved-token ');
+    await BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'});
+    expect(adapter.requests.single.uri.host, 'api.bgm.tv');
+    expect(
+        adapter.requests.single.headers['Authorization'], 'Bearer saved-token');
+  });
+
+  test('search routing requires the exact official HTTPS endpoint', () async {
+    final urls = [
+      'https://api.bgm.tv.example/v0/search/subjects',
+      'https://example.com/v0/search/subjects',
+      'https://api.bgm.tv/v0/search/subjects/extra',
+    ];
+    for (final url in urls) {
+      await BangumiClient.instance.post(url, data: {'keyword': 'JOJO'});
+    }
+    expect(adapter.requests.map((request) => request.uri.host),
+        ['api.bgm.tv.example', 'example.com', 'api.kazumi.fyi']);
+    expect(adapter.requests.last.uri.path, '/v0/search/subjects/extra');
   });
 
   test('subject details and collection writes retain existing mirror routing',

@@ -49,16 +49,23 @@ class BangumiClient {
     CancelToken? cancelToken,
   }) async {
     try {
-      final useOfficialSearch = _useOfficialSearchWithoutMirrorCredentials(
+      final usePublicSearchMirror = _usePublicSearchMirrorWithoutCredentials(
         url,
         requiresAuth: requiresAuth,
       );
       final response = await DioFactory.apiDio.post(
-        url,
+        usePublicSearchMirror
+            ? Uri.parse(ApiEndpoints.bangumiSearchMirrorDomain)
+                .replace(
+                  path: Uri.parse(url).path,
+                  query: Uri.parse(url).query,
+                )
+                .toString()
+            : url,
         data: data,
         queryParameters: queryParameters,
         options: Options(
-          extra: useOfficialSearch
+          extra: usePublicSearchMirror
               ? {DioFactory.bypassBangumiMirrorExtra: true}
               : null,
           headers: _headers(
@@ -66,7 +73,8 @@ class BangumiClient {
             url: url,
             method: 'POST',
             data: data,
-            signMirrorRequest: !useOfficialSearch,
+            signMirrorRequest: !usePublicSearchMirror,
+            includeSyncToken: !usePublicSearchMirror,
           ),
         ),
         cancelToken: cancelToken,
@@ -77,13 +85,13 @@ class BangumiClient {
     }
   }
 
-  bool _useOfficialSearchWithoutMirrorCredentials(
+  bool _usePublicSearchMirrorWithoutCredentials(
     String url, {
     required bool requiresAuth,
   }) {
-    // Self-built apps do not have the CI-only mirror signing credentials.
-    // Public subject search is also available on the official API without them.
-    // Keep every other endpoint and authenticated request on its chosen route.
+    // Fork builds may lack the Kazumi mirror's CI-only signing credentials.
+    // Keep public searches accelerated without sending account tokens to the
+    // anonymous mirror. Other endpoints retain their existing routes.
     if (requiresAuth ||
         !GStorage.getSetting(SettingsKeys.enableBangumiProxy) ||
         ((bangumiMirrorCredentials['id']?.trim().isNotEmpty ?? false) &&
@@ -106,6 +114,7 @@ class BangumiClient {
     required String method,
     Object? data,
     bool signMirrorRequest = true,
+    bool includeSyncToken = true,
   }) {
     final headers = <String, dynamic>{...bangumiHTTPHeader};
     final bangumiSyncEnable =
@@ -113,7 +122,8 @@ class BangumiClient {
     final token = (accessToken ??
             GStorage.getSetting<String>(SettingsKeys.bangumiAccessToken))
         .trim();
-    if ((requiresAuth || bangumiSyncEnable) && token.isNotEmpty) {
+    if ((requiresAuth || (includeSyncToken && bangumiSyncEnable)) &&
+        token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
     if (signMirrorRequest && _shouldSignProtectedMirrorRequest(url, method)) {

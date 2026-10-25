@@ -25,7 +25,7 @@ class NetworkMirrorSettings extends StatelessWidget {
           SettingsTile.switchTile(
             leading: Icons.travel_explore_rounded,
             title: const Text('Bangumi 镜像'),
-            description: const Text('加速番剧信息、热门与时间表加载'),
+            description: const Text('加速番剧信息、热门、时间表与搜索'),
             initialValue: enableBangumiProxy,
             onToggle: (value) => onBangumiChanged(value ?? !enableBangumiProxy),
           ),
