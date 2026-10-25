@@ -1,6 +1,7 @@
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/clients/bangumi_client.dart';
+import 'package:kazumi/request/clients/bangumi_public_route.dart';
 import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_relation.dart';
@@ -29,6 +30,9 @@ class BangumiSearchPage {
 
 class BangumiApi {
   static final BangumiClient _client = BangumiClient.instance;
+  // Choose a provider on page zero, and keep it for later pages. Switching
+  // catalogues midway would skip or repeat entries because their orders differ.
+  static final Set<String> _popularSearchFallback = {};
   static final AsyncRateLimiter _writeRateLimiter =
       AsyncRateLimiter(const Duration(milliseconds: 250));
 
@@ -58,7 +62,8 @@ class BangumiApi {
   // Official fallback for season switching. Mirror mode uses the cached
   // /kazumi/v1/calendar/season endpoint instead of Bangumi search.
   static Future<List<List<BangumiItem>>> getCalendarBySearch(
-      List<String> dateRange, int limit, int offset) async {
+      List<String> dateRange, int limit, int offset,
+      {bool publicMirror = false}) async {
     List<BangumiItem> bangumiList = [];
     List<List<BangumiItem>> bangumiCalendar = [];
     var params = <String, dynamic>{
@@ -76,10 +81,10 @@ class BangumiApi {
       final url = ApiEndpoints.formatUrl(
           ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
           [limit, offset]);
-      final jsonData = await _client.post(
-        url,
-        data: params,
-      );
+      final jsonData = publicMirror
+          ? await _client.publicSearch(
+              data: params, limit: limit, offset: offset)
+          : await _client.post(url, data: params);
       final jsonList = jsonData['data'];
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {
@@ -124,6 +129,11 @@ class BangumiApi {
         ApiEndpoints.bangumiMirrorDomain +
             buildBangumiMirrorSeasonCalendarPath(dateRange),
       );
+      if (jsonData is! Map ||
+          !List.generate(7, (i) => '${i + 1}')
+              .every((day) => jsonData[day] is List)) {
+        throw const FormatException('Invalid mirror season calendar');
+      }
       for (int i = 1; i <= 7; i++) {
         List<BangumiItem> bangumiList = [];
         final jsonList = jsonData['$i'] ?? [];
@@ -141,6 +151,22 @@ class BangumiApi {
     } catch (e) {
       KazumiLogger().e('Network: resolve bangumi mirror season calendar failed',
           error: e);
+      if (BangumiPublicRoute.canRetry(e)) {
+        // Search is bounded to the same 4 x 20 items as official season mode.
+        // Keep the requested dates; today's calendar is not a past-season
+        // substitute. No second call to the failing Kazumi endpoint.
+        final days = List.generate(7, (_) => <BangumiItem>[]);
+        for (var page = 0; page < 4; page++) {
+          final batch = await getCalendarBySearch(dateRange, 20, page * 20,
+              publicMirror: true);
+          if (batch.length != 7) return [];
+          for (var day = 0; day < 7; day++) {
+            days[day].addAll(batch[day]);
+          }
+          if (batch.every((day) => day.isEmpty)) break;
+        }
+        return days;
+      }
     }
     return bangumiCalendar;
   }
@@ -236,6 +262,10 @@ class BangumiApi {
     int limit = 24,
     int offset = 0,
   }) async {
+    if (offset == 0) _popularSearchFallback.remove(tag);
+    if (_popularSearchFallback.contains(tag)) {
+      return _getPublicPopular(tag: tag, limit: limit, offset: offset);
+    }
     List<BangumiItem> bangumiList = [];
     try {
       final jsonData = await _client.get(
@@ -247,6 +277,9 @@ class BangumiApi {
             ),
       );
       final jsonList = jsonData is List ? jsonData : jsonData['data'];
+      if (jsonList is! List) {
+        throw const FormatException('Invalid mirror popular catalogue');
+      }
       for (dynamic jsonItem in jsonList) {
         if (jsonItem is Map<String, dynamic>) {
           bangumiList.add(BangumiItem.fromJson(jsonItem));
@@ -255,8 +288,33 @@ class BangumiApi {
     } catch (e) {
       KazumiLogger()
           .e('Network: resolve bangumi mirror popular list failed', error: e);
+      if (offset == 0 && BangumiPublicRoute.canRetry(e)) {
+        _popularSearchFallback.add(tag);
+        return _getPublicPopular(tag: tag, limit: limit, offset: offset);
+      }
     }
     return bangumiList;
+  }
+
+  static Future<List<BangumiItem>> _getPublicPopular({
+    required String tag,
+    required int limit,
+    required int offset,
+  }) async {
+    try {
+      final jsonData = await _client.publicSearch(
+        data: buildBangumiSearchParams('', tags: [if (tag.isNotEmpty) tag]),
+        limit: limit,
+        offset: offset,
+      );
+      return (jsonData['data'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(BangumiItem.fromJson)
+          .toList();
+    } catch (e) {
+      KazumiLogger().e('Network: public popular fallback failed', error: e);
+      return [];
+    }
   }
 
   static List<String> _buildNumberFilter<T extends num>(T? min, T? max) {

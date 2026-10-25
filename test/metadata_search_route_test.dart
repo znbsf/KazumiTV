@@ -99,8 +99,7 @@ void main() {
     await GStorage.putSetting(SettingsKeys.bangumiSyncEnable, true);
     await GStorage.putSetting(SettingsKeys.bangumiAccessToken, ' saved-token ');
     await BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'});
-    expect(adapter.requests.single.headers['Authorization'],
-        hasCredentials ? 'Bearer saved-token' : isNull);
+    expect(adapter.requests.single.headers['Authorization'], isNull);
     expect(
         GStorage.getSetting(SettingsKeys.bangumiAccessToken), ' saved-token ');
     expect(GStorage.getSetting(SettingsKeys.bangumiSyncEnable), isTrue);
@@ -171,7 +170,7 @@ void main() {
     expect(adapter.requests.single.uri.host, 'api.kazumi.fyi');
   });
 
-  for (final status in [401, 403, 429, 503]) {
+  for (final status in [401, 403, 429]) {
     test('HTTP $status remains classified and does not trigger another request',
         () async {
       adapter.status = status;
@@ -186,6 +185,20 @@ void main() {
       expect(GStorage.getSetting(SettingsKeys.enableBangumiProxy), isTrue);
     });
   }
+
+  test('unavailable search has a bounded direct official fallback', () async {
+    adapter.status = 503;
+    await expectLater(
+      BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'}),
+      throwsA(isA<NetworkException>()
+          .having((error) => error.statusCode, 'status', 503)),
+    );
+    expect(adapter.requests.map((request) => request.uri.host), [
+      if (hasCredentials) 'api.kazumi.fyi',
+      'api.bgmapi.com',
+      'api.bgm.tv',
+    ]);
+  });
 
   test('certificate failure is surfaced without retry or route changes',
       () async {
@@ -227,7 +240,10 @@ class _SearchAdapter implements HttpClientAdapter {
       throw DioException(requestOptions: options, type: failure!);
     }
     return ResponseBody.fromString(
-      jsonEncode({'data': <dynamic>[], 'total': 0}),
+      jsonEncode(
+          options.method == 'GET' && options.uri.path == '/v0/subjects/38326'
+              ? {'id': 38326}
+              : {'data': <dynamic>[], 'total': 0}),
       status,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
