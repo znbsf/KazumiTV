@@ -70,7 +70,7 @@ void main() {
           '$_next/p1/$kind/123/comments?limit=20&offset=40',
           queryParameters: {'extra': 'kept'});
       expect(adapter.requests.single.uri.host,
-          _signed ? 'api.kazumi.fyi' : 'next.bangumi.pro');
+          _signed ? 'api.kazumi.fyi' : 'next.bangumi.lat');
       expect(adapter.requests.single.uri.queryParameters,
           {'limit': '20', 'offset': '40', 'extra': 'kept'});
       expect(adapter.requests.single.headers['Authorization'], isNull);
@@ -94,7 +94,7 @@ void main() {
     final data = await BangumiClient.instance.get('$_next/p1/subjects/38326');
     expect(data['id'], 38326);
     expect(adapter.requests.map((o) => o.uri.host),
-        ['api.kazumi.fyi', 'next.bangumi.pro', 'next.bgm.tv']);
+        ['api.kazumi.fyi', 'next.bangumi.lat', 'next.bgm.tv']);
     for (final o in adapter.requests) {
       expect(o.headers['Authorization'], isNull);
       expect(o.headers['X-Signature'], isNull);
@@ -109,7 +109,7 @@ void main() {
     await BangumiClient.instance.get('https://api.bgm.tv/v0/episodes',
         queryParameters: {'subject_id': 38326, 'offset': 100, 'limit': 100});
     expect(adapter.requests.map((o) => o.uri.host),
-        ['api.kazumi.fyi', 'api.bgmapi.com']);
+        ['api.kazumi.fyi', 'api.bangumi.lat']);
     expect(adapter.requests.last.uri.queryParameters,
         {'subject_id': '38326', 'offset': '100', 'limit': '100'});
   });
@@ -225,7 +225,7 @@ void main() {
             tag: '冒险', limit: 24, offset: 24),
         hasLength(1));
     expect(adapter.requests.map((o) => o.uri.host),
-        ['api.kazumi.fyi', 'api.bgmapi.com', 'api.bgmapi.com']);
+        ['api.kazumi.fyi', 'api.bangumi.lat', 'api.bangumi.lat']);
     expect(adapter.requests.last.uri.queryParameters,
         {'limit': '24', 'offset': '24'});
     final body = jsonDecode(adapter.bodies.last);
@@ -274,7 +274,7 @@ void main() {
     final body = jsonDecode(adapter.bodies.last);
     expect(body['filter']['air_date'], ['>=2025-01-01', '<2025-04-01']);
     expect(body['filter']['tag'], ['日本']);
-    expect(adapter.requests.last.uri.host, 'api.bgmapi.com');
+    expect(adapter.requests.last.uri.host, 'api.bangumi.lat');
   });
 }
 

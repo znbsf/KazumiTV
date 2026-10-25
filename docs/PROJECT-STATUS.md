@@ -2,6 +2,8 @@
 
 ## 2026-10-25 #33 同正式身份预览版与电视验证（进行中）
 
+进一步电视反证：首候选的next.bangumi.pro评论立即connection reset，官方next同样超时。重新读取镜像作者原帖（https://bgm.tv/group/topic/462456）发现10月23日已公告迁移bangumi.lat；前轮只依据搜索摘要及宿主旧域名200，遗漏最新正文，已撤销.pro作为当前推荐域名的结论。以真实预览UA匿名探测api.bangumi.lat同词7条、next.bangumi.lat三类评论均200，未换UA绕WAF或发送Token。最终候选改用当前.lat公开读域名，保留anibt作为第二搜索镜像；原api.bgmapi.com账号接口保持。base再递增20574，首/二候选保留而不发布。追加一次20分钟构建及10分钟实机验证；若当前域名仍失败则停止发布，不继续追换域名。UI基线及首候选真实搜索/评论失败均保留。
+
 实际电视新增反证：首候选94ff68ab已同证书install-r成功，UID/firstInstall/dataDir保留，但关键词“凉宫春日”在api.bgmapi.com分别receiveTimeout与connectionTimeout，两次官方回退均connectionTimeout；主首页Kazumi receiveTimeout后公开热度搜索200，证明首页自动回退实际触发。冻结首候选与失败截图/日志，不发布该轮产物；网络开关均未改变。宿主同词一次对照：api.bgmapi.com与bgmapi.anibt.net均200/7条，api.bangumi.pro404。宿主未配置显式代理不等于排除了主机透明代理，其结果不能替代电视。
 
 新最小路线只在匿名公开搜索中增加已公开且本次同参数实测的bgmapi.anibt.net，主镜像/第二镜像/官方各至多一次，不扩展评论或账号域名。基于电视新反证补第二候选，同版本名但base递增20573以便正常覆盖首候选；原Key/证书保持。追加预算构建20分钟、针对性回归及电视10分钟；若第二候选搜索仍失败不发布，不以无限换站或改代理掩盖。最终以第二候选精确源码/APK/设备身份及可见结果判定。

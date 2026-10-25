@@ -79,8 +79,8 @@ void main() {
     expect(adapter.requests, hasLength(1));
     final request = adapter.requests.single;
     expect(request.method, 'POST');
-    expect(
-        request.uri.host, hasCredentials ? 'api.kazumi.fyi' : 'api.bgmapi.com');
+    expect(request.uri.host,
+        hasCredentials ? 'api.kazumi.fyi' : 'api.bangumi.lat');
     expect(request.uri.scheme, 'https');
     expect(request.uri.path, '/v0/search/subjects');
     expect(request.uri.queryParameters,
@@ -195,7 +195,7 @@ void main() {
     );
     expect(adapter.requests.map((request) => request.uri.host), [
       if (hasCredentials) 'api.kazumi.fyi',
-      'api.bgmapi.com',
+      'api.bangumi.lat',
       'bgmapi.anibt.net',
       'api.bgm.tv',
     ]);
@@ -203,7 +203,7 @@ void main() {
 
   test('secondary search mirror recovers while preserving body and pagination',
       () async {
-    adapter.unavailableHosts.addAll(['api.kazumi.fyi', 'api.bgmapi.com']);
+    adapter.unavailableHosts.addAll(['api.kazumi.fyi', 'api.bangumi.lat']);
     final payload = {
       'keyword': '凉宫春日',
       'sort': 'heat',
@@ -214,7 +214,7 @@ void main() {
     await BangumiClient.instance.post(endpoint, data: payload);
     expect(adapter.requests.map((o) => o.uri.host), [
       if (hasCredentials) 'api.kazumi.fyi',
-      'api.bgmapi.com',
+      'api.bangumi.lat',
       'bgmapi.anibt.net',
     ]);
     expect(adapter.requests.last.uri.queryParameters,
