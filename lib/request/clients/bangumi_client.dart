@@ -141,7 +141,11 @@ class BangumiClient {
     if (first != route.mirror && first != route.official) {
       attempts.add(route.mirror);
     }
-    if (first != route.official) attempts.add(route.official);
+    if (first != route.official) {
+      final secondary = route.secondarySearchMirror;
+      if (secondary != null) attempts.add(secondary);
+      attempts.add(route.official);
+    }
     for (var i = 0; i < attempts.length; i++) {
       final target = attempts[i];
       try {

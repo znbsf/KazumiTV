@@ -79,7 +79,7 @@ void main() {
     expect(controller.isLoading, isFalse);
     expect(controller.hasMoreSearchResults, isTrue);
     final failedAttempts = offsets.length;
-    expect(failedAttempts, inInclusiveRange(2, 3));
+    expect(failedAttempts, inInclusiveRange(3, 4));
     failing = false;
     await controller.searchBangumi('retry');
     expect(offsets, List.filled(failedAttempts + 1, '0'));

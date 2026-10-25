@@ -46,6 +46,10 @@ class ApiEndpoints {
   /// Anonymous public subject search when the Kazumi mirror key is unavailable.
   static const String bangumiSearchMirrorDomain = 'https://api.bgmapi.com';
 
+  /// Secondary anonymous search route after TV-only timeouts on the first.
+  static const String bangumiSearchFallbackMirrorDomain =
+      'https://bgmapi.anibt.net';
+
   /// Anonymous p1 mirror; the v0 mirror does not implement these endpoints.
   static const String bangumiNextMirrorDomain = 'https://next.bangumi.pro';
 

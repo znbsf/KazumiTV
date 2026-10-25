@@ -11,6 +11,14 @@ class BangumiPublicRoute {
   final Uri mirror;
   final bool isComments;
 
+  Uri? get secondarySearchMirror =>
+      official.host == Uri.parse(ApiEndpoints.bangumiAPIDomain).host &&
+              official.path == '/v0/search/subjects'
+          ? Uri.parse(ApiEndpoints.bangumiSearchFallbackMirrorDomain).replace(
+              path: official.path,
+              query: official.hasQuery ? official.query : null)
+          : null;
+
   static BangumiPublicRoute? match(String url, String method) {
     final uri = Uri.parse(url);
     if (uri.scheme != 'https' || uri.port != 443 || uri.userInfo.isNotEmpty) {

@@ -196,8 +196,32 @@ void main() {
     expect(adapter.requests.map((request) => request.uri.host), [
       if (hasCredentials) 'api.kazumi.fyi',
       'api.bgmapi.com',
+      'bgmapi.anibt.net',
       'api.bgm.tv',
     ]);
+  });
+
+  test('secondary search mirror recovers while preserving body and pagination',
+      () async {
+    adapter.unavailableHosts.addAll(['api.kazumi.fyi', 'api.bgmapi.com']);
+    final payload = {
+      'keyword': '凉宫春日',
+      'sort': 'heat',
+      'filter': {
+        'type': [2]
+      }
+    };
+    await BangumiClient.instance.post(endpoint, data: payload);
+    expect(adapter.requests.map((o) => o.uri.host), [
+      if (hasCredentials) 'api.kazumi.fyi',
+      'api.bgmapi.com',
+      'bgmapi.anibt.net',
+    ]);
+    expect(adapter.requests.last.uri.queryParameters,
+        {'limit': '20', 'offset': '40'});
+    expect(jsonDecode(adapter.bodies.last), payload);
+    expect(adapter.requests.last.headers['Authorization'], isNull);
+    expect(adapter.requests.last.headers['X-Signature'], isNull);
   });
 
   test('certificate failure is surfaced without retry or route changes',
@@ -226,6 +250,7 @@ void main() {
 class _SearchAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   final bodies = <String>[];
+  final unavailableHosts = <String>{};
   int status = 200;
   DioExceptionType? failure;
 
@@ -244,7 +269,7 @@ class _SearchAdapter implements HttpClientAdapter {
           options.method == 'GET' && options.uri.path == '/v0/subjects/38326'
               ? {'id': 38326}
               : {'data': <dynamic>[], 'total': 0}),
-      status,
+      unavailableHosts.contains(options.uri.host) ? 503 : status,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
