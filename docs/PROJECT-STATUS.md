@@ -1,5 +1,23 @@
 # KazumiTV 当前状态
 
+## 2026-10-25 #33 搜索镜像候选（代码及API36搜索通过，未发布）
+
+用户授权查找并实测兼容镜像、修改后测试；仅独立工作树 `issue33-search-mirror`，基线 main `1763998b`。旧证据确认 0.4.4/0.4.5 构建未注入 Kazumi 镜像凭据；2026-10-02 的 `24e341bb` 将此类公开搜索改走官方接口。#33 用户已开启镜像、不开代理失败而开代理成功；不再归因为未开开关。
+
+本轮不重开播放/物理电视路线。匿名直连探测每候选一次详情 GET 与搜索 POST，超时10秒、401/403/429停止；最多两个已公开镜像及现有配置的 `api.bgmapi.com`。首轮沙箱全域名 DNS 失败为无效环境，随后宿主同探针：`api.bangumi.lol` 404；`bgmapi.anibt.net` 详情200/简化搜索502，官方简化搜索同为502。新增区分观察使用现有 App 完整请求参数，官方、`bgmapi.anibt.net`、`api.bgmapi.com` 均200并返回目标作品；不能将前次502隐去或证明长期稳定。
+
+候选只将“开启镜像、无Kazumi签名凭据、非必须鉴权的官方公开搜索端点”转发到应用原已配置的 `api.bgmapi.com`，保留关键词/筛选/分页；该匿名路由不携带用户Token或Kazumi签名。关闭镜像仍走官方；已有凭据构建、账号接口、评论及其他端点保持原路由。无自动多站重试，不传真实账号或申请/复用上游密钥。
+
+验证预算：针对性Flutter回归与双构建配置、实际请求最多15分钟；需要时独立API36模拟器+remoteqa固定公开测试签名包，构建20分钟/界面10分钟，取搜索结果和请求域名证据，不播放、不操作实体设备、不发布。失败或无新增证据即停止该路线，记录原因；收尾停止本任务自有模拟器和构建进程。原始探针位于根 `artifacts/issue33-mirror-guidance-20261025`，本地改动与实际App验收分别记账。
+
+代码固定为本地提交 `b73d043cddd0180f410ef7097ecf575febb469cd`。7个已有搜索测试文件共37项通过；另用明确虚假App ID/Key、mock HTTP adapter验证签名构建原路由，14项通过；修改范围4文件静态检查无问题，依赖锁不变。最初误指2个不存在的测试文件，纠正后按上述实际测试通过，不以初次命令为通过证据。离线pub解析成功后的Windows symlink提示属构建环境；复用固定Flutter的Android-only release metadata生成流程，不改系统开发者模式或依赖。
+
+x86_64 QA `0.4.6-mirror.1 / 205704`，包名 `com.znbsf.kazumi.fluttertv.remoteqa`、固定公开QA证书 `131f00a5…63523ea1`，APK SHA256 `b9b59aab613d2c2465a3058372116db5fa3480100ac7481e3e07c51cf7f1ec05`。包名/版本/ABI/签名/TV入口/非debug/probe关闭校验通过，原libmpv hash不变。独立API36 x86_64只读AVD首次安装后正常进入搜索；实际输入JOJO，UI显示16部番剧及海报，日志确认 `POST https://api.bgmapi.com/v0/search/subjects?limit=20&offset=0` 返回200/725ms。此会话系统HTTP代理null、App代理关闭、镜像开启，均有原始截图；未登录或播放，不操作实体设备。安装输入APK已核验，installed包名/版本已读回，未另pull设备base.apk哈希。观测为新鲜XML和按需PNG、混合遥控/坐标，不声称连续录屏或纯遥控验收。测试App已停止、模拟器正常emu kill后所属launcher/QEMU均不存在。
+
+同主机匿名直连中文“我的狐仙女友”返回正篇2810及续作2811，完整参数的相关度排序及offset20分页分别200/20条。此前502记录保留，不保证镜像长期稳定；本机/模拟器通过不能证明#33用户网络或实体ARM设备已解决。评论及账号链路本次未改。截图 `search-success-jojo.png`、`search-proxy-off-mirror-on.png`，日志 `search-ui-network.log`，分层回执 `qa-result.json` 均位于上记根证据目录。
+
+ARMv7/ARM64同源码QA产物已构建并核验固定公开签名/包名/ABI/非debug/TV入口/probe关闭，三个ABI均zipalign通过、原libmpv哈希不变。版本码为205701/205702（x64为205704）；ARMv7 SHA256 `9d891ad50c858864923d46a4de3ee563cd90ca2eadb2412531b9b2b76758ec1a`，ARM64 `375bfaf3c00c0d43af6eaacfeb7fcec73fc41a4c6d0c66a6e5e17bed68d79585`。仅x64执行了本轮真实App验收，两个ARM包供后续设备试用，未安装到物理设备、未合并/推送/正式发布。
+
 ## 2026-10-24 0.4.4应用内更新拒绝：真机已定位、补丁待交付
 
 用户明确授权原电视点击更新并抓ADB日志。现装正式0.4.4/205571 APK c77f598e…bb3b，UID10075/firstInstall2026-10-10保持。22:16:31实点一次复现：cache hash verified后UPDATE_REJECTED“安装包签名信息无效”，未到系统安装器。独立apksigner核现装0.4.4与公开0.4.5均v2/v3有效、单一同证书3225e3b8…7ce806，不重新签名/换key/覆盖旧Release。旧API36 adb覆盖升级没有验证Android9应用内archive签名读取。
