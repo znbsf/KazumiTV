@@ -44,6 +44,9 @@ class PluginSearchService {
       if (plugin.name != pluginName) continue;
       final result = plugin.parseHarvestedSearch(html);
       if (result == null) return false;
+      // Verification is a replacement result for this source. An earlier
+      // network request may still finish after the captcha page is accepted.
+      _querySessions[pluginName]?.cancel();
       infoController.pluginSearchResponseList.removeWhere(
         (response) => response.pluginName == pluginName,
       );

@@ -59,12 +59,12 @@ void main() {
 
   test('failed search remains retryable without advancing its offset',
       () async {
-    var requests = 0;
+    var failing = true;
     final offsets = <dynamic>[];
     DioFactory.apiDio.interceptors.insert(0,
         InterceptorsWrapper(onRequest: (options, handler) {
       offsets.add(options.uri.queryParameters['offset']);
-      if (requests++ == 0) {
+      if (failing) {
         handler.reject(DioException(
             requestOptions: options, type: DioExceptionType.connectionTimeout));
       } else {
@@ -78,9 +78,33 @@ void main() {
     expect(controller.isTimeOut, isTrue);
     expect(controller.isLoading, isFalse);
     expect(controller.hasMoreSearchResults, isTrue);
+    final failedAttempts = offsets.length;
+    expect(failedAttempts, inInclusiveRange(3, 4));
+    failing = false;
     await controller.searchBangumi('retry');
-    expect(offsets, ['0', '0']);
+    expect(offsets, List.filled(failedAttempts + 1, '0'));
     expect(controller.isTimeOut, isFalse);
+    expect(controller.hasMoreSearchResults, isFalse);
+  });
+
+  test('automatic fallback success does not become a failed search', () async {
+    var attempts = 0;
+    DioFactory.apiDio.interceptors.insert(0,
+        InterceptorsWrapper(onRequest: (options, handler) {
+      if (attempts++ == 0) {
+        handler.reject(DioException(
+            requestOptions: options, type: DioExceptionType.connectionTimeout));
+      } else {
+        handler.resolve(Response(
+            requestOptions: options,
+            statusCode: 200,
+            data: {'data': <dynamic>[]}));
+      }
+    }));
+    await controller.searchBangumi('fallback', type: 'init');
+    expect(attempts, 2);
+    expect(controller.isTimeOut, isFalse);
+    expect(controller.isLoading, isFalse);
     expect(controller.hasMoreSearchResults, isFalse);
   });
 }

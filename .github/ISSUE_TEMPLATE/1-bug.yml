@@ -73,13 +73,15 @@ body:
     attributes:
       label: 日志信息
       description: |
-        请进入 我的-设置-关于 页面，找到错误日志，复制并粘贴在上方。
-        如果日志过多，可以放在文本文档中以压缩包形式发送。
+        出错后先记下时间（含时区），进入「设置 → 存储与日志 → 错误日志」，点击「复制日志」，粘贴到此处或保存为 .txt 附件；获取前不要清空日志。
+        日志文件为应用支持目录下的 logs/kazumi_logs.log。Android 正式包通常位于 /data/user/0/com.znbsf.kazumi.fluttertv/files/logs/kazumi_logs.log，属于私有目录，普通文件管理器或 adb pull 通常无法读取。
+        电视无法粘贴到手机/电脑时，可先附错误日志截图并说明「无法导出」；当前没有跨设备导出按钮。闪退或无法进入日志页时，可补充 ADB 系统日志，步骤见 [日志获取说明](https://github.com/znbsf/KazumiTV/blob/main/README.md#问题反馈与日志)。
+        只附故障前后必要片段，并说明来源、线路、集数、失败发生在解析还是出画面之后。删除 token、Cookie、账号信息、完整播放 URL、设备标识和私有地址；拿不到日志也可以提交。
       value: |
         <details open><summary>Log</summary>
 
         ```shell
-        [在此处粘贴你的日志]
+        [在此处粘贴脱敏后的日志；注明出错时间和时区，无法获取时说明原因]
         ```
 
         </details>
