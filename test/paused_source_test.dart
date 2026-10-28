@@ -111,6 +111,34 @@ void main() {
     expect(controller.validityTracker.isSearchValid('source'), isFalse);
   });
 
+  for (final lateFailure in [false, true]) {
+    test('pause then resume retires the old search failure=$lateFailure',
+        () async {
+      final pending = Completer<PluginSearchResponse>();
+      final rule = _SearchRule('source')..response = pending.future;
+      final controller = PluginsController(pluginJsonWriter: (_) async {})
+        ..pluginList.add(rule);
+      final info = InfoController(CollectController(_UnusedCollect()));
+      final service = PluginSearchService(
+          infoController: info, pluginsController: controller);
+      final search = service.querySource('old', 'source');
+      await controller.setPluginEnabled('source', false);
+      await controller.setPluginEnabled('source', true);
+      if (lateFailure) {
+        pending.completeError(StateError('late failure'));
+      } else {
+        pending.complete(PluginSearchResponse(pluginName: 'source', data: [
+          SearchItem(name: 'old', src: '/old'),
+        ]));
+      }
+      await search;
+      expect(info.pluginSearchResponseList, isEmpty);
+      expect(info.pluginSearchStatus['source'], PluginSearchStatus.pending);
+      expect(controller.validityTracker.isSearchValid('source'), isFalse);
+      service.cancel();
+    });
+  }
+
   test('history cannot reopen a paused source or request its episode list',
       () async {
     final rule = _SearchRule('paused', enabled: false);

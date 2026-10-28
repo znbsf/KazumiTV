@@ -83,9 +83,9 @@ class PluginSearchService {
         shouldRethrow: true,
         cancelToken: _cancelToken,
       );
-      if (_isCancelled ||
-          session.isStale ||
-          !pluginsController.isPluginEnabled(plugin.name)) return;
+      if (_isCancelled || session.isStale || !_isCurrentSource(plugin)) {
+        return;
+      }
       infoController.pluginSearchStatus[plugin.name] =
           PluginSearchStatus.success;
       if (result.data.isNotEmpty) {
@@ -93,12 +93,18 @@ class PluginSearchService {
       }
       infoController.pluginSearchResponseList.add(result);
     } catch (error) {
-      if (_isCancelled ||
-          session.isStale ||
-          !pluginsController.isPluginEnabled(plugin.name)) return;
+      if (_isCancelled || session.isStale || !_isCurrentSource(plugin)) {
+        return;
+      }
       _handleSearchError(plugin, error);
     }
   }
+
+  // Pause/resume, removal and rule replacement retire the original instance.
+  // Checking only the name would accept an old request after a quick resume.
+  bool _isCurrentSource(Plugin plugin) => pluginsController.enabledPlugins.any(
+        (current) => identical(current, plugin),
+      );
 
   void _handleSearchError(Plugin plugin, Object error) {
     if (error is CaptchaRequiredException) {
