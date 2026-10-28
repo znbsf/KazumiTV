@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:kazumi/services/logging/bounded_log_file.dart';
 
 import 'package:logger/logger.dart';
 import 'package:path/path.dart' as p;
@@ -96,6 +97,8 @@ class KazumiLogPrinter extends LogPrinter {
 class KazumiLogOutput extends LogOutput {
   static final Lock _logLock = Lock();
   static String? _logFilePath;
+  static int _pendingWrites = 0;
+  static int _droppedWrites = 0;
 
   static Future<String> _getLogFilePath() async {
     if (_logFilePath != null) return _logFilePath!;
@@ -124,23 +127,34 @@ class KazumiLogOutput extends LogOutput {
   }
 
   void _writeToFile(OutputEvent event) {
+    if (_pendingWrites >= 256) {
+      _droppedWrites++;
+      return;
+    }
+    final buffer = StringBuffer();
+    if (_droppedWrites > 0) {
+      buffer.writeln('[log overload: $_droppedWrites events omitted]');
+      _droppedWrites = 0;
+    }
+    for (final line in event.lines) {
+      final remaining = 16 * 1024 - buffer.length;
+      if (remaining <= 0) break;
+      final clean = _removeAnsiCodes(line);
+      buffer.writeln(
+          clean.length > remaining ? clean.substring(0, remaining) : clean);
+    }
+    final text = buffer.toString();
+    _pendingWrites++;
     _logLock.synchronized(() async {
       try {
         final filePath = await _getLogFilePath();
         final file = File(filePath);
 
-        final buffer = StringBuffer();
-        for (var line in event.lines) {
-          final cleanLine = _removeAnsiCodes(line);
-          buffer.writeln(cleanLine);
-        }
-
-        await file.writeAsString(
-          buffer.toString(),
-          mode: FileMode.writeOnlyAppend,
-        );
+        await BoundedLogFile(file).append(text);
       } catch (e) {
         print('Failed to write log to file: ${_singleLineLogText(e)}');
+      } finally {
+        _pendingWrites--;
       }
     });
   }
@@ -243,7 +257,7 @@ Future<bool> clearLogs() async {
   try {
     final file = await getLogsPath();
     await KazumiLogOutput._logLock.synchronized(() async {
-      await file.writeAsString('');
+      await BoundedLogFile(file).clear();
     });
     return true;
   } catch (e) {
@@ -251,3 +265,12 @@ Future<bool> clearLogs() async {
     return false;
   }
 }
+
+Future<String> readRecentLogs() async {
+  final file = await getLogsPath();
+  return KazumiLogOutput._logLock
+      .synchronized(() => BoundedLogFile(file).tail());
+}
+
+/// Wait for already queued writes before closing an owning directory.
+Future<void> flushLogs() => KazumiLogOutput._logLock.synchronized(() {});

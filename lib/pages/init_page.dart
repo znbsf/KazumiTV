@@ -63,16 +63,13 @@ class _InitPageState extends State<InitPage> {
     unawaited(myController.loadShieldList());
     _webDavInit();
     _bangumiInit();
-    try {
-      await downloadController.init();
-      _setupBackgroundDownloadNavigation();
-    } catch (e) {
-      KazumiLogger().e('InitPage: downloadController.init() failed', error: e);
-    }
+    final downloadsReady = _initializeDownloads();
 
     await _checkRunningOnX11();
     await _showShortcutDialog();
     await _pluginInit();
+    // Keep the direct download route and old-data migration ready before navigation.
+    await downloadsReady;
 
     if (!mounted) {
       return;
@@ -158,6 +155,15 @@ class _InitPageState extends State<InitPage> {
       );
       return result ?? false;
     };
+  }
+
+  Future<void> _initializeDownloads() async {
+    _setupBackgroundDownloadNavigation();
+    try {
+      await downloadController.init();
+    } catch (e) {
+      KazumiLogger().e('InitPage: downloadController.init() failed', error: e);
+    }
   }
 
   void _startDefaultPage() {

@@ -46,8 +46,10 @@ final class _OwnedPlayer {
             ? null
             : PlaybackHistoryRecorder(writeHistory) {
     if (history != null) {
-      _playingSubscription =
-          player.stream.playing.listen(history!.observePlaying);
+      _playingSubscription = player.stream.playing.listen((playing) {
+        history!.observePlaying(playing);
+        if (!playing) unawaited(recordHistory());
+      });
     }
     if (TvInputLifecycle.enabled) {
       // Typed media-kit events only, never a native property query. The
@@ -80,14 +82,15 @@ final class _OwnedPlayer {
   final List<StreamSubscription<dynamic>> subscriptions = [];
   Future<void>? _disposeFuture;
 
-  Future<void> recordHistory() async {
+  Future<void> recordHistory({bool periodic = false}) async {
     if (!ready || history == null) return;
     try {
       final state = player.state;
       await history!.record(
           position: state.position,
           duration: state.duration,
-          playing: state.playing);
+          playing: state.playing,
+          periodic: periodic);
     } catch (error, stackTrace) {
       KazumiLogger().w('Player: failed to save playback progress',
           error: error, stackTrace: stackTrace);
@@ -152,8 +155,8 @@ abstract class _PlayerPlaybackController with Store {
   bool recoveryBlocksCompletion = false;
   bool get recoveryHasNativeError => _ownedPlayer?.hasNativeError ?? false;
   Player? get mediaPlayer => _ownedPlayer?.player;
-  Future<void> recordHistory() =>
-      _ownedPlayer?.recordHistory() ?? Future<void>.value();
+  Future<void> recordHistory({bool periodic = false}) =>
+      _ownedPlayer?.recordHistory(periodic: periodic) ?? Future<void>.value();
 
   // Native failure/EOF can report paused before the decoder log arrives.
   // Keep explicit playback intent on the owner, separate from observed state.

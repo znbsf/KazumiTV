@@ -1454,7 +1454,7 @@ class _PlayerItemState extends State<PlayerItem>
         });
       }
       if (TvMode.enabled) {
-        unawaited(playerController.playback.recordHistory());
+        unawaited(playerController.playback.recordHistory(periodic: true));
       } else {
         final historyIdentity = videoPageController.currentHistoryIdentity;
         if (playerController.playback.playerPlaying &&

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:kazumi/modules/search/plugin_search_module.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
 import 'package:kazumi/plugins/plugins.dart';
@@ -10,11 +11,15 @@ class PluginSearchService {
   PluginSearchService({
     required this.infoController,
     required this.pluginsController,
-  });
+    this.maxConcurrent = 4,
+  }) : assert(maxConcurrent > 0);
 
   final InfoController infoController;
   final PluginsController pluginsController;
-  final RuleCancelToken _cancelToken = RuleCancelToken();
+  final int maxConcurrent;
+  final Map<String, RuleCancelToken> _tokens = {};
+  final List<Completer<void>> _waiters = [];
+  int _running = 0;
 
   /// Per-plugin sessions so a replacement query (alias/manual search)
   /// invalidates the write-back of the still-running previous one.
@@ -22,6 +27,7 @@ class PluginSearchService {
   bool _isCancelled = false;
 
   Future<void> querySource(String keyword, String pluginName) async {
+    if (_isCancelled) return;
     for (final plugin in pluginsController.enabledPlugins) {
       if (plugin.name == pluginName) {
         infoController.pluginSearchResponseList.removeWhere(
@@ -47,6 +53,7 @@ class PluginSearchService {
       // Verification is a replacement result for this source. An earlier
       // network request may still finish after the captcha page is accepted.
       _querySessions[pluginName]?.cancel();
+      _tokens.remove(pluginName)?.cancel('verified result');
       infoController.pluginSearchResponseList.removeWhere(
         (response) => response.pluginName == pluginName,
       );
@@ -60,6 +67,7 @@ class PluginSearchService {
   }
 
   Future<void> queryAllSource(String keyword) async {
+    if (_isCancelled) return;
     infoController.pluginSearchResponseList.clear();
     infoController.pluginSearchStatus.clear();
 
@@ -77,11 +85,22 @@ class PluginSearchService {
     if (_isCancelled) return;
     final session =
         _querySessions.putIfAbsent(plugin.name, AsyncSessionOwner.new).begin();
+    _tokens.remove(plugin.name)?.cancel('replacement query');
+    final token = RuleCancelToken();
+    _tokens[plugin.name] = token;
+    if (_running >= maxConcurrent) {
+      final waiter = Completer<void>();
+      _waiters.add(waiter);
+      await waiter.future;
+    } else {
+      _running++;
+    }
     try {
+      if (_isCancelled || session.isStale || token.isCancelled) return;
       final result = await plugin.queryBangumi(
         keyword,
         shouldRethrow: true,
-        cancelToken: _cancelToken,
+        cancelToken: token,
       );
       if (_isCancelled || session.isStale || !_isCurrentSource(plugin)) {
         return;
@@ -97,6 +116,13 @@ class PluginSearchService {
         return;
       }
       _handleSearchError(plugin, error);
+    } finally {
+      if (identical(_tokens[plugin.name], token)) _tokens.remove(plugin.name);
+      if (_waiters.isNotEmpty) {
+        _waiters.removeAt(0).complete();
+      } else {
+        _running--;
+      }
     }
   }
 
@@ -130,6 +156,11 @@ class PluginSearchService {
 
   void cancel() {
     _isCancelled = true;
-    _cancelToken.cancel();
+    for (final token in _tokens.values) {
+      token.cancel('search cancelled');
+    }
+    for (final session in _querySessions.values) {
+      session.cancel();
+    }
   }
 }

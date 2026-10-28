@@ -17,6 +17,25 @@ abstract class _PlayerDebugController with Store {
 
   @observable
   ObservableList<String> playerLog = ObservableList.of([]);
+  static const maxLogEntries = 500;
+  static const maxLogCharacters = 256 * 1024;
+  int _logCharacters = 0;
+
+  void appendLog(String message) {
+    runInAction(() {
+      if (playerLog.isEmpty) _logCharacters = 0;
+      final line = message.length > 4096
+          ? '${message.substring(0, 4096)}…[truncated]'
+          : message;
+      playerLog.add(line);
+      _logCharacters += line.length;
+      while (playerLog.length > maxLogEntries ||
+          _logCharacters > maxLogCharacters) {
+        _logCharacters -= playerLog.removeAt(0).length;
+      }
+    });
+  }
+
   @observable
   int playerWidth = 0;
   @observable
@@ -55,7 +74,7 @@ abstract class _PlayerDebugController with Store {
     if (!isCurrentPlayer(player)) return;
     playerLogSubscription = player.stream.log.listen((event) {
       if (!isCurrentPlayer(player)) return;
-      playerLog.add(event.toString());
+      appendLog(event.toString());
       if (playerDebugMode) {
         KazumiLogger().i("MPV: ${event.toString()}", forceLog: true);
       }
