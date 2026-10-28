@@ -53,7 +53,9 @@ body:
     id: evidence
     attributes:
       label: 脱敏日志 / 截图
-      description: 可选。仅附必要片段；删除 token、Cookie、账号信息、签名播放 URL、设备标识和私有地址。无法安全脱敏时请勿上传。
+      description: |
+        可选。日志入口为「设置 → 存储与日志 → 错误日志 → 复制日志」，文件为应用支持目录下的 logs/kazumi_logs.log；Android 私有目录访问限制和 ADB 补充步骤见 [日志获取说明](https://github.com/znbsf/KazumiTV/blob/main/README.md#问题反馈与日志)。
+        仅附故障前后必要片段并注明时间和时区；删除 token、Cookie、账号信息、完整播放 URL、设备标识和私有地址。无法安全脱敏时请勿上传；拿不到日志可说明原因或附截图。
     validations:
       required: false
 
