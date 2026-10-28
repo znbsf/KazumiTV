@@ -22,7 +22,7 @@ class PluginSearchService {
   bool _isCancelled = false;
 
   Future<void> querySource(String keyword, String pluginName) async {
-    for (final plugin in pluginsController.pluginList) {
+    for (final plugin in pluginsController.enabledPlugins) {
       if (plugin.name == pluginName) {
         infoController.pluginSearchResponseList.removeWhere(
           (response) => response.pluginName == pluginName,
@@ -40,7 +40,7 @@ class PluginSearchService {
   /// into results; callers should fall back to [querySource].
   bool applyHarvestedSearchResult(String pluginName, String html) {
     if (_isCancelled) return false;
-    for (final plugin in pluginsController.pluginList) {
+    for (final plugin in pluginsController.enabledPlugins) {
       if (plugin.name != pluginName) continue;
       final result = plugin.parseHarvestedSearch(html);
       if (result == null) return false;
@@ -60,7 +60,7 @@ class PluginSearchService {
     infoController.pluginSearchResponseList.clear();
     infoController.pluginSearchStatus.clear();
 
-    final plugins = List<Plugin>.of(pluginsController.pluginList);
+    final plugins = List<Plugin>.of(pluginsController.enabledPlugins);
     for (final plugin in plugins) {
       infoController.pluginSearchStatus[plugin.name] =
           PluginSearchStatus.pending;
@@ -72,16 +72,17 @@ class PluginSearchService {
 
   Future<void> _queryPlugin(Plugin plugin, String keyword) async {
     if (_isCancelled) return;
-    final session = _querySessions
-        .putIfAbsent(plugin.name, AsyncSessionOwner.new)
-        .begin();
+    final session =
+        _querySessions.putIfAbsent(plugin.name, AsyncSessionOwner.new).begin();
     try {
       final result = await plugin.queryBangumi(
         keyword,
         shouldRethrow: true,
         cancelToken: _cancelToken,
       );
-      if (_isCancelled || session.isStale) return;
+      if (_isCancelled ||
+          session.isStale ||
+          !pluginsController.isPluginEnabled(plugin.name)) return;
       infoController.pluginSearchStatus[plugin.name] =
           PluginSearchStatus.success;
       if (result.data.isNotEmpty) {
@@ -89,7 +90,9 @@ class PluginSearchService {
       }
       infoController.pluginSearchResponseList.add(result);
     } catch (error) {
-      if (_isCancelled || session.isStale) return;
+      if (_isCancelled ||
+          session.isStale ||
+          !pluginsController.isPluginEnabled(plugin.name)) return;
       _handleSearchError(plugin, error);
     }
   }

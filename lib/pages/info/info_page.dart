@@ -133,7 +133,7 @@ class _InfoPageState extends State<InfoPage>
       MaterialPageRoute(
           builder: (_) => SourceHealthPage(
                 subject: infoController.bangumiItem,
-                plugins: List.of(inject<PluginsController>().pluginList),
+                plugins: List.of(inject<PluginsController>().enabledPlugins),
               )),
     );
     if (mounted) _tvPlayFocus.requestFocus();
@@ -167,7 +167,7 @@ class _InfoPageState extends State<InfoPage>
           if (!mounted || cancelToken.isCancelled || opened) return;
           KazumiDialog.showToast(message: '上次的播放源不可用，请重新选源');
         } else if (GStorage.getSetting(SettingsKeys.firstSourceAutoSelect)) {
-          final plugins = List.of(inject<PluginsController>().pluginList);
+          final plugins = List.of(inject<PluginsController>().enabledPlugins);
           final item = infoController.bangumiItem;
           final records = HealthRecordCodec.decode(
               GStorage.getSetting(SettingsKeys.sourceHealthRecords));
@@ -221,8 +221,7 @@ class _InfoPageState extends State<InfoPage>
       if (!mounted) return;
       await showAdaptiveBottomSheet<void>(
         context: context,
-        builder: (_) => SourceSheet(
-            infoController: infoController),
+        builder: (_) => SourceSheet(infoController: infoController),
       );
     } finally {
       _startingPlayback = false;

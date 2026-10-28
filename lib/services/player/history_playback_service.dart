@@ -62,7 +62,7 @@ class HistoryPlaybackService {
       return null;
     }
     Plugin? targetPlugin;
-    for (final plugin in _pluginsController.pluginList) {
+    for (final plugin in _pluginsController.enabledPlugins) {
       if (plugin.name == history.adapterName) {
         targetPlugin = plugin;
         break;
