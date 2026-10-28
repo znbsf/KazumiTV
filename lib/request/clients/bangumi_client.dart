@@ -8,6 +8,8 @@ import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/bangumi_mirror_credentials.dart';
 import 'package:kazumi/utils/crypto.dart';
+import 'package:kazumi/request/clients/bangumi_public_route.dart';
+import 'package:kazumi/services/logging/logger.dart';
 
 class BangumiClient {
   BangumiClient._();
@@ -21,6 +23,20 @@ class BangumiClient {
     String? accessToken,
     CancelToken? cancelToken,
   }) async {
+    final route = !requiresAuth &&
+            accessToken == null &&
+            GStorage.getSetting(SettingsKeys.enableBangumiProxy)
+        ? BangumiPublicRoute.match(url, 'GET')
+        : null;
+    if (route != null) {
+      return _publicRequest(
+        route,
+        'GET',
+        first: route.isComments && !_hasMirrorCredentials ? route.mirror : null,
+        queryParameters: queryParameters,
+        cancelToken: cancelToken,
+      );
+    }
     try {
       final response = await DioFactory.apiDio.get(
         url,
@@ -48,25 +64,31 @@ class BangumiClient {
     bool requiresAuth = false,
     CancelToken? cancelToken,
   }) async {
-    try {
-      final useOfficialSearch = _useOfficialSearchWithoutMirrorCredentials(
-        url,
-        requiresAuth: requiresAuth,
+    final route =
+        !requiresAuth && GStorage.getSetting(SettingsKeys.enableBangumiProxy)
+            ? BangumiPublicRoute.match(url, 'POST')
+            : null;
+    if (route != null) {
+      return _publicRequest(
+        route,
+        'POST',
+        first: !_hasMirrorCredentials ? route.mirror : null,
+        data: data,
+        queryParameters: queryParameters,
+        cancelToken: cancelToken,
       );
+    }
+    try {
       final response = await DioFactory.apiDio.post(
         url,
         data: data,
         queryParameters: queryParameters,
         options: Options(
-          extra: useOfficialSearch
-              ? {DioFactory.bypassBangumiMirrorExtra: true}
-              : null,
           headers: _headers(
             requiresAuth: requiresAuth,
             url: url,
             method: 'POST',
             data: data,
-            signMirrorRequest: !useOfficialSearch,
           ),
         ),
         cancelToken: cancelToken,
@@ -77,26 +99,95 @@ class BangumiClient {
     }
   }
 
-  bool _useOfficialSearchWithoutMirrorCredentials(
-    String url, {
-    required bool requiresAuth,
+  bool get _hasMirrorCredentials =>
+      (bangumiMirrorCredentials['id']?.trim().isNotEmpty ?? false) &&
+      (bangumiMirrorCredentials['value']?.trim().isNotEmpty ?? false);
+
+  /// Used when a Kazumi-specific catalogue is unavailable. The payload is
+  /// still public search, even in builds with Kazumi signing credentials.
+  Future<dynamic> publicSearch({
+    required Object data,
+    required int limit,
+    required int offset,
+    CancelToken? cancelToken,
   }) {
-    // Self-built apps do not have the CI-only mirror signing credentials.
-    // Public subject search is also available on the official API without them.
-    // Keep every other endpoint and authenticated request on its chosen route.
-    if (requiresAuth ||
-        !GStorage.getSetting(SettingsKeys.enableBangumiProxy) ||
-        ((bangumiMirrorCredentials['id']?.trim().isNotEmpty ?? false) &&
-            (bangumiMirrorCredentials['value']?.trim().isNotEmpty ?? false))) {
-      return false;
+    final url = ApiEndpoints.formatUrl(
+      ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiRankSearch,
+      [limit, offset],
+    );
+    final route = BangumiPublicRoute.match(url, 'POST')!;
+    return _publicRequest(
+      route,
+      'POST',
+      first: GStorage.getSetting(SettingsKeys.enableBangumiProxy)
+          ? route.mirror
+          : route.official,
+      data: data,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<dynamic> _publicRequest(
+    BangumiPublicRoute route,
+    String method, {
+    Uri? first,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+  }) async {
+    // null denotes the existing Kazumi interceptor route. Distinct explicit
+    // URLs bypass that interceptor, so the final official attempt is direct.
+    final attempts = <Uri?>[first];
+    if (first != route.mirror && first != route.official) {
+      attempts.add(route.mirror);
     }
-    final uri = Uri.parse(url);
-    final official = Uri.parse(ApiEndpoints.bangumiAPIDomain);
-    return uri.scheme == official.scheme &&
-        uri.host == official.host &&
-        uri.port == official.port &&
-        uri.userInfo.isEmpty &&
-        uri.path == '/v0/search/subjects';
+    if (first != route.official) {
+      final secondary = route.secondarySearchMirror;
+      if (secondary != null) attempts.add(secondary);
+      attempts.add(route.official);
+    }
+    for (var i = 0; i < attempts.length; i++) {
+      final target = attempts[i];
+      try {
+        if (cancelToken?.isCancelled ?? false) throw cancelToken!.cancelError!;
+        final response = await DioFactory.apiDio.request(
+          (target ?? route.official).toString(),
+          data: data,
+          queryParameters: queryParameters,
+          cancelToken: cancelToken,
+          options: Options(
+            method: method,
+            extra: target == null
+                ? null
+                : {DioFactory.bypassBangumiMirrorExtra: true},
+            headers: _headers(
+              requiresAuth: false,
+              url: route.official.toString(),
+              method: method,
+              data: data,
+              includeSyncToken: false,
+              signMirrorRequest: target == null,
+            ),
+          ),
+        );
+        route.validate(response.data);
+        return response.data;
+      } on DioException catch (e) {
+        if (i == attempts.length - 1 || !BangumiPublicRoute.canRetry(e)) {
+          throw await NetworkErrorMapper.mapException(e);
+        }
+        KazumiLogger().w('Bangumi public fallback: ${route.official.path} '
+            '${e.type.name}/${e.response?.statusCode ?? "-"} -> '
+            '${attempts[i + 1]!.host}');
+      } on FormatException catch (e, stack) {
+        if (i == attempts.length - 1) {
+          throw NetworkErrorMapper.parse(e, stack);
+        }
+        KazumiLogger().w('Bangumi public fallback: ${route.official.path} '
+            'invalid response -> ${attempts[i + 1]!.host}');
+      }
+    }
+    throw StateError('Public Bangumi route has no attempts');
   }
 
   Map<String, dynamic> _headers({
@@ -106,6 +197,7 @@ class BangumiClient {
     required String method,
     Object? data,
     bool signMirrorRequest = true,
+    bool includeSyncToken = true,
   }) {
     final headers = <String, dynamic>{...bangumiHTTPHeader};
     final bangumiSyncEnable =
@@ -113,7 +205,8 @@ class BangumiClient {
     final token = (accessToken ??
             GStorage.getSetting<String>(SettingsKeys.bangumiAccessToken))
         .trim();
-    if ((requiresAuth || bangumiSyncEnable) && token.isNotEmpty) {
+    if ((requiresAuth || (includeSyncToken && bangumiSyncEnable)) &&
+        token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
     if (signMirrorRequest && _shouldSignProtectedMirrorRequest(url, method)) {

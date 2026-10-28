@@ -79,7 +79,8 @@ void main() {
     expect(adapter.requests, hasLength(1));
     final request = adapter.requests.single;
     expect(request.method, 'POST');
-    expect(request.uri.host, hasCredentials ? 'api.kazumi.fyi' : 'api.bgm.tv');
+    expect(request.uri.host,
+        hasCredentials ? 'api.kazumi.fyi' : 'api.bangumi.lat');
     expect(request.uri.scheme, 'https');
     expect(request.uri.path, '/v0/search/subjects');
     expect(request.uri.queryParameters,
@@ -93,12 +94,12 @@ void main() {
     expect(GStorage.getSetting(SettingsKeys.bangumiSyncEnable), isFalse);
   });
 
-  test('public search retains existing optional bearer token', () async {
+  test('anonymous search mirror never receives an optional account token',
+      () async {
     await GStorage.putSetting(SettingsKeys.bangumiSyncEnable, true);
     await GStorage.putSetting(SettingsKeys.bangumiAccessToken, ' saved-token ');
     await BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'});
-    expect(
-        adapter.requests.single.headers['Authorization'], 'Bearer saved-token');
+    expect(adapter.requests.single.headers['Authorization'], isNull);
     expect(
         GStorage.getSetting(SettingsKeys.bangumiAccessToken), ' saved-token ');
     expect(GStorage.getSetting(SettingsKeys.bangumiSyncEnable), isTrue);
@@ -117,6 +118,31 @@ void main() {
     expect(request.uri.host, 'api.bgm.tv');
     expect(request.headers.containsKey('X-Signature'), isFalse);
     expect(GStorage.getSetting(SettingsKeys.enableBangumiProxy), isFalse);
+  });
+
+  test('mirror-disabled search preserves optional official authentication',
+      () async {
+    await GStorage.putSetting(SettingsKeys.enableBangumiProxy, false);
+    await GStorage.putSetting(SettingsKeys.bangumiSyncEnable, true);
+    await GStorage.putSetting(SettingsKeys.bangumiAccessToken, ' saved-token ');
+    await BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'});
+    expect(adapter.requests.single.uri.host, 'api.bgm.tv');
+    expect(
+        adapter.requests.single.headers['Authorization'], 'Bearer saved-token');
+  });
+
+  test('search routing requires the exact official HTTPS endpoint', () async {
+    final urls = [
+      'https://api.bgm.tv.example/v0/search/subjects',
+      'https://example.com/v0/search/subjects',
+      'https://api.bgm.tv/v0/search/subjects/extra',
+    ];
+    for (final url in urls) {
+      await BangumiClient.instance.post(url, data: {'keyword': 'JOJO'});
+    }
+    expect(adapter.requests.map((request) => request.uri.host),
+        ['api.bgm.tv.example', 'example.com', 'api.kazumi.fyi']);
+    expect(adapter.requests.last.uri.path, '/v0/search/subjects/extra');
   });
 
   test('subject details and collection writes retain existing mirror routing',
@@ -144,7 +170,7 @@ void main() {
     expect(adapter.requests.single.uri.host, 'api.kazumi.fyi');
   });
 
-  for (final status in [401, 403, 429, 503]) {
+  for (final status in [401, 403, 429]) {
     test('HTTP $status remains classified and does not trigger another request',
         () async {
       adapter.status = status;
@@ -159,6 +185,44 @@ void main() {
       expect(GStorage.getSetting(SettingsKeys.enableBangumiProxy), isTrue);
     });
   }
+
+  test('unavailable search has a bounded direct official fallback', () async {
+    adapter.status = 503;
+    await expectLater(
+      BangumiClient.instance.post(endpoint, data: {'keyword': 'JOJO'}),
+      throwsA(isA<NetworkException>()
+          .having((error) => error.statusCode, 'status', 503)),
+    );
+    expect(adapter.requests.map((request) => request.uri.host), [
+      if (hasCredentials) 'api.kazumi.fyi',
+      'api.bangumi.lat',
+      'bgmapi.anibt.net',
+      'api.bgm.tv',
+    ]);
+  });
+
+  test('secondary search mirror recovers while preserving body and pagination',
+      () async {
+    adapter.unavailableHosts.addAll(['api.kazumi.fyi', 'api.bangumi.lat']);
+    final payload = {
+      'keyword': '凉宫春日',
+      'sort': 'heat',
+      'filter': {
+        'type': [2]
+      }
+    };
+    await BangumiClient.instance.post(endpoint, data: payload);
+    expect(adapter.requests.map((o) => o.uri.host), [
+      if (hasCredentials) 'api.kazumi.fyi',
+      'api.bangumi.lat',
+      'bgmapi.anibt.net',
+    ]);
+    expect(adapter.requests.last.uri.queryParameters,
+        {'limit': '20', 'offset': '40'});
+    expect(jsonDecode(adapter.bodies.last), payload);
+    expect(adapter.requests.last.headers['Authorization'], isNull);
+    expect(adapter.requests.last.headers['X-Signature'], isNull);
+  });
 
   test('certificate failure is surfaced without retry or route changes',
       () async {
@@ -186,6 +250,7 @@ void main() {
 class _SearchAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   final bodies = <String>[];
+  final unavailableHosts = <String>{};
   int status = 200;
   DioExceptionType? failure;
 
@@ -200,8 +265,11 @@ class _SearchAdapter implements HttpClientAdapter {
       throw DioException(requestOptions: options, type: failure!);
     }
     return ResponseBody.fromString(
-      jsonEncode({'data': <dynamic>[], 'total': 0}),
-      status,
+      jsonEncode(
+          options.method == 'GET' && options.uri.path == '/v0/subjects/38326'
+              ? {'id': 38326}
+              : {'data': <dynamic>[], 'total': 0}),
+      unavailableHosts.contains(options.uri.host) ? 503 : status,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },
