@@ -33,6 +33,7 @@ class DanmakuLoadResult {
     required this.bangumiID,
     required this.status,
     this.failure,
+    this.prepared,
   });
 
   factory DanmakuLoadResult.success({
@@ -64,6 +65,7 @@ class DanmakuLoadResult {
   final int bangumiID;
   final DanmakuLoadStatus status;
   final NetworkException? failure;
+  final Map<int, List<DanmakuEntry>>? prepared;
 
   // A second search uses the same service; do not recommend it after a 429.
   String get failureMessage =>
@@ -216,17 +218,24 @@ abstract class _PlayerDanmakuController with Store {
     String pluginName,
     int episode,
   ) async {
-    if (isLocalPlayback()) {
-      return await _fetchCachedDanmaku(
-        bangumiId,
-        pluginName,
-        episode,
-      );
-    }
-    return await _fetchDanDanmakuByBgmBangumiID(
-      bangumiId,
-      episode,
-    );
+    final result = isLocalPlayback()
+        ? await _fetchCachedDanmaku(
+            bangumiId,
+            pluginName,
+            episode,
+          )
+        : await _fetchDanDanmakuByBgmBangumiID(
+            bangumiId,
+            episode,
+          );
+    final prepared = await prepareDanmakus(result.danmakus,
+        deduplicate: GStorage.getSetting(SettingsKeys.danmakuDeduplication));
+    // The caller still validates the episode/session after this asynchronous work.
+    return DanmakuLoadResult(
+        danmakus: result.danmakus,
+        bangumiID: result.bangumiID,
+        status: result.status,
+        prepared: prepared);
   }
 
   @action
@@ -243,7 +252,11 @@ abstract class _PlayerDanmakuController with Store {
     required bool enableDanmaku,
   }) {
     bangumiID = result.bangumiID;
-    addDanmakus(result.danmakus);
+    if (result.prepared case final prepared?) {
+      danDanmakus.addAll(prepared);
+    } else {
+      addDanmakus(result.danmakus);
+    }
     danmakuOn = enableDanmaku;
     danmakuLoading = false;
   }
@@ -405,7 +418,12 @@ abstract class _PlayerDanmakuController with Store {
       if (generation != _danmakuLoadGeneration) {
         throw const DanmakuLoadCancelled();
       }
-      addDanmakus(res);
+      final prepared = await prepareDanmakus(res,
+          deduplicate: GStorage.getSetting(SettingsKeys.danmakuDeduplication));
+      if (generation != _danmakuLoadGeneration) {
+        throw const DanmakuLoadCancelled();
+      }
+      danDanmakus.addAll(prepared);
       return res.isNotEmpty;
     } catch (e) {
       if (generation != _danmakuLoadGeneration) {

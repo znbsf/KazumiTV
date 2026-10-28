@@ -1,5 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:kazumi/modules/danmaku/danmaku_module.dart';
+
+Map<int, List<DanmakuEntry>> indexDanmakus((List<DanmakuEntry>, bool) input) {
+  final entries = input.$2
+      ? mergeDuplicateDanmakus(input.$1, timeWindowSeconds: 5)
+      : input.$1;
+  final indexed = <int, List<DanmakuEntry>>{};
+  for (final entry in entries) {
+    (indexed[entry.time.toInt()] ??= []).add(entry);
+  }
+  return indexed;
+}
+
+Future<Map<int, List<DanmakuEntry>>> prepareDanmakus(List<DanmakuEntry> entries,
+    {required bool deduplicate}) {
+  final input = (entries, deduplicate);
+  if (entries.length < 2000) return Future.value(indexDanmakus(input));
+  return compute(indexDanmakus, input, debugLabel: 'danmaku-preparation');
+}
 
 Color generateDanmakuColor(int colorValue) {
   final red = (colorValue >> 16) & 0xFF;
