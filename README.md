@@ -91,6 +91,40 @@
 - 页面仍可能有长帧，不承诺所有设备60fps。音画确认仅覆盖实测小米电视及所测内容，未进行整集长播或全站点兼容验收。
 - 各版本的候选设备回归、正式签名与升级验收分别记录；ARM64/x86_64 不宣称实机通过，参见当前发布说明。
 
+## 问题反馈与日志
+
+请使用本仓库的 [Bug 反馈表单](https://github.com/znbsf/KazumiTV/issues/new?template=1-bug.yml)。填写应用版本及安装包来源、电视/盒子型号、系统版本、复现步骤和预期结果。播放问题还请说明来源名称、线路、集数，以及失败发生在解析、等待首帧还是已经播放之后；无需提供完整播放链接。
+
+### 从应用内获取
+
+1. 出错后先记下时间及所在时区、最后一次操作。先保留日志，再重试；获取前不要点击「清空日志」、清除应用数据或卸载。
+2. 打开 **设置 → 存储与日志 → 错误日志**，选择 **复制日志**。电视首页的「设置」会先进入「我的」页，再点右上角「设置」进入分类设置；「存储与日志」在左侧靠下的「其他」分组中。当前日志入口不在「关于」页。
+3. 在能够使用该设备剪贴板的编辑器或浏览器中粘贴，检查并脱敏后提交；较长内容可保存为 `.txt` 附件。电视剪贴板不会自动同步到手机或电脑，当前日志页也没有跨设备导出按钮。无法导出时，先附错误日志截图并说明情况，仍可提交 Issue。
+
+普通模式会保存警告、错误及主动持久化的播放诊断，不是全部运行日志。日志为空或缺少某段信息不表示故障没有发生；先提交现有证据，无需默认开启播放器调试模式。
+
+### 日志文件位置
+
+文件名为 `kazumi_logs.log`，程序使用的路径是 `getApplicationSupportDirectory()/logs/kazumi_logs.log`。
+
+- Android 正式包、默认用户的通常路径：`/data/user/0/com.znbsf.kazumi.fluttertv/files/logs/kazumi_logs.log`，部分系统也显示为 `/data/data/com.znbsf.kazumi.fluttertv/files/logs/kazumi_logs.log`。
+- QA、实验包或其他系统用户的包名/用户目录可能不同；桌面系统的应用支持目录也由平台决定。优先使用应用内入口，勿按某台开发电脑的绝对路径查找。
+
+Android 上这是应用私有文件，普通文件管理器和 `adb pull` 通常无权读取，正式 Release 包也通常不支持 `run-as`。路径用于识别文件，不需要为反馈问题获取 root、卸载或改装调试包。
+
+### 闪退、卡死或无法进入日志页时
+
+如果已有获授权的 ADB 连接，可在故障后尽快从电脑保存系统日志。先用 `adb devices` 查看目标，将下面的 `DEVICE_SERIAL` 替换为对应设备标识；输出文件保存在电脑当前目录：
+
+```powershell
+adb devices
+adb -s DEVICE_SERIAL logcat -d -v threadtime > kazumitv-logcat.txt
+```
+
+这会导出设备当前保留的系统日志，不会清空缓冲，也不是复制 `kazumi_logs.log`。系统日志可能已被覆盖，并可能包含其他应用信息：本地保留原件，只提交与故障时间、KazumiTV 进程或系统崩溃相关的必要片段。没有 ADB 连接时，直接说明「无法获取系统日志」即可。
+
+Issue 和附件公开可见。提交前删除 token、Cookie、账号信息、完整播放 URL（尤其签名参数）、设备标识及私有地址。播放器调试日志和系统日志不能假定已自动脱敏；无法安全处理时，仅提供现象、时间和截图。
+
 ## 来源与许可
 
 感谢 [Predidit/Kazumi](https://github.com/Predidit/Kazumi) 及其贡献者，以及 [media-kit](https://github.com/media-kit/media-kit)、[Bangumi](https://bangumi.tv/) 和[弹弹play](https://www.dandanplay.com/) 等项目与服务。
