@@ -91,6 +91,25 @@ class _VideoPageState extends State<VideoPage>
 
   late final bool disableAnimations;
 
+  // Every argument is stable for this State. Reusing the instance lets the
+  // page rebuild for the side panel, loading text or debug log without
+  // rebuilding the whole player, which tracks its own observables.
+  late final Widget _playerItem = PlayerItem(
+    playerController: playerController,
+    videoPageController: videoPageController,
+    toggleMenu: _toggleTabBodyAnimated,
+    showMenuImmediately: _showTabBodyImmediately,
+    showEpisodeGuide: _showEpisodeGuide,
+    selectSource: _selectSource,
+    hideMenuImmediately: _hideTabBodyImmediately,
+    changeEpisode: changeEpisode,
+    onBackPressed: onBackPressed,
+    exitPlayer: exitPlayer,
+    keyboardFocus: keyboardFocus,
+    disableAnimations: disableAnimations,
+    pauseForTimedShutdown: pauseForTimedShutdown,
+  );
+
   StreamSubscription<SyncPlayChatMessage>? _syncChatSubscription;
   late final mobx.ReactionDisposer _pipModeListener;
 
@@ -901,21 +920,7 @@ class _VideoPageState extends State<VideoPage>
                       videoPageController.errorMessage != null) &&
                   !_isClosing
               ? Container()
-              : PlayerItem(
-                  playerController: playerController,
-                  videoPageController: videoPageController,
-                  toggleMenu: _toggleTabBodyAnimated,
-                  showMenuImmediately: _showTabBodyImmediately,
-                  showEpisodeGuide: _showEpisodeGuide,
-                  selectSource: _selectSource,
-                  hideMenuImmediately: _hideTabBodyImmediately,
-                  changeEpisode: changeEpisode,
-                  onBackPressed: onBackPressed,
-                  exitPlayer: exitPlayer,
-                  keyboardFocus: keyboardFocus,
-                  disableAnimations: disableAnimations,
-                  pauseForTimedShutdown: pauseForTimedShutdown,
-                ),
+              : _playerItem,
         ),
       ],
     );

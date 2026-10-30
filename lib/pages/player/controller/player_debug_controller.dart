@@ -1,6 +1,8 @@
 // ignore_for_file: library_private_types_in_public_api
 
 import 'dart:async';
+import 'dart:collection';
+import 'package:flutter/foundation.dart';
 
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:media_kit/media_kit.dart';
@@ -20,6 +22,77 @@ abstract class _PlayerDebugController with Store {
   static const maxLogEntries = 500;
   static const maxLogCharacters = 256 * 1024;
   int _logCharacters = 0;
+  final ListQueue<PlayerLog> _rawLogs = ListQueue<PlayerLog>();
+  int _rawLogCharacters = 0;
+  int _logViewerCount = 0;
+
+  @visibleForTesting
+  int get retainedRawLogCharacters => _rawLogCharacters;
+
+  @visibleForTesting
+  int get retainedRawLogCount => _rawLogs.length;
+
+  static int _rawSize(PlayerLog event) =>
+      event.prefix.length + event.level.length + event.text.length;
+
+  static String _truncate(String value, int limit) {
+    if (value.length <= limit) return value;
+    const suffix = '…[truncated]';
+    return '${value.substring(0, limit - suffix.length)}$suffix';
+  }
+
+  static PlayerLog _boundedLog(PlayerLog event) {
+    if (_rawSize(event) <= 4096) return event;
+    final prefix = _truncate(event.prefix, 256);
+    final level = _truncate(event.level, 32);
+    return PlayerLog(
+      prefix: prefix,
+      level: level,
+      text: _truncate(event.text, 4096 - prefix.length - level.length),
+    );
+  }
+
+  void recordLog(PlayerLog event, {required bool playerDebugMode}) {
+    final retained = _boundedLog(event);
+    _rawLogs.addLast(retained);
+    _rawLogCharacters += _rawSize(retained);
+    while (_rawLogs.length > maxLogEntries ||
+        _rawLogCharacters > maxLogCharacters) {
+      _rawLogCharacters -= _rawSize(_rawLogs.removeFirst());
+    }
+    if (!playerDebugMode && _logViewerCount == 0) return;
+    final message = event.toString();
+    appendLog(message);
+    if (playerDebugMode) {
+      KazumiLogger().i("MPV: $message", forceLog: true);
+    }
+  }
+
+  void attachLogViewer() {
+    if (_logViewerCount++ > 0) return;
+    // Rebuild from the latest raw window, including events received while the
+    // viewer was closed. Reopening must not duplicate already formatted logs.
+    runInAction(() {
+      playerLog.clear();
+      _logCharacters = 0;
+      for (final event in _rawLogs) {
+        appendLog(event.toString());
+      }
+    });
+  }
+
+  void detachLogViewer() {
+    if (_logViewerCount > 0) _logViewerCount--;
+  }
+
+  void clearLogs() {
+    _rawLogs.clear();
+    _rawLogCharacters = 0;
+    runInAction(() {
+      playerLog.clear();
+      _logCharacters = 0;
+    });
+  }
 
   void appendLog(String message) {
     runInAction(() {
@@ -74,10 +147,7 @@ abstract class _PlayerDebugController with Store {
     if (!isCurrentPlayer(player)) return;
     playerLogSubscription = player.stream.log.listen((event) {
       if (!isCurrentPlayer(player)) return;
-      appendLog(event.toString());
-      if (playerDebugMode) {
-        KazumiLogger().i("MPV: ${event.toString()}", forceLog: true);
-      }
+      recordLog(event, playerDebugMode: playerDebugMode);
     });
     await playerWidthSubscription?.cancel();
     if (!isCurrentPlayer(player)) return;

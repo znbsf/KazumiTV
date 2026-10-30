@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:kazumi/pages/settings/tv_remote_help.dart';
 import 'dart:async';
 
@@ -21,6 +22,16 @@ final _diagnostics = PlayerDiagnosticsSnapshot.fromProperties(
   hardwareAccelerationEnabled: false,
   configuredHardwareDecoder: 'no',
 );
+
+class _CountingLog extends PlayerLog {
+  _CountingLog(String text) : super(prefix: 'test', level: 'info', text: text);
+  int formatCalls = 0;
+  @override
+  String toString() {
+    formatCalls++;
+    return super.toString();
+  }
+}
 
 // Implements the UI's read boundary without constructing a native Player.
 class _FakePlaybackController implements PlayerPlaybackController {
@@ -100,6 +111,59 @@ Future<void> _selectStatus(WidgetTester tester) async {
 void main() {
   setUp(() => TvMode.setEnabledForTesting(true));
   tearDown(() => TvMode.setEnabledForTesting(false));
+
+  for (final initialTab in [VideoDetailsTab.status, VideoDetailsTab.remote]) {
+    testWidgets('${initialTab.name} only formats logs while logs tab selected',
+        (tester) async {
+      final player = _FakePlayerController(
+          _FakePlaybackController(Future.value(_diagnostics)));
+      final old = _CountingLog('old');
+      player.debug.recordLog(old, playerDebugMode: false);
+      await _pumpSheet(tester, player, initialTab: initialTab);
+      final live = _CountingLog('live');
+      player.debug.recordLog(live, playerDebugMode: false);
+      expect([old.formatCalls, live.formatCalls], [0, 0]);
+      final tabs =
+          tester.widget<TabBarView>(find.byType(TabBarView)).controller!;
+      tabs.animateTo(VideoDetailsTab.logs.index);
+      await tester.pumpAndSettle();
+      expect([old.formatCalls, live.formatCalls], [1, 1]);
+      expect(player.debug.playerLog.length, 2);
+      tabs.animateTo(initialTab.index);
+      await tester.pumpAndSettle();
+      final hidden = _CountingLog('hidden');
+      player.debug.recordLog(hidden, playerDebugMode: false);
+      expect(hidden.formatCalls, 0);
+      tabs.animateTo(VideoDetailsTab.logs.index);
+      await tester.pumpAndSettle();
+      expect(hidden.formatCalls, 1);
+      expect(player.debug.playerLog.length, 3);
+      await tester.pumpWidget(const SizedBox());
+      final disposed = _CountingLog('disposed');
+      player.debug.recordLog(disposed, playerDebugMode: false);
+      expect(disposed.formatCalls, 0);
+    });
+  }
+
+  testWidgets('replacing player transfers only a visible log subscription',
+      (tester) async {
+    final first = _FakePlayerController(
+        _FakePlaybackController(Future.value(_diagnostics)));
+    final second = _FakePlayerController(
+        _FakePlaybackController(Future.value(_diagnostics)));
+    await _pumpSheet(tester, first, initialTab: VideoDetailsTab.logs);
+    await _pumpSheet(tester, second, initialTab: VideoDetailsTab.logs);
+    final old = _CountingLog('old player');
+    final next = _CountingLog('new player');
+    first.debug.recordLog(old, playerDebugMode: false);
+    second.debug.recordLog(next, playerDebugMode: false);
+    expect([old.formatCalls, next.formatCalls], [0, 1]);
+    await _selectStatus(tester);
+    await _pumpSheet(tester, first, initialTab: VideoDetailsTab.status);
+    final hidden = _CountingLog('hidden player');
+    first.debug.recordLog(hidden, playerDebugMode: false);
+    expect(hidden.formatCalls, 0);
+  });
 
   testWidgets(
       'remote sheet shares row focus, scrolls to end and exits without native calls',
