@@ -33,6 +33,8 @@ class PluginBatchUpdateResult {
     required this.requiresNewerClient,
     required this.failed,
     required this.notNewer,
+    this.failedNames = const [],
+    this.incompatibleNames = const [],
   });
 
   final int candidates;
@@ -40,6 +42,8 @@ class PluginBatchUpdateResult {
   final int requiresNewerClient;
   final int failed;
   final int notNewer;
+  final List<String> failedNames;
+  final List<String> incompatibleNames;
 
   bool get hasNoCandidates => candidates == 0;
 }
@@ -91,6 +95,27 @@ abstract class _PluginsController with Store {
 
   @observable
   ObservableList<Plugin> pluginList = ObservableList.of([]);
+
+  Iterable<Plugin> get enabledPlugins => pluginList.where((p) => p.enabled);
+
+  bool isPluginEnabled(String name) => enabledPlugins.any(
+        (p) => pluginNameKey(p.name) == pluginNameKey(name),
+      );
+
+  Future<void> setPluginEnabled(String name, bool enabled) {
+    return _mutateAndPersist(
+      () {
+        final index = pluginList.indexWhere(
+          (p) => pluginNameKey(p.name) == pluginNameKey(name),
+        );
+        if (index < 0) throw StateError('Rule no longer installed: $name');
+        // Replace rather than mutate so observers and rollback see the change.
+        pluginList[index] = Plugin.fromJson(pluginList[index].toJson())
+          ..enabled = enabled;
+      },
+      errorMessage: 'Plugin: failed to persist source state for $name',
+    );
+  }
 
   @observable
   ObservableList<PluginHTTPItem> pluginHTTPList = ObservableList.of([]);
@@ -218,6 +243,7 @@ abstract class _PluginsController with Store {
     bool flag = false;
     for (int i = 0; i < pluginList.length; ++i) {
       if (pluginNameKey(pluginList[i].name) == pluginNameKey(plugin.name)) {
+        plugin.enabled = pluginList[i].enabled;
         pluginList.replaceRange(i, i + 1, [plugin]);
         flag = true;
         break;
@@ -396,7 +422,8 @@ abstract class _PluginsController with Store {
   List<String> _updatablePluginNames() {
     return [
       for (final plugin in pluginList)
-        if (pluginUpdateStatus(plugin) == PluginUpdateAvailability.updatable)
+        if (plugin.enabled &&
+            pluginUpdateStatus(plugin) == PluginUpdateAvailability.updatable)
           _pluginCatalogByName[pluginNameKey(plugin.name)]!.name,
     ];
   }
@@ -444,6 +471,7 @@ abstract class _PluginsController with Store {
       return (result: PluginUpdateResult.failed, plugin: null);
     }
     remotePlugin.name = name;
+    remotePlugin.enabled = true;
     try {
       if (remotePlugin.requiresNewerClient) {
         return (
@@ -496,17 +524,22 @@ abstract class _PluginsController with Store {
     var requiresNewerClient = 0;
     var failed = 0;
     var notNewer = 0;
+    final failedNames = <String>[];
+    final incompatibleNames = <String>[];
 
     final updatedPlugins = <Plugin>[];
-    for (final attempt in attempts) {
+    for (var i = 0; i < attempts.length; i++) {
+      final attempt = attempts[i];
       switch (attempt.result) {
         case PluginUpdateResult.updated:
           updated++;
           updatedPlugins.add(attempt.plugin!);
         case PluginUpdateResult.requiresNewerClient:
           requiresNewerClient++;
+          incompatibleNames.add(candidates[i]);
         case PluginUpdateResult.failed:
           failed++;
+          failedNames.add(candidates[i]);
         case PluginUpdateResult.notNewer:
           notNewer++;
       }
@@ -528,6 +561,8 @@ abstract class _PluginsController with Store {
       requiresNewerClient: requiresNewerClient,
       failed: failed,
       notNewer: notNewer,
+      failedNames: List.unmodifiable(failedNames),
+      incompatibleNames: List.unmodifiable(incompatibleNames),
     );
   }
 
@@ -555,11 +590,11 @@ abstract class _PluginsController with Store {
   }
 
   Future<void> removePlugins(Set<String> pluginNames) {
-    final names = Set<String>.of(pluginNames);
+    final names = pluginNames.map(pluginNameKey).toSet();
     return _mutateAndPersist(
       () {
         for (int i = pluginList.length - 1; i >= 0; --i) {
-          var name = pluginList[i].name;
+          var name = pluginNameKey(pluginList[i].name);
           if (names.contains(name)) {
             pluginList.removeAt(i);
           }

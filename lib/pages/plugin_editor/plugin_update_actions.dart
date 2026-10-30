@@ -1,5 +1,6 @@
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/plugins/plugins_controller.dart';
+import 'package:kazumi/pages/plugin_editor/rule_update_failure_dialog.dart';
 
 Future<void> updateAllPluginsWithFeedback(
   PluginsController controller, {
@@ -10,7 +11,17 @@ Future<void> updateAllPluginsWithFeedback(
     final result = await controller.tryUpdateAllPlugin(
       ensureCatalog: ensureCatalog,
     );
-    KazumiDialog.showToast(message: _batchUpdateMessage(result));
+    final message = _batchUpdateMessage(result);
+    if (result.failedNames.isNotEmpty || result.incompatibleNames.isNotEmpty) {
+      await showRuleUpdateFailures(
+        controller,
+        failedNames: result.failedNames,
+        incompatibleNames: result.incompatibleNames,
+        summary: message,
+      );
+    } else {
+      KazumiDialog.showToast(message: message);
+    }
   } catch (_) {
     KazumiDialog.showToast(message: '更新规则失败');
   }
@@ -26,7 +37,7 @@ Future<PluginUpdateResult> updatePluginWithFeedback(
   try {
     result = await controller.tryUpdatePluginByName(name);
   } catch (_) {
-    KazumiDialog.showToast(message: '保存规则失败');
+    KazumiDialog.showToast(message: '$name：保存规则失败，请重试');
     return PluginUpdateResult.failed;
   }
   final message = switch (result) {
@@ -35,7 +46,18 @@ Future<PluginUpdateResult> updatePluginWithFeedback(
     PluginUpdateResult.failed => installing ? '导入规则失败' : '更新规则失败',
     PluginUpdateResult.notNewer => '远程规则版本不高于本地，已跳过更新',
   };
-  KazumiDialog.showToast(message: message);
+  if (result == PluginUpdateResult.failed ||
+      result == PluginUpdateResult.requiresNewerClient) {
+    await showRuleUpdateFailures(
+      controller,
+      failedNames: result == PluginUpdateResult.failed ? [name] : [],
+      incompatibleNames:
+          result == PluginUpdateResult.requiresNewerClient ? [name] : [],
+      summary: '$name：$message',
+    );
+  } else {
+    KazumiDialog.showToast(message: '$name：$message');
+  }
   return result;
 }
 

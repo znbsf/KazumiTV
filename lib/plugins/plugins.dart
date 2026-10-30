@@ -23,6 +23,9 @@ class Plugin {
   String type;
   String name;
   String version;
+
+  /// Local source preference; remote rule updates must preserve it.
+  bool enabled;
   bool muliSources;
 
   /// Legacy schema field retained for rule import/export compatibility.
@@ -53,6 +56,7 @@ class Plugin {
     required this.type,
     required this.name,
     required this.version,
+    this.enabled = true,
     required this.muliSources,
     required this.useWebview,
     required this.useNativePlayer,
@@ -83,6 +87,7 @@ class Plugin {
       type: json['type'] as String? ?? 'anime',
       name: json['name'] as String? ?? '',
       version: json['version']?.toString() ?? '',
+      enabled: json['enabled'] as bool? ?? true,
       muliSources: json['muliSources'] as bool? ?? true,
       useWebview: json['useWebview'] as bool? ?? true,
       useNativePlayer: json['useNativePlayer'] as bool? ?? true,
@@ -153,6 +158,7 @@ class Plugin {
       'type': type,
       'name': name,
       'version': version,
+      'enabled': enabled,
       'muliSources': muliSources,
       'useWebview': useWebview,
       'useNativePlayer': useNativePlayer,

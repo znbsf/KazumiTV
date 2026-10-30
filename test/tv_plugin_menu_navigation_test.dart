@@ -181,6 +181,29 @@ void main() {
     });
   }
   testWidgets(
+      'installed rule menu pauses and restores source with remote confirm',
+      (tester) async {
+    final fixture = _Fixture();
+    await fixture.mount(tester, shop: false);
+    await fixture.open(tester, shop: false);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(fixture.controller.pluginList.first.enabled, isFalse);
+    expect(find.text('已暂时停用'), findsOneWidget);
+    expect(fixture.writes, 1);
+    await fixture.open(tester, shop: false);
+    expect(find.text('恢复启用'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(fixture.controller.pluginList.first.enabled, isTrue);
+    expect(find.text('已暂时停用'), findsNothing);
+    expect(fixture.writes, 2);
+    expect(fixture.downloads, 0);
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'pushed catalogue menu Back stays in shop before next Back leaves',
       (tester) async {
     final fixture = _Fixture();

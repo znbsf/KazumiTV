@@ -179,13 +179,24 @@ class _PluginViewPageState extends State<PluginViewPage> {
       } else {
         KazumiDialog.showToast(
             message: state == PluginUpdateAvailability.notInCatalog
-                ? '规则仓库中没有当前规则'
-                : '规则已是最新');
+                ? '${plugin.name}：规则仓库中没有当前规则'
+                : '${plugin.name}：规则已是最新');
       }
     } catch (_) {
-      KazumiDialog.showToast(message: '检查规则更新失败');
+      KazumiDialog.showToast(message: '${plugin.name}：检查规则更新失败');
     } finally {
       if (mounted) setState(() => _updatingNames.remove(plugin.name));
+    }
+  }
+
+  Future<void> _toggleEnabled(Plugin plugin) async {
+    try {
+      await _controller.setPluginEnabled(plugin.name, !plugin.enabled);
+      KazumiDialog.showToast(
+        message: '${plugin.name}：${plugin.enabled ? '已暂时停用' : '已恢复启用'}',
+      );
+    } catch (_) {
+      KazumiDialog.showToast(message: '${plugin.name}：保存启用状态失败');
     }
   }
 
@@ -230,6 +241,7 @@ class _PluginViewPageState extends State<PluginViewPage> {
                   final colors = Theme.of(context).colorScheme;
                   final all = _controller.pluginList.toList();
                   final updates = all
+                      .where((p) => p.enabled)
                       .where((p) =>
                           _controller.pluginUpdateStatus(p) ==
                           PluginUpdateAvailability.updatable)
@@ -240,8 +252,9 @@ class _PluginViewPageState extends State<PluginViewPage> {
                           (p.name.toLowerCase().contains(query) ||
                               p.baseUrl.toLowerCase().contains(query)) &&
                           (!_updatesOnly ||
-                              _controller.pluginUpdateStatus(p) ==
-                                  PluginUpdateAvailability.updatable))
+                              (p.enabled &&
+                                  _controller.pluginUpdateStatus(p) ==
+                                      PluginUpdateAvailability.updatable)))
                       .toList();
                   final canReorder =
                       query.isEmpty && !_updatesOnly && !_selecting;
@@ -399,6 +412,11 @@ class _PluginViewPageState extends State<PluginViewPage> {
                           _selected.add(plugin.name);
                         }),
                         tags: [
+                          if (!plugin.enabled)
+                            RuleTag(
+                                label: '已暂时停用',
+                                background: colors.surfaceContainerHighest,
+                                foreground: colors.onSurfaceVariant),
                           RuleTag(
                               label: plugin.version,
                               background: colors.surfaceContainerHighest,
@@ -462,6 +480,12 @@ class _PluginViewPageState extends State<PluginViewPage> {
                 controller.isOpen ? controller.close() : controller.open(),
             icon: const Icon(Icons.more_horiz_rounded)),
         menuChildren: [
+          MenuItemButton(
+              leadingIcon: Icon(plugin.enabled
+                  ? Icons.pause_circle_outline_rounded
+                  : Icons.play_circle_outline_rounded),
+              onPressed: () => _toggleEnabled(plugin),
+              child: Text(plugin.enabled ? '暂时停用' : '恢复启用')),
           MenuItemButton(
               leadingIcon: const Icon(Icons.edit_outlined),
               onPressed: () => context.pushNamed('/settings/plugin/editor',

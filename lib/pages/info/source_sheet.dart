@@ -276,7 +276,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
         builder: (context) {
           // Snapshot observable values here; lazy list builders are not tracked.
           final groupsByName = {
-            for (final plugin in _pluginsController.pluginList)
+            for (final plugin in _pluginsController.enabledPlugins)
               plugin.name: _SourceSearchGroup(
                 name: plugin.name,
                 keyword: _keywordFor(plugin.name),
