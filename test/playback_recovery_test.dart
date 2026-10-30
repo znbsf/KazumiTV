@@ -26,6 +26,7 @@ import 'package:kazumi/services/player/source_switch.dart';
 import 'package:kazumi/services/player/cross_source_resume.dart';
 import 'package:kazumi/services/video_source/services.dart';
 import 'package:kazumi/services/video_source/resolved_source_cache.dart';
+import 'package:kazumi/services/player/recent_video_cache_service.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
@@ -112,12 +113,54 @@ class _Playback implements PlayerPlaybackController {
 }
 
 class _Danmaku implements PlayerDanmakuController {
+  int latestRequests = 0;
+  @override
+  int get danmakuLoadGeneration => 0;
+  @override
+  Future<DanmakuLoadResult> fetchLatestDanmaku(int id, int episode) async {
+    latestRequests++;
+    return DanmakuLoadResult.success(danmakus: const [], bangumiID: id);
+  }
+
   @override
   Future<DanmakuLoadResult> fetchDanmaku(
           int id, String plugin, int episode) async =>
       DanmakuLoadResult.success(danmakus: const [], bangumiID: id);
   @override
   dynamic noSuchMethod(Invocation invocation) => null;
+}
+
+class _Lease extends RecentCacheLease {
+  _Lease()
+      : super({
+          'id': 'cached-episode',
+          'offline': true,
+          'url': 'http://127.0.0.1:1234/token/playlist.m3u8',
+          'metadata': <String, dynamic>{}
+        }, RecentVideoCacheService());
+  int releases = 0;
+  @override
+  Future<void> release() async {
+    releases++;
+  }
+}
+
+class _RecentCache extends RecentVideoCacheService {
+  Future<RecentCacheLease?>? found;
+  @override
+  Future<RecentCacheLease?> find(String identity) async => await found;
+  @override
+  Future<RecentCacheLease?> prepare(
+          {required String identity,
+          required String url,
+          required Map<String, String> headers,
+          required Map<String, dynamic> metadata,
+          required bool hls,
+          required bool adBlocker}) async =>
+      null;
+  @override
+  Future<Never> readDanmaku(String id) async =>
+      throw StateError('no cached comments');
 }
 
 class _Player implements PlayerController {
@@ -158,6 +201,7 @@ void main() {
   late _Player player;
   late VideoPageController controller;
   late _History history;
+  late _RecentCache recentCache;
   setUpAll(() async {
     temporary = await Directory.systemTemp.createTemp('kazumi_recovery_');
     PathProviderPlatform.instance = _Paths(temporary.path);
@@ -172,8 +216,11 @@ void main() {
     history = _History();
     source = _Source();
     player = _Player();
+    recentCache = _RecentCache();
     controller = VideoPageController(history, _Downloads(), _DownloadManager(),
-        videoSourceService: source, resolvedSourceCache: ResolvedSourceCache());
+        videoSourceService: source,
+        resolvedSourceCache: ResolvedSourceCache(),
+        recentCache: recentCache);
     controller.applyPlaybackArgs(OnlineVideoPlaybackArgs(
       bangumiItem: focusItem(1),
       plugin: Plugin.fromJson(
@@ -196,6 +243,38 @@ void main() {
   tearDown(() {
     controller.dispose();
     TvMode.setEnabledForTesting(false);
+  });
+
+  test('complete recent video bypasses network parsing but refreshes danmaku',
+      () async {
+    final lease = _Lease();
+    recentCache.found = Future.value(lease);
+    await controller.changeEpisode(1, playerController: player);
+    await Future<void>.delayed(Duration.zero);
+    expect(source.requests, isEmpty);
+    expect(player.initializations.single.videoUrl, lease.url);
+    expect(player.initializations.single.isLocalPlayback, true);
+    expect(player.initializations.single.loopbackCache, true);
+    expect(player.initializations.single.httpHeaders, isEmpty);
+    expect(player.danmaku.latestRequests, 1);
+    await controller.cancelEpisodeLoad(playerController: player);
+    expect(lease.releases, 1);
+  });
+
+  test(
+      'cancel during cache lookup releases late lease without starting playback',
+      () async {
+    final lookup = Completer<RecentCacheLease?>();
+    recentCache.found = lookup.future;
+    final pending = controller.changeEpisode(1, playerController: player);
+    await Future<void>.delayed(Duration.zero);
+    await controller.cancelEpisodeLoad(playerController: player);
+    final lease = _Lease();
+    lookup.complete(lease);
+    await pending;
+    expect(lease.releases, 1);
+    expect(player.initializations, isEmpty);
+    expect(source.requests, isEmpty);
   });
 
   PreparedSourceSwitch candidate() => PreparedSourceSwitch(

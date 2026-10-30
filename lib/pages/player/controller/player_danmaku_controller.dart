@@ -228,6 +228,16 @@ abstract class _PlayerDanmakuController with Store {
             bangumiId,
             episode,
           );
+    return _prepareResult(result);
+  }
+
+  Future<DanmakuLoadResult> fetchLatestDanmaku(
+      int bangumiId, int episode) async {
+    return _prepareResult(
+        await _fetchDanDanmakuByBgmBangumiID(bangumiId, episode));
+  }
+
+  Future<DanmakuLoadResult> _prepareResult(DanmakuLoadResult result) async {
     final prepared = await prepareDanmakus(result.danmakus,
         deduplicate: GStorage.getSetting(SettingsKeys.danmakuDeduplication));
     // The caller still validates the episode/session after this asynchronous work.

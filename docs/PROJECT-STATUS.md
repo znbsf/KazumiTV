@@ -1,5 +1,17 @@
 # KazumiTV 当前状态
 
+## 2026-10-31：#53 近期视频持久缓存（实现与验证中，未交付）
+
+用户授权建立 issue 并尝试实现自动视频缓存；随后明确视频有完整缓存时默认使用，弹幕优先尝试获取最新内容、失败或为空再回退缓存，命中需提示，支持逐集清理。已建立 https://github.com/znbsf/KazumiTV/issues/53 。本轮基于实时 origin/main / HEAD `3890b31b`，复用无源代码修改的工作树，新分支 `codex/issue53-persistent-playback-cache`；原 artifacts 保留。
+
+实现范围：独立开关默认关闭、额度默认 2 GiB；独立 isolate 中执行 loopback HLS 转发与流式落盘、完整分片提交、LRU、空间保留和逐集删除；近期缓存页提供无需联网选源的本地入口。首版仅明确完整的未加密单轨 VOD HLS，复杂清单、代理和去广告保留原路径，不改变原播放器临时缓冲或手动下载。弹幕遵循网络优先，并与该集缓存一同管理。主机受控回归已开始，首次编译暴露 List<int>/TypedData 与缺失 import，已按诊断修复；不记为通过。
+
+验证预算：受控本地 HTTP/临时目录回归及改动文件分析 20 分钟，覆盖重启断网、Range、取消/换集、容量/低空间、清理与弹幕新鲜度；一次 ARMv7 QA 构建最多 10 分钟。失败按具体反例修复，不扩展旧 direct/copy 或音频路线。若后续设备验证需要安装，另核对当前设备身份、占用和隔离 QA 包；本轮尚未开始设备操作。主机吞吐只证明受控数据路径，不证明电视帧率、闪存时延、首帧或真实源兼容。保留未测项，不发布、不关闭 issue。
+
+中间验证：默认 PATH 实际为 Flutter 3.47.5，核对后显式改用项目 3.47.3 / e8113bf；离线 enforce-lockfile pub get 后，同一组 100 项通过，改动文件分析无 error/warning、17 条样式 info，锁文件未变。16 MiB 单分片主机转发写盘观察 110 ms，仅本地吞吐样本。新页面测试中的 Hive 写入受 widget 虚拟时钟阻塞，停止核实归属的测试进程后改用可注入设置存取夹具，另测真实设置/隐身语义，3 项 UI/设置通过。
+
+首次 QA release 构建在 103.8 秒以 GeneratedPluginRegistrant 引用 dev-only flutter_native_splash 类而 release Gradle 未包含该类失败。核对固定 SDK 源码：releaseMode 的注册生成器过滤 dev dependency，Gradle release 也过滤；同工作树并行 analyze 可能将注册文件重写为开发模式。因此后续检查与构建串行，使用 runbook 的 --pub 正常再生成，不编辑生成文件、升级依赖或跳过校验。新边界审查另明确拒绝嵌套媒体 m3u8 分片，新增回归，防止把子清单计作可离线视频。以上具体失败/实质改动构成一次补构建依据，仍限 10 分钟；不重开旧设备路线。
+
 ## 2026-10-30 0.4.6 已正式发布，讨论滚动留待下版
 
 用户明确授权发布既有草稿并更新相关 issue，同时报告播放界面“讨论”无法滚动，要求下次 release 处理。13:25:22 UTC 公开 Release 429034612，标签 v0.4.6 指向精确构建提交 0a2edbfd44bfefb65ad1e8273236fad94d9060dd；Latest=true、draft=false、prerelease=false，基础号 20667。未重建或替换任何 APK，未操作电视。发布前附件元数据与白名单一致，发布后全部 11 项实际匿名下载，字节数及 SHA256 均通过；记录 artifacts/release-046-final-20261030/published-release.json、public-download-verification.json，下载子进程均已退出。

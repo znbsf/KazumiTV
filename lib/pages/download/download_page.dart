@@ -58,7 +58,11 @@ class _DownloadPageState extends State<DownloadPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const SysAppBar(title: Text('下载管理')),
+      appBar: SysAppBar(title: const Text('下载管理'), actions: [
+        TextButton(
+            onPressed: () => context.pushNamed('/settings/recent-cache'),
+            child: const Text('近期视频缓存')),
+      ]),
       body: Observer(builder: (context) {
         final recordKeys = downloadController.recordKeys.toList();
         _expanded.removeWhere((key, _) => !recordKeys.contains(key));

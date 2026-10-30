@@ -389,6 +389,7 @@ abstract class _PlayerPlaybackController with Store {
     VideoSourceFormat videoSourceFormat = VideoSourceFormat.auto,
     PlaybackProgressWriter? onHistoryProgress,
     void Function(String message)? onPlaybackError,
+    bool loopbackCache = false,
   }) async {
     startOffset = offset;
     superResolutionMode = SuperResolutionMode.fromStorageValue(
@@ -481,7 +482,9 @@ abstract class _PlayerPlaybackController with Store {
       }
 
       final bool proxyEnable = GStorage.getSetting(SettingsKeys.proxyEnable);
-      if (proxyEnable) {
+      if (loopbackCache) {
+        await pp.setProperty('http-proxy', '');
+      } else if (proxyEnable) {
         final String proxyUrl = GStorage.getSetting(SettingsKeys.proxyUrl);
         final formattedProxy = ProxyUtils.getFormattedProxyUrl(proxyUrl);
         if (formattedProxy != null) {
