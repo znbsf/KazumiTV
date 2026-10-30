@@ -1,4 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const watchdog=setTimeout(()=>{console.error('FAIL: browser scenarios did not finish');process.exit(1);},15000);
 const source=fs.readFileSync(require('path').join(__dirname,'../../lib/services/phone_keyboard_session.dart'),'utf8');
 const script=source.slice(source.indexOf('let state=null'),source.indexOf('</script>'));
 const target=(id='a',generation=1,revision=0)=>({generation,target:{id,label:id,revision,maxLength:120}});
@@ -39,6 +40,8 @@ await respond(tabA,readable());await respond(tabB,readable());
 tabA.elements.remoteDpad.children[0].onclick();assert.equal(tabA.requests[0].options.headers['X-Kazumi-Client'],browserA);assert.equal(tabA.requests[0].options.headers['Content-Type'],'application/json');await respond(tabA,readable());
 const reloaded=fixture('/presence',{},storage);assert.equal(reloaded.requests[0].options.headers['X-Kazumi-Client'],browserA,'refresh preserves count identity');await respond(reloaded,readable());
 f=fixture('/composing');await respond(f,readable());f.elements.text.compositionstart();f.elements.text.value='正在输入';f.run('poll()');assert.equal(f.requests.length,1,'IME must retain online heartbeat');await respond(f,{...target('new',4),readTextAllowed:false});assert.equal(f.elements.text.value,'正在输入','heartbeat cannot replace in-progress IME');f.elements.text.compositionend();assert.equal(f.elements.text.value,'');assert.equal(f.requests.length,0,'target change during IME cannot write to new field');
-console.log('PASS 21 synthetic JavaScript scenarios: unknown/confirm, cross-target confirm, in-flight IME target switch, serialized poll/input, normal composition, persistent offline/reconnect, absolute timeout');
-})().catch(e=>{console.error(e);process.exitCode=1;});
+const credential={...readable('saved-token-must-not-echo'),target:{...readable('saved-token-must-not-echo').target,writeOnly:true}};
+f=fixture('/credential');await respond(f,credential);assert.equal(f.elements.text.value,'','write-only ignores readable contents');assert(f.elements.privacy.textContent.includes('只写'));f.elements.text.value='pasted-new-token';f.elements.text.selectionStart=16;f.elements.text.selectionEnd=16;f.elements.text.input();body=JSON.parse(f.requests[0].options.body);assert.equal(body.text,'pasted-new-token');assert(!('selection' in body),'credentials never send read/selection requests');await respond(f,{...credential,target:{...credential.target,revision:1}});assert.equal(f.elements.text.value,'pasted-new-token','write-only ack keeps the newly pasted value');f.elements.text.select();assert.equal(f.requests.length,0);const credentialConfirm=f.elements.confirm.onclick();assert.equal(JSON.parse(f.requests[0].options.body).action,'confirm');await respond(f,{...credential,target:null});await credentialConfirm;assert.equal(f.elements.text.value,'','confirmation clears browser credential');assert(f.elements.text.disabled);
+console.log('PASS 22 synthetic JavaScript scenarios including write-only credentials: unknown/confirm, cross-target confirm, in-flight IME target switch, serialized poll/input, normal composition, persistent offline/reconnect, absolute timeout');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>clearTimeout(watchdog));
 

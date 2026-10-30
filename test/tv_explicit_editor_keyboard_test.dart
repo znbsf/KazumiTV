@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/bean/widget/tv_search_entry.dart';
+import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
 import 'package:kazumi/pages/video/episode_jump_dialog.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 
@@ -38,6 +39,14 @@ void main() {
       tester.testTextInput.hide();
       await _key(tester,
           cancel ? LogicalKeyboardKey.arrowDown : LogicalKeyboardKey.arrowUp);
+      if (cancel) {
+        // The explicit editor now offers phone input before its footer actions.
+        expect(
+            FocusManager.instance.primaryFocus!.context!
+                .findAncestorWidgetOfExactType<PhoneKeyboardButton>(),
+            isNotNull);
+        await _key(tester, LogicalKeyboardKey.tab);
+      }
       expect(FocusManager.instance.primaryFocus, isNot(same(inputFocus)));
       expect(
           FocusManager.instance.primaryFocus!.context!

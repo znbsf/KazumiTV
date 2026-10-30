@@ -8,6 +8,7 @@ import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/sync/webdav.dart';
 
 class WebDavServerPage extends StatefulWidget {
@@ -127,12 +128,13 @@ class _WebDavServerPageState extends State<WebDavServerPage> {
                       ),
                       TvTextFormEntry(
                         controller: _password,
-                        allowPhoneKeyboard: false,
+                        phoneKeyboardWriteOnly: true,
                         enabled: !_busy,
                         obscureText: !_passwordVisible,
                         autocorrect: false,
                         enableSuggestions: false,
-                        onFieldSubmitted: (_) => _save(),
+                        onFieldSubmitted:
+                            TvMode.enabled ? null : (_) => _save(),
                         decoration: InputDecoration(
                           labelText: '密码或应用授权码',
                           border: const OutlineInputBorder(),

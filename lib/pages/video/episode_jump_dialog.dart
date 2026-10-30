@@ -1,4 +1,4 @@
-import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
+import 'package:kazumi/bean/widget/tv_explicit_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -43,19 +43,20 @@ class _EpisodeJumpDialogState extends State<_EpisodeJumpDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: const Text('定位剧集'),
-        content: TvTextEditingShortcuts(
+        content: TvExplicitTextField(
+            label: '原始集序号',
             child: TextField(
-          key: const ValueKey('episode-jump-number'),
-          controller: _input,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          decoration: InputDecoration(
-            labelText: '原始集序号（1–${widget.count}）',
-            errorText: _error,
-          ),
-          onSubmitted: (_) => _confirm(),
-        )),
+              key: const ValueKey('episode-jump-number'),
+              controller: _input,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: '原始集序号（1–${widget.count}）',
+                errorText: _error,
+              ),
+              onSubmitted: (_) => _confirm(),
+            )),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context), child: const Text('取消')),

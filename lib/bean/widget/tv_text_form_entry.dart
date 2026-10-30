@@ -15,6 +15,7 @@ class TvTextFormEntry extends StatelessWidget {
       this.autofocus = false,
       this.obscureText = false,
       this.allowPhoneKeyboard = true,
+      this.phoneKeyboardWriteOnly = false,
       this.autocorrect = true,
       this.enableSuggestions = true,
       this.keyboardType,
@@ -30,6 +31,7 @@ class TvTextFormEntry extends StatelessWidget {
   final InputDecoration decoration;
   final bool enabled, autofocus, obscureText, autocorrect, enableSuggestions;
   final bool allowPhoneKeyboard;
+  final bool phoneKeyboardWriteOnly;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
@@ -73,6 +75,7 @@ class _TvFormField extends FormField<String> {
             autovalidateMode: entry.autovalidateMode,
             builder: (state) => TvTextEntry(
                 allowPhoneKeyboard: entry.allowPhoneKeyboard,
+                phoneKeyboardWriteOnly: entry.phoneKeyboardWriteOnly,
                 child: TextField(
                   controller: entry.controller,
                   focusNode: entry.focusNode,
