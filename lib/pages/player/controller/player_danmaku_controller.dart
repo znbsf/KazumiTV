@@ -235,6 +235,7 @@ abstract class _PlayerDanmakuController with Store {
         danmakus: result.danmakus,
         bangumiID: result.bangumiID,
         status: result.status,
+        failure: result.failure,
         prepared: prepared);
   }
 

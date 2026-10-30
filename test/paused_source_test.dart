@@ -73,6 +73,27 @@ class _UnusedDownload extends Fake implements DownloadController {}
 class _UnusedCollect extends Fake implements ICollectCrudRepository {}
 
 void main() {
+  test('a source paused while waiting for a search slot never starts',
+      () async {
+    final pending = Completer<PluginSearchResponse>();
+    final running = _SearchRule('running')..response = pending.future;
+    final queued = _SearchRule('queued');
+    final controller = PluginsController(pluginJsonWriter: (_) async {})
+      ..pluginList.addAll([running, queued]);
+    final info = InfoController(CollectController(_UnusedCollect()));
+    final service = PluginSearchService(
+        infoController: info, pluginsController: controller, maxConcurrent: 1);
+    final search = service.queryAllSource('fixture');
+    expect(running.searches, 1);
+    expect(queued.searches, 0);
+    await controller.setPluginEnabled('queued', false);
+    pending.complete(PluginSearchResponse(pluginName: 'running', data: []));
+    await search;
+    expect(queued.searches, 0);
+    expect(info.pluginSearchResponseList.map((e) => e.pluginName), ['running']);
+    service.cancel();
+  });
+
   test('paused sources are excluded from all and individual searches',
       () async {
     final enabled = _SearchRule('enabled');

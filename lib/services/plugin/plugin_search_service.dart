@@ -96,7 +96,10 @@ class PluginSearchService {
       _running++;
     }
     try {
-      if (_isCancelled || session.isStale || token.isCancelled) return;
+      if (_isCancelled ||
+          session.isStale ||
+          token.isCancelled ||
+          !_isCurrentSource(plugin)) return;
       final result = await plugin.queryBangumi(
         keyword,
         shouldRethrow: true,
