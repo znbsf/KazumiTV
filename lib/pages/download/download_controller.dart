@@ -135,7 +135,8 @@ abstract class _DownloadController with Store {
 
   final Map<String, double> _speeds = {};
   final _backgroundNotificationUpdater = _LatestAsyncRunner();
-  DateTime _lastUiUpdateTime = DateTime.now();
+  final Set<String> _dirtyRecordKeys = {};
+  Timer? _uiUpdateTimer;
   static const _uiUpdateInterval = Duration(milliseconds: 500);
 
   void _onDownloadProgress(String recordKey, int episodeNumber,
@@ -157,12 +158,24 @@ abstract class _DownloadController with Store {
       _speeds[key] = speed;
     }
 
-    final now = DateTime.now();
-    if (isFinalState ||
-        now.difference(_lastUiUpdateTime) >= _uiUpdateInterval) {
-      _lastUiUpdateTime = now;
+    if (isFinalState) {
       _refreshRecord(recordKey);
       _queueBackgroundNotificationUpdate();
+    } else {
+      _dirtyRecordKeys.add(recordKey);
+      // One trailing batch gives every changed record a turn, even when its
+      // last callback falls between another record's progress ticks.
+      _uiUpdateTimer ??= Timer(_uiUpdateInterval, () {
+        _uiUpdateTimer = null;
+        final keys = _dirtyRecordKeys.toList();
+        _dirtyRecordKeys.clear();
+        runInAction(() {
+          for (final key in keys) {
+            _refreshRecord(key);
+          }
+        });
+        _queueBackgroundNotificationUpdate();
+      });
     }
   }
 
@@ -253,6 +266,9 @@ abstract class _DownloadController with Store {
   }
 
   void _replaceRecords(List<DownloadRecord> nextRecords) {
+    _dirtyRecordKeys.clear();
+    _uiUpdateTimer?.cancel();
+    _uiUpdateTimer = null;
     runInAction(() {
       records
         ..clear()
@@ -271,6 +287,11 @@ abstract class _DownloadController with Store {
   }
 
   void _refreshRecord(String recordKey) {
+    _dirtyRecordKeys.remove(recordKey);
+    if (_dirtyRecordKeys.isEmpty) {
+      _uiUpdateTimer?.cancel();
+      _uiUpdateTimer = null;
+    }
     final record = _repository.getRecord(recordKey);
     runInAction(() {
       if (record == null || record.episodes.isEmpty) {
