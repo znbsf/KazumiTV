@@ -1,6 +1,6 @@
 # KazumiTV 当前状态
 
-## 2026-10-31：#53 近期视频持久缓存（实现与验证中，未交付）
+## 2026-10-31：#53 近期视频持久缓存（本地候选已构建，真机未验）
 
 用户授权建立 issue 并尝试实现自动视频缓存；随后明确视频有完整缓存时默认使用，弹幕优先尝试获取最新内容、失败或为空再回退缓存，命中需提示，支持逐集清理。已建立 https://github.com/znbsf/KazumiTV/issues/53 。本轮基于实时 origin/main / HEAD `3890b31b`，复用无源代码修改的工作树，新分支 `codex/issue53-persistent-playback-cache`；原 artifacts 保留。
 
@@ -11,6 +11,14 @@
 中间验证：默认 PATH 实际为 Flutter 3.47.5，核对后显式改用项目 3.47.3 / e8113bf；离线 enforce-lockfile pub get 后，同一组 100 项通过，改动文件分析无 error/warning、17 条样式 info，锁文件未变。16 MiB 单分片主机转发写盘观察 110 ms，仅本地吞吐样本。新页面测试中的 Hive 写入受 widget 虚拟时钟阻塞，停止核实归属的测试进程后改用可注入设置存取夹具，另测真实设置/隐身语义，3 项 UI/设置通过。
 
 首次 QA release 构建在 103.8 秒以 GeneratedPluginRegistrant 引用 dev-only flutter_native_splash 类而 release Gradle 未包含该类失败。核对固定 SDK 源码：releaseMode 的注册生成器过滤 dev dependency，Gradle release 也过滤；同工作树并行 analyze 可能将注册文件重写为开发模式。因此后续检查与构建串行，使用 runbook 的 --pub 正常再生成，不编辑生成文件、升级依赖或跳过校验。新边界审查另明确拒绝嵌套媒体 m3u8 分片，新增回归，防止把子清单计作可离线视频。以上具体失败/实质改动构成一次补构建依据，仍限 10 分钟；不重开旧设备路线。
+
+最终程序提交 `79ec39f84b4d6efee3f7640d9bdabf9677953166`。固定 Flutter 下 100 项相关回归通过，补嵌套分片拒绝后缓存核心 17 项通过（其中 16 项为重验，唯一相关用例合计 101，不累加为 117）。静态检查无 error/warning，17 条 info 为样式提示。证据：`artifacts/issue53-pinned-tests.log`、`issue53-core-final.log`、`issue53-pinned-analysis.log`；主机 16 MiB 样本分别 110/139 ms，不作为设备吞吐或 FPS 承诺。未实施整仓回归、真实源和设备验收。
+
+串行正常 `--pub` 补构建 89.8 秒成功：`artifacts/issue53-persistent-cache/KazumiTV-0.4.6-cache.1-armv7-QA.apk`，remoteqa / ARMv7 / 206801，SHA256 `356f57fbe2a2d80200e829ddaa515204b6483c4dc027a70daea910ddac4bc78d`。固定公开测试证书、包名/ABI/版本/TV入口、非debug/probe及16 KiB ZIP对齐通过，回执 `verification.json`；依赖锁未变。该候选使用正常 App 入口，不带设备测试夹具；尚未安装、上传、推送、合并或发布。
+
+使用入口为“设置 → 近期视频缓存”，下载管理也有同名入口。开关默认关闭；完整视频命中优先本地、弹幕先联网再按失败/空结果回退并提示，逐集删除包含对应弹幕，活动条目与手动下载受保护。首版不支持 MP4、加密/多轨/多清晰度/字节范围/嵌套 HLS、直播、代理或去广告路径的自动保存；不补齐跳过的片段，也不宣称所有“看过”的集数都完整。单集弹幕最多 8 MiB，超限保留在线结果但不新增持久副本。
+
+收尾：按 PID、创建时间、父进程与命令角色核对并停止本任务 Gradle 52384、Kotlin 12072/1872，回读均退出；未见本工作树剩余 Dart/Flutter/Java 任务，宿主 CPU 当次采样 18%（不是零负载结论），回执 `cleanup.json`。本轮未操作电视、未启动采集；电视首帧、内存/CPU/闪存时延、连续播放/退出和真实源兼容仍需后续有界验收。Issue #53 保持开放。
 
 ## 2026-10-30 0.4.6 已正式发布，讨论滚动留待下版
 
