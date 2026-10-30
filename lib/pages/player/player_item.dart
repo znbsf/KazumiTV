@@ -1,4 +1,4 @@
-import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
+import 'package:kazumi/bean/widget/tv_text_prompt_dialog.dart';
 import 'package:kazumi/pages/player/tv_player_focus.dart';
 import 'package:kazumi/pages/player/tv_playback_info.dart';
 import 'package:kazumi/pages/player/player_shortcut_platform_actions.dart';
@@ -1511,30 +1511,12 @@ class _PlayerItemState extends State<PlayerItem>
 
   Future<void> showDanmakuSwitch() => dialogs.run(
         (task) async {
-          String keyword = videoPageController.title;
           final query = await task.show<String>(
-            builder: (context) => AlertDialog(
-              title: const Text('弹幕检索'),
-              content: TvTextEditingShortcuts(
-                child: TextFormField(
-                  initialValue: keyword,
-                  decoration: const InputDecoration(hintText: '番剧名'),
-                  onChanged: (value) => keyword = value,
-                  onFieldSubmitted: (value) =>
-                      KazumiDialog.dismiss(context: context, popWith: value),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => KazumiDialog.dismiss(context: context),
-                  child: const Text('取消'),
-                ),
-                TextButton(
-                  onPressed: () =>
-                      KazumiDialog.dismiss(context: context, popWith: keyword),
-                  child: const Text('提交'),
-                ),
-              ],
+            builder: (context) => TvTextPromptDialog(
+              title: '弹幕检索',
+              initialText: videoPageController.title,
+              hint: '番剧名',
+              submitLabel: '检索',
             ),
           );
           final response = await task.loading(

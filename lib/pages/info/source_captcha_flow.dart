@@ -317,7 +317,8 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
                 label: const Text('换一张'),
               ),
             ),
-            TvTextEditingShortcuts(
+            TvExplicitTextField(
+              label: '验证码',
               child: TextField(
                 controller: _inputController,
                 focusNode: _inputFocus,
@@ -334,8 +335,8 @@ class _CaptchaDialogState extends State<_CaptchaDialog> {
                   floatingLabelBehavior: FloatingLabelBehavior.always,
                   errorText: _inputError,
                   errorMaxLines: 2,
-                  border:
-                      OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),

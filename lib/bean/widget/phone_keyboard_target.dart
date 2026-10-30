@@ -12,6 +12,8 @@ class PhoneKeyboardEditorTarget extends StatefulWidget {
       required this.onConfirm,
       required this.child,
       this.writeOnly = false,
+      this.detachOnConfirm = true,
+      this.onChanged,
       this.maxLength = 2048,
       this.inputFormatters = const []});
   final TextEditingController controller;
@@ -21,6 +23,8 @@ class PhoneKeyboardEditorTarget extends StatefulWidget {
   final int maxLength;
   final List<TextInputFormatter> inputFormatters;
   final bool writeOnly;
+  final bool detachOnConfirm;
+  final ValueChanged<String>? onChanged;
   @override
   State<PhoneKeyboardEditorTarget> createState() =>
       _PhoneKeyboardEditorTargetState();
@@ -63,9 +67,10 @@ class _PhoneKeyboardEditorTargetState extends State<PhoneKeyboardEditorTarget> {
             value = formatter.formatEditUpdate(widget.controller.value, value);
           }
           widget.controller.value = value;
+          widget.onChanged?.call(value.text);
         },
         onConfirm: () {
-          PhoneKeyboard.instance.detach(target);
+          if (widget.detachOnConfirm) PhoneKeyboard.instance.detach(target);
           widget.onConfirm();
         });
     widget.controller.addListener(_changed);

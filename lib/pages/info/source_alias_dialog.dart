@@ -24,46 +24,15 @@ void _showCustomKeywordDialog({
   required String initialKeyword,
   required String sourceName,
 }) {
-  String keyword = initialKeyword;
-
-  void submit(String value) {
-    final trimmed = value.trim();
-    if (trimmed.isEmpty) return;
-    KazumiDialog.dismiss();
-    onSubmit(trimmed);
-  }
-
   KazumiDialog.show(
-    builder: (context) => AlertDialog(
-      title: const Text('修改检索词'),
-      content: TvTextEditingShortcuts(
-        child: TextFormField(
-          initialValue: initialKeyword,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            labelText: '检索关键词',
-            helperText: '仅检索来源：$sourceName',
-            helperMaxLines: 3,
-            border: const OutlineInputBorder(),
-          ),
-          onChanged: (value) => keyword = value,
-          onFieldSubmitted: submit,
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: KazumiDialog.dismiss,
-          child: Text(
-            '取消',
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
-          ),
-        ),
-        TextButton(
-          onPressed: () => submit(keyword),
-          child: const Text('检索'),
-        ),
-      ],
+    builder: (context) => SourceKeywordDialog(
+      initialKeyword: initialKeyword,
+      sourceName: sourceName,
+      onCancel: () => KazumiDialog.dismiss(context: context),
+      onSubmit: (value) {
+        KazumiDialog.dismiss(context: context);
+        onSubmit(value);
+      },
     ),
   );
 }

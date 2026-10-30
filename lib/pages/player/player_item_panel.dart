@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:kazumi/bean/widget/tv_text_editing_shortcuts.dart';
+import 'package:kazumi/bean/widget/tv_text_prompt_dialog.dart';
 import 'package:kazumi/bean/widget/tv_dialog_text_entry.dart';
 
 import 'package:canvas_danmaku/models/danmaku_content_item.dart';
@@ -269,27 +269,11 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
           final hold = widget.acquirePlayerPanelHold();
           try {
             final message = await KazumiDialog.show<String>(
-              builder: (dialogContext) => AlertDialog(
-                title: const Text('发送弹幕'),
-                content: TvTextEditingShortcuts(
-                  child: TextField(
-                    autofocus: true,
-                    controller: textController,
-                    decoration: const InputDecoration(hintText: '发个友善的弹幕'),
-                    onSubmitted: (value) => Navigator.pop(dialogContext, value),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('取消'),
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        Navigator.pop(dialogContext, textController.text),
-                    child: const Text('发送'),
-                  ),
-                ],
+              builder: (dialogContext) => TvTextPromptDialog(
+                title: '发送弹幕',
+                initialText: textController.text,
+                hint: '发个友善的弹幕',
+                submitLabel: '发送',
               ),
             );
             if (mounted && message != null) await _submitDanmakuText(message);
