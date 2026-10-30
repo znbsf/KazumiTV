@@ -8,6 +8,7 @@ import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/plugins/plugins.dart';
 import 'package:kazumi/pages/history/history_controller.dart';
 import 'package:kazumi/pages/player/player_controller.dart';
+import 'package:kazumi/pages/player/controller/player_danmaku_controller.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/history/history_module.dart';
@@ -791,11 +792,14 @@ abstract class _VideoPageController with Store implements Disposable {
           playerController.danmaku.applyUnavailableDanmakuLoad(result);
           if (result.isFailed) {
             KazumiDialog.showToast(
-              message: '弹幕加载失败，可手动检索',
+              message: result.failureMessage,
             );
           }
         }
       }
+    } on DanmakuLoadCancelled {
+      // A retired load must neither replace the new load nor prompt a retry.
+      return;
     } catch (e) {
       if (session.isActive && danmakuSession.isActive) {
         playerController.danmaku.finishDanmakuLoad(disableDanmaku: true);
