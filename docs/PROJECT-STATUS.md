@@ -1,5 +1,30 @@
 # KazumiTV 当前状态
 
+## 2026-10-31：本地计划补充项核对与 #53 第二版（本地实现，设备未验）
+
+用户要求一起处理本地计划中的额外需求，并对范围澄清回答“全都看看”。在同一 `codex/issue53-persistent-playback-cache` 工作树继续，逐项比对根目录历史性能评审、下方 UI/TV 待办与本轮缓存范围；未修改旧 native checkout、独立 preview 或其他工作树。程序提交 `e7bece4fe3a796006538d81953e0903b6a72f10c`。
+
+| 项目 | 本轮结论 |
+| --- | --- |
+| 历史全量刷新、首页简介整页更新、关闭调试后原生日志整理 | 当前主线已分别采用增量更新、局部 ValueNotifier、受限原始队列/按需格式化；复用实现，相关回归通过。根目录 PERFORMANCE-CODE-REVIEW-20261030.md 的“待修改”是旧评审快照。 |
+| 解析日志触发整页 setState | 改为有上限的日志缓冲，仅打开的日志面板监听；隐藏时不重建外壳/选集栏。 |
+| 海报焦点缩放重绘 | 内容加 RepaintBoundary；绘制计数测试确认焦点动画不重绘海报内容，不声称电视 FPS 已提升。 |
+| 纯图标按钮遥控名称 | 获取焦点显示名称，失焦关闭提示；保留尺寸、主题、语义及 OK/指针操作。 |
+| #51 讨论滚动 | 增加独立阅读焦点，上下/重复键滚动，到底仍可反向，上端可回控件；实际讨论标签页进入、长内容、退出/重入受控测试通过，实体遥控未验。 |
+| MP4 持久缓存 | 支持完整 HTTP 响应落盘及离线 Range；HEAD 内容类型/长度校验，部分 seek 不冒充完整。尚未拼接多次分段请求；因此看过但未收到完整文件的 MP4 不保证离线。 |
+| 复杂 HLS | 新支持 AES-128/密钥轮换、显式及隐式 IV 的原序号保留、MAP/init、未加密 BYTERANGE 显式/隐式偏移；密钥/init/全部媒体齐全才可离线。保留 fMP4 扩展名，避免误命名为 TS。多轨/多清晰度、DRM、加密媒体字节范围、直播仍回退原播放路径。 |
+| 代理与去广告 | worker 继承与 native 一致的单会话 HTTP 代理；回环请求不走外部代理。复核锁定原生补丁：去广告基于原始 PTS/DISCONTINUITY；缓存保留原包与标记、持久保存开关，在线及离线仍由原播放器过滤，不移植下载端删组算法。真实广告内容及声画效果未验。 |
+| 缓存续播衔接 | 修复 MP4 命中被强制 HLS；在线观看同时保存缓存进度；离线入口遵守记忆进度开关/片尾归零，并与手动下载进度隔离。 |
+| 过扫描、次要页排版 | 核对现有 SettingsList/TV 输入适配与设置、规则长列表、下载列表、一起看表单回归；未复现统一布局缺陷。保留电视裁切/阅读距离走查，不盲目加入全局 5% 边距。 |
+| 常驻 TV 背景、历史 INFO 中/大方案 | 背景项已撤销；精简 INFO 已有当前实现。历史文件明确排除的虚拟电视/EPG/额外元数据不当成当前新增需求，不混入 preview。 |
+
+固定 Flutter 3.47.3 本轮 16 个相关文件最终共有 140 个不同用例通过：主批次 102 通过、一个文件因新增测试缺 import 未加载、一个文案匹配误命中说明文字；修正后两文件 37 通过（其中 2 项重复，合计 137）。再增加去广告清单保真、fMP4 后缀、真实讨论标签入口 3 项，最终 140；不累加各轮重跑次数。UI 新夹具最初使用重复 `_` 参数、动态空 map，以及提示出现后的旧语义计数断言，均按具体诊断修正；原失败日志保留。生产代码检查无 error/warning，23 条大括号风格 info；锁文件未改。
+
+证据：`artifacts/issue53-followups-regression.log`、`issue53-followups-corrections.log`、`issue53-format-discussion-tests.log`、`issue53-discussion-entry.log`、`issue53-followups-analysis.log`。HTTP 回归证明字节/密钥/初始化片段保存、Range、完整性及关闭源后重启读取；其中 AES/fMP4 使用受控字节夹具，不冒充真实解密/解码、电视首帧或性能验收。受控 16 MiB 流式转发观察 145 ms 仅为主机样本。原生算法依据复核 `Predidit/libmpv-android-video-build@dd2bfba8` 的 ffmpeg-hls-kazumi-combined.patch 与锁定 media_kit 参数传递；未修改 libmpv。
+
+第二版 QA 构建使用同一固定 SDK，按既有 runbook 串行执行检查后再构建，避免生成插件注册文件争写。仅构建 ARMv7 remoteqa / 0.4.6-cache.2 / 基础号 20681，旧 cache.1 产物保留；验证回执与最终构建结果追加于本节。未操作电视、推送、合并或发布；#53/#51 均不据本地测试关闭。
+
+构建收尾：串行正常 --pub 构建 111.7 秒成功。第二版保存在 `artifacts/issue53-persistent-cache-2/KazumiTV-0.4.6-cache.2-armv7-QA.apk`，29,484,347 字节，SHA256 `2c4b98106f1476fa630a1a894aa2e1e57a468f44ed0ddc4e36c821accffd2cd8`。固定测试证书、remoteqa / ARMv7 / 206811、TV 入口、非 debug/probe、16 KiB ZIP 对齐及原 libmpv hash 校验通过；`verification.json` 保留精确源码 SHA。构建只出现既有 AGP/Kotlin/SDK 工具版本提示，不升级依赖或绕过校验。按 PID/创建时间/父子链核实并停止本任务 Gradle 43348、Kotlin 43080，确认均退出、无本任务 Dart/Java/文件搜索残留；宿主 CPU 当次 17%，设备未操作，回执 `cleanup.json`。已同步 #53 本地进展及未测范围，保持开放。
 ## 2026-10-31：#53 近期视频持久缓存（本地候选已构建，真机未验）
 
 用户授权建立 issue 并尝试实现自动视频缓存；随后明确视频有完整缓存时默认使用，弹幕优先尝试获取最新内容、失败或为空再回退缓存，命中需提示，支持逐集清理。已建立 https://github.com/znbsf/KazumiTV/issues/53 。本轮基于实时 origin/main / HEAD `3890b31b`，复用无源代码修改的工作树，新分支 `codex/issue53-persistent-playback-cache`；原 artifacts 保留。
