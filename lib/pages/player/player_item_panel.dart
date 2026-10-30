@@ -35,6 +35,7 @@ import 'package:kazumi/services/platform/tv_navigation.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/player/tv_player_controls.dart';
+import 'package:kazumi/pages/player/player_control_visibility.dart';
 
 class PlayerItemPanel extends StatefulWidget {
   const PlayerItemPanel({
@@ -847,11 +848,11 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
             right: 0,
             child: Observer(
               builder: (context) {
-                return Visibility(
-                  visible: !playerController.panel.lockPanel &&
-                      (widget.disableAnimations
-                          ? playerController.panel.showVideoController
-                          : true),
+                return PlayerControlVisibility(
+                  visible: playerController.panel.showVideoController,
+                  locked: playerController.panel.lockPanel,
+                  disableAnimations: widget.disableAnimations,
+                  animation: widget.panelVisibilityController,
                   child: widget.disableAnimations
                       ? bottomControlWidget
                       : SlideTransition(
@@ -955,6 +956,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                       const SizedBox(height: 4),
                       _withTvControlTraversal(
                         SingleChildScrollView(
+                          key: const PageStorageKey('tv-player-bottom-actions'),
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
