@@ -624,7 +624,9 @@ void main() {
       nodes[1].requestFocus();
       await tester.pump(const Duration(milliseconds: 200));
       final frames = tester
-          .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+          .widgetList<Container>(find.descendant(
+              of: find.byType(TvFocusableSurface),
+              matching: find.byType(Container)))
           .where((w) {
         final d = w.decoration;
         return d is BoxDecoration &&

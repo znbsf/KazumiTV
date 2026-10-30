@@ -180,6 +180,35 @@ void main() {
         isNull);
   });
 
+  testWidgets('single row move reaches visible focus within 120ms',
+      (tester) async {
+    await mount(tester);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 10));
+    }
+    _expectVisibleFocus(tester, 6);
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('repeat replaces an unfinished reveal without another animation',
+      (tester) async {
+    final app = await mount(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowDown);
+    // Layout the newly revealed row, then apply its pending focus, without
+    // advancing the test clock through another scrolling animation.
+    await tester.pump();
+    await tester.pump();
+    _expectVisibleFocus(tester, 11);
+    final offset = app.popular.scrollOffset;
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pumpAndSettle();
+    _expectVisibleFocus(tester, 11);
+    expect(app.popular.scrollOffset, closeTo(offset, 0.5));
+  });
+
   testWidgets('TV home shows a complete larger row and a following-row cue',
       (tester) async {
     await mount(tester);
@@ -564,12 +593,15 @@ void main() {
     await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
     await frames(450);
     _expectVisibleFocus(tester, 6);
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 2; i++) {
       await tester.sendKeyRepeatEvent(LogicalKeyboardKey.arrowDown);
       await frames(180);
     }
-    // 6 -> pending 11 -> pending 16 -> pending 21. The reveal is 260 ms;
-    // repeats every 180 ms must leave 21 pending, not already focused.
+    // Repeats now jump, so use a fresh press for the final animated reveal.
+    // Another repeat at the loading boundary must preserve this pending move.
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.arrowDown);
+    await frames(80);
     final beforePrefetch = state('pending_last_loaded_row');
     expect(beforePrefetch['pendingChannel'], 21,
         reason: 'Fixture must actually reach the in-flight boundary state');
@@ -621,7 +653,7 @@ void main() {
     observedInputs.addAll(life.report()['appEvents'] as List);
     expect(
         observedInputs.where((e) => e['key'] == 'down').map((e) => e['type']),
-        ['down', 'repeat', 'repeat', 'repeat', 'repeat', 'up']);
+        ['down', 'repeat', 'repeat', 'up', 'down', 'repeat', 'up']);
   }, timeout: const Timeout(Duration(seconds: 30)));
 
   testWidgets('TV directory appends a batch without taking newer focus',

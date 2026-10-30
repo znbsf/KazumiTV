@@ -55,7 +55,7 @@ class _TvFocusableSurfaceState extends State<TvFocusableSurface> {
         }
         Scrollable.ensureVisible(
           context,
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 100),
           curve: Curves.easeOut,
           alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
         );
@@ -105,11 +105,11 @@ class _TvFocusableSurfaceState extends State<TvFocusableSurface> {
         onKeyEvent: _handleKeyEvent,
         child: AnimatedScale(
           scale: visuallyHighlighted ? widget.focusScale : 1,
-          duration: const Duration(milliseconds: 140),
+          duration: const Duration(milliseconds: 90),
           curve: Curves.easeOut,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 140),
-            curve: Curves.easeOut,
+          // The border identifies the destination immediately; only scale
+          // eases into place. Do not tween the blurred shadow on every frame.
+          child: Container(
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(widget.borderRadius + 2),

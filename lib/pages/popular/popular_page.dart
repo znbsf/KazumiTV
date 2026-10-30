@@ -77,6 +77,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
   bool _channelLookupLimited = false;
   int _gridFocusRequest = 0;
   int? _pendingGridChannel;
+  Duration _categoryRevealDuration = const Duration(milliseconds: 100);
   // Channel numbers are presentation; focus identity follows the subject.
   int _homeReturnEpoch = 0;
   int? _restoringHomeEpoch;
@@ -387,22 +388,24 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
       final nextRow = (currentIndex ~/ columns + 1) * columns;
       if (nextRow >= count) {
         unawaited(_loadNextGridRow(currentIndex + columns + 1,
-            originChannel: currentIndex + 1));
+            originChannel: currentIndex + 1,
+            animate: event is! KeyRepeatEvent));
       } else {
         // A shorter final row still has a real target, even when this column
         // has no cell there. Stop/loading applies only after the final row.
         unawaited(_focusGridChannel(
-            (currentIndex + columns).clamp(0, count - 1) + 1));
+            (currentIndex + columns).clamp(0, count - 1) + 1,
+            animate: event is! KeyRepeatEvent));
       }
       return KeyEventResult.handled;
     }
     final target = tvGridTarget(currentIndex, count, columns, direction) + 1;
-    unawaited(_focusGridChannel(target));
+    unawaited(_focusGridChannel(target, animate: event is! KeyRepeatEvent));
     return KeyEventResult.handled;
   }
 
   Future<void> _loadNextGridRow(int target,
-      {required int originChannel}) async {
+      {required int originChannel, bool animate = true}) async {
     if (TvInputLifecycle.active)
       _traceGrid(
           'load_begin', {'target': target, 'originChannel': originChannel});
@@ -433,7 +436,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         FocusManager.instance.primaryFocus != origin ||
         RouteVisibility.isCoveredOf(context) ||
         target > _visibleBangumiList.length) return;
-    await _focusGridChannel(target);
+    await _focusGridChannel(target, animate: animate);
   }
 
   Future<void> _focusRetryFooter(int channel) async {
@@ -519,7 +522,8 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
     _pendingGridChannel = null;
   }
 
-  Future<void> _focusGridChannel(int channelNumber) async {
+  Future<void> _focusGridChannel(int channelNumber,
+      {bool animate = true}) async {
     final request = _gridFocusRequest;
     final origin = FocusManager.instance.primaryFocus;
     final originScope = origin?.enclosingScope;
@@ -528,7 +532,9 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
       _traceGrid('focus_begin', {'target': channelNumber});
     // A cached/kept-alive FocusNode can have a context outside the viewport.
     // Reveal by grid geometry first, in either direction, then transfer focus.
-    await _scrollToChannel(channelNumber, revealOnly: true);
+    await _scrollToChannel(channelNumber,
+        revealOnly: true,
+        duration: animate ? const Duration(milliseconds: 100) : Duration.zero);
     if (!mounted || request != _gridFocusRequest) {
       if (TvInputLifecycle.active)
         _traceGrid('focus_abort', {
@@ -1028,6 +1034,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
   Future<void> _scrollToChannel(
     int channelNumber, {
     bool revealOnly = false,
+    Duration duration = const Duration(milliseconds: 260),
   }) async {
     if (!scrollController.hasClients) return;
     final crossCount = _gridCrossCount();
@@ -1063,11 +1070,15 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         'revealOnly': revealOnly
       });
     if ((target - position.pixels).abs() > 0.5) {
-      await scrollController.animateTo(
-        target,
-        duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutCubic,
-      );
+      if (duration == Duration.zero) {
+        scrollController.jumpTo(target);
+      } else {
+        await scrollController.animateTo(
+          target,
+          duration: duration,
+          curve: Curves.easeOutCubic,
+        );
+      }
     }
     if (!mounted) return;
     await WidgetsBinding.instance.endOfFrame;
@@ -1630,6 +1641,9 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
           }
           _homeReturnEpoch++;
           final tags = ['', ...defaultAnimeTags];
+          _categoryRevealDuration = event is KeyRepeatEvent
+              ? Duration.zero
+              : const Duration(milliseconds: 100);
           if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
             if (index == 0) {
               Actions.maybeInvoke(context, const TvFocusRailIntent());
@@ -1667,7 +1681,10 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
               if (!mounted || !node.hasFocus || _visibleBangumiList.isEmpty) {
                 return;
               }
-              await _scrollToChannel(1);
+              await _scrollToChannel(1,
+                  duration: event is KeyRepeatEvent
+                      ? Duration.zero
+                      : const Duration(milliseconds: 100));
               if (mounted && node.hasFocus && _visibleBangumiList.isNotEmpty) {
                 _focusNodeForChannel(1).requestFocus();
               }
@@ -1683,6 +1700,8 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         },
         onFocusChange: (focused) {
           if (!focused) return;
+          final duration = _categoryRevealDuration;
+          _categoryRevealDuration = const Duration(milliseconds: 100);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final node = _focusNodeForTag(tag);
             if (!mounted || !node.hasFocus || node.context == null) return;
@@ -1694,7 +1713,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
             scrollable.position.ensureVisible(
               target,
               alignment: 0.5,
-              duration: const Duration(milliseconds: 160),
+              duration: duration,
               curve: Curves.easeOut,
             );
           });
