@@ -10,6 +10,7 @@ import 'package:kazumi/modules/danmaku/danmaku_module.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/player/controller/player_danmaku_controller.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
@@ -92,6 +93,7 @@ void main() {
     DioFactory.reset();
   });
   tearDownAll(() async {
+    await flushLogs();
     await Hive.close();
     PathProviderPlatform.instance = previousPaths;
     expect(directory.parent.absolute.path, Directory.systemTemp.absolute.path);

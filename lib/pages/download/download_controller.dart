@@ -42,7 +42,10 @@ abstract class _DownloadController with Store {
   final Map<String, VideoSourceResolverLease> _activeResolveLeases = {};
   bool _isBackgroundServiceInitialized = false;
 
-  Future<void> init() async {
+  Future<void>? _initialization;
+  Future<void> init() => _initialization ??= _initialize();
+
+  Future<void> _initialize() async {
     _replaceRecords(_repository.getAllRecords());
 
     // Reset any incomplete states to 'paused' on startup

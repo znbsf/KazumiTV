@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 
 import 'package:dio/dio.dart';
@@ -31,6 +32,7 @@ void main() {
   tearDownAll(() async {
     DioFactory.reset();
     await Hive.close();
+    await flushLogs();
     await temp.delete(recursive: true);
   });
   setUp(() {

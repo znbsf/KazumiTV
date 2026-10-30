@@ -4,6 +4,35 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/services/player/playback_history_recorder.dart';
 
 void main() {
+  test(
+      'periodic capture coalesces local and sync writes; boundary saves immediately',
+      () async {
+    var now = DateTime.utc(2026);
+    final writes = <int>[];
+    final recorder = PlaybackHistoryRecorder((p, d) async {
+      writes.add(p.inSeconds);
+    }, now: () => now);
+    for (var i = 0; i < 12; i++) {
+      await recorder.record(
+          position: Duration(seconds: i),
+          duration: const Duration(minutes: 2),
+          playing: true,
+          periodic: true);
+      now = now.add(const Duration(seconds: 1));
+    }
+    expect(writes, [0, 5, 10]);
+    await recorder.record(
+        position: const Duration(seconds: 11),
+        duration: const Duration(minutes: 2),
+        playing: false);
+    expect(writes, [0, 5, 10, 11]);
+    // A background/final capture also bypasses the interval while still playing.
+    await recorder.record(
+        position: const Duration(seconds: 12),
+        duration: const Duration(minutes: 2),
+        playing: true);
+    expect(writes.last, 12);
+  });
   late List<int> writes;
   late PlaybackHistoryRecorder recorder;
   Future<void> sample(int milliseconds,

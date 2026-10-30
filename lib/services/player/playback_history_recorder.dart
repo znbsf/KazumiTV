@@ -6,9 +6,13 @@ typedef PlaybackProgressWriter = Future<void> Function(
 /// One recorder per native media session. Inputs must come from native state,
 /// never from a requested seek target or a prepared route.
 class PlaybackHistoryRecorder {
-  PlaybackHistoryRecorder(this._write);
+  PlaybackHistoryRecorder(this._write, {DateTime Function()? now})
+      : _now = now ?? DateTime.now;
 
   final PlaybackProgressWriter _write;
+  final DateTime Function() _now;
+  DateTime? _lastPeriodicWrite;
+  static const persistenceInterval = Duration(seconds: 5);
   final AsyncSerialQueue _writes = AsyncSerialQueue();
   bool _hasPlayed = false;
   (Duration, Duration)? _saved;
@@ -21,6 +25,7 @@ class PlaybackHistoryRecorder {
     required Duration position,
     required Duration duration,
     required bool playing,
+    bool periodic = false,
   }) {
     observePlaying(playing);
     if (!_hasPlayed ||
@@ -30,9 +35,23 @@ class PlaybackHistoryRecorder {
       return Future<void>.value();
     }
     final snapshot = (position, duration);
+    final now = _now();
+    if (periodic &&
+        playing &&
+        _lastPeriodicWrite != null &&
+        now.difference(_lastPeriodicWrite!) < persistenceInterval) {
+      return Future<void>.value();
+    }
+    _lastPeriodicWrite = now;
     return _writes.run(() async {
       if (_saved == snapshot) return;
-      await _write(position, duration);
+      try {
+        // One write captures both the local progress and its WebDAV events.
+        await _write(position, duration);
+      } catch (_) {
+        _lastPeriodicWrite = null;
+        rethrow;
+      }
       _saved = snapshot;
     });
   }

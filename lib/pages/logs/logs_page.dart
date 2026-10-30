@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:kazumi/services/logging/logger.dart' as logging;
 
 import 'package:kazumi/bean/appbar/sys_app_bar.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -67,11 +66,11 @@ class _LogsPageState extends State<LogsPage> {
     });
 
     try {
-      final file = await _getLogsFile();
+      final file = await logging.getLogsPath();
       if (!mounted) return;
 
       if (await file.exists()) {
-        final content = await file.readAsString();
+        final content = await logging.readRecentLogs();
         if (!mounted) return;
 
         _allLines = content.split('\n');
@@ -123,16 +122,9 @@ class _LogsPageState extends State<LogsPage> {
     });
   }
 
-  Future<File> _getLogsFile() async {
-    final directory = await getApplicationSupportDirectory();
-    final path = directory.path;
-    return File('$path/logs/kazumi_logs.log');
-  }
-
   Future<void> _clearLogs() async {
     try {
-      final file = await _getLogsFile();
-      await file.writeAsString('');
+      if (!await logging.clearLogs()) throw StateError('日志清除失败');
       if (!mounted) return;
 
       setState(() {

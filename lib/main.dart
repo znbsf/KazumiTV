@@ -60,9 +60,8 @@ void main() async {
     ));
   }
 
-  if (Platform.isAndroid) {
-    await WebViewFeatureService.initialize();
-  }
+  // Probe in parallel with storage; parser selection still waits for readiness.
+  final webViewReady = WebViewFeatureService.initialize();
 
   try {
     final hivePath = '${(await getApplicationSupportDirectory()).path}/hive';
@@ -119,7 +118,8 @@ void main() async {
   if (Platform.isWindows) {
     SystemProxyService.init();
   }
-  await MeteredNetworkService.refresh();
+  await webViewReady;
+  unawaited(MeteredNetworkService.refresh());
   ProxyManager.applyProxy();
   runApp(
     ModularApp(
