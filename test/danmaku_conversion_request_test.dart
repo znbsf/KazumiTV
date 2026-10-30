@@ -12,6 +12,7 @@ import 'package:kazumi/pages/settings/danmaku/danmaku_ch_convert_tile.dart';
 import 'package:kazumi/request/apis/danmaku_api.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -109,6 +110,34 @@ void main() {
     expect(request.uri.path, ApiEndpoints.dandanAPISearchEpisodes);
     expect(request.queryParameters, {'anime': '测试标题', 'v2': 'true'});
   });
+
+  for (final status in [429, 403, 500]) {
+    test('danmaku HTTP $status preserves status and never retries', () async {
+      adapter.status = status;
+      for (final action in <Future<dynamic> Function()>[
+        () => DanmakuApi.searchAnimes('测试'),
+        () => DanmakuApi.getDanDanBangumiIDByBgmBangumiID(100),
+        () => DanmakuApi.getDanDanEpisodesByDanDanBangumiID(123),
+        () => DanmakuApi.getDanDanmakuByEpisodeID(1001),
+      ]) {
+        adapter.requests.clear();
+        await expectLater(
+            action(),
+            throwsA(isA<NetworkException>()
+                .having((e) => e.statusCode, 'status', status)
+                .having(
+                    (e) => (e.rawError as DioException)
+                        .response
+                        ?.headers
+                        .value('retry-after'),
+                    'original Retry-After retained',
+                    '120')
+                .having((e) => e.message.contains('限制请求'), 'rate limit',
+                    status == 429)));
+        expect(adapter.requests, hasLength(1));
+      }
+    });
+  }
 
   test('a failed comment request preserves the saved conversion', () async {
     await GStorage.putSetting(SettingsKeys.danmakuChConvert, 2);
@@ -272,6 +301,7 @@ Widget _app(Widget tile) => MaterialApp(
 class _DanmakuAdapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   bool fail = false;
+  int status = 200;
   Map<String, dynamic> response = {
     'comments': [
       {'p': '1.5,1,16777215,[Test]', 'm': '缓存文字保持原样'}
@@ -286,7 +316,9 @@ class _DanmakuAdapter implements HttpClientAdapter {
       throw DioException.connectionError(
           requestOptions: options, reason: 'simulated connection failure');
     }
-    return ResponseBody.fromString(jsonEncode(response), 200, headers: {
+    return ResponseBody.fromString(jsonEncode(response), status, headers: {
+      if (status == 429 || status == 403 || status == 500)
+        'retry-after': ['120'],
       Headers.contentTypeHeader: ['application/json']
     });
   }
