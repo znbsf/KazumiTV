@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -28,6 +29,17 @@ class _DownloadPageState extends State<DownloadPage> {
 
   // Keep expansion state across controller snapshot replacements.
   final Map<String, bool> _expanded = {};
+  final Map<String, List<int>> _episodeOrders = {};
+
+  List<int> _episodeOrder(DownloadRecord record) {
+    final previous = _episodeOrders[record.key];
+    if (previous != null &&
+        previous.length == record.episodes.length &&
+        previous.every(record.episodes.containsKey)) {
+      return previous;
+    }
+    return _episodeOrders[record.key] = record.episodes.keys.toList()..sort();
+  }
 
   @override
   void initState() {
@@ -50,69 +62,70 @@ class _DownloadPageState extends State<DownloadPage> {
       body: Observer(builder: (context) {
         final recordKeys = downloadController.recordKeys.toList();
         _expanded.removeWhere((key, _) => !recordKeys.contains(key));
+        _episodeOrders.removeWhere((key, _) => !recordKeys.contains(key));
         if (recordKeys.isEmpty) {
           return const GeneralEmptyState(
             icon: Icons.download_rounded,
             title: '还没有下载记录',
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: recordKeys.length,
-          itemBuilder: (context, index) {
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
-                child: _buildRecordCard(recordKeys[index]),
-              ),
-            );
-          },
-        );
+        return LayoutBuilder(builder: (context, constraints) {
+          final horizontal = math.max(16.0, (constraints.maxWidth - 1000) / 2);
+          return CustomScrollView(slivers: [
+            SliverPadding(
+              padding:
+                  EdgeInsets.symmetric(horizontal: horizontal, vertical: 16),
+              sliver: SliverMainAxisGroup(slivers: [
+                for (final key in recordKeys) _buildRecordCard(key),
+              ]),
+            ),
+          ]);
+        });
       }),
     );
   }
 
   Widget _buildRecordCard(String recordKey) {
-    return Observer(builder: (context) {
-      final record = downloadController.getRecordSnapshot(recordKey);
-      if (record == null) {
-        return const SizedBox.shrink();
-      }
+    return Observer(
+        key: ValueKey(recordKey),
+        builder: (context) {
+          final record = downloadController.getRecordSnapshot(recordKey);
+          if (record == null) {
+            return const SliverToBoxAdapter(child: SizedBox.shrink());
+          }
 
-      var totalSpeed = 0.0;
-      for (final e in record.episodes.values) {
-        if (e.status == DownloadStatus.downloading) {
-          totalSpeed += downloadController.getSpeed(
-            record.bangumiId,
-            record.pluginName,
-            e.episodeNumber,
-          );
-        }
-      }
-      final expanded = _isExpanded(recordKey, record);
+          var totalSpeed = 0.0;
+          for (final e in record.episodes.values) {
+            if (e.status == DownloadStatus.downloading) {
+              totalSpeed += downloadController.getSpeed(
+                record.bangumiId,
+                record.pluginName,
+                e.episodeNumber,
+              );
+            }
+          }
+          final expanded = _isExpanded(recordKey, record);
 
-      return DownloadRecordCard(
-        record: record,
-        expanded: expanded,
-        onToggle: () {
-          setState(() => _expanded[recordKey] = !expanded);
-        },
-        onResumeAll: () {
-          downloadController.resumeAllDownloads(
-            record.bangumiId,
-            record.pluginName,
+          return DownloadRecordSliver(
+            record: record,
+            expanded: expanded,
+            onToggle: () {
+              setState(() => _expanded[recordKey] = !expanded);
+            },
+            onResumeAll: () {
+              downloadController.resumeAllDownloads(
+                record.bangumiId,
+                record.pluginName,
+              );
+              KazumiDialog.showToast(message: '已开始恢复下载');
+            },
+            onDeleteAll: () => _confirmDeleteRecord(record),
+            totalSpeed: totalSpeed,
+            episodeNumbers: _episodeOrder(record),
+            episodeTileBuilder: (context, number) =>
+                _buildEpisodeTile(record, record.episodes[number]!),
           );
-          KazumiDialog.showToast(message: '已开始恢复下载');
-        },
-        onDeleteAll: () => _confirmDeleteRecord(record),
-        totalSpeed: totalSpeed,
-        episodeTileBuilder: () {
-          final episodes = record.episodes.values.toList()
-            ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
-          return episodes.map((ep) => _buildEpisodeTile(record, ep)).toList();
-        },
-      );
-    });
+        });
   }
 
   Widget _buildEpisodeTile(DownloadRecord record, DownloadEpisode episode) {

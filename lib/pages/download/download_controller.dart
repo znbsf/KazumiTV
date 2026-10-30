@@ -270,19 +270,20 @@ abstract class _DownloadController with Store {
     _dirtyRecordKeys.clear();
     _uiUpdateTimer?.cancel();
     _uiUpdateTimer = null;
+    final snapshots = nextRecords.map(_cloneRecord).toList();
     runInAction(() {
       records
         ..clear()
-        ..addAll(nextRecords.map(_cloneRecord));
+        ..addAll(snapshots);
 
       recordKeys
         ..clear()
-        ..addAll(nextRecords.map((record) => record.key));
+        ..addAll(snapshots.map((record) => record.key));
 
       recordByKey
         ..clear()
-        ..addEntries(nextRecords.map(
-          (record) => MapEntry(record.key, _cloneRecord(record)),
+        ..addEntries(snapshots.map(
+          (record) => MapEntry(record.key, record),
         ));
       for (final atom in _recordAtoms.values.toList()) {
         atom.reportChanged();
@@ -316,9 +317,9 @@ abstract class _DownloadController with Store {
 
       final recordIndex = records.indexWhere((item) => item.key == recordKey);
       if (recordIndex == -1) {
-        records.add(_cloneRecord(record));
+        records.add(snapshot);
       } else {
-        records[recordIndex] = _cloneRecord(record);
+        records[recordIndex] = snapshot;
       }
     });
   }
