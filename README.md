@@ -3,7 +3,7 @@
 为 Android TV 和遥控器设计的动画浏览与播放应用。
 基于 **[Predidit/Kazumi](https://github.com/Predidit/Kazumi)**：延续上游的 Flutter/Dart 业务、规则与 media-kit 播放能力，结合本仓库原生 TV 版本的布局和交互工作，形成当前 Flutter TV 融合版。**本项目是独立衍生项目，不是上游官方 TV 版本。**
 
-[下载 0.4.5 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.5) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
+[下载 0.4.6 正式版](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.6) · [版本记录](CHANGELOG.md) · [构建说明](docs/TV_BUILD_AND_RELEASE.md)
 
 维护入口：[当前项目状态](docs/PROJECT-STATUS.md) · [开发经验](docs/ENGINEERING-LESSONS.md)
 
@@ -41,9 +41,9 @@
 
 截图保留实际界面，仅压缩图片体积；[截图来源与说明](docs/screenshots/v0.4.3/README.md)。截图不代表所有来源、设备或长时间播放均已验证。
 
-## 0.4.6 手机输入、下载与播放优化（待发布）
+## 0.4.6 手机输入、下载与播放优化
 
-0.4.6 正式签名候选已准备，包含已验收的首页焦点优化；尚未公开发布，当前下载链接仍指向 0.4.5。
+0.4.6 已于 2026-10-30 正式发布，包含已验收的首页焦点优化。
 
 - **手机输入覆盖更多场景**：来源检索、弹幕、剧集数字定位、验证码以及 Bangumi / WebDAV 凭据；先确认文字，再由电视执行搜索、发送或保存。
 - **下载恢复与进度刷新修复**：改善中断续传和下载完整性检查，修复并行任务进度刷新，长剧集列表按需创建行。
@@ -52,7 +52,9 @@
 - **来源与网络处理改善**：规则更新失败后可保留、停用或移除；搜索与评论等公开接口支持有界备用切换，修复弹幕取消后的迟到结果和限流提示。
 - **Android 9 更新兼容修复**：改善下载 APK 的签名读取兼容性。
 
-具体改动及验证范围见 [0.4.6 候选说明](docs/RELEASE-0.4.6.md)。性能改动已验证减少重复工作，未量化所有设备的帧率或卡顿改善；备用接口仍可能受网络和服务状态影响。
+具体改动及验证范围见 [0.4.6 发布说明](docs/RELEASE-0.4.6.md)。性能改动已验证减少重复工作，未量化所有设备的帧率或卡顿改善；备用接口仍可能受网络和服务状态影响。
+
+已知问题：播放界面的“讨论”无法滚动查看，已记录为 [#51](https://github.com/znbsf/KazumiTV/issues/51)，安排下次 release 处理。
 
 ## 0.4.5 播放修复
 
@@ -79,7 +81,7 @@
 
 手机图是实际网页代码的浏览器场景预览；场景数据与范围见[截图说明](docs/screenshots/v0.4.4/README.md)。
 
-## 手机输入怎么用（0.4.6 候选）
+## 手机输入怎么用（0.4.6）
 
 1. 手机与电视连接同一局域网，在电视首页打开「手机遥控」，开启配对并扫码；输入弹窗内的「手机键盘」也可打开配对入口。
 2. 在电视选中要编辑的字段并按 **OK**，打开编辑框。手机网页会显示当前字段；只移动焦点到字段上不会开始编辑。
@@ -102,15 +104,15 @@
 
 ## 下载与安装
 
-当前正式版：**0.4.5**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
+当前正式版：**0.4.6**。需要 **Android 7.0/API 24 或更新版本**，按系统 ABI 选择 APK。
 
-0.4.5 修复有界后续播放页解析、特定 HHJX 故障补救、换源请求头快照与日志容错；保留 0.4.4 的手机遥控与 GitHub 应用更新。完整范围和验收边界见 [0.4.5 发布说明](docs/RELEASE-0.4.5.md)。
+0.4.6 扩展手机输入，修复下载恢复与并行进度刷新，减少播放和界面重复工作，并加快首页遥控响应；保留既有播放修复与 GitHub 应用更新。完整范围和验收边界见 [0.4.6 发布说明](docs/RELEASE-0.4.6.md)。
 
 | 安装包 | 适用系统 |
 |---|---|
-| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.5/KazumiTV-0.4.5-armeabi-v7a.apk) | 32 位 ARM Android |
-| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.5/KazumiTV-0.4.5-arm64-v8a.apk) | 64 位 ARM Android |
-| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.5/KazumiTV-0.4.5-x86_64.apk) | x86_64 Android / 模拟器 |
+| [ARMv7](https://github.com/znbsf/KazumiTV/releases/download/v0.4.6/KazumiTV-0.4.6-armeabi-v7a.apk) | 32 位 ARM Android |
+| [ARM64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.6/KazumiTV-0.4.6-arm64-v8a.apk) | 64 位 ARM Android |
+| [x86_64](https://github.com/znbsf/KazumiTV/releases/download/v0.4.6/KazumiTV-0.4.6-x86_64.apk) | x86_64 Android / 模拟器 |
 
 1. 下载并侧载 APK，在启动器打开 **KazumiTV**。
 2. 首次启动按引导准备规则与播放来源，再从作品详情选择来源和剧集。
