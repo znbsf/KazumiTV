@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:media_kit/media_kit.dart';
 import 'package:kazumi/pages/player/controller/player_danmaku_controller.dart';
 import 'package:kazumi/pages/player/controller/player_playback_controller.dart';
 
@@ -7,6 +9,14 @@ class _InteractiveSeekSession {
   final Future<void> pauseCompleted;
   Duration target;
   Future<bool>? commit;
+}
+
+class _SeekRequest {
+  _SeekRequest(this.player, this.target, this.enableSync);
+  final Player player;
+  Duration target;
+  bool enableSync;
+  final completed = Completer<void>();
 }
 
 class PlayerSeekController {
@@ -28,7 +38,8 @@ class PlayerSeekController {
   final Future<void> Function({bool enableSync}) _play;
   final Future<void> Function(bool enableSync) _onSeekCompleted;
 
-  Future<void> _seekTail = Future<void>.value();
+  _SeekRequest? _activeSeek;
+  _SeekRequest? _pendingSeek;
   _InteractiveSeekSession? _interactiveSession;
 
   bool get hasActiveInteractiveSeek => _interactiveSession != null;
@@ -46,21 +57,47 @@ class PlayerSeekController {
     _playback.currentPosition = normalizedTarget;
     _danmaku.clearAndInvalidateScheduledDanmakus();
 
-    final operation = _seekTail.then((_) async {
-      if (!_playback.isCurrentPlayer(player)) {
-        return;
-      }
+    if (_activeSeek?.player == player) {
+      final pending =
+          _pendingSeek ??= _SeekRequest(player, normalizedTarget, enableSync);
+      pending.target = normalizedTarget;
+      pending.enableSync = enableSync;
+      return pending.completed.future;
+    }
+
+    // A replacement player must not wait for an old native seek to return.
+    _pendingSeek?.completed.complete();
+    _pendingSeek = null;
+    final request = _SeekRequest(player, normalizedTarget, enableSync);
+    _activeSeek = request;
+    unawaited(_runSeek(request));
+    return request.completed.future;
+  }
+
+  Future<void> _runSeek(_SeekRequest request) async {
+    try {
+      if (!_playback.isCurrentPlayer(request.player)) return;
       try {
-        await player.seek(normalizedTarget);
+        await request.player.seek(request.target);
       } catch (_) {
         return;
       }
-      if (_playback.isCurrentPlayer(player)) {
-        await _onSeekCompleted(enableSync);
+      // An obsolete intermediate target must not broadcast the newer UI
+      // position before the native player has actually sought to it.
+      if (_playback.isCurrentPlayer(request.player) && _pendingSeek == null) {
+        await _onSeekCompleted(request.enableSync);
       }
-    });
-    _seekTail = _settle(operation);
-    return operation;
+    } catch (error, stack) {
+      request.completed.completeError(error, stack);
+    } finally {
+      if (!request.completed.isCompleted) request.completed.complete();
+      if (identical(_activeSeek, request)) {
+        final next = _pendingSeek;
+        _pendingSeek = null;
+        _activeSeek = next;
+        if (next != null) unawaited(_runSeek(next));
+      }
+    }
   }
 
   Future<void> seekBy(
@@ -138,12 +175,4 @@ class PlayerSeekController {
 
   bool _isCurrent(_InteractiveSeekSession session) =>
       identical(_interactiveSession, session);
-
-  Future<void> _settle(Future<void> operation) async {
-    try {
-      await operation;
-    } catch (_) {
-      // The caller receives the error; the queue only needs to remain usable.
-    }
-  }
 }
