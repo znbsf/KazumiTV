@@ -1,5 +1,19 @@
 # KazumiTV 当前状态
 
+## 2026-10-31：通过手机遥控导出日志（本地实现，设备未验）
+
+用户提出电视复制日志困难，希望复用手机遥控页面获取文件/复制后提交 GitHub。复用现有工作树，从 d742d679 新建 `codex/phone-log-export`，此前缓存候选提交与产物保留。沿用配对 token、同源检查、后台断开与撤销语义；电视日志页显式生成短期脱敏快照，手机只下载该快照，不暴露文件路径、不持续读取原日志、不自动上传 GitHub。准备阶段读取现有日志/遥控协议与 README 导出限制；无项目 profile，按现有入口推进。
+
+本轮受控验收预算：日志遮盖/字节上限、过期撤销/错误 token/跨源/会话重建、手机复制下载/迟到响应及既有输入遥控回归合计 20 分钟；必要 QA ARMv7 构建最多 10 分钟。具体失败修复后只补受影响用例；到预算或无新增证据停止对应实验。手机剪贴板在 HTTP 页面可能受限，保留可选择文本和文件下载，不把 Node DOM 夹具当真实手机验收。不操作正在使用的电视，不公开原始日志。
+
+程序提交 `13648f9be0a7a16136409e166ef5cc21cf07c9a8`：电视错误日志页增加「手机导出 / 停止导出」，未连接时沿用遥控配对弹窗；手机页「问题反馈与日志」提供按需获取、纯文本预览、复制、下载 `.txt` 和 GitHub Bug 表单链接。读取既有受限近期日志，Isolate 中遮盖常见敏感内容；导出 UTF-8 上限 512 KiB，不创建持续日志流或自动上传。快照有效期最多 5 分钟，随机导出 ID 绑定当前会话；停止、清空、过期、后台断开/重建后原地址不可用。已复制/下载的手机文件不受撤销影响。常见遮盖不等于任意隐私均已识别，页面明确要求提交前检查。
+
+固定 SDK 下 57 个不同 Flutter 用例通过：HTTP/配对/在线状态四文件 42 项，UI/输入/日志批次 20 通过、2 项因 Flutter mock HttpClient 导致测试未建立在线状态而失败；将 UI 夹具改为明确在线的测试 manager 后 2 项通过，批次间重复的 7 项只计一次。覆盖显式导出、清空期间异步结果丢弃、错误 token/跨源/猜测路径、替换/撤销/过期、同 token 新会话不继承、脱敏及字节上限。Node 共 29 个合成场景通过，包括按需获取、Blob 下载内容/名称、剪贴板拒绝与手动复制、超时、超限、断线及迟到响应。最终静态检查无 error/warning，剩余 4 条既有大括号风格 info；锁文件未改。
+
+测试证据：`artifacts/phone-log-export-transport-tests.log`、`phone-log-export-ui-tests.log`（保留初次夹具失败）、`phone-log-export-ui-correction.log`、`phone-log-export-analysis-final.log`；Node 入口 `tools/qa/phone_keyboard_page_test.cjs`。测试未覆盖真实手机浏览器下载/剪贴板、实体遥控焦点、真实电视负载或 GitHub 附件提交；未向 GitHub 发送日志，也未安装、推送、合并或发布。
+
+同一固定 SDK 串行构建 QA ARMv7 成功（Gradle 145.1 秒）：`artifacts/phone-log-export/KazumiTV-0.4.6-phone-log.1-armv7-QA.apk`，remoteqa 包名、versionCode `206821`、29,494,847 字节，SHA-256 `000fbca7c5a3bbfa0c143d10d5d1f1b8e4133be4f9420e512b082294a29e36b7`。固定公开 QA 证书、ABI/TV 入口、无内部 QA/probe 标记、libmpv 哈希与 zipalign 均通过，见同目录 `verification.json`；构建日志 `artifacts/phone-log-export-build.log`。构建带有既有 Gradle/AGP/Kotlin 后续兼容与 SDK XML 工具版本提醒，本轮未升级工具链。已停止并核实本轮 Gradle 39132、其 Kotlin 子进程 9828 退出；停后主机 CPU 单次样本 9%，记录于 `process-cleanup.json`，不作为电视性能数据。
+
 ## 2026-10-31：本地计划补充项核对与 #53 第二版（本地实现，设备未验）
 
 用户要求一起处理本地计划中的额外需求，并对范围澄清回答“全都看看”。在同一 `codex/issue53-persistent-playback-cache` 工作树继续，逐项比对根目录历史性能评审、下方 UI/TV 待办与本轮缓存范围；未修改旧 native checkout、独立 preview 或其他工作树。程序提交 `e7bece4fe3a796006538d81953e0903b6a72f10c`。
