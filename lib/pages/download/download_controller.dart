@@ -37,6 +37,7 @@ abstract class _DownloadController with Store {
   final ObservableList<String> recordKeys = ObservableList<String>();
   final ObservableMap<String, DownloadRecord> recordByKey =
       ObservableMap<String, DownloadRecord>();
+  final Map<String, Atom> _recordAtoms = {};
 
   final List<_ResolveRequest> _resolveQueue = [];
   final Map<String, VideoSourceResolverLease> _activeResolveLeases = {};
@@ -283,6 +284,9 @@ abstract class _DownloadController with Store {
         ..addEntries(nextRecords.map(
           (record) => MapEntry(record.key, _cloneRecord(record)),
         ));
+      for (final atom in _recordAtoms.values.toList()) {
+        atom.reportChanged();
+      }
     });
   }
 
@@ -298,11 +302,13 @@ abstract class _DownloadController with Store {
         recordByKey.remove(recordKey);
         recordKeys.remove(recordKey);
         records.removeWhere((item) => item.key == recordKey);
+        _recordAtoms[recordKey]?.reportChanged();
         return;
       }
 
       final snapshot = _cloneRecord(record);
       recordByKey[recordKey] = snapshot;
+      _recordAtoms[recordKey]?.reportChanged();
       final keyIndex = recordKeys.indexOf(recordKey);
       if (keyIndex == -1) {
         recordKeys.add(recordKey);
@@ -317,7 +323,20 @@ abstract class _DownloadController with Store {
     });
   }
 
-  DownloadRecord? getRecordSnapshot(String recordKey) => recordByKey[recordKey];
+  DownloadRecord? getRecordSnapshot(String recordKey) {
+    // ObservableMap observes the whole map, even for operator[]. Keep row and
+    // episode-panel dependencies scoped to the requested record instead.
+    if (mainContext.isComputingDerivation()) {
+      final atom = _recordAtoms.putIfAbsent(
+          recordKey,
+          () => Atom(
+                name: 'download.$recordKey',
+                onUnobserved: () => _recordAtoms.remove(recordKey),
+              ));
+      atom.reportObserved();
+    }
+    return untracked(() => recordByKey[recordKey]);
+  }
 
   DownloadRecord _cloneRecord(DownloadRecord record) {
     return DownloadRecord(

@@ -925,11 +925,10 @@ class _VideoPageState extends State<VideoPage>
         builder: (context) {
           final downloads = <String, DownloadEpisode>{};
           if (!videoPageController.isOfflineMode) {
-            for (final record in downloadController.records) {
-              if (record.bangumiId != videoPageController.bangumiItem.id ||
-                  record.pluginName != videoPageController.currentPlugin.name) {
-                continue;
-              }
+            final record = downloadController.getRecordSnapshot(
+              '${videoPageController.currentPlugin.name}_${videoPageController.bangumiItem.id}',
+            );
+            if (record != null) {
               for (final episode in record.episodes.values) {
                 if (episode.episodePageUrl.isNotEmpty) {
                   downloads[episode.episodePageUrl] = episode;
