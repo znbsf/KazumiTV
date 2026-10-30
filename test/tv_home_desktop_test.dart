@@ -30,6 +30,15 @@ class _Paths extends PathProviderPlatform {
   Future<String?> getApplicationSupportPath() async => path;
 }
 
+class _CountingHistory extends HistoryRepository {
+  int reads = 0;
+  @override
+  List<History> getAllHistories() {
+    reads++;
+    return super.getAllHistories();
+  }
+}
+
 Finder _surface(String label) => find.byWidgetPredicate(
       (widget) =>
           widget is TvFocusableSurface && widget.focusNode?.debugLabel == label,
@@ -157,6 +166,45 @@ void main() {
     tvChannelInputController.cancel();
     tvArtworkController.select(null);
     TvMode.setEnabledForTesting(false);
+  });
+
+  testWidgets(
+      'recent history is cached across focus and deferred while home is covered',
+      (tester) async {
+    await _seedRecent(tester, ids: List.generate(2000, (i) => i + 1));
+    final history = _CountingHistory();
+    await _mount(tester,
+        popularBuilder: (controller) => PopularPage(
+              controller: controller,
+              historyRepository: history,
+            ));
+    expect(history.reads, 1);
+    for (final id in [1, 2, 3, 4, 5]) {
+      tester.widget<BangumiCardV>(_poster(id)).focusNode!.requestFocus();
+      await tester.pumpAndSettle();
+    }
+    expect(history.reads, 1);
+    await _openRecentLink(tester, 1);
+    final before = history.reads;
+    var homeBuilds = 0;
+    final oldHook = debugOnRebuildDirtyWidget;
+    debugOnRebuildDirtyWidget = (element, builtOnce) {
+      if (element.widget is PopularPage || element.widget is TvRecentWatch) {
+        homeBuilds++;
+      }
+      oldHook?.call(element, builtOnce);
+    };
+    addTearDown(() => debugOnRebuildDirtyWidget = oldHook);
+    await _seedRecent(tester,
+        ids: [3000, 3001], latest: DateTime(2026, 10, 30));
+    await tester.pumpAndSettle();
+    expect(history.reads, before);
+    expect(homeBuilds, 0);
+    await rootNavigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+    expect(history.reads, before + 1);
+    expect(_surface('TV recent 3000'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   for (final destination in [1, 2, 3, 4]) {

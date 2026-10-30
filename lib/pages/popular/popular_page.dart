@@ -38,9 +38,11 @@ import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
 
 class PopularPage extends StatefulWidget {
-  const PopularPage({super.key, required this.controller});
+  const PopularPage(
+      {super.key, required this.controller, this.historyRepository});
 
   final PopularController controller;
+  final IHistoryRepository? historyRepository;
 
   @override
   State<PopularPage> createState() => _PopularPageState();
@@ -86,6 +88,10 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
   int _summaryRevision = 0;
   final _summaryCache = <int, String>{};
   StreamSubscription<dynamic>? _historySubscription;
+  late final IHistoryRepository _historyRepository =
+      widget.historyRepository ?? HistoryRepository();
+  List<History> _recentItems = const [];
+  bool _historyDirty = true;
   VoidCallback? _releaseProbeState;
   ModalRoute<dynamic>? _probeRoute;
   bool _probeCovered = false;
@@ -94,9 +100,10 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!TvInputLifecycle.enabled) return;
     _probeRoute = ModalRoute.of(context);
     _probeCovered = RouteVisibility.isCoveredOf(context);
+    if (TvMode.enabled && _homeHistoryVisible) _refreshRecentItems();
+    if (!TvInputLifecycle.enabled) return;
     _releaseProbeState ??= TvInputLifecycle.registerPageState(
       this,
       isCurrent: () =>
@@ -146,7 +153,16 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         inputEvent: event);
   }
 
-  double get _recentExtent => TvRecentWatch.items().isEmpty ? 0 : 44;
+  bool get _homeHistoryVisible =>
+      (_probeRoute?.isCurrent ?? true) && !_probeCovered;
+
+  void _refreshRecentItems() {
+    if (!_historyDirty) return;
+    _recentItems = TvRecentWatch.items(repository: _historyRepository);
+    _historyDirty = false;
+  }
+
+  double get _recentExtent => _recentItems.isEmpty ? 0 : 44;
   double get _pinnedExtent => _tvToolbarHeight + _recentExtent;
   double get _rowSpacing => TvMode.enabled
       ? (TvVisuals.fixedSurfaces ? 12 : 16)
@@ -165,8 +181,9 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
     tvChannelInputController.addListener(_handleChannelDigit);
     TvNavigation.homeRequests.addListener(_focusHome);
     if (TvMode.enabled) {
-      _historySubscription = GStorage.histories.watch().listen((_) {
-        if (mounted) setState(() {});
+      _historySubscription = _historyRepository.changes.listen((_) {
+        _historyDirty = true;
+        if (mounted && _homeHistoryVisible) setState(_refreshRecentItems);
       });
     }
     if (popularController.trendList.isEmpty) {
@@ -252,7 +269,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
     final id = _spotlight.value?.id;
     return id != null &&
         (items.any((item) => item.id == id) ||
-            TvRecentWatch.items().any((entry) => entry.bangumiItem.id == id));
+            _recentItems.any((entry) => entry.bangumiItem.id == id));
   }
 
   void _scheduleDefaultSpotlight(List<BangumiItem> items) {
@@ -855,8 +872,8 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         : _visibleBangumiList[anchorIndex].id;
     final savedOffset = pixels - _introExtent - row * stride;
     final recentScope = recentOrigin?.enclosingScope;
-    final recentIndex = TvRecentWatch.items()
-        .indexWhere((entry) => entry.bangumiItem.id == item.id);
+    final recentIndex =
+        _recentItems.indexWhere((entry) => entry.bangumiItem.id == item.id);
     final tag = popularController.currentTag;
     final epoch = ++_homeReturnEpoch;
     _restoringHomeEpoch = epoch;
@@ -901,7 +918,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
       }
       if (!current()) return;
       if (recentOrigin != null) {
-        final recent = TvRecentWatch.items();
+        final recent = _recentItems;
         if (recent.isNotEmpty) {
           final selected =
               recent.indexWhere((entry) => entry.bangumiItem.id == item.id);
@@ -1119,6 +1136,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
                     pinned: true,
                     delegate: _RecentWatchHeader(
                       _recentExtent,
+                      entries: _recentItems,
                       onOpen: _openRecent,
                       onNavigation: _onRecentNavigation,
                     )),
@@ -1820,8 +1838,11 @@ class _GridFocusKeeperState extends State<_GridFocusKeeper>
 
 class _RecentWatchHeader extends SliverPersistentHeaderDelegate {
   _RecentWatchHeader(this.height,
-      {required this.onOpen, required this.onNavigation});
+      {required this.entries,
+      required this.onOpen,
+      required this.onNavigation});
   final double height;
+  final List<History> entries;
   final Future<void> Function(History, FocusNode) onOpen;
   final VoidCallback onNavigation;
   @override
@@ -1835,11 +1856,14 @@ class _RecentWatchHeader extends SliverPersistentHeaderDelegate {
           color: Theme.of(context).colorScheme.surface.withValues(alpha: .9),
           child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
-              child:
-                  TvRecentWatch(onOpen: onOpen, onNavigation: onNavigation)));
+              child: TvRecentWatch(
+                  entries: entries,
+                  onOpen: onOpen,
+                  onNavigation: onNavigation)));
   @override
   bool shouldRebuild(_RecentWatchHeader oldDelegate) =>
       oldDelegate.height != height ||
+      oldDelegate.entries != entries ||
       oldDelegate.onOpen != onOpen ||
       oldDelegate.onNavigation != onNavigation;
 }
