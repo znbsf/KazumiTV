@@ -31,12 +31,17 @@ class TvPlayerAction extends StatefulWidget {
 
 class _TvPlayerActionState extends State<TvPlayerAction> {
   bool _focused = false;
+  final _tooltipKey = GlobalKey<TooltipState>();
 
   void _onFocusChange(bool focused) {
     setState(() => _focused = focused);
-    if (!focused) return;
+    if (!focused) {
+      Tooltip.dismissAllToolTips();
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_focused) return;
+      _tooltipKey.currentState?.ensureTooltipVisible();
       Scrollable.ensureVisible(
         context,
         duration: const Duration(milliseconds: 160),
@@ -131,7 +136,11 @@ class _TvPlayerActionState extends State<TvPlayerAction> {
     );
     return iconOnly
         ? Tooltip(
+            key: _tooltipKey,
             message: widget.label,
+            triggerMode: TooltipTriggerMode.manual,
+            showDuration: const Duration(days: 1),
+            preferBelow: false,
             excludeFromSemantics: true,
             child: action,
           )

@@ -757,7 +757,8 @@ abstract class _VideoPageController with Store implements Disposable {
     final resolvedOffset = offset > 0
         ? offset
         : cached != null
-            ? (cached.metadata['position'] as int? ?? 0)
+            ? RecentVideoCacheService.resumeOffset(cached.metadata,
+                playResume: GStorage.getSetting(SettingsKeys.playResume))
             : getHistoryOffsetFor(_playbackHistoryIdentity!);
     _requestedOffset = resolvedOffset;
 
@@ -778,7 +779,7 @@ abstract class _VideoPageController with Store implements Disposable {
       pageUrl: resolvedEpisode.pageUrl,
       sortNumber: resolvedEpisode.sortNumber,
       httpHeaders: {},
-      adBlockerEnabled: false,
+      adBlockerEnabled: cached?.metadata['adBlocker'] == true,
       episodeTitle: resolvedEpisode.displayTitle,
       referer: '',
       currentRoad: resolvedEpisode.roadIndex,
@@ -934,7 +935,9 @@ abstract class _VideoPageController with Store implements Disposable {
                   url: cached.url,
                   offset: offset,
                   type: VideoSourceType.cached,
-                  format: VideoSourceFormat.hls),
+                  format: cached.url.endsWith('.m3u8')
+                      ? VideoSourceFormat.hls
+                      : VideoSourceFormat.auto),
               const {},
               fromCache: false)
           : preparedSource != null
@@ -1006,7 +1009,7 @@ abstract class _VideoPageController with Store implements Disposable {
         pageUrl: resolvedEpisode.pageUrl,
         sortNumber: resolvedEpisode.sortNumber,
         httpHeaders: cached != null ? const {} : attempt.headers,
-        adBlockerEnabled: cached != null ? false : adBlocker,
+        adBlockerEnabled: adBlocker,
         episodeTitle: resolvedEpisode.displayTitle,
         referer: attempt.headers['referer'] ?? '',
         currentRoad: resolvedEpisode.roadIndex,
@@ -1018,6 +1021,12 @@ abstract class _VideoPageController with Store implements Disposable {
           if (!_switchingSource && historyAccepted) {
             await historyController.updateHistory(historyIdentity, position,
                 duration: duration);
+            if (cached != null) {
+              try {
+                await _recentCache.progress(
+                    cached.id, position.inSeconds, duration.inSeconds);
+              } catch (_) {/* Cache bookkeeping must not lose history. */}
+            }
           }
         },
         onPlaybackError: (message) {

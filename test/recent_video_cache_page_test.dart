@@ -89,7 +89,7 @@ void main() {
     await tester
         .pumpWidget(MaterialApp(home: RecentVideoCachePage(service: cache)));
     await tester.pumpAndSettle();
-    expect(find.textContaining('可离线播放'), findsOneWidget);
+    expect(find.text('可离线播放 · 10.0 MiB'), findsOneWidget);
     expect(find.textContaining('部分缓存 1/2'), findsOneWidget);
     final deletes = find.widgetWithText(TextButton, '删除这一集');
     expect(tester.widget<TextButton>(deletes.at(1)).onPressed, isNull);

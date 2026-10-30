@@ -25,6 +25,7 @@ import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/player/source_switch.dart';
 import 'package:kazumi/services/player/cross_source_resume.dart';
 import 'package:kazumi/services/video_source/services.dart';
+import 'package:kazumi/services/video_source/video_source_format.dart';
 import 'package:kazumi/services/video_source/resolved_source_cache.dart';
 import 'package:kazumi/services/player/recent_video_cache_service.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -131,12 +132,13 @@ class _Danmaku implements PlayerDanmakuController {
 }
 
 class _Lease extends RecentCacheLease {
-  _Lease()
+  _Lease({bool mp4 = false, Map<String, dynamic> metadata = const {}})
       : super({
           'id': 'cached-episode',
           'offline': true,
-          'url': 'http://127.0.0.1:1234/token/playlist.m3u8',
-          'metadata': <String, dynamic>{}
+          'url':
+              'http://127.0.0.1:1234/token/${mp4 ? 'media.mp4' : 'playlist.m3u8'}',
+          'metadata': metadata
         }, RecentVideoCacheService());
   int releases = 0;
   @override
@@ -147,6 +149,14 @@ class _Lease extends RecentCacheLease {
 
 class _RecentCache extends RecentVideoCacheService {
   Future<RecentCacheLease?>? found;
+  final progressWrites = <(int, int)>[];
+  @override
+  Future<RecentCacheLease?> openOffline(String id) async => await found;
+  @override
+  Future<void> progress(String id, int position, int duration) async {
+    progressWrites.add((position, duration));
+  }
+
   @override
   Future<RecentCacheLease?> find(String identity) async => await found;
   @override
@@ -259,6 +269,59 @@ void main() {
     expect(player.danmaku.latestRequests, 1);
     await controller.cancelEpisodeLoad(playerController: player);
     expect(lease.releases, 1);
+  });
+
+  test('MP4 cache retains native format detection and online progress',
+      () async {
+    final lease = _Lease(mp4: true);
+    recentCache.found = Future.value(lease);
+    await controller.changeEpisode(1, playerController: player);
+    final params = player.initializations.single;
+    expect(params.videoSourceFormat, VideoSourceFormat.auto);
+    await params.onHistoryProgress!(
+        const Duration(seconds: 45), const Duration(seconds: 900));
+    expect(recentCache.progressWrites, [(45, 900)]);
+  });
+
+  test('online cache playback preserves requested native ad filter', () async {
+    await GStorage.putSetting(SettingsKeys.forceAdBlocker, true);
+    addTearDown(() => GStorage.putSetting(SettingsKeys.forceAdBlocker, false));
+    recentCache.found = Future.value(_Lease(metadata: {'adBlocker': true}));
+    await controller.changeEpisode(1, playerController: player);
+    expect(player.initializations.single.adBlockerEnabled, true);
+  });
+
+  test(
+      'offline cache preserves filter and honors resume preference and near-end reset',
+      () async {
+    recentCache.found = Future.value(_Lease(metadata: {
+      'adBlocker': true,
+      'position': 120,
+      'duration': 300,
+    }));
+    controller.applyPlaybackArgs(OfflineVideoPlaybackArgs(
+      bangumiItem: focusItem(1),
+      pluginName: 'fixture',
+      episodeNumber: 1,
+      road: 0,
+      recentCacheId: 'cached-episode',
+      downloadedEpisodes: [
+        DownloadEpisode(1, 'Episode 1', 0, DownloadStatus.completed, 100, 1, 1,
+            '', '', '', null, '', 10, ''),
+      ],
+    ));
+    await GStorage.putSetting(SettingsKeys.playResume, true);
+    addTearDown(() => GStorage.putSetting(SettingsKeys.playResume, true));
+    await controller.changeEpisode(1, playerController: player);
+    expect(player.initializations.last.adBlockerEnabled, true);
+    expect(player.initializations.last.offset, 120);
+    await GStorage.putSetting(SettingsKeys.playResume, false);
+    await controller.changeEpisode(1, playerController: player);
+    expect(player.initializations.last.offset, 0);
+    expect(
+        RecentVideoCacheService.resumeOffset({'position': 298, 'duration': 300},
+            playResume: true),
+        0);
   });
 
   test(

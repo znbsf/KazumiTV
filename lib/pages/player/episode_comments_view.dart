@@ -1,6 +1,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/card/user_comments_card.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
@@ -42,124 +44,132 @@ class EpisodeCommentsView extends StatelessWidget {
         final gutter = constraints.maxWidth > 760
             ? (constraints.maxWidth - 728) / 2
             : 16.0;
-        return CustomScrollView(
-          key: ValueKey(episode),
-          scrollBehavior: const ScrollBehavior().copyWith(
-            scrollbars: false,
-            dragDevices: {
-              PointerDeviceKind.mouse,
-              PointerDeviceKind.touch,
-              PointerDeviceKind.trackpad,
-            },
-          ),
-          slivers: [
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(gutter, 16, gutter, 0),
-              sliver: SliverToBoxAdapter(
-                child: _EpisodeHeader(
-                  episode: episode,
-                  info: episodeInfo,
-                  onSelectEpisode: onSelectEpisode,
-                ),
-              ),
-            ),
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(gutter + 4, 16, gutter, 12),
-              sliver: SliverToBoxAdapter(child: _buildToolbar(context)),
-            ),
-            if (!isLoading && hasError && comments.isEmpty)
-              SliverToBoxAdapter(
-                child: GeneralErrorWidget(
-                  icon: Icons.cloud_off_rounded,
-                  title: '评论暂时未能加载',
-                  errMsg: '请检查网络后重试，或切换分集查看讨论。',
-                  onRetry: onRefresh,
-                  retryText: '重新加载',
-                ),
-              )
-            else if (!isLoading && comments.isEmpty)
-              SliverToBoxAdapter(
-                child: GeneralEmptyState(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  title: '本集还没有讨论',
-                  actions: [
-                    StateActionButton.tonal(
-                      onPressed: onSelectEpisode,
-                      icon: Icons.video_library_outlined,
-                      text: '切换分集',
+        return DiscussionScrollRegion(
+            key: ValueKey(episode),
+            enabled: TvMode.enabled,
+            builder: (controller) => CustomScrollView(
+                  controller: controller,
+                  key: ValueKey(episode),
+                  scrollBehavior: const ScrollBehavior().copyWith(
+                    scrollbars: false,
+                    dragDevices: {
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.trackpad,
+                    },
+                  ),
+                  slivers: [
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(gutter, 16, gutter, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: _EpisodeHeader(
+                          episode: episode,
+                          info: episodeInfo,
+                          onSelectEpisode: onSelectEpisode,
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(gutter + 4, 16, gutter, 12),
+                      sliver: SliverToBoxAdapter(child: _buildToolbar(context)),
+                    ),
+                    if (!isLoading && hasError && comments.isEmpty)
+                      SliverToBoxAdapter(
+                        child: GeneralErrorWidget(
+                          icon: Icons.cloud_off_rounded,
+                          title: '评论暂时未能加载',
+                          errMsg: '请检查网络后重试，或切换分集查看讨论。',
+                          onRetry: onRefresh,
+                          retryText: '重新加载',
+                        ),
+                      )
+                    else if (!isLoading && comments.isEmpty)
+                      SliverToBoxAdapter(
+                        child: GeneralEmptyState(
+                          icon: Icons.chat_bubble_outline_rounded,
+                          title: '本集还没有讨论',
+                          actions: [
+                            StateActionButton.tonal(
+                              onPressed: onSelectEpisode,
+                              icon: Icons.video_library_outlined,
+                              text: '切换分集',
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (comments.isNotEmpty) ...[
+                      if (hasError)
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
+                          sliver: SliverToBoxAdapter(
+                            child: Material(
+                              color: colors.errorContainer,
+                              borderRadius: BorderRadius.circular(16),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                                child: Row(children: [
+                                  Expanded(
+                                    child: Text('刷新失败，已保留现有讨论',
+                                        style: TextStyle(
+                                            color: colors.onErrorContainer)),
+                                  ),
+                                  TextButton(
+                                    onPressed: onRefresh,
+                                    style: TextButton.styleFrom(
+                                        foregroundColor:
+                                            colors.onErrorContainer),
+                                    child: const Text('重试'),
+                                  ),
+                                ]),
+                              ),
+                            ),
+                          ),
+                        ),
+                      SliverPadding(
+                        padding: EdgeInsets.symmetric(horizontal: gutter),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => KeepAlive(
+                              // Retain BBCode image geometry and expanded discussions.
+                              key: ObjectKey(comments[index]),
+                              keepAlive: true,
+                              child: IndexedSemantics(
+                                index: index,
+                                child:
+                                    UserCommentsCard.episode(comments[index]),
+                              ),
+                            ),
+                            childCount: comments.length,
+                            findChildIndexCallback: (key) {
+                              final index = comments.indexOf((key as ObjectKey)
+                                  .value as EpisodeCommentItem);
+                              return index < 0 ? null : index;
+                            },
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: false,
+                            addSemanticIndexes: false,
+                          ),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          child: Text(
+                              '已显示全部 ${comments.length} 条讨论 · 来自 Bangumi',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(color: colors.onSurfaceVariant)),
+                        ),
+                      ),
+                    ],
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                          height: MediaQuery.paddingOf(context).bottom),
                     ),
                   ],
-                ),
-              )
-            else if (comments.isNotEmpty) ...[
-              if (hasError)
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(gutter, 0, gutter, 12),
-                  sliver: SliverToBoxAdapter(
-                    child: Material(
-                      color: colors.errorContainer,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-                        child: Row(children: [
-                          Expanded(
-                            child: Text('刷新失败，已保留现有讨论',
-                                style:
-                                    TextStyle(color: colors.onErrorContainer)),
-                          ),
-                          TextButton(
-                            onPressed: onRefresh,
-                            style: TextButton.styleFrom(
-                                foregroundColor: colors.onErrorContainer),
-                            child: const Text('重试'),
-                          ),
-                        ]),
-                      ),
-                    ),
-                  ),
-                ),
-              SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: gutter),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) => KeepAlive(
-                      // Retain BBCode image geometry and expanded discussions.
-                      key: ObjectKey(comments[index]),
-                      keepAlive: true,
-                      child: IndexedSemantics(
-                        index: index,
-                        child: UserCommentsCard.episode(comments[index]),
-                      ),
-                    ),
-                    childCount: comments.length,
-                    findChildIndexCallback: (key) {
-                      final index = comments.indexOf(
-                          (key as ObjectKey).value as EpisodeCommentItem);
-                      return index < 0 ? null : index;
-                    },
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: false,
-                    addSemanticIndexes: false,
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  child: Text('已显示全部 ${comments.length} 条讨论 · 来自 Bangumi',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(color: colors.onSurfaceVariant)),
-                ),
-              ),
-            ],
-            SliverToBoxAdapter(
-              child: SizedBox(height: MediaQuery.paddingOf(context).bottom),
-            ),
-          ],
-        );
+                ));
       }),
     );
   }
@@ -228,6 +238,79 @@ class EpisodeCommentsView extends StatelessWidget {
       }
       return Row(children: [title, const Spacer(), actions]);
     });
+  }
+}
+
+/// A remote can focus the reading surface even when comments contain no
+/// buttons. Child buttons retain their normal directional traversal.
+class DiscussionScrollRegion extends StatefulWidget {
+  const DiscussionScrollRegion(
+      {super.key, required this.enabled, required this.builder});
+  final bool enabled;
+  final Widget Function(ScrollController controller) builder;
+
+  @override
+  State<DiscussionScrollRegion> createState() => _DiscussionScrollRegionState();
+}
+
+class _DiscussionScrollRegionState extends State<DiscussionScrollRegion> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (!node.hasPrimaryFocus ||
+        !_scroll.hasClients ||
+        (event is! KeyDownEvent && event is! KeyRepeatEvent)) {
+      return KeyEventResult.ignored;
+    }
+    final direction = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowDown => 1,
+      LogicalKeyboardKey.arrowUp => -1,
+      _ => 0,
+    };
+    if (direction == 0) return KeyEventResult.ignored;
+    final next =
+        (_scroll.offset + direction * _scroll.position.viewportDimension * .65)
+            .clamp(0.0, _scroll.position.maxScrollExtent)
+            .toDouble();
+    // At the start, Up returns to the tab/toolbar. At the end, retain the
+    // reader so reversing direction works instead of escaping to playback.
+    if (direction < 0 && next == _scroll.offset) return KeyEventResult.ignored;
+    _scroll.jumpTo(next);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scroll = widget.builder(_scroll);
+    if (!widget.enabled) return scroll;
+    return Focus(
+      autofocus: true,
+      onFocusChange: (_) => setState(() {}),
+      onKeyEvent: _onKey,
+      child: Builder(builder: (context) {
+        final focused = Focus.of(context).hasPrimaryFocus;
+        return DecoratedBox(
+          decoration: BoxDecoration(
+              border: Border.all(
+            color: focused
+                ? Theme.of(context).colorScheme.primary
+                : Colors.transparent,
+            width: 2,
+          )),
+          child: Column(children: [
+            Text(focused ? '上下键滚动讨论 · 左右键选择操作' : '聚焦讨论区后可用上下键滚动',
+                style: Theme.of(context).textTheme.labelMedium),
+            Expanded(child: scroll),
+          ]),
+        );
+      }),
+    );
   }
 }
 

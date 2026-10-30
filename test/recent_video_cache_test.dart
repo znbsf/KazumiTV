@@ -256,13 +256,13 @@ void main() {
     ('nested media segment', manifest.replaceAll('a.ts', 'a.m3u8')),
     ('live', manifest.replaceAll('#EXT-X-ENDLIST', '')),
     (
-      'encrypted',
+      'DRM',
       manifest.replaceAll(
-          '#EXTINF:5,', '#EXT-X-KEY:METHOD=AES-128,URI="key"\n#EXTINF:5,')
+          '#EXTINF:5,', '#EXT-X-KEY:METHOD=SAMPLE-AES,URI="key"\n#EXTINF:5,')
     ),
     (
-      'byte range',
-      manifest.replaceAll('#EXTINF:5,', '#EXT-X-BYTERANGE:5@0\n#EXTINF:5,')
+      'implicit range without preceding offset',
+      manifest.replaceAll('#EXTINF:5,', '#EXT-X-BYTERANGE:5\n#EXTINF:5,')
     ),
     ('external tracks', '#EXTM3U\n#EXT-X-MEDIA:TYPE=AUDIO,URI="audio.m3u8"\n'),
     (

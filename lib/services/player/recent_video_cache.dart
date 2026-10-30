@@ -8,6 +8,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:kazumi/utils/async_serial_queue.dart';
+import 'package:kazumi/services/player/recent_hls_manifest.dart';
 
 /// A deliberately conservative VOD cache. Only plain, finite HLS playlists are
 /// admitted. Unsupported manifests leave the original player path untouched.
@@ -177,6 +178,8 @@ class RecentVideoCache {
     required String url,
     required Map<String, String> headers,
     required Map<String, dynamic> metadata,
+    bool hls = true,
+    String? proxy,
   }) async {
     await initialize();
     final id = keyFor(identity);
@@ -185,9 +188,12 @@ class RecentVideoCache {
     final client = HttpClient()
       ..autoUncompress = false
       ..connectionTimeout = const Duration(seconds: 5);
+    if (proxy != null) client.findProxy = (_) => proxy;
     try {
       // Preparation has one absolute deadline. Closing the client cancels I/O.
-      final parsed = await _readPlaylist(client, Uri.parse(url), headers)
+      final parsed = await (hls
+              ? _readPlaylist(client, Uri.parse(url), headers)
+              : _readMp4(client, Uri.parse(url), headers))
           .timeout(const Duration(seconds: 6), onTimeout: () {
         client.close(force: true);
         throw TimeoutException('cache preparation');
@@ -197,7 +203,10 @@ class RecentVideoCache {
         if (_active(id)) return null;
         final free = await availableBytes(root.path);
         if (free < reserveBytes || _limit <= 0) return null;
-        final fingerprint = keyFor(jsonEncode([parsed.$1, parsed.$2]));
+        final fingerprint = keyFor(jsonEncode([
+          parsed.playlist,
+          parsed.resources.map((r) => r.fingerprint).toList()
+        ]));
         var entry = _entries[id];
         if (entry != null && entry.fingerprint != fingerprint) {
           await _remove(entry);
@@ -205,15 +214,15 @@ class RecentVideoCache {
         }
         if (entry == null) {
           if (!await _makeRoom(entryOverhead, newEntry: true)) return null;
-          entry = _Entry(id, fingerprint, parsed.$1,
-              List.filled(parsed.$2.length, 0), metadata);
+          entry = _Entry(id, fingerprint, parsed.playlist,
+              List.filled(parsed.resources.length, 0), metadata);
           await Directory(p.join(root.path, id)).create();
           _entries[id] = entry;
           _used += entryOverhead;
           await _save(entry);
         }
         // This client moves to the session; it is closed on release.
-        return _lease(entry, client, parsed.$2, headers);
+        return _lease(entry, client, parsed.resources, headers);
       });
     } catch (_) {
       // A cache probe must never prevent normal streaming.
@@ -226,7 +235,7 @@ class RecentVideoCache {
   }
 
   Future<Map<String, dynamic>> _lease(_Entry entry, HttpClient? client,
-      List<String> urls, Map<String, String> headers) async {
+      List<RecentMediaResource> urls, Map<String, String> headers) async {
     _server ??= await HttpServer.bind(InternetAddress.loopbackIPv4, 0)
       ..listen(_serve);
     final random = Random.secure();
@@ -244,7 +253,8 @@ class RecentVideoCache {
     return {
       ...entry.summary(active: true),
       'token': token,
-      'url': 'http://127.0.0.1:${_server!.port}/$token/playlist.m3u8',
+      'url':
+          'http://127.0.0.1:${_server!.port}/$token/${entry.mp4 ? 'media.mp4' : 'playlist.m3u8'}',
       'offline': client == null,
     };
   }
@@ -299,7 +309,7 @@ class RecentVideoCache {
       }
       session.requests.add(request);
       request.response.headers.set('Cache-Control', 'no-store');
-      if (parts[1] == 'playlist.m3u8') {
+      if (parts[1] == 'playlist.m3u8' && !session.entry.mp4) {
         final data = utf8.encode(session.entry.playlist);
         request.response.headers.contentType =
             ContentType('application', 'vnd.apple.mpegurl');
@@ -307,8 +317,14 @@ class RecentVideoCache {
         if (request.method == 'GET') request.response.add(data);
         return;
       }
-      final match = RegExp(r'^s(\d+)\.ts$').firstMatch(parts[1]);
-      final index = match == null ? -1 : int.parse(match[1]!);
+      final match =
+          RegExp(r'^s(\d+)\.(?:ts|key|m4s|mp4|m4a|aac|ac3|ec3|vtt|webvtt)$')
+              .firstMatch(parts[1]);
+      final index = session.entry.mp4 && parts[1] == 'media.mp4'
+          ? 0
+          : match == null
+              ? -1
+              : int.parse(match[1]!);
       if (index < 0 || index >= session.entry.lengths.length) {
         request.response.statusCode = HttpStatus.notFound;
         return;
@@ -323,7 +339,7 @@ class RecentVideoCache {
         if (session.closed) return;
         final file = _file(session.entry.id, 's$index.ts');
         if (session.entry.lengths[index] > 0 && await file.exists()) {
-          await _serveFile(request, file);
+          await _serveFile(request, file, mp4: session.entry.mp4);
           return;
         }
         if (session.client == null) {
@@ -349,7 +365,8 @@ class RecentVideoCache {
     }
   }
 
-  Future<void> _serveFile(HttpRequest request, File file) async {
+  Future<void> _serveFile(HttpRequest request, File file,
+      {bool mp4 = false}) async {
     final length = await file.length();
     var start = 0;
     var end = length - 1;
@@ -376,7 +393,8 @@ class RecentVideoCache {
           .set('Content-Range', 'bytes $start-$end/$length');
     }
     request.response.headers.set('Accept-Ranges', 'bytes');
-    request.response.headers.contentType = ContentType('video', 'mp2t');
+    request.response.headers.contentType =
+        mp4 ? ContentType('video', 'mp4') : ContentType.binary;
     request.response.contentLength = end - start + 1;
     if (request.method != 'HEAD') {
       await request.response.addStream(file.openRead(start, end + 1));
@@ -385,11 +403,52 @@ class RecentVideoCache {
 
   Future<void> _relay(HttpRequest request, _Session session, int index) async {
     final range = request.headers.value('range');
-    final headers = {...session.headers, if (range != null) 'Range': range};
-    final result = await _get(
-        session.client!, Uri.parse(session.urls[index]), headers,
+    final resource = session.urls[index];
+    var resourceStart = 0;
+    var resourceEnd = (resource.length ?? 1) - 1;
+    if (resource.length != null && range != null) {
+      final parsed = RegExp(r'^bytes=(\d*)-(\d*)$').firstMatch(range);
+      if (parsed == null || (parsed[1]!.isEmpty && parsed[2]!.isEmpty)) {
+        request.response.statusCode = 416;
+        return;
+      }
+      if (parsed[1]!.isEmpty) {
+        resourceStart = max(0, resource.length! - int.parse(parsed[2]!));
+      } else {
+        resourceStart = int.parse(parsed[1]!);
+        if (parsed[2]!.isNotEmpty)
+          resourceEnd = min(resourceEnd, int.parse(parsed[2]!));
+      }
+      if (resourceStart > resourceEnd || resourceStart >= resource.length!) {
+        request.response.statusCode = 416;
+        request.response.headers
+            .set('Content-Range', 'bytes */${resource.length}');
+        return;
+      }
+    }
+    final upstreamRange = resource.length == null
+        ? range
+        : 'bytes=${resource.start! + resourceStart}-${resource.start! + resourceEnd}';
+    final headers = {
+      for (final h in session.headers.entries)
+        if (h.key.toLowerCase() != 'range') h.key: h.value,
+      if (upstreamRange != null) 'Range': upstreamRange,
+    };
+    final result = await _get(session.client!, Uri.parse(resource.url), headers,
         method: request.method);
     final upstream = result.$1;
+    if (resource.length != null) {
+      final match = RegExp(r'^bytes (\d+)-(\d+)/(\d+)$')
+          .firstMatch(upstream.headers.value('content-range') ?? '');
+      if (upstream.statusCode != 206 ||
+          match == null ||
+          int.parse(match[1]!) != resource.start! + resourceStart ||
+          int.parse(match[2]!) != resource.start! + resourceEnd ||
+          int.parse(match[3]!) <= int.parse(match[2]!)) {
+        await upstream.listen(null).cancel();
+        throw const HttpException('invalid source byte range');
+      }
+    }
     request.response.statusCode = upstream.statusCode;
     for (final name in [
       'content-type',
@@ -401,16 +460,28 @@ class RecentVideoCache {
       final value = upstream.headers.value(name);
       if (value != null) request.response.headers.set(name, value);
     }
+    if (resource.length != null) {
+      request.response.statusCode = range == null ? 200 : 206;
+      request.response.headers.removeAll('content-range');
+      if (range != null)
+        request.response.headers.set('Content-Range',
+            'bytes $resourceStart-$resourceEnd/${resource.length}');
+    }
     // Only full, successfully terminated responses become durable segments.
     final contentRange = RegExp(r'^bytes 0-(\d+)/(\d+)$')
         .firstMatch(upstream.headers.value('content-range') ?? '');
-    final fullResponse = upstream.statusCode == 200 ||
+    final fullResponse = (resource.length != null &&
+            resourceStart == 0 &&
+            resourceEnd == resource.length! - 1) ||
+        upstream.statusCode == 200 ||
         (upstream.statusCode == 206 &&
             contentRange != null &&
             int.parse(contentRange[1]!) + 1 == int.parse(contentRange[2]!));
     var saving = request.method == 'GET' &&
-        (range == null || range == 'bytes=0-') &&
         fullResponse &&
+        (!session.entry.mp4 ||
+            ['video/mp4', 'application/octet-stream']
+                .contains(upstream.headers.contentType?.mimeType)) &&
         (upstream.headers.value('content-encoding') == null ||
             upstream.headers.value('content-encoding') == 'identity') &&
         !session.writeDisabled;
@@ -478,6 +549,8 @@ class RecentVideoCache {
       if (saving &&
           !session.closed &&
           received > 0 &&
+          (!resource.key || received == 16) &&
+          (resource.length == null || received == resource.length) &&
           (upstream.contentLength < 0 || received == upstream.contentLength)) {
         await _queue.run(() async {
           await partial.rename(_file(session.entry.id, 's$index.ts').path);
@@ -547,7 +620,21 @@ class RecentVideoCache {
     }
   }
 
-  Future<(String, List<String>)?> _readPlaylist(
+  Future<RecentHlsManifest?> _readMp4(
+      HttpClient client, Uri uri, Map<String, String> headers) async {
+    final (response, finalUri) =
+        await _get(client, uri, headers, method: 'HEAD');
+    final mime = response.headers.contentType?.mimeType;
+    if (response.statusCode != 200 ||
+        response.contentLength <= 0 ||
+        !(mime == 'video/mp4' ||
+            (mime == 'application/octet-stream' &&
+                finalUri.path.toLowerCase().endsWith('.mp4')))) return null;
+    await response.drain<void>();
+    return RecentHlsManifest('', [RecentMediaResource(finalUri.toString())]);
+  }
+
+  Future<RecentHlsManifest?> _readPlaylist(
       HttpClient client, Uri uri, Map<String, String> headers,
       [int depth = 0]) async {
     if (depth > 2) return null;
@@ -561,16 +648,13 @@ class RecentVideoCache {
     final content = utf8.decode(bytes.takeBytes()).trim();
     if (!content.startsWith('#EXTM3U')) return null;
     final lines = content.split(RegExp(r'\r?\n')).map((l) => l.trim()).toList();
-    // Keys, byte ranges, separate audio/subtitle renditions and fMP4 init maps
-    // need their own completeness model. Never silently strip those tags.
-    if (lines.any((l) =>
-        l.contains('URI=') ||
-        l.startsWith('#EXT-X-BYTERANGE') ||
-        l.startsWith('#EXT-X-KEY') ||
-        l.startsWith('#EXT-X-MAP') ||
-        l.startsWith('#EXT-X-DEFINE') ||
-        l.startsWith('#EXT-X-I-FRAMES-ONLY'))) return null;
     if (lines.any((l) => l.startsWith('#EXT-X-STREAM-INF:'))) {
+      if (lines.any((l) =>
+          l.contains('URI=') ||
+          l.contains('AUDIO=') ||
+          l.contains('VIDEO=') ||
+          l.contains('SUBTITLES=') ||
+          l.startsWith('#EXT-X-DEFINE'))) return null;
       // A single rendition preserves the source's track/quality selection.
       final variants =
           lines.where((l) => l.isNotEmpty && !l.startsWith('#')).toList();
@@ -578,30 +662,7 @@ class RecentVideoCache {
       return _readPlaylist(
           client, finalUri.resolve(variants.single), headers, depth + 1);
     }
-    if (!lines.contains('#EXT-X-ENDLIST') ||
-        lines.contains('#EXT-X-PLAYLIST-TYPE:EVENT')) return null;
-    final urls = <String>[];
-    final local = <String>[];
-    var needsSegment = false;
-    for (final line in lines) {
-      if (line.startsWith('#EXTINF:')) {
-        if (needsSegment) return null;
-        needsSegment = true;
-      }
-      if (line.isNotEmpty && !line.startsWith('#')) {
-        if (!needsSegment || urls.length >= maxSegments) return null;
-        final segment = finalUri.resolve(line);
-        if (segment.scheme != 'http' && segment.scheme != 'https') return null;
-        if (segment.path.toLowerCase().endsWith('.m3u8')) return null;
-        local.add('s${urls.length}.ts');
-        urls.add(segment.toString());
-        needsSegment = false;
-      } else {
-        local.add(line);
-      }
-    }
-    if (urls.isEmpty || needsSegment) return null;
-    return ('${local.join('\n')}\n', urls);
+    return RecentHlsManifest.parse(content, finalUri, maxSegments);
   }
 
   Future<(HttpClientResponse, Uri)> _get(
@@ -644,6 +705,7 @@ class _Entry {
   final String id;
   final String fingerprint;
   final String playlist;
+  bool get mp4 => playlist.isEmpty;
   final List<int> lengths;
   final Map<String, dynamic> metadata;
   int accessed = DateTime.now().millisecondsSinceEpoch;
@@ -661,15 +723,30 @@ class _Entry {
         lengths.length > RecentVideoCache.maxSegments ||
         lengths.any((v) => v < 0)) throw const FormatException('segments');
     final playlist = json['playlist'] as String;
+    if (playlist.isNotEmpty) {
+      final parsed = RecentHlsManifest.parse(playlist,
+          Uri.parse('http://cache.invalid/'), RecentVideoCache.maxSegments);
+      if (parsed == null ||
+          parsed.resources.any((r) =>
+              !RegExp(r'^http://cache\.invalid/s\d+\.(?:ts|key|m4s|mp4|m4a|aac|ac3|ec3|vtt|webvtt)$')
+                  .hasMatch(r.url) ||
+              r.length != null))
+        throw const FormatException('nonlocal resources');
+    }
     final files = playlist
         .split('\n')
         .where((l) => l.isNotEmpty && !l.startsWith('#'))
         .toList();
-    if (files.length != lengths.length ||
-        List.generate(files.length, (i) => files[i] != 's$i.ts')
-            .any((v) => v) ||
-        playlist.contains('URI=') ||
-        !playlist.contains('#EXT-X-ENDLIST')) {
+    files.addAll(
+        RegExp(r'URI="([^"]+)"').allMatches(playlist).map((m) => m[1]!));
+    final expected = List.generate(lengths.length, (i) => 's$i').toSet();
+    final indices = files.map((name) => name.split('.').first).toSet();
+    if (playlist.isEmpty
+        ? lengths.length != 1
+        : files.length != lengths.length ||
+            indices.difference(expected).isNotEmpty ||
+            expected.difference(indices).isNotEmpty ||
+            !playlist.contains('#EXT-X-ENDLIST')) {
       throw const FormatException('nonlocal playlist');
     }
     return _Entry(id, json['fingerprint'], playlist, lengths,
@@ -704,7 +781,7 @@ class _Session {
   final String token;
   final _Entry entry;
   final HttpClient? client;
-  final List<String> urls;
+  final List<RecentMediaResource> urls;
   final Map<String, String> headers;
   final requests = <HttpRequest>{};
   final pending = <int, Future<void>>{};

@@ -192,9 +192,9 @@ class _RecentVideoCachePageState extends State<RecentVideoCachePage> {
           const SettingsSection(title: Text('当前支持范围'), tiles: [
             SettingsTile(
                 leading: Icons.help_outline,
-                title: Text('普通 HLS 点播'),
+                title: Text('MP4 与 HLS 点播'),
                 description: Text(
-                    '实验版支持未加密、完整结束清单的单轨 HLS。MP4、直播、多轨/多清晰度、加密、字节范围、代理或去广告播放沿用原播放方式，不自动缓存。\n视频完整时优先使用本地内容；弹幕先获取最新内容，失败或无结果时使用缓存并提示。')),
+                    '支持完整 MP4、单轨 HLS（含 AES-128、初始化片段和未加密字节范围），支持 HTTP 代理。缓存保留原片段，去广告由播放器执行。仅收到全部所需内容后可离线播放；跳过或中断的内容不会标为完整。\n直播、多轨/多清晰度、DRM 和加密字节范围沿用原播放方式。视频完整时优先本地；弹幕先获取最新内容，失败或无结果时使用缓存并提示。')),
           ]),
         ]));
   }

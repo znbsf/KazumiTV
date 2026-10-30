@@ -135,8 +135,15 @@ void main() {
     ));
     focus.requestFocus();
     await tester.pumpAndSettle();
-    expect(find.text('下一集'), findsNothing);
-    expect(find.bySemanticsLabel('下一集'), findsOneWidget);
+    expect(find.text('下一集'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(TvPlayerAction),
+            matching: find.byWidgetPredicate((widget) =>
+                widget is Semantics &&
+                widget.properties.label == '下一集' &&
+                widget.properties.button == true)),
+        findsOneWidget);
     expect(tester.widget<Tooltip>(find.byType(Tooltip)).message, '下一集');
     final icon = tester.widget<Icon>(find.byIcon(Icons.skip_next_rounded));
     expect(
@@ -149,6 +156,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.tap(find.byIcon(Icons.skip_next_rounded));
     expect(activations, 2);
+    focus.unfocus();
+    await tester.pumpAndSettle();
+    expect(find.text('下一集'), findsNothing);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });

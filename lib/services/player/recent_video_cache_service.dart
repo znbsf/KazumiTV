@@ -7,9 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:kazumi/services/network/system_proxy_service.dart';
+import 'package:kazumi/services/network/proxy_utils.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/services/player/recent_video_cache.dart';
 import 'package:kazumi/modules/danmaku/danmaku_module.dart';
+import 'package:kazumi/utils/constants.dart';
 
 class RecentCacheLease {
   RecentCacheLease(this.data, this._service);
@@ -33,6 +35,17 @@ class RecentCacheLease {
 class RecentVideoCacheService {
   static final shared = RecentVideoCacheService();
   Future<SendPort>? _worker;
+
+  static int resumeOffset(Map<String, dynamic> metadata,
+      {required bool playResume}) {
+    if (!playResume) return 0;
+    final position = metadata['position'] as int? ?? 0;
+    final duration = metadata['duration'] as int? ?? 0;
+    if (position < 0 ||
+        (duration > 0 &&
+            position >= duration - nearEndWatchedThreshold.inSeconds)) return 0;
+    return position;
+  }
 
   bool get automaticEnabled =>
       GStorage.getSetting(SettingsKeys.recentVideoCacheEnabled);
@@ -136,20 +149,29 @@ class RecentVideoCacheService {
     required bool hls,
     required bool adBlocker,
   }) async {
-    // Experimental path: do not alter proxy or native ad-filter semantics.
-    // These modes and non-HLS sources continue to use the existing player.
-    if (!enabled ||
-        !hls ||
-        adBlocker ||
-        GStorage.getSetting(SettingsKeys.proxyEnable) ||
-        SystemProxyService.isActive) return null;
+    // Cache original packets and discontinuities. Filtering remains in the
+    // native decoder, including offline replays, never in the cache writer.
+    if (!enabled) return null;
+    String? proxy;
+    if (GStorage.getSetting(SettingsKeys.proxyEnable)) {
+      final parsed =
+          ProxyUtils.parseProxyUrl(GStorage.getSetting(SettingsKeys.proxyUrl));
+      if (parsed == null) return null;
+      proxy = 'PROXY ${parsed.$1}:${parsed.$2}';
+    } else if (SystemProxyService.isActive) {
+      // Match the native player's per-session proxy selection.
+      final parsed = SystemProxyService.proxyFor('https');
+      if (parsed != null) proxy = 'PROXY ${parsed.$1}:${parsed.$2}';
+    }
     try {
       await configure();
       final result = await _call('online', {
         'identity': identity,
         'url': url,
         'headers': headers,
-        'metadata': metadata,
+        'metadata': {...metadata, 'adBlocker': adBlocker},
+        'hls': hls,
+        'proxy': proxy,
       });
       return result == null
           ? null
@@ -225,7 +247,9 @@ void _cacheWorker(List<dynamic> startup) {
               identity: args['identity'],
               url: args['url'],
               headers: Map<String, String>.from(args['headers']),
-              metadata: Map<String, dynamic>.from(args['metadata']));
+              metadata: Map<String, dynamic>.from(args['metadata']),
+              hls: args['hls'] as bool,
+              proxy: args['proxy'] as String?);
         case 'release':
           await cache.release(args['token'] as String);
           value = null;
