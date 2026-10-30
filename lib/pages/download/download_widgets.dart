@@ -9,8 +9,8 @@ import 'package:kazumi/utils/format.dart';
 const Duration _kExpandDuration = Duration(milliseconds: 250);
 const Curve _kExpandCurve = Curves.easeInOutCubic;
 
-class DownloadRecordCard extends StatelessWidget {
-  const DownloadRecordCard({
+class DownloadRecordSliver extends StatelessWidget {
+  const DownloadRecordSliver({
     super.key,
     required this.record,
     required this.expanded,
@@ -18,6 +18,7 @@ class DownloadRecordCard extends StatelessWidget {
     required this.onResumeAll,
     required this.onDeleteAll,
     required this.totalSpeed,
+    required this.episodeNumbers,
     required this.episodeTileBuilder,
   });
 
@@ -28,7 +29,8 @@ class DownloadRecordCard extends StatelessWidget {
   final VoidCallback onDeleteAll;
   final double totalSpeed;
 
-  final List<Widget> Function() episodeTileBuilder;
+  final List<int> episodeNumbers;
+  final Widget Function(BuildContext, int) episodeTileBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -36,25 +38,20 @@ class DownloadRecordCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final episodes = record.episodes.values;
     final totalCount = episodes.length;
-    final completedCount =
-        episodes.where((e) => e.status == DownloadStatus.completed).length;
-    final activeCount = episodes
-        .where((e) =>
-            e.status == DownloadStatus.downloading ||
-            e.status == DownloadStatus.resolving ||
-            e.status == DownloadStatus.pending)
-        .length;
-    final aggregateProgress = totalCount == 0
-        ? 0.0
-        : episodes.fold<double>(
-              0,
-              (sum, e) =>
-                  sum +
-                  (e.status == DownloadStatus.completed
-                      ? 1.0
-                      : e.progressPercent),
-            ) /
-            totalCount;
+    var completedCount = 0;
+    var activeCount = 0;
+    var progressSum = 0.0;
+    for (final episode in episodes) {
+      final completed = episode.status == DownloadStatus.completed;
+      if (completed) completedCount++;
+      if (episode.status == DownloadStatus.downloading ||
+          episode.status == DownloadStatus.resolving ||
+          episode.status == DownloadStatus.pending) {
+        activeCount++;
+      }
+      progressSum += completed ? 1.0 : episode.progressPercent;
+    }
+    final aggregateProgress = totalCount == 0 ? 0.0 : progressSum / totalCount;
     final allCompleted = completedCount >= totalCount;
 
     var meta = '$completedCount/$totalCount 已完成';
@@ -65,121 +62,144 @@ class DownloadRecordCard extends StatelessWidget {
       }
     }
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      color: colorScheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          InkWell(
-            onTap: onToggle,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  NetworkImgLayer(
-                    src: record.bangumiCover,
-                    width: 56,
-                    height: 75,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          record.bangumiName,
-                          style: textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            RuleTag(
-                              label: record.pluginName,
-                              background: colorScheme.secondaryContainer,
-                              foreground: colorScheme.onSecondaryContainer,
-                            ),
-                            Text(
-                              meta,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+    return SliverPadding(
+      padding: const EdgeInsets.only(bottom: 12),
+      sliver: DecoratedSliver(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        sliver: SliverMainAxisGroup(slivers: [
+          SliverToBoxAdapter(
+              child: Material(
+                  type: MaterialType.transparency,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      InkWell(
+                        onTap: onToggle,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              NetworkImgLayer(
+                                src: record.bangumiCover,
+                                width: 56,
+                                height: 75,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      record.bangumiName,
+                                      style: textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.w700),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      children: [
+                                        RuleTag(
+                                          label: record.pluginName,
+                                          background:
+                                              colorScheme.secondaryContainer,
+                                          foreground:
+                                              colorScheme.onSecondaryContainer,
+                                        ),
+                                        Text(
+                                          meta,
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                icon: Icon(
+                                  Icons.more_vert,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                                tooltip: '更多操作',
+                                onSelected: (value) {
+                                  if (value == 'resume_all') {
+                                    onResumeAll();
+                                  } else if (value == 'delete') {
+                                    onDeleteAll();
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'resume_all',
+                                    child: Text('全部开始'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text(
+                                      '全部删除',
+                                      style:
+                                          TextStyle(color: colorScheme.error),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: AnimatedRotation(
+                                  turns: expanded ? 0.5 : 0,
+                                  duration: _kExpandDuration,
+                                  curve: _kExpandCurve,
+                                  child: Icon(
+                                    Icons.expand_more,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: Icon(
-                      Icons.more_vert,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    tooltip: '更多操作',
-                    onSelected: (value) {
-                      if (value == 'resume_all') {
-                        onResumeAll();
-                      } else if (value == 'delete') {
-                        onDeleteAll();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'resume_all',
-                        child: Text('全部开始'),
                       ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          '全部删除',
-                          style: TextStyle(color: colorScheme.error),
+                      if (!allCompleted)
+                        Padding(
+                          padding:
+                              EdgeInsets.fromLTRB(16, 0, 16, expanded ? 4 : 16),
+                          child:
+                              LinearProgressIndicator(value: aggregateProgress),
                         ),
-                      ),
                     ],
+                  ))),
+          if (expanded)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              sliver: SliverList.builder(
+                itemCount: episodeNumbers.length,
+                findChildIndexCallback: (key) {
+                  if (key is! ValueKey<int>) return null;
+                  final index = episodeNumbers.indexOf(key.value);
+                  return index < 0 ? null : index;
+                },
+                itemBuilder: (context, index) => KeyedSubtree(
+                  key: ValueKey(episodeNumbers[index]),
+                  child: Material(
+                    type: MaterialType.transparency,
+                    child: episodeTileBuilder(context, episodeNumbers[index]),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: AnimatedRotation(
-                      turns: expanded ? 0.5 : 0,
-                      duration: _kExpandDuration,
-                      curve: _kExpandCurve,
-                      child: Icon(
-                        Icons.expand_more,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          if (!allCompleted)
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, expanded ? 4 : 16),
-              child: LinearProgressIndicator(value: aggregateProgress),
-            ),
-          AnimatedSize(
-            duration: _kExpandDuration,
-            curve: _kExpandCurve,
-            alignment: Alignment.topCenter,
-            child: expanded
-                ? Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    child: Column(children: episodeTileBuilder()),
-                  )
-                : const SizedBox(width: double.infinity),
-          ),
-        ],
+        ]),
       ),
     );
   }
