@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:kazumi/services/logging/log_export.dart';
 
 String _randomId() => List.generate(16, (_) => Random.secure().nextInt(256))
     .map((v) => v.toRadixString(16).padLeft(2, '0'))
@@ -95,6 +96,47 @@ class PhoneKeyboardSession {
   HttpServer? _server;
   Timer? _idle;
   bool _closed = false;
+  LogExport? _logExport;
+  String? _logExportId;
+  DateTime? _logExportExpires;
+  Timer? _logExportTimer;
+
+  /// Only the explicit TV export action publishes a snapshot. Pairing alone
+  /// never grants a live file reader, and exports never survive disconnect.
+  void publishLogExport(LogExport snapshot,
+      {Duration lifetime = const Duration(minutes: 5)}) {
+    if (_closed ||
+        _server == null ||
+        lifetime <= Duration.zero ||
+        lifetime > const Duration(minutes: 5)) {
+      throw StateError('No active export session');
+    }
+    revokeLogExport();
+    _logExport = snapshot;
+    _logExportId = _randomId();
+    _logExportExpires = DateTime.now().add(lifetime);
+    _logExportTimer = Timer(lifetime, revokeLogExport);
+    _touch();
+  }
+
+  void revokeLogExport() {
+    _logExportTimer?.cancel();
+    _logExportTimer = null;
+    _logExport = null;
+    _logExportId = null;
+    _logExportExpires = null;
+  }
+
+  Map<String, Object?>? get logExportState => !_closed &&
+          _logExport != null &&
+          DateTime.now().isBefore(_logExportExpires!)
+      ? {
+          'id': _logExportId,
+          'filename': _logExport!.filename,
+          'createdAt': _logExport!.createdAt.toUtc().toIso8601String(),
+          'expiresAt': _logExportExpires!.toUtc().toIso8601String(),
+        }
+      : null;
   PhoneKeyboardTarget? _target;
   int _generation = 0;
   final Map<String, String> _receipts = {};
@@ -129,6 +171,7 @@ class PhoneKeyboardSession {
         'pairingExpiresAt': expiresAt?.toUtc().toIso8601String(),
         'generation': _generation,
         'readTextAllowed': _readTextAllowed && _target?.writeOnly != true,
+        'logExport': logExportState,
         'remoteSequence': _remoteSequence,
         'remote': remoteState?.call() ??
             {'context': '', 'revision': 0, 'keys': <Object>[]},
@@ -249,8 +292,10 @@ class PhoneKeyboardSession {
     try {
       if (_closed ||
           (expiresAt != null && !DateTime.now().isBefore(expiresAt!)) ||
-          !['/$token', '/$token/state', '/$token/input']
-              .contains(request.uri.path)) {
+          (!['/$token', '/$token/state', '/$token/input']
+                  .contains(request.uri.path) &&
+              !(logExportState != null &&
+                  request.uri.path == '/$token/logs/$_logExportId'))) {
         response.statusCode = 404;
       } else if (request.headers.value('origin') != null &&
           request.headers.value('origin') != uri!.origin) {
@@ -258,6 +303,18 @@ class PhoneKeyboardSession {
       } else if (request.method == 'GET' && request.uri.path == '/$token') {
         response.headers.contentType = ContentType.html;
         response.write(_page);
+      } else if (request.method == 'GET' &&
+          request.uri.path == '/$token/logs/$_logExportId' &&
+          logExportState != null) {
+        final snapshot = _logExport!;
+        response.headers.contentType =
+            ContentType('text', 'plain', charset: 'utf-8');
+        response.headers.set('Content-Disposition',
+            'attachment; filename="${snapshot.filename}"');
+        final bytes = utf8.encode(snapshot.text);
+        response.contentLength = bytes.length;
+        response.add(bytes);
+        _touch();
       } else if (request.method == 'GET' &&
           request.uri.path == '/$token/state') {
         _heartbeat(request);
@@ -398,6 +455,7 @@ class PhoneKeyboardSession {
     _clients.clear();
     _target = null;
     _readTextAllowed = false;
+    revokeLogExport();
     await _server?.close(force: true);
     _receipts.clear();
     _remoteResults.clear();
@@ -426,6 +484,7 @@ details{margin-top:20px;border:1px solid var(--outline);border-radius:20px;paddi
 <div class="modes" role="group" aria-label="控制方式"><button id="remoteMode" aria-pressed="true">遥控器</button><button id="keyboardMode" aria-pressed="false">文字输入</button></div>
 <section id="keyboardPanel" hidden><p id="privacy">默认仅替换草稿，不读取电视已有文本。可在电视连接弹窗授权本次读取普通文本。</p><textarea id="text" aria-label="发送到电视的文本" rows="5" disabled></textarea><div class="editActions"><button id="clear" disabled>清空</button><button id="confirm" disabled>确认文本</button></div><p>确认只保存文本；搜索、下载等操作请在电视上确认。</p></section>
 <section id="remotePanel"><p id="remoteStatus"></p><div id="remoteKeys"><div id="remoteDpad" role="group" aria-label="方向键"></div><div id="remoteBack" role="group" aria-label="返回"></div><h2>播放与功能</h2><div id="remoteExtras" role="group" aria-label="当前场景其他操作"></div><p>灰色按键在当前页面不可用，进入播放器后自动更新。</p><details open><summary>节目编号</summary><p id="digitStatus">返回首页后可按海报编号选番。</p><div id="remoteDigits" role="group" aria-label="数字键"></div></details></div></section>
+<details id="logPanel"><summary>问题反馈与日志</summary><p id="logStatus" role="status">在电视的「设置 → 存储与日志 → 错误日志」选择「手机导出」。</p><button id="loadLogs" disabled>获取电视日志</button><div id="logPreview" hidden><p>这是导出时的快照。常见敏感信息已遮盖，请检查后再提交公开 Issue。</p><textarea id="logText" aria-label="待提交的日志" rows="8" readonly spellcheck="false"></textarea><div class="editActions"><button id="copyLogs" disabled>复制日志</button><button id="downloadLogs" disabled>下载 .txt 文件</button></div></div><p>下载后可在 GitHub 反馈表单中添加附件；也可复制后粘贴。导出过期后请在电视重新生成。</p><a href="https://github.com/znbsf/KazumiTV/issues/new?template=1-bug.yml" target="_blank" rel="noopener noreferrer">打开 GitHub 问题反馈</a></details>
 <footer><button id="hapticToggle" type="button" aria-pressed="true">按键震动：开</button><p id="connectionPolicy">临时连接 · 闲置 10 分钟或电视应用进入后台后断开</p><p>电源、电视桌面与系统音量请使用实体遥控器</p></footer><script>
 let state=null, composing=false, busy=false, dirty=false, serial=0, uncertain=false, deferred=null, compositionTarget=null, compositionRevision=null, discardComposition=false, offline=false, selectionDirty=false, remoteMessage='', sending=false;
 const base=location.pathname.replace(/\/$/,''), box=document.getElementById('text'), status=document.getElementById('status'), clear=document.getElementById('clear'), confirm=document.getElementById('confirm');
@@ -437,6 +496,15 @@ function renderHaptics(){hapticButton.disabled=!hapticAvailable();hapticButton.t
 function pulse(){if(haptics&&hapticAvailable()&&document.visibilityState!=='hidden'){try{navigator.vibrate(12);}catch(_){}}}
 hapticButton.onclick=()=>{haptics=!haptics;try{localStorage.setItem('kazumi-haptics',haptics?'on':'off');}catch(_){}renderHaptics();if(haptics)pulse();};renderHaptics();
 const client=Date.now().toString(36)+Math.random().toString(36).slice(2);
+let loadedLog=null,logBusy=false,logMessage='',logRequest=null;
+const logBox=document.getElementById('logText');
+function logKey(){const id=state?.logExport?.id;return !offline&&typeof id==='string'&&/^[a-f0-9]{32}$/.test(id)?state.sessionId+':'+id:null;}
+function clearLogPreview(){loadedLog=null;logBox.value='';if(logRequest){logRequest.abort();logRequest=null;}logBusy=false;}
+function renderLogs(){const key=logKey();if(loadedLog&&loadedLog.key!==key){clearLogPreview();logMessage='';}document.getElementById('loadLogs').disabled=!key||logBusy;document.getElementById('copyLogs').disabled=!loadedLog;document.getElementById('downloadLogs').disabled=!loadedLog;document.getElementById('logPreview').hidden=!loadedLog;setText(document.getElementById('logStatus'),!key?'请在电视「错误日志」选择「手机导出」，生成后 5 分钟内可获取。':logBusy?'正在获取日志…':logMessage||(loadedLog?'日志已准备好，请检查后复制或下载。':'电视已准备好日志，点击获取。'));}
+async function loadLogs(){const key=logKey();if(!key||logBusy)return;const id=state.logExport.id;const filename=state.logExport.filename;logBusy=true;logMessage='';const controller=new AbortController();logRequest=controller;renderLogs();const timer=setTimeout(()=>controller.abort(),5000);try{const response=await fetch(base+'/logs/'+id,{headers:{'X-Kazumi-Client':browserId},signal:controller.signal,cache:'no-store'});if(!response.ok)throw Error();const text=await response.text();if(new TextEncoder().encode(text).length>524288)throw Error();if(logKey()!==key||document.visibilityState==='hidden'||logRequest!==controller)return;loadedLog={key,text,filename:/^kazumitv-log-[0-9TZ]+\.txt$/.test(filename)?filename:'kazumitv-log.txt'};logBox.value=text;logMessage='';}catch(_){if(logKey()===key&&logRequest===controller)logMessage='获取失败或导出已过期，请在电视重新生成后重试。';}finally{clearTimeout(timer);if(logRequest===controller){logBusy=false;logRequest=null;}renderLogs();}}
+async function copyLogs(){if(!loadedLog||loadedLog.key!==logKey())return;const text=loadedLog.text;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);}else{logBox.focus();logBox.select();if(!document.execCommand?.('copy'))throw Error();}logMessage='已复制，可粘贴到 GitHub。';}catch(_){logBox.focus();logBox.select();logMessage='浏览器未允许自动复制，请长按选中的日志复制，或下载文件。';}renderLogs();}
+function downloadLogs(){if(!loadedLog||loadedLog.key!==logKey())return;let url;try{url=URL.createObjectURL(new Blob([loadedLog.text],{type:'text/plain;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download=loadedLog.filename;document.body.appendChild(link);link.click();link.remove();logMessage='已请求下载，请在浏览器下载或文件列表中查看。';}catch(_){logMessage='此浏览器未能下载，请复制或长按日志文本。';}finally{if(url)setTimeout(()=>URL.revokeObjectURL(url),5000);renderLogs();}}
+document.getElementById('loadLogs').onclick=loadLogs;document.getElementById('copyLogs').onclick=copyLogs;document.getElementById('downloadLogs').onclick=downloadLogs;
 let browserId=client;try{const saved=localStorage.getItem('kazumi-remote-browser');if(saved&&/^[a-zA-Z0-9_-]{16,64}$/.test(saved))browserId=saved;else localStorage.setItem('kazumi-remote-browser',browserId);}catch(_){}
 function key(s){return s?.target ? (s.sessionId||'')+':'+s.generation+':'+s.target.id : (s?.sessionId||null);}
 function selection(){return {baseOffset:box.selectionDirection==='backward'?box.selectionEnd:box.selectionStart,extentOffset:box.selectionDirection==='backward'?box.selectionStart:box.selectionEnd};}
@@ -444,7 +512,7 @@ function sameSelection(a,b){return a?.baseOffset===b?.baseOffset&&a?.extentOffse
 function canRead(s){return !!s?.readTextAllowed&&!s.target?.writeOnly;}
 async function request(url,options={}){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),5000);try{const response=await fetch(url,{...options,headers:{...options.headers,'X-Kazumi-Client':browserId},signal:controller.signal});const data=await response.json();return {ok:response.ok,status:response.status,json:async()=>data};}finally{clearTimeout(timer);}}
 function setText(element,text){if(element.textContent!==text)element.textContent=text;}
-function render(){const expiry=state?.pairingExpiresAt;setText(document.getElementById('connectionPolicy'),expiry?'配对有效至 '+new Date(expiry).toLocaleString()+' · 可收藏本页；电视应用回到前台后自动重连':'临时连接 · 闲置 10 分钟或电视应用进入后台后断开');const t=state?.target;box.disabled=!t||offline;clear.disabled=!t||offline||sending||composing;confirm.disabled=!t||offline||sending||composing||uncertain;if(t)box.maxLength=t.maxLength;setText(status,offline?'连接已断开或网络不可达，请等待重连或在电视上重新开启':uncertain?'电视内容已变化或上次发送未确认，请检查后重新输入或清空':t?'正在编辑：'+t.label:'已连接 · 可遥控电视，或打开输入框输入文字');setText(document.getElementById('privacy'),t?.writeOnly?'凭据只写：可粘贴新内容；电视已有内容始终不回读。确认后请在电视验证并保存。':canRead(state)?'本次已允许读取普通文本，可编辑原文与选择区；断开即撤销。':'仅替换草稿，不读取电视已有文本。可在电视连接弹窗授权本次读取。');const remote=state?.remote;setText(document.getElementById('remoteStatus'),remoteMessage||('当前场景：'+(remote?.context||'无可用操作')));renderRemote(remote);}
+function render(){const expiry=state?.pairingExpiresAt;setText(document.getElementById('connectionPolicy'),expiry?'配对有效至 '+new Date(expiry).toLocaleString()+' · 可收藏本页；电视应用回到前台后自动重连':'临时连接 · 闲置 10 分钟或电视应用进入后台后断开');const t=state?.target;box.disabled=!t||offline;clear.disabled=!t||offline||sending||composing;confirm.disabled=!t||offline||sending||composing||uncertain;if(t)box.maxLength=t.maxLength;setText(status,offline?'连接已断开或网络不可达，请等待重连或在电视上重新开启':uncertain?'电视内容已变化或上次发送未确认，请检查后重新输入或清空':t?'正在编辑：'+t.label:'已连接 · 可遥控电视，或打开输入框输入文字');setText(document.getElementById('privacy'),t?.writeOnly?'凭据只写：可粘贴新内容；电视已有内容始终不回读。确认后请在电视验证并保存。':canRead(state)?'本次已允许读取普通文本，可编辑原文与选择区；断开即撤销。':'仅替换草稿，不读取电视已有文本。可在电视连接弹窗授权本次读取。');const remote=state?.remote;setText(document.getElementById('remoteStatus'),remoteMessage||('当前场景：'+(remote?.context||'无可用操作')));renderRemote(remote);renderLogs();}
 const remoteButtons=new Map();
 const fixedExtras=[['playPause','播放 / 暂停'],['play','播放'],['pause','暂停'],['stop','停止'],['rewind','快退'],['fastForward','快进'],['previous','上一集'],['next','下一集'],['guide','选集'],['menu','Menu 菜单'],['info','Info 信息'],['red','红键'],['green','绿键'],['yellow','黄键'],['blue','蓝键']];
 function applyTheme(theme){if(!theme)return;const root=document.documentElement;for(const name of ['background','surface','onSurface','muted','primary','onPrimary','secondary','onSecondary','outline']){const value=theme[name];if(typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value))root.style.setProperty('--'+name,value);}if(['light','dark'].includes(theme.brightness))root.style.colorScheme=theme.brightness;}
@@ -465,6 +533,6 @@ clear.onclick=()=>{if(busy||composing)return;box.value='';dirty=true;send('clear
 confirm.onclick=async()=>{if(busy||composing||uncertain||!state?.target)return;const target=key(state);if(dirty&&!(await send('input')))return;if(selectionDirty&&!(await send('selection')))return;if(!dirty&&!uncertain&&key(state)===target)await send('confirm');};
 function showMode(keyboard){document.getElementById('keyboardPanel').hidden=!keyboard;document.getElementById('remotePanel').hidden=keyboard;document.getElementById('keyboardMode').setAttribute('aria-pressed',String(keyboard));document.getElementById('remoteMode').setAttribute('aria-pressed',String(!keyboard));}
 document.getElementById('keyboardMode').onclick=()=>showMode(true);document.getElementById('remoteMode').onclick=()=>showMode(false);
-document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState!=='hidden'){nextPollAt=0;poll();}});
+document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState!=='hidden'){nextPollAt=0;poll();}else{clearLogPreview();renderLogs();}});
 setInterval(()=>{if(document.visibilityState==='hidden'||Date.now()<nextPollAt)return;if(dirty&&!busy&&!composing&&!uncertain)send('input');else if(selectionDirty&&!busy&&!composing&&!uncertain)send('selection');else poll();},800);poll();
 </script></body></html>''';
