@@ -84,6 +84,9 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
   bool _homeReadyReported = false;
   bool _homeReadyFrameScheduled = false;
   final _spotlight = ValueNotifier<BangumiItem?>(null);
+  final _summaryCacheRevision = ValueNotifier<int>(0);
+  static final _summaryHtmlPattern = RegExp(r'<[^>]*>');
+  static final _summaryWhitespacePattern = RegExp(r'\s+');
   Timer? _summaryTimer;
   int _summaryRevision = 0;
   final _summaryCache = <int, String>{};
@@ -207,6 +210,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
     ++_summaryRevision;
     _summaryTimer?.cancel();
     _spotlight.dispose();
+    _summaryCacheRevision.dispose();
     _historySubscription?.cancel();
     for (final node in _channelFocusNodes.values) {
       node.dispose();
@@ -260,7 +264,7 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         _summaryCache[item.id] = details.summary;
         if (_summaryCache.length > 64)
           _summaryCache.remove(_summaryCache.keys.first);
-        setState(() {});
+        _summaryCacheRevision.value++;
       }
     });
   }
@@ -1299,9 +1303,10 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
         child: Observer(
           builder: (_) {
             final items = _visibleBangumiList;
-            return ValueListenableBuilder<BangumiItem?>(
-              valueListenable: _spotlight,
-              builder: (context, selected, _) {
+            return ListenableBuilder(
+              listenable: Listenable.merge([_spotlight, _summaryCacheRevision]),
+              builder: (context, _) {
+                final selected = _spotlight.value;
                 final item =
                     selected != null && items.any((v) => v.id == selected.id)
                         ? selected
@@ -1309,8 +1314,8 @@ class _PopularPageState extends State<PopularPage> with KazumiDialogOwner {
                 final summary = (item?.summary.isNotEmpty == true
                         ? item!.summary
                         : _summaryCache[item?.id] ?? '')
-                    .replaceAll(RegExp(r'<[^>]*>'), '')
-                    .replaceAll(RegExp(r'\s+'), ' ');
+                    .replaceAll(_summaryHtmlPattern, '')
+                    .replaceAll(_summaryWhitespacePattern, ' ');
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

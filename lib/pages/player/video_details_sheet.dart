@@ -90,6 +90,7 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
   int _lastLogCount = 0;
   PlayerDiagnosticsSnapshot? _diagnostics;
   bool _loadingDiagnostics = false;
+  bool _logViewerAttached = false;
 
   PlayerController get playerController => widget.playerController;
 
@@ -103,6 +104,7 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
       initialIndex: requestedTab < tabCount ? requestedTab : 0,
       vsync: this,
     );
+    _syncLogViewer();
     _tabController.addListener(_handleTabChanged);
     if (TvMode.enabled &&
         _tabController.index == VideoDetailsTab.status.index) {
@@ -111,7 +113,20 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
   }
 
   @override
+  void didUpdateWidget(covariant VideoDetailsSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playerController != playerController) {
+      if (_logViewerAttached) {
+        oldWidget.playerController.debug.detachLogViewer();
+        _logViewerAttached = false;
+      }
+      _syncLogViewer();
+    }
+  }
+
+  @override
   void dispose() {
+    if (_logViewerAttached) playerController.debug.detachLogViewer();
     _tabController.dispose();
     _logScrollController.dispose();
     super.dispose();
@@ -119,6 +134,7 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
 
   void _handleTabChanged() {
     if (mounted) {
+      _syncLogViewer();
       setState(() {});
       if (TvMode.enabled &&
           _tabController.index == VideoDetailsTab.status.index &&
@@ -126,6 +142,17 @@ class _VideoDetailsSheetState extends State<VideoDetailsSheet>
           !_loadingDiagnostics) {
         unawaited(_refreshDiagnostics());
       }
+    }
+  }
+
+  void _syncLogViewer() {
+    final shouldAttach = _tabController.index == VideoDetailsTab.logs.index;
+    if (_logViewerAttached == shouldAttach) return;
+    _logViewerAttached = shouldAttach;
+    if (shouldAttach) {
+      playerController.debug.attachLogViewer();
+    } else {
+      playerController.debug.detachLogViewer();
     }
   }
 

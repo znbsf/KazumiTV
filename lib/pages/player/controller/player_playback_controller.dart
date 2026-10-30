@@ -439,7 +439,7 @@ abstract class _PlayerPlaybackController with Store {
     cachePolicy.startWatching();
 
     try {
-      debug.playerLog.clear();
+      debug.clearLogs();
       await debug.setup(
         player,
         isCurrentPlayer: isCurrentPlayer,

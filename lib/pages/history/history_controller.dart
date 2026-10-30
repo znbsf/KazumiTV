@@ -17,8 +17,10 @@ abstract class _HistoryController with Store {
 
   void init() {
     final temp = _historyRepository.getAllHistories();
-    histories.clear();
-    histories.addAll(temp);
+    runInAction(() {
+      histories.clear();
+      histories.addAll(temp);
+    });
   }
 
   Future<void> updateHistory(
@@ -31,7 +33,23 @@ abstract class _HistoryController with Store {
       progress: progress,
       duration: duration,
     );
-    init();
+    // Read back the persisted value (including near-end normalization), not
+    // the requested progress. A private-mode/invalid write may save nothing.
+    final saved = _historyRepository.getHistory(
+      identity.pluginName,
+      identity.bangumiItem,
+      entryKind: identity.entryKind,
+    );
+    if (saved == null) return;
+    runInAction(() {
+      // Hive can mutate the same History instance already in the list.
+      // Remove/insert also notifies observers when only its progress changed.
+      histories.removeWhere((entry) => entry.key == saved.key);
+      final index = histories.indexWhere(
+        (entry) => entry.lastWatchTime.isBefore(saved.lastWatchTime),
+      );
+      histories.insert(index < 0 ? histories.length : index, saved);
+    });
   }
 
   Progress? lastWatching(
@@ -71,6 +89,6 @@ abstract class _HistoryController with Store {
 
   Future<void> clearAll() async {
     await _historyRepository.clearAllHistories();
-    histories.clear();
+    runInAction(histories.clear);
   }
 }

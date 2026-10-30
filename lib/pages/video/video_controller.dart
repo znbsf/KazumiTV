@@ -1,4 +1,3 @@
-import 'package:kazumi/services/platform/tv_mode.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:kazumi/services/video_source/resolved_source_cache.dart';
@@ -749,10 +748,8 @@ abstract class _VideoPageController with Store implements Disposable {
       coverUrl: bangumiItem.images['large'],
       bangumiName:
           bangumiItem.nameCn.isNotEmpty ? bangumiItem.nameCn : bangumiItem.name,
-      onHistoryProgress: TvMode.enabled
-          ? (position, duration) => historyController
-              .updateHistory(historyIdentity, position, duration: duration)
-          : null,
+      onHistoryProgress: (position, duration) => historyController
+          .updateHistory(historyIdentity, position, duration: duration),
       onPlaybackError: (message) =>
           _handlePlaybackFailure(message, session, playerController),
     );
@@ -902,15 +899,12 @@ abstract class _VideoPageController with Store implements Disposable {
         bangumiName: bangumiItem.nameCn.isNotEmpty
             ? bangumiItem.nameCn
             : bangumiItem.name,
-        onHistoryProgress: TvMode.enabled
-            ? (position, duration) async {
-                if (!_switchingSource && historyAccepted) {
-                  await historyController.updateHistory(
-                      historyIdentity, position,
-                      duration: duration);
-                }
-              }
-            : null,
+        onHistoryProgress: (position, duration) async {
+          if (!_switchingSource && historyAccepted) {
+            await historyController.updateHistory(historyIdentity, position,
+                duration: duration);
+          }
+        },
         onPlaybackError: (message) {
           if (session.isActive) _resolvedSourceCache.invalidate(cacheKey);
           _handlePlaybackFailure(message, session, playerController);

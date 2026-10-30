@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_service_mpris/audio_service_mpris.dart';
@@ -211,7 +212,8 @@ class AudioController {
       (duration ?? Duration.zero).inMilliseconds.toString(),
     ].join('|');
 
-    if (_lastMediaItemCacheKey != mediaItemCacheKey) {
+    final mediaItemChanged = _lastMediaItemCacheKey != mediaItemCacheKey;
+    if (mediaItemChanged) {
       _lastMediaItemCacheKey = mediaItemCacheKey;
       handler.publishMediaItem(
         MediaItem(
@@ -257,23 +259,60 @@ class AudioController {
             ? duration
             : bufferedPosition;
 
-    handler.updatePlaybackState(
-      PlaybackState(
-        controls: controls,
-        androidCompactActionIndices: compactActionIndices,
-        systemActions: duration == null || duration == Duration.zero
-            ? const {}
-            : const {
-                MediaAction.seek,
-              },
-        processingState: processingState,
-        playing: playing,
-        updatePosition: normalizedPosition,
-        bufferedPosition: normalizedBufferedPosition,
-        speed: speed,
-        queueIndex: queueIndex,
-      ),
+    // The platform session extrapolates position from updatePosition and
+    // speed, so the per-second player tick only needs to cross the platform
+    // channel when a control changes or the position jumps (seek, stall).
+    final seekable = duration != null && duration != Duration.zero;
+    final next = PlaybackState(
+      controls: controls,
+      androidCompactActionIndices: compactActionIndices,
+      systemActions: seekable ? const {MediaAction.seek} : const {},
+      processingState: processingState,
+      playing: playing,
+      updatePosition: normalizedPosition,
+      bufferedPosition: normalizedBufferedPosition,
+      speed: speed,
+      queueIndex: queueIndex,
     );
+    if (mediaItemChanged ||
+        shouldPublishPlaybackState(handler.playbackState.value, next)) {
+      handler.updatePlaybackState(next);
+    }
+  }
+
+  static const _positionDriftTolerance = Duration(milliseconds: 1500);
+  static const _bufferedPositionTolerance = Duration(seconds: 10);
+
+  @visibleForTesting
+  static bool shouldPublishPlaybackState(
+    PlaybackState published,
+    PlaybackState next,
+  ) {
+    if (published.processingState != next.processingState ||
+        published.playing != next.playing ||
+        published.speed != next.speed ||
+        published.queueIndex != next.queueIndex ||
+        published.systemActions.contains(MediaAction.seek) !=
+            next.systemActions.contains(MediaAction.seek) ||
+        !_sameControls(published.controls, next.controls)) {
+      return true;
+    }
+    // A paused/buffering session does not extrapolate: even a short seek must
+    // reach the platform. Buffer progress also must not stay stale forever.
+    final drift = (published.position - next.updatePosition).abs();
+    return (next.playing && next.processingState == AudioProcessingState.ready
+            ? drift >= _positionDriftTolerance
+            : drift != Duration.zero) ||
+        (published.bufferedPosition - next.bufferedPosition).abs() >=
+            _bufferedPositionTolerance;
+  }
+
+  static bool _sameControls(List<MediaControl> a, List<MediaControl> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].action != b[i].action) return false;
+    }
+    return true;
   }
 
   void _resetArtwork() {
