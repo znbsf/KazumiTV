@@ -1,4 +1,3 @@
-import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -17,10 +16,13 @@ import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:kazumi/modules/search/image_search_module.dart';
 import 'package:kazumi/pages/search/search_controller.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/widget/tv_focus_label.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 
 part 'image_search_widgets.dart';
 

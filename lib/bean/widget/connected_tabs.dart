@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 
 // Material 3 connected-button small tokens.
 
@@ -118,7 +119,29 @@ class _ConnectedSegmentState extends State<_ConnectedSegment> {
             child: child,
           );
         },
-        child: InkWell(
+        child: TvInkWell(
+          borderRadius: BorderRadiusDirectional.only(
+            topStart: widget.isLeading
+                ? outerRadius
+                : Radius.circular(_pressed ? _connectedPressedInnerCorner :
+                    _connectedInnerCorner +
+                        (outerCorner - _connectedInnerCorner) * selection),
+            bottomStart: widget.isLeading
+                ? outerRadius
+                : Radius.circular(_pressed ? _connectedPressedInnerCorner :
+                    _connectedInnerCorner +
+                        (outerCorner - _connectedInnerCorner) * selection),
+            topEnd: widget.isTrailing
+                ? outerRadius
+                : Radius.circular(_pressed ? _connectedPressedInnerCorner :
+                    _connectedInnerCorner +
+                        (outerCorner - _connectedInnerCorner) * selection),
+            bottomEnd: widget.isTrailing
+                ? outerRadius
+                : Radius.circular(_pressed ? _connectedPressedInnerCorner :
+                    _connectedInnerCorner +
+                        (outerCorner - _connectedInnerCorner) * selection),
+          ),
           onTap: widget.onTap,
           onHighlightChanged: (value) => setState(() => _pressed = value),
           child: Center(

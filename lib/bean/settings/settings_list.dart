@@ -5,6 +5,7 @@ import 'package:kazumi/bean/widget/tv_slider_navigation.dart';
 
 import 'package:kazumi/bean/widget/content_section.dart';
 import 'package:kazumi/bean/widget/split_list_row.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 
 enum _TileKind { plain, toggle, radio }
 
@@ -437,7 +438,8 @@ class SettingsTile<T> extends StatelessWidget {
     final tvRadioScope = _TvSettingsRadioScope.maybeOf<T>(context);
 
     return TvSettingsTileReveal(
-        child: InkWell(
+        child: TvInkWell(
+      borderRadius: BorderRadius.circular(4),
       onTap: _tapHandler(context),
       onHighlightChanged: SplitListRow.pressReporterOf(context),
       child: Padding(

@@ -1,4 +1,3 @@
-import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
@@ -284,14 +284,26 @@ void main() {
         matching: find.byIcon(Icons.play_circle_outline_rounded))));
     all.requestFocus();
     await tester.pumpAndSettle();
+    final allIcon = find.descendant(
+        of: find.byKey(const ValueKey('collect-filter-all')),
+        matching: find.byIcon(Icons.video_library_outlined));
+    final colors = Theme.of(tester.element(allIcon)).colorScheme;
+    expect(tester.widget<Icon>(allIcon).color, colors.onPrimary);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pumpAndSettle();
     expect(watching.hasPrimaryFocus, isTrue);
+    // Focus does not select a filter: Watching is still the selected category.
+    expect(tester.widget<Icon>(allIcon).color, colors.onSurfaceVariant);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
     await tester.pumpAndSettle();
     expect(all.hasPrimaryFocus, isTrue);
+    final watchingIcon = find.descendant(
+        of: find.byKey(const ValueKey('collect-filter-1')),
+        matching: find.byIcon(Icons.play_circle_outline_rounded));
+    expect(tester.widget<Icon>(allIcon).color, colors.onPrimary);
+    expect(tester.widget<Icon>(watchingIcon).color, colors.onPrimaryContainer);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pumpAndSettle();
     expect(search.focusNode!.hasPrimaryFocus, isTrue);

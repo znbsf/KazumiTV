@@ -116,6 +116,25 @@ class _CollectLibraryCard extends StatelessWidget {
               ],
             ),
           ),
+          if (TvMode.enabled && focusNode != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: focusNode!,
+                  builder: (context, _) => DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: focusNode!.hasFocus
+                            ? colors.primary
+                            : Colors.transparent,
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

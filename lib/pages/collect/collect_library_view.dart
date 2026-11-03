@@ -1,4 +1,3 @@
-import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
+import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/collect/collect_module.dart';
 import 'package:kazumi/modules/collect/collect_type.dart';
@@ -13,6 +13,7 @@ import 'package:kazumi/pages/collect/collect_library_query.dart';
 import 'package:kazumi/pages/menu/route_visibility.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/widget/tv_focus_label.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 
 part 'collect_library_card.dart';
 
@@ -653,50 +654,55 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(selected ? 20 : 12),
           clipBehavior: Clip.antiAlias,
-          child: InkWell(
+          child: TvInkWell(
+            borderRadius: BorderRadius.circular(selected ? 20 : 12),
+            focusBackground: true,
             key: ValueKey('collect-filter-${type?.value ?? 'all'}'),
             focusNode: TvMode.enabled ? _categoryFocus[type] : null,
             onTap: () => _selectType(type),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: wide ? 56 : 48),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  mainAxisSize: wide ? MainAxisSize.max : MainAxisSize.min,
-                  children: [
-                    Icon(
-                      switch (type) {
-                        CollectType.watching =>
-                          Icons.play_circle_outline_rounded,
-                        CollectType.planToWatch =>
-                          Icons.bookmark_border_rounded,
-                        CollectType.onHold =>
-                          Icons.pause_circle_outline_rounded,
-                        CollectType.watched => Icons.task_alt_rounded,
-                        CollectType.abandoned =>
-                          Icons.remove_circle_outline_rounded,
-                        _ => Icons.video_library_outlined,
-                      },
-                      size: 20,
-                      color: foreground,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(label,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                            color: foreground,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500)),
-                    if (wide) const Spacer() else const SizedBox(width: 10),
-                    Text('$count',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: foreground,
-                          fontWeight: FontWeight.w700,
-                        )),
-                  ],
+            builder: (context, focused) {
+              final focusForeground = focused ? colors.onPrimary : foreground;
+              return ConstrainedBox(
+                constraints: BoxConstraints(minHeight: wide ? 56 : 48),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisSize: wide ? MainAxisSize.max : MainAxisSize.min,
+                    children: [
+                      Icon(
+                        switch (type) {
+                          CollectType.watching =>
+                            Icons.play_circle_outline_rounded,
+                          CollectType.planToWatch =>
+                            Icons.bookmark_border_rounded,
+                          CollectType.onHold =>
+                            Icons.pause_circle_outline_rounded,
+                          CollectType.watched => Icons.task_alt_rounded,
+                          CollectType.abandoned =>
+                            Icons.remove_circle_outline_rounded,
+                          _ => Icons.video_library_outlined,
+                        },
+                        size: 20,
+                        color: focusForeground,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(label,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                              color: focusForeground,
+                              fontWeight:
+                                  selected ? FontWeight.w700 : FontWeight.w500)),
+                      if (wide) const Spacer() else const SizedBox(width: 10),
+                      Text('$count',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: focusForeground,
+                            fontWeight: FontWeight.w700,
+                          )),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

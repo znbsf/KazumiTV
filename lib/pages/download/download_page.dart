@@ -235,7 +235,13 @@ class _DownloadPageState extends State<DownloadPage> {
             message: '播放',
             child: IconButton(
               icon: Icon(Icons.play_circle_outline,
-                  size: 20, color: colorScheme.primary),
+                  size: 20, color: TvMode.enabled ? null : colorScheme.primary),
+              style: TvMode.enabled
+                  ? ButtonStyle(foregroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.focused)
+                          ? colorScheme.onPrimary
+                          : colorScheme.primary))
+                  : null,
               onPressed: () => _playEpisode(record, episode),
               tooltip: '播放',
               visualDensity: VisualDensity.compact,

@@ -10,6 +10,13 @@ import 'bbcode_elements.dart';
 import 'generated/BBCodeParser.dart';
 import 'generated/BBCodeLexer.dart';
 
+class BBCodeAction {
+  const BBCodeAction({required this.label, required this.onSelected});
+
+  final String label;
+  final Future<void> Function() onSelected;
+}
+
 class BBCodeWidget extends StatefulWidget {
   const BBCodeWidget({
     super.key,
@@ -21,11 +28,55 @@ class BBCodeWidget extends StatefulWidget {
   final TextScaler textScaler;
 
   @override
-  State<StatefulWidget> createState() => _BBCodeWidgetState();
+  BBCodeWidgetState createState() => BBCodeWidgetState();
 }
 
-class _BBCodeWidgetState extends State<BBCodeWidget> {
+class BBCodeWidgetState extends State<BBCodeWidget> {
   bool _isVisible = false;
+  List<dynamic> _elements = [];
+
+  List<String> get _imageUrls =>
+      _elements.whereType<BBCodeImg>().map((e) => e.imageUrl).toList();
+
+  /// The same parsed fragments and reveal state used by pointer interaction.
+  List<BBCodeAction> get tvActions {
+    final actions = <BBCodeAction>[];
+    final links = <String>{};
+    for (final text in _elements.whereType<BBCodeText>()) {
+      final link = text.link;
+      if (link != null && (!text.masked || _isVisible) && links.add(link)) {
+        actions.add(BBCodeAction(
+          label: '打开链接 $link',
+          onSelected: () async {
+            await launchUrl(Uri.parse(link));
+          },
+        ));
+      }
+    }
+    if (_elements.whereType<BBCodeText>().any((text) => text.masked)) {
+      actions.add(BBCodeAction(
+        label: _isVisible ? '隐藏遮罩' : '显示遮罩',
+        onSelected: () async {
+          if (mounted) setState(() => _isVisible = !_isVisible);
+        },
+      ));
+    }
+    final images = _imageUrls;
+    for (var index = 0; index < images.length; index++) {
+      final imageIndex = index;
+      actions.add(BBCodeAction(
+        label: '查看图片 ${index + 1}',
+        onSelected: () async {
+          if (!mounted) return;
+          await ImageViewer.show(context,
+              imageUrls: images,
+              initialIndex: imageIndex,
+              heroTag: ImageViewer.heroTagFor(images[imageIndex], imageIndex));
+        },
+      ));
+    }
+    return actions;
+  }
 
   Color? _parseColor(String hex) {
     if (hex.startsWith('#')) {
@@ -64,6 +115,7 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
     final bbcodeBaseListener = BBCodeBaseListener();
     ParseTreeWalker.DEFAULT.walk(bbcodeBaseListener, tree);
     bbCodeTag.clear();
+    _elements = bbcodeBaseListener.bbcode;
 
     final imageUrls = bbcodeBaseListener.bbcode
         .whereType<BBCodeImg>()

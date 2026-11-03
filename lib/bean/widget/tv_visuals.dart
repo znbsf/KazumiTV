@@ -23,7 +23,7 @@ abstract final class TvVisuals {
     fontWeight: FontWeight.w500,
   );
   static const body = TextStyle(fontSize: 15, height: 21 / 15);
-  static const caption = TextStyle(fontSize: 13, height: 18 / 13);
+  static const caption = TextStyle(fontSize: 14, height: 18 / 14);
   static const control = TextStyle(
     fontSize: 14,
     height: 20 / 14,
@@ -36,15 +36,17 @@ abstract final class TvVisuals {
         backgroundColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.disabled)) return null;
           if (states.contains(WidgetState.focused)) return colors.primary;
-          if (states.contains(WidgetState.selected))
+          if (states.contains(WidgetState.selected)) {
             return colors.secondaryContainer;
+          }
           return null;
         }),
         foregroundColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.disabled)) return null;
           if (states.contains(WidgetState.focused)) return colors.onPrimary;
-          if (states.contains(WidgetState.selected))
+          if (states.contains(WidgetState.selected)) {
             return colors.onSecondaryContainer;
+          }
           return null;
         }),
         side: WidgetStateProperty.resolveWith((states) {

@@ -262,11 +262,33 @@ class _BestMatch extends StatelessWidget {
           if (video != null)
             OutlinedButton.icon(
               onPressed: () => onPreview(video),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: colors.onSurface,
-                side: BorderSide(color: colors.onSurface.withValues(alpha: .5)),
-                minimumSize: const Size(0, 48),
-              ),
+              style: TvMode.enabled
+                  ? TvVisuals.focusButtonStyle(colors).copyWith(
+                      foregroundColor: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.focused)
+                            ? colors.onPrimary
+                            : colors.onSurface,
+                      ),
+                      side: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.focused)
+                            ? BorderSide(color: colors.onSurface, width: 3)
+                            : BorderSide(
+                                color: colors.onSurface.withValues(alpha: .5)),
+                      ),
+                    ).merge(
+                      OutlinedButton.styleFrom(
+                        foregroundColor: colors.onSurface,
+                        side: BorderSide(
+                            color: colors.onSurface.withValues(alpha: .5)),
+                        minimumSize: const Size(0, 48),
+                      ),
+                    )
+                  : OutlinedButton.styleFrom(
+                      foregroundColor: colors.onSurface,
+                      side: BorderSide(
+                          color: colors.onSurface.withValues(alpha: .5)),
+                      minimumSize: const Size(0, 48),
+                    ),
               icon: const Icon(Icons.play_arrow_rounded, size: 20),
               label: const Text('预览片段'),
             ),
@@ -355,7 +377,11 @@ class _OtherMatch extends StatelessWidget {
           top: Radius.circular(first ? 20 : 8),
           bottom: Radius.circular(last ? 20 : 8)),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: TvInkWell(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(first ? 20 : 8),
+          bottom: Radius.circular(last ? 20 : 8),
+        ),
         onTap: () => onSelect(_title(result)),
         child: Semantics(
           button: true,

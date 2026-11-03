@@ -11,6 +11,7 @@ import 'package:kazumi/bean/card/bangumi_card.dart';
 import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/pages/popular/popular_page.dart';
@@ -167,6 +168,45 @@ void main() {
     tvArtworkController.select(null);
     TvMode.setEnabledForTesting(false);
   });
+
+  for (final viewport in [const Size(960, 540), const Size(1280, 720)]) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets('TV navigation captions fit at $viewport text $scale',
+          (tester) async {
+        await _mount(tester, viewport: viewport, textScale: scale);
+        for (final label in ['设置', '手机遥控', '搜索', '排期', '历史', '收藏']) {
+          final text = find.descendant(
+              of: find.byType(TvFocusableSurface), matching: find.text(label));
+          expect(text, findsOneWidget);
+          expect(tester.widget<Text>(text).style?.fontSize, 14);
+          final rect = tester.getRect(text);
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.top, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(viewport.width));
+          expect(rect.bottom, lessThanOrEqualTo(viewport.height));
+          final surface = find.ancestor(
+              of: text, matching: find.byType(TvFocusableSurface));
+          tester.widget<TvFocusableSurface>(surface).focusNode!.requestFocus();
+          await tester.pumpAndSettle();
+          final fullName = find.byWidgetPredicate((w) =>
+              w is Text && w.data == label &&
+              w.style?.height == TvVisuals.control.height);
+          expect(fullName, findsOneWidget);
+          expect(tester.widget<Text>(fullName).style?.fontSize, 14);
+          expect(find.ancestor(of: fullName, matching: find.byType(FittedBox)),
+              findsNothing);
+          final fullRect = tester.getRect(fullName);
+          expect(fullRect.left, greaterThanOrEqualTo(0));
+          expect(fullRect.top, greaterThanOrEqualTo(0));
+          expect(fullRect.right, lessThanOrEqualTo(viewport.width));
+          expect(fullRect.bottom, lessThanOrEqualTo(viewport.height));
+          expect(tester.getRect(text), rect);
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
 
   testWidgets(
       'recent history is cached across focus and deferred while home is covered',

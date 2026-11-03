@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/card/rule_card.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/utils/format.dart';
 
@@ -80,7 +81,8 @@ class DownloadRecordSliver extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      InkWell(
+                      TvInkWell(
+                        borderRadius: BorderRadius.circular(16),
                         focusNode: headerFocus,
                         onTap: onToggle,
                         child: Padding(
@@ -232,8 +234,9 @@ class DownloadEpisodeTile extends StatelessWidget {
         (episode.status == DownloadStatus.paused &&
             episode.progressPercent > 0);
 
-    return InkWell(
+    return TvInkWell(
       borderRadius: BorderRadius.circular(12),
+      mobileBorderRadius: BorderRadius.circular(12),
       onTap: onPlay,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
