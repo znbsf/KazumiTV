@@ -644,7 +644,7 @@ class _VideoPageState extends State<VideoPage>
   Widget get sideTabBody {
     final size = MediaQuery.sizeOf(context);
     final sideWidth = TvMode.enabled
-        ? (size.width * 0.42).clamp(360.0, 440.0).toDouble()
+        ? tvPlayerSidePanelWidth(size.width)
         : (!isDesktop() && !isTablet())
             ? size.height
             : (size.width / 3 > 420 ? 420.0 : size.width / 3);

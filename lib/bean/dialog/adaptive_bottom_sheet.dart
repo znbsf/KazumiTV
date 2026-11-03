@@ -4,7 +4,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 
+import 'package:kazumi/bean/dialog/tv_panel_page_host.dart';
+import 'package:kazumi/bean/widget/tv_player_side_panel.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/utils/device.dart';
 
 BoxConstraints _adaptiveBottomSheetConstraints(
@@ -38,6 +42,53 @@ Future<T?> showAdaptiveBottomSheet<T>({
   double compactLandscapeMaxHeightFactor = 0.9,
   bool useRootNavigator = false,
 }) {
+  if (TvMode.enabled) {
+    return showGeneralDialog<T>(
+      context: context,
+      useRootNavigator: useRootNavigator,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      requestFocus: true,
+      transitionDuration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 250),
+      transitionBuilder: (context, animation, secondaryAnimation, child) =>
+          Align(
+        alignment: Alignment.centerRight,
+        child: SlideTransition(
+          position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(
+            animation.drive(CurveTween(curve: Curves.easeOutCubic)),
+          ),
+          child: child,
+        ),
+      ),
+      pageBuilder: (context, animation, secondaryAnimation) => SizedBox(
+        width: tvPlayerSidePanelWidth(MediaQuery.sizeOf(context).width),
+        height: MediaQuery.sizeOf(context).height,
+        child: TvPlayerSidePanel(
+          opacity: 1,
+          child: Material(
+            type: MaterialType.transparency,
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                scaffoldBackgroundColor: Colors.transparent,
+              ),
+              child: SafeArea(
+                child: CallbackShortcuts(
+                  bindings: {
+                    const SingleActivator(LogicalKeyboardKey.escape): () =>
+                        Navigator.of(context).maybePop(),
+                  },
+                  child: TvPanelPageHost(builder: builder),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   return _showMaterialBottomSheet<T>(
     context: context,
     builder: builder,
