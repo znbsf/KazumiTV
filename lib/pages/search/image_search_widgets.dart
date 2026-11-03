@@ -118,7 +118,9 @@ class _ImageSearchResults extends StatelessWidget {
       required this.error,
       required this.onRetry,
       required this.onSelect,
+      this.firstResultFocus,
       required this.onPreview});
+  final FocusNode? firstResultFocus;
   final List<ResultItem> results;
   final bool searching;
   final String error;
@@ -172,6 +174,7 @@ class _ImageSearchResults extends StatelessWidget {
       ],
       const SizedBox(height: 20),
       _BestMatch(
+          focusNode: firstResultFocus,
           result: results.first, onSelect: onSelect, onPreview: onPreview),
       if (results.length > 1) ...[
         const SizedBox(height: 28),
@@ -219,7 +222,9 @@ class _ImageSearchLoadingState extends StatelessWidget {
 
 class _BestMatch extends StatelessWidget {
   const _BestMatch(
-      {required this.result, required this.onSelect, required this.onPreview});
+      {required this.result, required this.onSelect, required this.onPreview,
+      this.focusNode});
+  final FocusNode? focusNode;
   final ResultItem result;
   final ValueChanged<String> onSelect;
   final ValueChanged<Uri> onPreview;
@@ -248,6 +253,7 @@ class _BestMatch extends StatelessWidget {
         const SizedBox(height: 16),
         Wrap(spacing: 8, runSpacing: 8, children: [
           FilledButton.icon(
+            focusNode: focusNode,
             onPressed: () => onSelect(_title(result)),
             style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
             icon: const Icon(Icons.search_rounded, size: 20),

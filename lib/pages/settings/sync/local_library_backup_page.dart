@@ -6,6 +6,7 @@ import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/pages/settings/sync/sync_settings_widgets.dart';
 import 'package:kazumi/services/storage/local_library_backup.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 class LocalLibraryBackupPage extends StatefulWidget {
   const LocalLibraryBackupPage({super.key, this.service});
@@ -26,6 +27,17 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
   bool _failed = false;
   String? _message;
   int _generation = 0;
+  final _cancelFocus = FocusNode(debugLabel: 'backup preview cancel');
+  final _importFocus = FocusNode(debugLabel: 'backup import');
+  final Map<String, FocusNode> _fileFocus = {};
+  FocusNode? _previewEntry;
+
+  void _focusAfterFrame(FocusNode? node) {
+    if (!TvMode.enabled || node == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && node.canRequestFocus) node.requestFocus();
+    });
+  }
 
   @override
   void initState() {
@@ -37,6 +49,11 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
   void dispose() {
     _generation++;
     _reading?.cancel();
+    _cancelFocus.dispose();
+    _importFocus.dispose();
+    for (final node in _fileFocus.values) {
+      node.dispose();
+    }
     if (_preview != null) _service.cancelPreview(_preview!);
     _service.forgetUndo();
     super.dispose();
@@ -108,6 +125,7 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
       _failed = false;
       _message = '已取消恢复，收藏与历史未改动。';
     });
+    _focusAfterFrame(_previewEntry);
   }
 
   Future<void> _import() => _run('请选择备份文件…', () async {
@@ -146,6 +164,7 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
         }
         _preview = preview;
         _message = null;
+        _focusAfterFrame(_cancelFocus);
       });
 
   Future<void> _previewLocal(LocalLibraryBackupFile file) =>
@@ -160,6 +179,7 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
         }
         _preview = preview;
         _message = null;
+        _focusAfterFrame(_cancelFocus);
       });
 
   Future<void> _export() => _run('正在生成备份…', () async {
@@ -256,6 +276,7 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
                 icon: Icons.restore_rounded),
             StateActionButton.tonal(
                 onPressed: _busy ? null : _cancelPreview,
+                focusNode: TvMode.enabled ? _cancelFocus : null,
                 text: '取消恢复',
                 icon: Icons.close_rounded),
           ] else ...[
@@ -269,7 +290,13 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
                 text: '导出到文件',
                 icon: Icons.file_upload_rounded),
             StateActionButton.tonal(
-                onPressed: _busy ? null : _import,
+                focusNode: TvMode.enabled ? _importFocus : null,
+                onPressed: _busy
+                    ? null
+                    : () {
+                        _previewEntry = _importFocus;
+                        _import();
+                      },
                 text: '从文件恢复',
                 icon: Icons.file_download_rounded),
             if (_service.canUndo) ...[
@@ -283,7 +310,18 @@ class _LocalLibraryBackupPageState extends State<LocalLibraryBackupPage> {
             if (_files.isEmpty) const Text('暂无本地备份'),
             for (final file in _files)
               StateActionButton.tonal(
-                  onPressed: _busy ? null : () => _previewLocal(file),
+                  focusNode: TvMode.enabled
+                      ? _fileFocus.putIfAbsent(file.name,
+                          () => FocusNode(debugLabel: 'backup local entry'))
+                      : null,
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          if (TvMode.enabled) {
+                            _previewEntry = _fileFocus[file.name];
+                          }
+                          _previewLocal(file);
+                        },
                   text: '预览备份 · ${_date(file.createdAt)}',
                   icon: Icons.preview_rounded),
           ],

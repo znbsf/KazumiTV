@@ -32,10 +32,12 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
   late bool _notShowWatched = widget.initialNotShowWatched;
   late bool _notShowAbandoned = widget.initialNotShowAbandoned;
   final TextEditingController _tagController = TextEditingController();
+  final _tagFocus = FocusNode();
 
   @override
   void dispose() {
     _tagController.dispose();
+    _tagFocus.dispose();
     super.dispose();
   }
 
@@ -273,11 +275,19 @@ class _SearchFilterSheetState extends State<_SearchFilterSheet> {
                     // Separate scroll offsets from the expansion's boolean state.
                     key: const PageStorageKey('custom-tag-input'),
                     controller: _tagController,
+                    focusNode: TvMode.enabled ? _tagFocus : null,
                     textInputAction: TextInputAction.done,
                     decoration: _fieldDecoration('自定义标签').copyWith(
                         suffixIcon: IconButton(
                             tooltip: '添加标签',
-                            onPressed: () => _addTag(_tagController.text),
+                            onPressed: () {
+                              _addTag(_tagController.text);
+                              if (TvMode.enabled) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (mounted) _tagFocus.requestFocus();
+                                });
+                              }
+                            },
                             icon: const Icon(Icons.add_rounded))),
                     onSubmitted: _addTag,
                   )),

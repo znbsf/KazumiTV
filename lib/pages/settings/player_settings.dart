@@ -391,7 +391,7 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
                 description: Text('禁用播放器内的过渡动画'),
                 initialValue: playerDisableAnimations,
               ),
-              if (!isDesktop())
+              if (!isDesktop() && !TvMode.enabled)
                 SettingsTile.switchTile(
                   leading: Icons.swipe_vertical_rounded,
                   onToggle: (value) async {

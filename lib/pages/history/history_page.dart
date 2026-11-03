@@ -15,6 +15,7 @@ import 'package:kazumi/services/player/history_playback_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
 import 'package:kazumi/utils/device.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key, required this.controller});
@@ -120,20 +121,24 @@ class _HistoryPageState extends State<HistoryPage> {
                               : () => setState(() => _editing = false),
                           child: const Text('完成'),
                         )
-                      : IconButton.filledTonal(
-                          tooltip: '管理历史记录',
-                          onPressed: () => setState(() => _editing = true),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
+                      : TvFocusLabel(
+                          message: '管理历史记录',
+                          child: IconButton.filledTonal(
+                            tooltip: '管理历史记录',
+                            onPressed: () => setState(() => _editing = true),
+                            icon: const Icon(Icons.edit_outlined),
+                          )),
                 ),
                 if (_editing)
-                  IconButton(
-                    tooltip: '清空全部历史记录',
-                    onPressed: _clearing || _deleting.isNotEmpty
-                        ? null
-                        : _clearHistory,
-                    icon: const Icon(Icons.delete_sweep_outlined),
-                  ),
+                  TvFocusLabel(
+                      message: '清空全部历史记录',
+                      child: IconButton(
+                        tooltip: '清空全部历史记录',
+                        onPressed: _clearing || _deleting.isNotEmpty
+                            ? null
+                            : _clearHistory,
+                        icon: const Icon(Icons.delete_sweep_outlined),
+                      )),
               ],
             ],
           ),

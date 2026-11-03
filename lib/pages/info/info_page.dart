@@ -38,6 +38,7 @@ import 'package:kazumi/repositories/history_repository.dart';
 import 'package:kazumi/services/player/history_playback_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class InfoPage extends StatefulWidget {
   const InfoPage({
@@ -84,6 +85,7 @@ class _InfoPageState extends State<InfoPage>
   HealthRun? _recordedSourceRun;
   final _detailScrollController = ScrollController();
   final _tvPlayFocus = FocusNode(debugLabel: 'TV detail play');
+  final _tvHealthFocus = FocusNode(debugLabel: 'TV source health');
   final _tvBackFocus = FocusNode(debugLabel: 'TV detail back');
   final _tvTabsFocus = FocusNode(debugLabel: 'TV detail tabs');
 
@@ -136,7 +138,11 @@ class _InfoPageState extends State<InfoPage>
                 plugins: List.of(inject<PluginsController>().enabledPlugins),
               )),
     );
-    if (mounted) _tvPlayFocus.requestFocus();
+    if (TvMode.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _tvHealthFocus.requestFocus();
+      });
+    }
     return result;
   }
 
@@ -443,6 +449,7 @@ class _InfoPageState extends State<InfoPage>
     _recordedSourceRun?.cancel();
     _detailScrollController.dispose();
     _tvPlayFocus.dispose();
+    _tvHealthFocus.dispose();
     _tvBackFocus.dispose();
     _tvTabsFocus.dispose();
     infoTabController.removeListener(onInfoTabChanged);
@@ -541,16 +548,19 @@ class _InfoPageState extends State<InfoPage>
                       ),
                     ),
                   EmbeddedNativeControlArea(
-                    child: IconButton(
-                      onPressed: () {
-                        launchUrl(
-                          Uri.parse(
-                              'https://bangumi.tv/subject/${infoController.bangumiItem.id}'),
-                          mode: LaunchMode.externalApplication,
-                        );
-                      },
-                      icon: const Icon(Icons.open_in_browser_rounded),
-                    ),
+                    child: TvFocusLabel(
+                        message: '在浏览器打开',
+                        child: IconButton(
+                          tooltip: '在浏览器打开',
+                          onPressed: () {
+                            launchUrl(
+                              Uri.parse(
+                                  'https://bangumi.tv/subject/${infoController.bangumiItem.id}'),
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                          icon: const Icon(Icons.open_in_browser_rounded),
+                        )),
                   ),
                   if (!showWindowButton && isDesktop())
                     CloseButton(onPressed: () => windowManager.close()),
@@ -607,6 +617,7 @@ class _InfoPageState extends State<InfoPage>
                                   tvActions: TvMode.enabled
                                       ? TvDetailActions(
                                           playFocus: _tvPlayFocus,
+                                          sourceHealthFocus: _tvHealthFocus,
                                           onSourceHealth: () => _sourceHealth(),
                                           onPlay: _startWatching,
                                           onSelectSource: () => _startWatching(

@@ -66,6 +66,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   final _scrollController = ScrollController();
   final _display = <String, _SourceDisplay>{};
   final _headerKeys = <String, GlobalKey>{};
+  final _headerFocus = <String, FocusNode>{};
   bool _autoExpansionHandled = false;
 
   @override
@@ -92,6 +93,9 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
 
   @override
   void dispose() {
+    for (final node in _headerFocus.values) {
+      node.dispose();
+    }
     _scrollController.dispose();
     super.dispose();
   }
@@ -104,12 +108,26 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
   }
 
   void _collapseFromFooter(String name) {
+    _focusHeader(name);
     final headerContext = _headerKeys[name]?.currentContext;
     if (headerContext != null) {
       // Anchor before shrinking, while the header is still laid out.
       Scrollable.ensureVisible(headerContext, alignment: 0);
     }
     _setDisplay(name, _SourceDisplay.collapsed);
+  }
+
+  void _focusHeader(String name) {
+    if (TvMode.enabled) _headerFocus[name]?.requestFocus();
+  }
+
+  void _retry(String name) {
+    _sourceAction(name, widget.onRetry);
+  }
+
+  void _sourceAction(String name, ValueChanged<String> action) {
+    _focusHeader(name);
+    action(name);
   }
 
   Widget _animateSize(Widget child) => MediaQuery.disableAnimationsOf(context)
@@ -215,6 +233,12 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
                   child: Material(
                     type: MaterialType.transparency,
                     child: InkWell(
+                      focusNode: TvMode.enabled
+                          ? _headerFocus.putIfAbsent(
+                              group.name,
+                              () => FocusNode(
+                                  debugLabel: 'TV source ${group.name}'))
+                          : null,
                       borderRadius: BorderRadius.circular(16),
                       onTap: toggle,
                       child: ConstrainedBox(
@@ -281,7 +305,7 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
       return Padding(
           padding: const EdgeInsets.all(12),
           child: TextButton.icon(
-            onPressed: () => widget.onRetry(group.name),
+            onPressed: () => _retry(group.name),
             icon: const Icon(Icons.search),
             label: Text('搜索 ${group.name}'),
           ));
@@ -300,11 +324,13 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
               compact: true,
               actions: [
                 StateActionButton.tonal(
-                  onPressed: () => widget.onSourceSearch(group.name),
+                  onPressed: () =>
+                      _sourceAction(group.name, widget.onSourceSearch),
                   text: '修改检索词',
                 ),
                 TextButton(
-                  onPressed: () => widget.onSourceAliasSearch(group.name),
+                  onPressed: () =>
+                      _sourceAction(group.name, widget.onSourceAliasSearch),
                   child: const Text('使用别名'),
                 ),
               ],
@@ -376,15 +402,15 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
           onSelected: (action) => action(),
           itemBuilder: (_) => [
             PopupMenuItem(
-              value: () => widget.onSourceSearch(group.name),
+              value: () => _sourceAction(group.name, widget.onSourceSearch),
               child: const Text('修改此来源的检索词'),
             ),
             PopupMenuItem(
-              value: () => widget.onSourceAliasSearch(group.name),
+              value: () => _sourceAction(group.name, widget.onSourceAliasSearch),
               child: const Text('使用别名检索此来源'),
             ),
             PopupMenuItem(
-              value: () => widget.onRetry(group.name),
+              value: () => _retry(group.name),
               child: const Text('重新检索此来源'),
             ),
             PopupMenuItem(
@@ -457,14 +483,17 @@ class _SourceSheetViewState extends State<_SourceSheetView> {
             '需要验证',
             '完成网站验证后继续检索。',
             '进行验证',
-            () => widget.onVerify(sourceName),
+            () {
+              _focusHeader(sourceName);
+              widget.onVerify(sourceName);
+            },
           )
         : (
             Icons.error_outline_rounded,
             '检索失败',
             '可以重试，或打开网站检查是否可用。',
             '重试',
-            () => widget.onRetry(sourceName),
+            () => _retry(sourceName),
           );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),

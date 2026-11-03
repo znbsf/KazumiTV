@@ -15,6 +15,7 @@ import 'package:scrollview_observer/scrollview_observer.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class EpisodeSelectionPanel extends StatefulWidget {
   const EpisodeSelectionPanel({
@@ -342,19 +343,27 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: '定位当前集',
-                          onPressed: _canLocate ? revealCurrentEpisode : null,
-                          icon: const Icon(Icons.my_location_rounded, size: 20),
-                        ),
+                        TvFocusLabel(
+                            message: '定位当前集',
+                            child: IconButton(
+                              tooltip: '定位当前集',
+                              onPressed:
+                                  _canLocate ? revealCurrentEpisode : null,
+                              icon: const Icon(Icons.my_location_rounded,
+                                  size: 20),
+                            )),
                         if (!widget.isOffline)
-                          IconButton.filledTonal(
-                            tooltip: '缓存剧集',
-                            onPressed: count > 0 && widget.onDownload != null
-                                ? () => widget.onDownload!(_visibleRoad)
-                                : null,
-                            icon: const Icon(Icons.download_rounded, size: 20),
-                          ),
+                          TvFocusLabel(
+                              message: '缓存剧集',
+                              child: IconButton.filledTonal(
+                                tooltip: '缓存剧集',
+                                onPressed:
+                                    count > 0 && widget.onDownload != null
+                                        ? () => widget.onDownload!(_visibleRoad)
+                                        : null,
+                                icon: const Icon(Icons.download_rounded,
+                                    size: 20),
+                              )),
                       ],
                     ),
                   ),
@@ -427,43 +436,57 @@ class EpisodeSelectionPanelState extends State<EpisodeSelectionPanel> {
                       disableAnimations: widget.disableAnimations),
                   Row(children: [
                     Expanded(child: Text('$count 集')),
-                    IconButton(
-                        key: const ValueKey('episode-browser-toggle'),
-                        tooltip: _nativeEnabled
+                    TvFocusLabel(
+                        message: _nativeEnabled
                             ? '原生选集实验：开启（点击关闭）'
                             : '原生选集实验：关闭（点击开启）',
-                        onPressed: _browserOpening
-                            ? null
-                            : () => setState(
-                                () => _nativeEnabled = !_nativeEnabled),
-                        icon: Icon(_nativeEnabled
-                            ? Icons.view_module_rounded
-                            : Icons.view_module_outlined)),
-                    IconButton(
-                        key: const ValueKey('episode-quick-browser'),
-                        focusNode: _browserFocus,
-                        tooltip: _nativeEnabled ? '原生快速选集' : '按序号定位剧集',
-                        onPressed:
-                            count > 0 && !_browserOpening ? _openBrowser : null,
-                        icon: const Icon(Icons.numbers_rounded)),
+                        child: IconButton(
+                            key: const ValueKey('episode-browser-toggle'),
+                            tooltip: _nativeEnabled
+                                ? '原生选集实验：开启（点击关闭）'
+                                : '原生选集实验：关闭（点击开启）',
+                            onPressed: _browserOpening
+                                ? null
+                                : () => setState(
+                                    () => _nativeEnabled = !_nativeEnabled),
+                            icon: Icon(_nativeEnabled
+                                ? Icons.view_module_rounded
+                                : Icons.view_module_outlined))),
+                    TvFocusLabel(
+                        message: _nativeEnabled ? '原生快速选集' : '按序号定位剧集',
+                        child: IconButton(
+                            key: const ValueKey('episode-quick-browser'),
+                            focusNode: _browserFocus,
+                            tooltip: _nativeEnabled ? '原生快速选集' : '按序号定位剧集',
+                            onPressed: count > 0 && !_browserOpening
+                                ? _openBrowser
+                                : null,
+                            icon: const Icon(Icons.numbers_rounded))),
                     if (_visibleRoad != widget.selectedRoad &&
                         widget.onResumeRoad != null &&
                         count > 0)
-                      IconButton(
-                          tooltip: '同集换线',
-                          onPressed: () => widget.onResumeRoad!(_visibleRoad),
-                          icon: const Icon(Icons.sync_alt_rounded)),
-                    IconButton(
-                        tooltip: '定位当前集',
-                        onPressed: _canLocate ? revealCurrentEpisode : null,
-                        icon: const Icon(Icons.my_location_rounded)),
+                      TvFocusLabel(
+                          message: '同集换线',
+                          child: IconButton(
+                              tooltip: '同集换线',
+                              onPressed: () =>
+                                  widget.onResumeRoad!(_visibleRoad),
+                              icon: const Icon(Icons.sync_alt_rounded))),
+                    TvFocusLabel(
+                        message: '定位当前集',
+                        child: IconButton(
+                            tooltip: '定位当前集',
+                            onPressed: _canLocate ? revealCurrentEpisode : null,
+                            icon: const Icon(Icons.my_location_rounded))),
                     if (!widget.isOffline)
-                      IconButton(
-                          tooltip: '缓存剧集',
-                          onPressed: count > 0 && widget.onDownload != null
-                              ? () => widget.onDownload!(_visibleRoad)
-                              : null,
-                          icon: const Icon(Icons.download_rounded)),
+                      TvFocusLabel(
+                          message: '缓存剧集',
+                          child: IconButton(
+                              tooltip: '缓存剧集',
+                              onPressed: count > 0 && widget.onDownload != null
+                                  ? () => widget.onDownload!(_visibleRoad)
+                                  : null,
+                              icon: const Icon(Icons.download_rounded))),
                   ]),
                 ])),
         Expanded(
@@ -570,6 +593,8 @@ class _RoadSelector extends StatefulWidget {
 }
 
 class _RoadSelectorState extends State<_RoadSelector> {
+  final _menuController = MenuController();
+  LocalHistoryEntry? _menuHistory;
   final _focusNode = FocusNode(debugLabel: 'Playback road selector');
   final _roadFocusNodes = <int, FocusNode>{};
   FocusNode? _focusBeforeOpen;
@@ -580,9 +605,15 @@ class _RoadSelectorState extends State<_RoadSelector> {
 
   void _handleOpen() {
     if (!TvMode.enabled) return;
+    _menuHistory = LocalHistoryEntry(onRemove: () {
+      if (_menuHistory == null) return;
+      _menuHistory = null;
+      if (_menuController.isOpen) _menuController.close();
+    });
+    ModalRoute.of(context)?.addLocalHistoryEntry(_menuHistory!);
     // A custom MenuAnchor trigger does not move keyboard focus into its menu.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.roads.isEmpty) return;
+      if (!mounted || !_menuController.isOpen || widget.roads.isEmpty) return;
       final node =
           _roadFocus(widget.visibleRoad.clamp(0, widget.roads.length - 1));
       if (node.context != null) node.requestFocus();
@@ -609,6 +640,9 @@ class _RoadSelectorState extends State<_RoadSelector> {
   }
 
   void _handleClose() {
+    final history = _menuHistory;
+    _menuHistory = null;
+    history?.remove();
     if (!mounted) return;
     final previousFocus = _focusBeforeOpen;
     _focusBeforeOpen = null;
@@ -629,6 +663,9 @@ class _RoadSelectorState extends State<_RoadSelector> {
 
   @override
   void dispose() {
+    final history = _menuHistory;
+    _menuHistory = null;
+    history?.remove();
     _focusNode.dispose();
     for (final node in _roadFocusNodes.values) {
       node.dispose();
@@ -718,6 +755,7 @@ class _RoadSelectorState extends State<_RoadSelector> {
       final width =
           math.min(constraints.maxWidth, MediaQuery.sizeOf(context).width - 32);
       return MenuAnchor(
+        controller: _menuController,
         childFocusNode: _focusNode,
         crossAxisUnconstrained: false,
         consumeOutsideTap: true,

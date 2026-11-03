@@ -20,9 +20,11 @@ class DownloadRecordSliver extends StatelessWidget {
     required this.totalSpeed,
     required this.episodeNumbers,
     required this.episodeTileBuilder,
+    this.headerFocus,
   });
 
   final DownloadRecord record;
+  final FocusNode? headerFocus;
   final bool expanded;
   final VoidCallback onToggle;
   final VoidCallback onResumeAll;
@@ -79,6 +81,7 @@ class DownloadRecordSliver extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       InkWell(
+                        focusNode: headerFocus,
                         onTap: onToggle,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),

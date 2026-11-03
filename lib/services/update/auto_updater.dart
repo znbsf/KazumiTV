@@ -495,17 +495,22 @@ class AutoUpdater {
         builder: (context) {
           return AlertDialog(
             title: const Text('下载失败'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(errorMessage),
-                const SizedBox(height: 8),
-                Text(
-                  '错误详情: ${e.toString()}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+            content: ConstrainedBox(
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+              child: SingleChildScrollView(
+                  child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(errorMessage),
+                  const SizedBox(height: 8),
+                  Text(
+                    '错误详情: ${e.toString()}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              )),
             ),
             actions: [
               TextButton(
@@ -536,56 +541,62 @@ class AutoUpdater {
       builder: (context) {
         return AlertDialog(
           title: const Text('下载完成'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text('新版本 ${updateInfo.version} 已下载完成'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '请在系统安装界面确认；取消安装不会影响当前版本',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(4),
-                ),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.5),
+            child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      '文件位置:',
-                      style: Theme.of(context).textTheme.labelSmall,
+                    Icon(
+                      Icons.check_circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 20,
                     ),
-                    const SizedBox(height: 4),
-                    SelectableText(
-                      filePath,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontFamily: 'monospace',
-                          ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('新版本 ${updateInfo.version} 已下载完成'),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Text(
+                  '请在系统安装界面确认；取消安装不会影响当前版本',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: TvMode.enabled ? 14 : 12,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '文件位置:',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      const SizedBox(height: 4),
+                      SelectableText(
+                        filePath,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            )),
           ),
           actions: [
             TextButton(

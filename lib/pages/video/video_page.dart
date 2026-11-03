@@ -492,6 +492,11 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void onBackPressed(BuildContext context) async {
+    if (TvMode.enabled &&
+        ModalRoute.of(context)?.willHandlePopInternally == true) {
+      Navigator.of(context).pop();
+      return;
+    }
     if (KazumiDialog.observer.hasKazumiDialog) {
       KazumiDialog.dismiss();
       return;

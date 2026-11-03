@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/services/logging/logger.dart' as logging;
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 import 'package:kazumi/bean/appbar/sys_app_bar.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class LogsPage extends StatefulWidget {
   const LogsPage({super.key});
@@ -23,6 +25,7 @@ class _LogsPageState extends State<LogsPage> {
 
   bool _isLoading = true;
   bool _hasError = false;
+  bool _readingFocused = false;
   String _fullContent = '';
 
   static const int _initialLoadCount = 50;
@@ -184,6 +187,62 @@ class _LogsPageState extends State<LogsPage> {
       );
     }
 
+    if (TvMode.enabled) {
+      return LayoutBuilder(builder: (context, constraints) {
+        return Focus(
+          debugLabel: 'TV log reading area',
+          onFocusChange: (focused) => setState(() => _readingFocused = focused),
+          onKeyEvent: (node, event) {
+            if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+              return KeyEventResult.ignored;
+            }
+            final direction = event.logicalKey == LogicalKeyboardKey.arrowDown
+                ? 1
+                : event.logicalKey == LogicalKeyboardKey.arrowUp
+                    ? -1
+                    : 0;
+            if (direction == 0 || !_scrollController.hasClients) {
+              return KeyEventResult.ignored;
+            }
+            final position = _scrollController.position;
+            final target =
+                (position.pixels + direction * position.viewportDimension * 0.7)
+                    .clamp(position.minScrollExtent, position.maxScrollExtent);
+            if (target == position.pixels) return KeyEventResult.ignored;
+            _scrollController.jumpTo(target);
+            return KeyEventResult.handled;
+          },
+          child: DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _readingFocused
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
+                width: 3,
+              ),
+            ),
+            child: SelectionArea(
+              child: SizedBox(
+                width: constraints.maxWidth,
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _logLines.length,
+                  itemBuilder: (context, index) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(_logLines[index],
+                        style: const TextStyle(
+                            fontFamily: 'monospace', fontSize: 14)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      });
+    }
     return SelectionArea(
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -218,19 +277,23 @@ class _LogsPageState extends State<LogsPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        FloatingActionButton(
-          heroTag: null,
-          onPressed: _clearLogs,
-          tooltip: '清空日志',
-          child: const Icon(Icons.clear_all),
-        ),
+        TvFocusLabel(
+            message: '清空日志',
+            child: FloatingActionButton(
+              heroTag: null,
+              onPressed: _clearLogs,
+              tooltip: '清空日志',
+              child: const Icon(Icons.clear_all),
+            )),
         const SizedBox(width: 15),
-        FloatingActionButton(
-          heroTag: null,
-          onPressed: _copyLogs,
-          tooltip: '复制日志',
-          child: const Icon(Icons.copy),
-        ),
+        TvFocusLabel(
+            message: '复制日志',
+            child: FloatingActionButton(
+              heroTag: null,
+              onPressed: _copyLogs,
+              tooltip: '复制日志',
+              child: const Icon(Icons.copy),
+            )),
       ],
     );
   }

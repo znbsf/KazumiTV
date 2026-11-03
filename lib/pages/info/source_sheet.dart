@@ -33,6 +33,8 @@ import 'package:kazumi/services/plugin/plugin_search_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
 import 'package:kazumi/utils/device.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'source_alias_dialog.dart';
@@ -45,12 +47,14 @@ class SourceSheet extends StatefulWidget {
       required this.infoController,
       this.autoSearchOnOpen = true,
       this.switchOrigin,
-      this.createVideoSourceService});
+      this.createVideoSourceService,
+      this.createCaptchaVerificationService});
 
   final InfoController infoController;
   final bool autoSearchOnOpen;
   final SourceSwitchOrigin? switchOrigin;
   final IVideoSourceService Function()? createVideoSourceService;
+  final CaptchaVerificationService Function()? createCaptchaVerificationService;
 
   @override
   State<SourceSheet> createState() => _SourceSheetState();
@@ -77,8 +81,13 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
       pluginsController: _pluginsController,
     );
     _captchaFlow = _SourceCaptchaFlow(
+      createService: widget.createCaptchaVerificationService,
       onVerified: _showVerifiedResult,
-      onCancelled: (plugin) => _retry(plugin.name),
+      onCancelled: (plugin) {
+        if (!mounted) return;
+        widget.infoController.pluginSearchStatus[plugin.name] =
+            PluginSearchStatus.error;
+      },
     );
     if (widget.autoSearchOnOpen) {
       _searchService.queryAllSource(_keyword);

@@ -1,10 +1,12 @@
 part of 'source_sheet.dart';
 
 class _SourceCaptchaFlow {
-  _SourceCaptchaFlow({required this.onVerified, required this.onCancelled});
+  _SourceCaptchaFlow({required this.onVerified, required this.onCancelled,
+      this.createService});
 
   final void Function(Plugin plugin, String pageHtml) onVerified;
   final void Function(Plugin plugin) onCancelled;
+  final CaptchaVerificationService Function()? createService;
   final _dialogs = KazumiDialogController();
 
   void dispose() => _dialogs.dispose();
@@ -21,7 +23,7 @@ class _SourceCaptchaFlow {
 
   void start(Plugin plugin, String keyword) {
     unawaited(_dialogs.run((task) async {
-      final service = CaptchaVerificationService();
+      final service = createService?.call() ?? CaptchaVerificationService();
       final verified = Completer<String>();
       final config = plugin.antiCrawlerConfig;
       final searchUrl = plugin.searchURL

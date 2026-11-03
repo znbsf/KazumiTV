@@ -19,6 +19,8 @@ import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/search/image_search_module.dart';
 import 'package:kazumi/pages/search/search_controller.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 part 'image_search_widgets.dart';
 
@@ -34,6 +36,8 @@ class ImageSearchPage extends StatefulWidget {
 class _ImageSearchPageState extends State<ImageSearchPage> {
   final _urlController = TextEditingController();
   final _urlFocus = FocusNode();
+  final _primaryFocus = FocusNode(debugLabel: 'TV image search action');
+  final _firstResultFocus = FocusNode(debugLabel: 'TV image search first result');
   final _pageScroll = ScrollController();
   final _sourceScroll = ScrollController();
   final _resultScroll = ScrollController();
@@ -68,6 +72,8 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     _previewDebounce?.cancel();
     _urlController.dispose();
     _urlFocus.dispose();
+    _primaryFocus.dispose();
+    _firstResultFocus.dispose();
     _pageScroll.dispose();
     _sourceScroll.dispose();
     _resultScroll.dispose();
@@ -149,8 +155,20 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     } catch (_) {
       if (mounted) setState(() => _inputError = '无法读取图片，请重新选择并检查相册权限');
     } finally {
-      if (mounted) setState(() => _isPicking = false);
+      if (mounted) {
+        setState(() => _isPicking = false);
+        _focusAfterFrame(_primaryFocus);
+      }
     }
+  }
+
+  void _focusAfterFrame(FocusNode node) {
+    if (!TvMode.enabled) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        node.requestFocus();
+      }
+    });
   }
 
   Future<void> _search() async {
@@ -161,7 +179,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
       return;
     }
     _previewDebounce?.cancel();
-    FocusManager.instance.primaryFocus?.unfocus();
+    if (!TvMode.enabled) FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
       _inputError = null;
       _userScrolledDuringSearch = false;
@@ -170,8 +188,14 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     final search = _useUrl
         ? _controller.searchImageByUrl(_urlController.text.trim())
         : _controller.searchImageByFile(_imageFile!);
+    _focusAfterFrame(_primaryFocus);
     WidgetsBinding.instance.addPostFrameCallback((_) => _revealResults());
     await search;
+    if (mounted) {
+      _focusAfterFrame(_controller.imageSearchResults.isNotEmpty
+          ? _firstResultFocus
+          : _primaryFocus);
+    }
     if (mounted && !_userScrolledDuringSearch) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _revealResults());
     }
@@ -244,10 +268,12 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
       appBar: SysAppBar(
         backgroundColor: colors.surface,
         actions: [
-          IconButton(
-              onPressed: _showHelp,
-              tooltip: '搜图小贴士',
-              icon: const Icon(Icons.help_outline_rounded)),
+          TvFocusLabel(
+              message: '搜图小贴士',
+              child: IconButton(
+                  onPressed: _showHelp,
+                  tooltip: '搜图小贴士',
+                  icon: const Icon(Icons.help_outline_rounded))),
         ],
       ),
       body: SafeArea(
@@ -294,6 +320,7 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
         short: short, inlineAction: !pinAction);
     final resultContent = showResults
         ? _ImageSearchResults(
+            firstResultFocus: TvMode.enabled ? _firstResultFocus : null,
             results: results,
             searching: searching,
             error: error,
@@ -437,11 +464,13 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
               fillColor: colors.surfaceContainerLow,
               border:
                   OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-              suffixIcon: IconButton(
-                onPressed: busy ? null : _pasteUrl,
-                tooltip: '粘贴图片链接',
-                icon: const Icon(Icons.content_paste_rounded),
-              ),
+              suffixIcon: TvFocusLabel(
+                  message: '粘贴图片链接',
+                  child: IconButton(
+                    onPressed: busy ? null : _pasteUrl,
+                    tooltip: '粘贴图片链接',
+                    icon: const Icon(Icons.content_paste_rounded),
+                  )),
             ),
           )),
           const SizedBox(height: 8),
@@ -528,13 +557,16 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
     final selecting = !_useUrl && _imageFile == null;
     return FilledButton.icon(
       key: const ValueKey('image-search-primary'),
-      onPressed: busy
-          ? null
-          : selecting
-              ? _pickImage
-              : _hasImage
-                  ? _search
-                  : null,
+      focusNode: TvMode.enabled ? _primaryFocus : null,
+      onPressed: busy && TvMode.enabled
+          ? () {}
+          : busy
+              ? null
+              : selecting
+                  ? _pickImage
+                  : _hasImage
+                      ? _search
+                      : null,
       style: ButtonStyle(
         minimumSize: const WidgetStatePropertyAll(Size.fromHeight(56)),
         padding: const WidgetStatePropertyAll(

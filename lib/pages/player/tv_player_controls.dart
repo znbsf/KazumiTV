@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kazumi/bean/widget/tv_player_side_panel.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
+import 'package:scrollview_observer/scrollview_observer.dart';
 
 /// Native main's compact player action, with one target for remote and pointer.
 class TvPlayerAction extends StatefulWidget {
@@ -130,11 +132,13 @@ class _TvPlayerActionState extends State<TvPlayerAction> {
       ),
     );
     return iconOnly
-        ? Tooltip(
+        ? TvFocusLabel(
             message: widget.label,
-            excludeFromSemantics: true,
-            child: action,
-          )
+            child: Tooltip(
+              message: widget.label,
+              excludeFromSemantics: true,
+              child: action,
+            ))
         : action;
   }
 }
@@ -235,17 +239,96 @@ class _TvPlayerProgressState extends State<TvPlayerProgress> {
 }
 
 /// Presented in an owned dialog route so Back cannot reach playback controls.
-class TvPlayerSettingsPanel extends StatelessWidget {
+class TvPlayerSettingsPanel extends StatefulWidget {
   const TvPlayerSettingsPanel({
     super.key,
     required this.title,
     required this.onBack,
     required this.children,
+    this.initialFocusNode,
+    this.initialFocusIndex,
   });
 
   final String title;
   final VoidCallback onBack;
   final List<Widget> children;
+  final FocusNode? initialFocusNode;
+  final int? initialFocusIndex;
+
+  @override
+  State<TvPlayerSettingsPanel> createState() => _TvPlayerSettingsPanelState();
+}
+
+class _TvPlayerSettingsPanelState extends State<TvPlayerSettingsPanel> {
+  final _scope = FocusScopeNode(debugLabel: 'Player settings');
+  final _backFocus = FocusNode(debugLabel: 'Player settings back');
+  final _scroll = ScrollController();
+  late final _observer = ListObserverController(controller: _scroll);
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_focusInitial());
+  }
+
+  Future<void> _focusInitial() async {
+    // Resume after all first-frame callbacks, including the observer's sliver
+    // registration, instead of jumping from the parent's earlier callback.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted || !_scroll.hasClients) return;
+    final selectedIndex = widget.children.indexWhere((child) =>
+        child is TvPlayerAction && child.selected && child.onPressed != null);
+    final firstIndex = widget.children.indexWhere(
+        (child) => child is TvPlayerAction && child.onPressed != null);
+    final index = widget.initialFocusIndex ??
+        (selectedIndex >= 0 ? selectedIndex : firstIndex);
+    if (index >= 0) {
+      // Title, gap, Back, then alternating gaps and business controls.
+      final positioned = _observer.jumpTo(index: 4 + index * 2);
+      // The observer completes after a frame even when no scrolling is needed.
+      WidgetsBinding.instance.scheduleFrame();
+      await positioned;
+    }
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final items = _scope.traversalDescendants.where((node) =>
+          node is! FocusScopeNode &&
+          node != _backFocus &&
+          node.context?.findAncestorWidgetOfExactType<TvPlayerAction>() !=
+              null &&
+          node.canRequestFocus);
+      final selected = items.where((node) =>
+          node.context
+              ?.findAncestorWidgetOfExactType<TvPlayerAction>()
+              ?.selected ==
+          true);
+      final target = widget.initialFocusNode ??
+          selected.firstOrNull ??
+          items.firstOrNull ??
+          _backFocus;
+      target.requestFocus();
+      final targetContext = target.context;
+      if (targetContext != null) {
+        // The observer jump builds the target but can leave its bottom clipped.
+        unawaited(Scrollable.ensureVisible(
+          targetContext,
+          alignment: .5,
+          duration: Duration.zero,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+        ));
+      }
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  @override
+  void dispose() {
+    _backFocus.dispose();
+    _scope.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Align(
@@ -255,40 +338,48 @@ class TvPlayerSettingsPanel extends StatelessWidget {
           height: double.infinity,
           child: TvPlayerSidePanel(
             opacity: 1,
-            child: FocusTraversalGroup(
-              policy: WidgetOrderTraversalPolicy(),
-              child: Focus(
-                canRequestFocus: false,
-                skipTraversal: true,
-                onKeyEvent: (node, event) {
-                  if (event is KeyDownEvent &&
-                      (event.logicalKey == LogicalKeyboardKey.escape ||
-                          event.logicalKey == LogicalKeyboardKey.goBack ||
-                          event.logicalKey == LogicalKeyboardKey.gameButtonB)) {
-                    onBack();
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: ListView(
-                  padding: const EdgeInsets.all(28),
-                  children: [
-                    Text(
-                      title,
-                      style: TvVisuals.title.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface),
+            child: FocusScope(
+              node: _scope,
+              child: FocusTraversalGroup(
+                policy: WidgetOrderTraversalPolicy(),
+                child: Focus(
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                  onKeyEvent: (node, event) {
+                    if (event is KeyDownEvent &&
+                        (event.logicalKey == LogicalKeyboardKey.escape ||
+                            event.logicalKey == LogicalKeyboardKey.goBack ||
+                            event.logicalKey ==
+                                LogicalKeyboardKey.gameButtonB)) {
+                      widget.onBack();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: ListViewObserver(
+                    controller: _observer,
+                    child: ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.all(28),
+                      children: [
+                        Text(
+                          widget.title,
+                          style: TvVisuals.title.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface),
+                        ),
+                        const SizedBox(height: 12),
+                        TvPlayerAction(
+                          focusNode: _backFocus,
+                          label: widget.title == '设置' ? '返回播放' : '返回设置',
+                          onPressed: widget.onBack,
+                        ),
+                        for (final child in widget.children) ...[
+                          const SizedBox(height: 12),
+                          child,
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    TvPlayerAction(
-                      autofocus: true,
-                      label: title == '设置' ? '返回播放' : '返回设置',
-                      onPressed: onBack,
-                    ),
-                    for (final child in children) ...[
-                      const SizedBox(height: 12),
-                      child,
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),

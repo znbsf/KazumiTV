@@ -11,6 +11,7 @@ class TvDetailActions extends StatefulWidget {
     required this.onPlay,
     this.onSelectSource,
     this.onSourceHealth,
+    this.sourceHealthFocus,
     required this.collectionBuilder,
     required this.onReview,
     required this.onUp,
@@ -21,6 +22,7 @@ class TvDetailActions extends StatefulWidget {
   final VoidCallback onPlay;
   final VoidCallback? onSelectSource;
   final VoidCallback? onSourceHealth;
+  final FocusNode? sourceHealthFocus;
   final Widget Function(FocusNode focusNode) collectionBuilder;
   final VoidCallback onReview;
   final VoidCallback onUp;
@@ -31,7 +33,8 @@ class TvDetailActions extends StatefulWidget {
 }
 
 class _TvDetailActionsState extends State<TvDetailActions> {
-  final _healthFocus = FocusNode(debugLabel: 'TV source health');
+  final _ownedHealthFocus = FocusNode(debugLabel: 'TV source health');
+  FocusNode get _healthFocus => widget.sourceHealthFocus ?? _ownedHealthFocus;
   final _sourceFocus = FocusNode(debugLabel: 'TV detail source');
   final _collectFocus = FocusNode(debugLabel: 'TV detail collect');
   final _reviewFocus = FocusNode(debugLabel: 'TV detail review');
@@ -47,7 +50,7 @@ class _TvDetailActionsState extends State<TvDetailActions> {
   @override
   void dispose() {
     _sourceFocus.dispose();
-    _healthFocus.dispose();
+    _ownedHealthFocus.dispose();
     _collectFocus.dispose();
     _reviewFocus.dispose();
     super.dispose();

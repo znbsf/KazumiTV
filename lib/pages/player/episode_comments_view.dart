@@ -21,6 +21,7 @@ class EpisodeCommentsView extends StatelessWidget {
     required this.onToggleSort,
     required this.onSelectEpisode,
     required this.onRefresh,
+    this.selectEpisodeFocusNode,
   });
 
   final int episode;
@@ -32,6 +33,7 @@ class EpisodeCommentsView extends StatelessWidget {
   final VoidCallback onToggleSort;
   final VoidCallback onSelectEpisode;
   final VoidCallback onRefresh;
+  final FocusNode? selectEpisodeFocusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -60,6 +62,7 @@ class EpisodeCommentsView extends StatelessWidget {
                   episode: episode,
                   info: episodeInfo,
                   onSelectEpisode: onSelectEpisode,
+                  selectEpisodeFocusNode: selectEpisodeFocusNode,
                 ),
               ),
             ),
@@ -236,11 +239,13 @@ class _EpisodeHeader extends StatelessWidget {
     required this.episode,
     required this.info,
     required this.onSelectEpisode,
+    this.selectEpisodeFocusNode,
   });
 
   final int episode;
   final EpisodeInfo? info;
   final VoidCallback onSelectEpisode;
+  final FocusNode? selectEpisodeFocusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -289,6 +294,7 @@ class _EpisodeHeader extends StatelessWidget {
                             fontWeight: FontWeight.w700)),
                   ),
                   FilledButton.icon(
+                    focusNode: selectEpisodeFocusNode,
                     onPressed: onSelectEpisode,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(48, 48),

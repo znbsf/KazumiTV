@@ -113,10 +113,13 @@ class _AliasPickerDialogState extends State<_AliasPickerDialog> {
             for (var index = 0; index < widget.aliases.length; index++)
               ListTile(
                 title: Text(widget.aliases[index]),
-                trailing: IconButton(
-                  onPressed: () => _confirmDelete(index),
-                  icon: const Icon(Icons.delete),
-                ),
+                trailing: TvFocusLabel(
+                    message: '删除别名',
+                    child: IconButton(
+                      tooltip: '删除别名',
+                      onPressed: () => _confirmDelete(index),
+                      icon: const Icon(Icons.delete),
+                    )),
                 onTap: () => widget.onAliasSelected(widget.aliases[index]),
               ),
           ],

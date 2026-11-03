@@ -315,7 +315,12 @@ class _TvHistoryGridState extends State<TvHistoryGrid> with RouteAware {
     }
   }
 
-  Widget get contentGrid {
+  Widget get contentGrid => LayoutBuilder(
+      builder: (context, constraints) => _buildContentGrid(TvMode.enabled
+          ? constraints.maxWidth
+          : MediaQuery.sizeOf(context).width));
+
+  Widget _buildContentGrid(double screenWidth) {
     int crossCount = 1;
     if (MediaQuery.sizeOf(context).width > LayoutBreakpoint.compact['width']!) {
       crossCount = 2;
@@ -324,14 +329,15 @@ class _TvHistoryGridState extends State<TvHistoryGrid> with RouteAware {
       crossCount = 3;
     }
 
-    final double screenWidth = MediaQuery.sizeOf(context).width;
+    final double maxContentWidth = 1000;
     if (TvMode.enabled) {
       // Reserve the rail and enough room for poster, text and a separate More
       // target. The old three-column phone density truncates even short titles.
-      crossCount = ((screenWidth - 80) / 380).floor().clamp(1, 3);
+      crossCount = ((screenWidth.clamp(0.0, maxContentWidth) - 80) / 380)
+          .floor()
+          .clamp(1, 3);
     }
     _columns = crossCount;
-    final double maxContentWidth = 1000;
     final double horizontalPadding =
         screenWidth > maxContentWidth ? (screenWidth - maxContentWidth) / 2 : 0;
 

@@ -12,6 +12,7 @@ import 'package:kazumi/modules/collect/collect_type.dart';
 import 'package:kazumi/pages/collect/collect_library_query.dart';
 import 'package:kazumi/pages/menu/route_visibility.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 part 'collect_library_card.dart';
 
@@ -28,7 +29,7 @@ class CollectLibraryView extends StatefulWidget {
   final List<CollectedBangumi> entries;
   final bool showRating;
   final FutureOr<void> Function(BangumiItem) onOpen;
-  final void Function(BangumiItem, CollectType) onChangeType;
+  final FutureOr<void> Function(BangumiItem, CollectType) onChangeType;
   final bool Function(BangumiItem) canEdit;
 
   @override
@@ -38,6 +39,9 @@ class CollectLibraryView extends StatefulWidget {
 class _CollectLibraryViewState extends State<CollectLibraryView> {
   final _searchController = TextEditingController();
   final _searchFocus = FocusNode();
+  final _categoryFocus = {
+    for (final type in _categories) type: FocusNode(),
+  };
   final _categoryScrollController = ScrollController(keepScrollOffset: false);
   final _categoryKeys = {
     for (final type in _categories) type: GlobalKey(),
@@ -98,6 +102,40 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
 
   bool _attached(FocusNode node) =>
       node.context?.mounted == true && node.parent != null;
+
+  Future<void> _changeType(BangumiItem item, CollectType newType) async {
+    if (!TvMode.enabled) {
+      await widget.onChangeType(item, newType);
+      return;
+    }
+    final ids = _tvEntries.map((entry) => entry.bangumiItem.id).toList();
+    final index = ids.indexOf(item.id);
+    final type = _selectedType;
+    final query = _query;
+    final sort = _sort;
+    final epoch = ++_returnEpoch;
+    await widget.onChangeType(item, newType);
+    await WidgetsBinding.instance.endOfFrame;
+    bool valid() => _canRestore(epoch, type, query, sort);
+    if (!valid() || index < 0) return;
+    final candidates = [
+      item.id,
+      ...ids.skip(index + 1),
+      ...ids.take(index).toList().reversed,
+    ];
+    final remaining = _tvEntries.map((entry) => entry.bangumiItem.id).toSet();
+    final target = candidates.where(remaining.contains).firstOrNull;
+    if (target == null) {
+      final scroll = _scrollControllers[type]!;
+      if (scroll.hasClients) scroll.jumpTo(0);
+      _categoryFocus[type]!.requestFocus();
+      return;
+    }
+    final targetIndex =
+        _tvEntries.indexWhere((entry) => entry.bangumiItem.id == target);
+    await _realizeRow(targetIndex, 0, _scrollControllers[type]!, valid);
+    if (valid()) _focusFor(target).requestFocus();
+  }
 
   Future<void> _open(BangumiItem item) async {
     if (!TvMode.enabled) {
@@ -223,6 +261,9 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
     }
     _searchController.dispose();
     _searchFocus.dispose();
+    for (final node in _categoryFocus.values) {
+      node.dispose();
+    }
     _categoryScrollController.dispose();
     for (final controller in _scrollControllers.values) {
       controller.dispose();
@@ -574,7 +615,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
         focusNode: TvMode.enabled ? _focusFor(entry.bangumiItem.id) : null,
         onOpen: () => unawaited(_open(entry.bangumiItem)),
         onChangeType: widget.canEdit(entry.bangumiItem)
-            ? (type) => widget.onChangeType(entry.bangumiItem, type)
+            ? (type) => unawaited(_changeType(entry.bangumiItem, type))
             : null,
       );
 
@@ -614,6 +655,7 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: ValueKey('collect-filter-${type?.value ?? 'all'}'),
+            focusNode: TvMode.enabled ? _categoryFocus[type] : null,
             onTap: () => _selectType(type),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: wide ? 56 : 48),
@@ -687,21 +729,24 @@ class _CollectLibraryViewState extends State<CollectLibraryView> {
         void toggleMenu() =>
             controller.isOpen ? controller.close() : controller.open();
 
-        return Tooltip(
-          message: '排序：${_sort.label}',
-          child: expanded
-              ? TextButton.icon(
-                  style: style,
-                  onPressed: toggleMenu,
-                  icon: const Icon(Icons.sort_rounded, size: 20),
-                  label: Text(_sort.label),
-                )
-              : IconButton(
-                  style: style,
-                  onPressed: toggleMenu,
-                  icon: const Icon(Icons.sort_rounded, size: 20),
-                ),
-        );
+        return TvFocusLabel(
+            message: '排序：${_sort.label}',
+            enabled: !expanded,
+            child: Tooltip(
+              message: '排序：${_sort.label}',
+              child: expanded
+                  ? TextButton.icon(
+                      style: style,
+                      onPressed: toggleMenu,
+                      icon: const Icon(Icons.sort_rounded, size: 20),
+                      label: Text(_sort.label),
+                    )
+                  : IconButton(
+                      style: style,
+                      onPressed: toggleMenu,
+                      icon: const Icon(Icons.sort_rounded, size: 20),
+                    ),
+            ));
       },
     );
   }
