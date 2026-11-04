@@ -113,8 +113,15 @@ class _Downloads implements DownloadController {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-FocusNode _textFocus(WidgetTester tester, String label) =>
-    Focus.of(tester.element(find.text(label).last));
+FocusNode _textFocus(WidgetTester tester, String label) {
+  final text = find.text(label).last;
+  final surfaces = find.ancestor(of: text, matching: find.byType(TvFocusableSurface));
+  if (surfaces.evaluate().isNotEmpty) {
+    final node = tester.widget<TvFocusableSurface>(surfaces.first).focusNode;
+    if (node != null) return node;
+  }
+  return Focus.of(tester.element(text));
+}
 FocusNode _entryFocus(WidgetTester tester, Finder entry) => tester
     .widget<TvFocusableSurface>(
         find.descendant(of: entry, matching: find.byType(TvFocusableSurface)))
@@ -187,7 +194,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('I-8 collapse footer hands focus to source header',
+  testWidgets('I-8 leaving source results hands focus to source header',
       (tester) async {
     final rule = FakeRule('source')
       ..search = () async => PluginSearchResponse(pluginName: 'source', data: [
@@ -198,11 +205,10 @@ void main() {
       ..bangumiItem = focusItem(1);
     await _mount(tester, SourceSheet(infoController: info),
         plugins: PluginsController()..pluginList.add(rule));
-    await tester.tap(find.text('展开全部 2 个结果'));
-    await tester.pumpAndSettle();
-    _textFocus(tester, '收起全部条目').requestFocus();
+    // TV shows all results directly. Left replaces the old collapse footer.
+    _textFocus(tester, 'two').requestFocus();
     await tester.pump();
-    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
     await tester.pumpAndSettle();
     expect(_textFocus(tester, 'source').hasPrimaryFocus, isTrue);
   });
@@ -216,8 +222,6 @@ void main() {
       ..bangumiItem = focusItem(1);
     await _mount(tester, SourceSheet(infoController: info),
         plugins: PluginsController()..pluginList.add(rule));
-    await tester.tap(find.text('source'));
-    await tester.pumpAndSettle();
     rule.search = () => pending.future;
     _textFocus(tester, '重试').requestFocus();
     await tester.pump();
@@ -242,8 +246,6 @@ void main() {
               infoController: info,
               createCaptchaVerificationService: _Captcha.new),
           plugins: PluginsController()..pluginList.add(rule));
-      await tester.tap(find.text('source'));
-      await tester.pumpAndSettle();
       await tester.tap(find.text('进行验证'));
       await tester.pump(const Duration(milliseconds: 300));
       if (cancel == 'button') {

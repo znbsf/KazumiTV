@@ -709,6 +709,7 @@ class _VideoPageState extends State<VideoPage>
     try {
       final prepared = await showAdaptiveBottomSheet<PreparedSourceSwitch>(
         context: context,
+        tvWide: true,
         builder: (_) => SourceSheet(
           infoController: info,
           switchOrigin: SourceSwitchOrigin(

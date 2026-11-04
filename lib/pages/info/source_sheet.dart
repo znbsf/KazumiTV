@@ -1,12 +1,14 @@
 import 'package:kazumi/services/source_health/source_health_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:kazumi/pages/info/source_keyword_dialog.dart';
 import 'package:kazumi/bean/widget/tv_explicit_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -287,7 +289,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
           // Snapshot observable values here; lazy list builders are not tracked.
           final groupsByName = {
             for (final plugin in _pluginsController.enabledPlugins)
-              plugin.name: _SourceSearchGroup(
+              plugin.name: SourceSearchGroup(
                 name: plugin.name,
                 keyword: _keywordFor(plugin.name),
                 unsearched: !widget.autoSearchOnOpen &&
@@ -311,7 +313,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
             }
             if (group.hasResults) firstResultSource ??= group.name;
           }
-          return _SourceSheetView(
+          return SourceSheetView(
             keyword: _keyword,
             groups: groupsByName.values.toList(),
             firstResultSource: firstResultSource,

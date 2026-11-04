@@ -41,6 +41,7 @@ Future<T?> showAdaptiveBottomSheet<T>({
   double maxHeightFactor = 0.75,
   double compactLandscapeMaxHeightFactor = 0.9,
   bool useRootNavigator = false,
+  bool tvWide = false,
 }) {
   if (TvMode.enabled) {
     return showGeneralDialog<T>(
@@ -64,7 +65,11 @@ Future<T?> showAdaptiveBottomSheet<T>({
         ),
       ),
       pageBuilder: (context, animation, secondaryAnimation) => SizedBox(
-        width: tvPlayerSidePanelWidth(MediaQuery.sizeOf(context).width),
+        width: tvWide
+            ? (MediaQuery.sizeOf(context).width * 0.66)
+                .clamp(560.0, 760.0)
+                .toDouble()
+            : tvPlayerSidePanelWidth(MediaQuery.sizeOf(context).width),
         height: MediaQuery.sizeOf(context).height,
         child: TvPlayerSidePanel(
           opacity: 1,

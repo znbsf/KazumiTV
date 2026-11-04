@@ -227,6 +227,7 @@ class _InfoPageState extends State<InfoPage>
       if (!mounted) return;
       await showAdaptiveBottomSheet<void>(
         context: context,
+        tvWide: true,
         builder: (_) => SourceSheet(infoController: infoController),
       );
     } finally {
