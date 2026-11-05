@@ -356,28 +356,34 @@ class _TvPlayerSettingsPanelState extends State<TvPlayerSettingsPanel> {
                     }
                     return KeyEventResult.ignored;
                   },
-                  child: ListViewObserver(
-                    controller: _observer,
-                    child: ListView(
-                      controller: _scroll,
-                      padding: const EdgeInsets.all(28),
-                      children: [
-                        Text(
-                          widget.title,
-                          style: TvVisuals.title.copyWith(
-                              color: Theme.of(context).colorScheme.onSurface),
-                        ),
-                        const SizedBox(height: 12),
-                        TvPlayerAction(
-                          focusNode: _backFocus,
-                          label: widget.title == '设置' ? '返回播放' : '返回设置',
-                          onPressed: widget.onBack,
-                        ),
-                        for (final child in widget.children) ...[
+                  // Keeps the focus outline off the screen edge; the list still
+                  // paints into this margin.
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: ListViewObserver(
+                      controller: _observer,
+                      child: ListView(
+                        controller: _scroll,
+                        clipBehavior: Clip.none,
+                        padding: const EdgeInsets.fromLTRB(28, 12, 28, 12),
+                        children: [
+                          Text(
+                            widget.title,
+                            style: TvVisuals.title.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface),
+                          ),
                           const SizedBox(height: 12),
-                          child,
+                          TvPlayerAction(
+                            focusNode: _backFocus,
+                            label: widget.title == '设置' ? '返回播放' : '返回设置',
+                            onPressed: widget.onBack,
+                          ),
+                          for (final child in widget.children) ...[
+                            const SizedBox(height: 12),
+                            child,
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),

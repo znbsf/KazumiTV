@@ -110,6 +110,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('settings keep the focused row off the screen edge',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: TvPlayerSettingsPanel(
+          title: '设置',
+          onBack: () {},
+          children: [
+            for (var i = 0; i < 20; i++)
+              TvPlayerAction(label: 'row$i', onPressed: () {}),
+          ],
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 12; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+    final focused = FocusManager.instance.primaryFocus!.context!;
+    final rect = tester.getRect(find.byWidget(focused.widget).first);
+    expect(rect.bottom, lessThanOrEqualTo(540 - 16));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('icon actions retain remote activation, semantics and tooltip',
       (tester) async {
     final semantics = tester.ensureSemantics();

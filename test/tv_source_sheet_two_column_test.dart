@@ -128,6 +128,28 @@ void main() {
     expect(find.text('B result 0'), findsOneWidget);
   });
 
+  testWidgets('selected source uses fill while only remote focus has border',
+      (tester) async {
+    await _mount(tester, _view([_group('A', results: 1)], first: 'A'));
+    final source = find.ancestor(of: find.text('A'),
+        matching: find.byType(TvFocusableSurface)).first;
+    Border border() => tester.widgetList<Container>(find.descendant(
+        of: source, matching: find.byType(Container)))
+        .map((w) => w.decoration).whereType<BoxDecoration>()
+        .map((d) => d.border).whereType<Border>().first;
+    expect(_focus(tester, 'A result 0').hasPrimaryFocus, isTrue);
+    expect(border().top.color, Colors.transparent);
+    final material = tester.widget<Material>(find.descendant(
+        of: source, matching: find.byType(Material)).first);
+    expect(material.color, Theme.of(tester.element(source)).colorScheme.secondaryContainer);
+    await _key(tester, LogicalKeyboardKey.arrowLeft);
+    expect(_focus(tester, 'A').hasPrimaryFocus, isTrue);
+    expect(border().top.width, 3);
+    expect(border().top.color, Theme.of(tester.element(source)).colorScheme.primary);
+    await _key(tester, LogicalKeyboardKey.arrowRight);
+    expect(border().top.color, Colors.transparent);
+  });
+
   const actions = [
     '修改此来源的检索词',
     '使用别名检索此来源',

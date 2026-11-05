@@ -253,6 +253,102 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
   });
+  testWidgets('C15 real settings keeps hold and restores destroyed panel entry',
+      (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final downloads = Downloads();
+    final history = HistoryController(HistoryRepo());
+    final video = VideoState(history);
+    final player = PlayerController(Shader(), downloads, Audio())
+      ..bangumiId = 1
+      ..currentEpisode = 1
+      ..currentRoad = 0
+      ..currentDanmakuEpisodeNumber = 1
+      ..referer = '';
+    runInAction(() {
+      player.playback.loading = false;
+      player.playback.isBuffering = false;
+      player.playback.playerSpeed = 3.0;
+    });
+    final args = OnlineVideoPlaybackArgs(
+      bangumiItem: focusItem(1),
+      plugin: Plugin.fromJson(
+          {'name': 'test', 'baseURL': 'https://example.invalid'}),
+      title: 'Focus review',
+      src: 'https://example.invalid/series',
+      allowHistoryResume: false,
+      roads: List.generate(
+          2, (i) => Road(name: 'road$i', data: ['/ep1'], identifier: ['1'])),
+    );
+    await tester.pumpWidget(ModularApp(
+      module: createModule(register: (c) {
+        c.addInstance<MyController>(My());
+        c.addInstance<CollectController>(FocusCollectController());
+        c.addInstance<DownloadController>(downloads);
+        c.addInstance<HistoryController>(history);
+        c.route('/',
+            child: (_, __) => VideoPage(
+                args: args,
+                playerController: player,
+                videoPageController: video,
+                historyController: history,
+                downloadController: downloads));
+      }),
+      initialRoute: '/',
+      child: Builder(
+          builder: (context) => MaterialApp.router(
+              routerConfig: ModularApp.routerConfigOf(context))),
+    ));
+    Future<void> step() async {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    Future<void> key(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await step();
+    }
+
+    await step();
+    runInAction(() => video.showTabBody = false);
+    runInAction(() => player.panel.showVideoController = true);
+    await step();
+    final settings = find.byWidgetPredicate(
+        (w) => w is TvPlayerAction && w.label == '设置');
+    await tester.tap(settings);
+    await step();
+    for (final label in ['弹幕设置', '一起看']) {
+      final entry = find.byWidgetPredicate(
+          (w) => w is TvPlayerAction && w.label == label);
+      await tester.scrollUntilVisible(entry, 120,
+          scrollable: find.descendant(of: find.byType(TvPlayerSettingsPanel),
+              matching: find.byType(Scrollable)).first);
+      await tester.tap(entry);
+      await step();
+      expect(find.byType(TvPlayerSettingsPanel), findsNothing);
+      // The settings entry is destroyed and the auto-hide delay elapses.
+      await tester.pump(const Duration(seconds: 6));
+      expect(player.panel.canHidePlayerPanel, isFalse);
+      expect(player.panel.showVideoController, isTrue);
+      await key(LogicalKeyboardKey.escape);
+      expect(find.byType(TvPlayerSettingsPanel), findsOneWidget);
+      await step();
+      expect(FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<TvPlayerAction>()?.label, label);
+    }
+    await key(LogicalKeyboardKey.escape);
+    expect(find.byType(TvPlayerSettingsPanel), findsNothing);
+    expect(player.panel.canHidePlayerPanel, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
   for (final desktop in [false, true]) {
     testWidgets(
         'production player rebuild and state retention desktop=$desktop',

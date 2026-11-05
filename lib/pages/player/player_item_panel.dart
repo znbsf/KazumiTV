@@ -49,7 +49,19 @@ class _TvSettingsFocusOwner extends StatefulWidget {
 
 class _TvSettingsFocusOwnerState extends State<_TvSettingsFocusOwner> {
   final _entries = <String, FocusNode>{
-    for (final title in ['播放速度', '画面比例', '超分辨率', '定时停止'])
+    for (final title in [
+      '播放速度',
+      '画面比例',
+      '超分辨率',
+      '定时停止',
+      '弹幕设置',
+      '一起看',
+      '弹幕来源',
+      '更换播放源',
+      '播放信息',
+      '修改跳过时间',
+      '远程投屏',
+    ])
       title: FocusNode(debugLabel: 'Player settings entry $title'),
   };
 
@@ -101,7 +113,7 @@ class PlayerItemPanel extends StatefulWidget {
   final VideoPageController videoPageController;
   final void Function(BuildContext) onBackPressed;
   final Future<void> Function(double) setPlaybackSpeed;
-  final void Function() showDanmakuSwitch;
+  final Future<void> Function() showDanmakuSwitch;
   final void Function() toggleMenu;
   final void Function() handleFullscreen;
   final Future<void> Function() enterAndroidPictureInPicture;
@@ -117,8 +129,8 @@ class PlayerItemPanel extends StatefulWidget {
   final void Function() handleDanmaku;
   final void Function(String direction) handlePreNextEpisode;
   final void Function() skipOP;
-  final void Function() showVideoInfo;
-  final void Function() showSyncPlayPanel;
+  final Future<void> Function() showVideoInfo;
+  final Future<void> Function() showSyncPlayPanel;
   final VoidCallback pauseForTimedShutdown;
   final bool disableAnimations;
 
@@ -399,7 +411,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
     );
   }
 
-  void showForwardChange() => showPlayerForwardTimeDialog(playerController);
+  Future<void> showForwardChange() =>
+      showPlayerForwardTimeDialog(playerController);
 
   @override
   void initState() {
@@ -1113,26 +1126,24 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
         },
       );
 
-  Future<void> _selectSourceFromTvSettings() async {
-    await widget.selectSource?.call();
-    if (mounted &&
-        _bottomSettingsFocus.context != null &&
-        ModalRoute.of(context)?.isCurrent == true) {
-      _bottomSettingsFocus.requestFocus();
-    }
-  }
-
-  Future<void> _showTvSettings() async {
+  Future<void> _showTvSettings({String? returnSection}) async {
     if (_tvSettingsHandle != null) return;
     final handle = KazumiDialogHandle<void>();
     _tvSettingsHandle = handle;
     final hold = widget.acquirePlayerPanelHold();
     widget.onMenuVisibilityChanged(true);
     String section = '设置';
-    String? returnSection;
     VoidCallback? afterDismiss;
+    Future<void> Function()? panelAction;
+    String? panelEntry;
     void pick(VoidCallback action) {
       afterDismiss = action;
+      handle.dismiss();
+    }
+
+    void openPanel(String entry, Future<void> Function() action) {
+      panelEntry = entry;
+      panelAction = action;
       handle.dismiss();
     }
 
@@ -1231,7 +1242,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                   controls.add(
                     TvPlayerAction(
                       label: '自定义分钟',
-                      onPressed: () => pick(
+                      onPressed: () => openPanel(
+                        '定时停止',
                         () => TimedShutdownService.showCustomTimerDialog(
                           onExpired: widget.pauseForTimedShutdown,
                         ),
@@ -1246,8 +1258,11 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                           pick(() => widget.handlePreNextEpisode('prev')),
                     ),
                     TvPlayerAction(
+                      key: const ValueKey('弹幕设置'),
+                      focusNode: entryFocus['弹幕设置'],
                       label: '弹幕设置',
-                      onPressed: () => pick(
+                      onPressed: () => openPanel(
+                        '弹幕设置',
                         () => showDanmakuSettingsSheet(
                           context: this.context,
                           danmakuController:
@@ -1261,13 +1276,18 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                     ),
                     if (widget.selectSource != null)
                       TvPlayerAction(
+                        key: const ValueKey('更换播放源'),
+                        focusNode: entryFocus['更换播放源'],
                         label: '更换播放源',
-                        onPressed: () => pick(
-                            () => unawaited(_selectSourceFromTvSettings())),
+                        onPressed: () =>
+                            openPanel('更换播放源', widget.selectSource!),
                       ),
                     TvPlayerAction(
+                      key: const ValueKey('弹幕来源'),
+                      focusNode: entryFocus['弹幕来源'],
                       label: '弹幕来源',
-                      onPressed: () => pick(widget.showDanmakuSwitch),
+                      onPressed: () =>
+                          openPanel('弹幕来源', widget.showDanmakuSwitch),
                     ),
                     danmakuTextField,
                     TvPlayerAction(
@@ -1303,16 +1323,20 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                       ),
                     ),
                     TvPlayerAction(
+                      key: const ValueKey('播放信息'),
+                      focusNode: entryFocus['播放信息'],
                       label: '播放信息',
-                      onPressed: () => pick(widget.showVideoInfo),
+                      onPressed: () => openPanel('播放信息', widget.showVideoInfo),
                     ),
                     TvPlayerAction(
                       label: '跳过 ${playerController.playback.buttonSkipTime} 秒',
                       onPressed: () => pick(widget.skipOP),
                     ),
                     TvPlayerAction(
+                      key: const ValueKey('修改跳过时间'),
+                      focusNode: entryFocus['修改跳过时间'],
                       label: '修改跳过时间',
-                      onPressed: () => pick(showForwardChange),
+                      onPressed: () => openPanel('修改跳过时间', showForwardChange),
                     ),
                     Row(
                       children: [
@@ -1338,23 +1362,28 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                           pick(() => playerController.launchExternalPlayer()),
                     ),
                     TvPlayerAction(
+                      key: const ValueKey('远程投屏'),
+                      focusNode: entryFocus['远程投屏'],
                       label: '远程投屏',
-                      onPressed: () => pick(() {
+                      onPressed: () => openPanel('远程投屏', () async {
                         final resume = playerController.playback.playing;
                         playerController.pause();
-                        RemotePlay()
-                            .castVideo(
-                          playerController.videoUrl,
-                          videoPageController.currentPlugin.referer,
-                        )
-                            .whenComplete(() {
+                        try {
+                          await RemotePlay().castVideo(
+                            playerController.videoUrl,
+                            videoPageController.currentPlugin.referer,
+                          );
+                        } finally {
                           if (mounted && resume) playerController.play();
-                        });
+                        }
                       }),
                     ),
                     TvPlayerAction(
+                      key: const ValueKey('一起看'),
+                      focusNode: entryFocus['一起看'],
                       label: '一起看',
-                      onPressed: () => pick(widget.showSyncPlayPanel),
+                      onPressed: () =>
+                          openPanel('一起看', widget.showSyncPlayPanel),
                     ),
                     TvPlayerAction(
                       label: '截图',
@@ -1385,8 +1414,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                     initialFocusNode:
                         section == '设置' ? entryFocus[returnSection] : null,
                     initialFocusIndex: section == '设置' && returnSection != null
-                        ? controls.indexWhere(
-                            (control) => control.key == ValueKey(returnSection))
+                        ? controls.indexWhere((control) =>
+                            control.key == ValueKey(returnSection!))
                         : null,
                     onBack: back,
                     children: controls,
@@ -1397,13 +1426,37 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
           ),
         ),
       );
-    } finally {
       _tvSettingsHandle = null;
-      widget.onMenuVisibilityChanged(false);
-      hold.release();
+      if (mounted &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          panelAction != null) {
+        final revision = videoPageController.playbackRevision;
+        final episode = playerController.currentEpisode;
+        final road = playerController.currentRoad;
+        await panelAction!();
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            _tvSettingsHandle == null &&
+            videoPageController.playbackRevision == revision &&
+            playerController.currentEpisode == episode &&
+            playerController.currentRoad == road) {
+          // Acquire the next settings hold before releasing this one. The old
+          // entry nodes have gone; the new route owns fresh nodes at this entry.
+          unawaited(_showTvSettings(returnSection: panelEntry));
+        }
+      }
+    } finally {
+      if (identical(_tvSettingsHandle, handle)) _tvSettingsHandle = null;
       if (mounted) {
-        _bottomSettingsFocus.requestFocus();
+        widget.onMenuVisibilityChanged(false);
+        hold.release();
+        if (_tvSettingsHandle == null &&
+            ModalRoute.of(context)?.isCurrent == true) {
+          _bottomSettingsFocus.requestFocus();
+        }
         afterDismiss?.call();
+      } else {
+        hold.releaseSilently();
       }
     }
   }
@@ -2126,8 +2179,9 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
   }
 }
 
-void showPlayerForwardTimeDialog(PlayerController playerController) {
-  KazumiDialog.show(
+Future<void> showPlayerForwardTimeDialog(
+    PlayerController playerController) async {
+  await KazumiDialog.show<void>(
     builder: (context) {
       String input = "";
       return AlertDialog(

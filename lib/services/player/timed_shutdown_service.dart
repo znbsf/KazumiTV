@@ -131,10 +131,10 @@ class TimedShutdownService {
     }
   }
 
-  static void showCustomTimerDialog({
+  static Future<void> showCustomTimerDialog({
     VoidCallback? onExpired,
-  }) {
-    KazumiDialog.show(
+  }) async {
+    await KazumiDialog.show<void>(
       builder: (context) => _CustomTimerDialog(
         onExpired: onExpired,
       ),

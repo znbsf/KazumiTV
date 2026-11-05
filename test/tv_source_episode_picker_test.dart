@@ -94,6 +94,35 @@ void main() {
     }
   }
 
+  for (final scale in [1.0, 1.3]) {
+    testWidgets('manual picker labels only overflow and stay below title at $scale',
+        (tester) async {
+      TvMode.setEnabledForTesting(true);
+      tester.view.physicalSize = const Size(960, 540);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const long = '这是一个需要完整显示的非常非常长的剧集名称用于检查截断提示位置';
+      await _open(tester, _target([
+        Road(name: '线路', data: ['/1', '/2'], identifier: ['第一集', long]),
+      ]), scale: scale);
+      expect(find.text('第一集'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      expect(find.text(long), findsNWidgets(2));
+      final overlay = find.text(long).last;
+      expect(tester.getRect(overlay).top,
+          greaterThan(tester.getRect(find.text('选择新源集数')).bottom));
+      expect(tester.getRect(overlay).top, greaterThanOrEqualTo(
+          tester.getRect(find.byKey(const ValueKey('source-episode-0-2'))).bottom));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+      await tester.pumpAndSettle();
+      expect(find.text('第一集'), findsOneWidget);
+      expect(find.text(long), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('single playable road hides road list and skips empty URLs', (tester) async {
     TvMode.setEnabledForTesting(true);
     await _open(tester, _target([

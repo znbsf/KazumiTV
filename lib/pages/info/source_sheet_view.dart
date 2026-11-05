@@ -383,7 +383,6 @@ class _SourceSheetViewState extends State<SourceSheetView> {
             focusNode: node,
             focusScale: 1,
             ensureVisibleOnFocus: false,
-            highlighted: group.name == _selectedSource,
             onPressed: openMenu,
             onFocusChange: (focused) {
               if (focused) {
@@ -414,7 +413,9 @@ class _SourceSheetViewState extends State<SourceSheetView> {
               return KeyEventResult.handled;
             },
             child: Material(
-              color: theme.colorScheme.surfaceContainerLow,
+              color: group.name == _selectedSource
+                  ? theme.colorScheme.secondaryContainer
+                  : theme.colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 canRequestFocus: false,

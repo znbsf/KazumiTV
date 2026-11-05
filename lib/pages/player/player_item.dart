@@ -1592,17 +1592,14 @@ class _PlayerItemState extends State<PlayerItem>
         },
       );
 
-  void showVideoInfo() {
-    showVideoDetailsSheet(context, playerController: playerController);
-  }
+  Future<void> showVideoInfo() =>
+      showVideoDetailsSheet(context, playerController: playerController);
 
-  void showSyncPlayPanel() {
-    showSyncPlaySheet(
-      context,
-      playerController: playerController,
-      changeEpisode: widget.changeEpisode,
-    );
-  }
+  Future<void> showSyncPlayPanel() => showSyncPlaySheet(
+        context,
+        playerController: playerController,
+        changeEpisode: widget.changeEpisode,
+      );
 
   bool _needsFullPanel(BuildContext context) {
     if (TvMode.enabled && !videoPageController.isPip) {

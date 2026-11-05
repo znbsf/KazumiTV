@@ -292,6 +292,8 @@ class _TvSourceEpisodePickerState extends State<_TvSourceEpisodePicker> {
                                       return KeyEventResult.ignored;
                                     },
                                     child: TvFocusLabel(
+                                      onlyWhenTruncated: true,
+                                      preferBelow: true,
                                       message: entries[index].identity.title,
                                       child: TextButton(
                                         key: ValueKey(

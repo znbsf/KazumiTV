@@ -18,12 +18,12 @@ import 'package:kazumi/services/platform/tv_mode.dart';
 
 enum VideoDetailsTab { status, logs, remote }
 
-void showVideoDetailsSheet(
+Future<void> showVideoDetailsSheet(
   BuildContext context, {
   required PlayerController playerController,
   VideoDetailsTab initialTab = VideoDetailsTab.status,
-}) {
-  showAdaptiveBottomSheet<void>(
+}) async {
+  await showAdaptiveBottomSheet<void>(
     context: context,
     maxHeightFactor: 0.86,
     compactLandscapeMaxHeightFactor: 0.95,
