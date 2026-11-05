@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:antlr4/antlr4.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:kazumi/bean/widget/image_preview.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'bbcode_base_listener.dart';
@@ -189,10 +190,38 @@ class BBCodeWidgetState extends State<BBCodeWidget> {
                       tag: heroTag,
                       child: CachedNetworkImage(
                         imageUrl: e.imageUrl,
-                        placeholder: (context, url) =>
-                            const SizedBox(width: 1, height: 1),
+                        placeholder: (context, url) => TvMode.enabled
+                            ? const SizedBox(
+                                width: 180,
+                                height: 48,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.image_outlined, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('图片加载中',
+                                        style: TextStyle(fontSize: 14)),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox(width: 1, height: 1),
                         errorWidget: (context, error, stackTrace) {
-                          return const Text('.');
+                          return TvMode.enabled
+                              ? const SizedBox(
+                                  width: 180,
+                                  height: 48,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.broken_image_outlined,
+                                          size: 20),
+                                      SizedBox(width: 8),
+                                      Text('图片无法显示',
+                                          style: TextStyle(fontSize: 14)),
+                                    ],
+                                  ),
+                                )
+                              : const Text('.');
                         },
                       ),
                     ),

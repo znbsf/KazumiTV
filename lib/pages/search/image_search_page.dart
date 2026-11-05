@@ -142,6 +142,21 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
       _inputError = null;
     });
     try {
+      if (TvMode.enabled) {
+        var canPickImage = false;
+        try {
+          canPickImage = await const MethodChannel('com.predidit.kazumi/intent')
+                  .invokeMethod<bool>('canPickImage') ==
+              true;
+        } catch (_) {
+          // Missing/failed platform queries must not enter the unsafe picker.
+        }
+        if (!mounted) return;
+        if (!canPickImage) {
+          setState(() => _inputError = '这台电视没有系统图片选择器，请改用“图片链接”');
+          return;
+        }
+      }
       final image = await _picker.pickImage(source: ImageSource.gallery);
       if (image == null) return;
       final file = File(image.path);

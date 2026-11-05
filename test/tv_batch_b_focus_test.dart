@@ -353,6 +353,11 @@ void main() {
           .setMockMethodCallHandler(channel, (call) => pending.future);
       addTearDown(() => tester.binding.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null));
+      const intents = MethodChannel('com.predidit.kazumi/intent');
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(intents, (call) async => true);
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(intents, null));
       await _mount(tester, ImageSearchPage(controller: _Images()));
       _textFocus(tester, '选择截图').requestFocus();
       await tester.pump();

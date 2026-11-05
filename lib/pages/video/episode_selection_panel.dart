@@ -16,6 +16,7 @@ import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/bean/widget/tv_focus_label.dart';
+import 'package:kazumi/bean/widget/tv_idle_dismiss.dart';
 
 class EpisodeSelectionPanel extends StatefulWidget {
   const EpisodeSelectionPanel({
@@ -644,6 +645,9 @@ class _RoadSelectorState extends State<_RoadSelector> {
     _menuHistory = null;
     history?.remove();
     if (!mounted) return;
+    // MenuAnchor can finish its close animation after the closing key/focus
+    // event. A pushed route need not notify ModalRoute.of when history changes.
+    if (TvMode.enabled) TvIdleDismiss.notifyActivity(context);
     final previousFocus = _focusBeforeOpen;
     _focusBeforeOpen = null;
     if (previousFocus == null ||
