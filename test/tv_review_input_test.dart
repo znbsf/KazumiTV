@@ -126,6 +126,16 @@ void main() {
     expect(find.widgetWithText(InputChip, 'tag'), findsOneWidget);
     expect(tagFocus.hasFocus, true);
     expect(submissions, 0);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final keepEditing = find.widgetWithText(TextButton, '继续编辑');
+    expect(FocusManager.instance.primaryFocus?.context
+        ?.findAncestorWidgetOfExactType<TextButton>(),
+        same(tester.widget<TextButton>(keepEditing)));
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.text('放弃编辑？'), findsNothing);
+    expect(find.byType(RatingReviewDialog), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

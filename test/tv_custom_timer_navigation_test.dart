@@ -41,7 +41,7 @@ void main() {
     await _open(tester);
     expect(find.byType(Slider), findsNWidgets(2));
     expect(find.byType(CupertinoPicker), findsNothing);
-    await _key(tester, LogicalKeyboardKey.arrowDown);
+    // The hours slider is the dialog's initial focus on TV.
     await _key(tester, LogicalKeyboardKey.arrowLeft);
     expect(_value(tester, 0), 0);
     await _key(tester, LogicalKeyboardKey.arrowRight);
@@ -74,7 +74,7 @@ void main() {
       (tester) async {
     await _open(tester);
     expect(find.byType(Slider), findsNWidgets(2));
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 2; i++) {
       await _key(tester, LogicalKeyboardKey.arrowDown);
     }
     await _key(tester, LogicalKeyboardKey.arrowRight);

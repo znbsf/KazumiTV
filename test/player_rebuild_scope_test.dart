@@ -114,6 +114,163 @@ void main() {
     await Hive.close();
     await temp.delete(recursive: true);
   });
+  for (final tv in [true, false]) {
+    for (final closeDelay in [
+      const Duration(milliseconds: 50),
+      const Duration(milliseconds: 400),
+    ]) {
+      testWidgets('D01 real player comments reopen tv=$tv after $closeDelay', (
+        tester,
+      ) async {
+        TvMode.setEnabledForTesting(tv);
+        final previous = GStorage.getSetting(
+          SettingsKeys.playerDisableAnimations,
+        );
+        await tester.runAsync(
+          () =>
+              GStorage.putSetting(SettingsKeys.playerDisableAnimations, false),
+        );
+        addTearDown(
+          () => tester.runAsync(
+            () => GStorage.putSetting(
+              SettingsKeys.playerDisableAnimations,
+              previous,
+            ),
+          ),
+        );
+        addTearDown(() => TvMode.setEnabledForTesting(false));
+        tester.view.physicalSize = const Size(960, 540);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final downloads = Downloads();
+        final history = HistoryController(HistoryRepo());
+        final video = VideoState(history);
+        final player = PlayerController(Shader(), downloads, Audio())
+          ..bangumiId = 1
+          ..currentEpisode = 1
+          ..currentRoad = 0
+          ..currentDanmakuEpisodeNumber = 1
+          ..referer = '';
+        runInAction(() {
+          player.playback.loading = false;
+          player.playback.isBuffering = false;
+          player.playback.playerSpeed = 3.0;
+        });
+        final args = OnlineVideoPlaybackArgs(
+          bangumiItem: focusItem(1),
+          plugin: Plugin.fromJson({
+            'name': 'test',
+            'baseURL': 'https://example.invalid',
+          }),
+          title: 'Focus review',
+          src: 'https://example.invalid/series',
+          allowHistoryResume: false,
+          roads: List.generate(
+            2,
+            (i) => Road(
+              name: 'road$i',
+              data: ['/ep1', '/ep2'],
+              identifier: ['1', '2'],
+            ),
+          ),
+        );
+        await tester.pumpWidget(
+          ModularApp(
+            module: createModule(
+              register: (c) {
+                c.addInstance<MyController>(My());
+                c.addInstance<CollectController>(FocusCollectController());
+                c.addInstance<DownloadController>(downloads);
+                c.addInstance<HistoryController>(history);
+                c.route(
+                  '/',
+                  child: (_, __) => VideoPage(
+                    args: args,
+                    playerController: player,
+                    videoPageController: video,
+                    historyController: history,
+                    downloadController: downloads,
+                  ),
+                );
+              },
+            ),
+            initialRoute: '/',
+            child: Builder(
+              builder: (context) => MaterialApp.router(
+                routerConfig: ModularApp.routerConfigOf(context),
+              ),
+            ),
+          ),
+        );
+        Future<void> step() async {
+          for (var i = 0; i < 6; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+        }
+
+        await step();
+
+        runInAction(
+          () => video.selectedEpisode = const VideoEpisodeSelection(
+            episode: 2,
+            road: 0,
+          ),
+        );
+        player.currentEpisode = 2;
+        await step();
+        final tabs = tester.widget<TabBar>(find.byType(TabBar)).controller!;
+        await tester.tap(find.text('评论'));
+        await step();
+        expect(tabs.index, 1);
+        // Opening an already-visible rail must not reset the user's chosen tab.
+        expect(video.showTabBody, isTrue);
+        if (tv) {
+          await Navigator.of(tester.element(find.byType(VideoPage))).maybePop();
+        } else {
+          tester.widget<PlayerItem>(find.byType(PlayerItem)).toggleMenu();
+        }
+        await tester.pump();
+        await tester.pump(closeDelay);
+        expect(video.showTabBody, closeDelay.inMilliseconds < 120);
+        tester.widget<PlayerItem>(find.byType(PlayerItem)).toggleMenu();
+        // Check the first reopening frame too: a retained TabBarView must have
+        // built the episode page before the post-frame reveal looks up its key.
+        await tester.pump();
+        expect(tabs.index, tv ? 0 : 1);
+        if (tv) expect(find.byKey(const ValueKey('0:2')), findsOneWidget);
+        await step();
+        expect(video.showTabBody, isTrue);
+        if (tv) {
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'TV episode 0:2',
+          );
+        }
+        if (tv && closeDelay.inMilliseconds < 120) {
+          // Reopening mid-close while already on episodes must not leave a
+          // pending TabBarView remount for a later rebuild to apply.
+          await Navigator.of(tester.element(find.byType(VideoPage))).maybePop();
+          await tester.pump();
+          await tester.pump(closeDelay);
+          tester.widget<PlayerItem>(find.byType(PlayerItem)).toggleMenu();
+          await step();
+          final key = tester.widget<TabBarView>(find.byType(TabBarView)).key;
+          tabs.index = 1;
+          await step();
+          expect(tester.widget<TabBarView>(find.byType(TabBarView)).key, key);
+          tabs.index = 0;
+          await step();
+        }
+        await tester.tap(find.text('评论'));
+        await step();
+        expect(tabs.index, 1);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 1));
+      });
+    }
+  }
   testWidgets(
       'P-3/P-6 real player Back preserves rail and settings entry focus',
       (tester) async {

@@ -88,6 +88,7 @@ class _VideoPageState extends State<VideoPage>
 
   bool _tabBodyTargetVisible = true;
   int _tabBodyAnimationRun = 0;
+  int _tvTabBodyOpenRun = 0;
 
   late final bool disableAnimations;
 
@@ -432,6 +433,17 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void _setTabBodyVisible(bool visible, {required bool animated}) {
+    if (TvMode.enabled &&
+        visible &&
+        !_tabBodyTargetVisible &&
+        tabController.index != 0) {
+      tabController.index = 0;
+      // A retained TabBarView otherwise animates from comments and has no
+      // episode state for this opening frame's post-frame reveal. Only bump
+      // when the index changed: that notification applies the new key now,
+      // not on some later rebuild that would drop the focused episode.
+      _tvTabBodyOpenRun++;
+    }
     if (TvMode.enabled && visible) {
       playerController.panel.showVideoController = false;
     }
@@ -1017,6 +1029,7 @@ class _VideoPageState extends State<VideoPage>
           ),
           Expanded(
             child: TabBarView(
+              key: TvMode.enabled ? ValueKey(_tvTabBodyOpenRun) : null,
               controller: tabController,
               children: [
                 episodePanel,

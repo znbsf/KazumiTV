@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/bean/dialog/tv_dialog_initial_focus.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/card/rule_card.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/info/tv_detail_actions.dart';
@@ -56,7 +58,8 @@ class _FocusVisualFixtureState extends State<FocusVisualFixture> {
               OutlinedButton(
                   onPressed: () => showDialog<void>(
                       context: context,
-                      builder: (_) => Theme(
+                      builder: (_) {
+                        final dialog = Theme(
                           data: theme,
                           child: AlertDialog(
                               title: const Text('临时连接'),
@@ -65,7 +68,11 @@ class _FocusVisualFixtureState extends State<FocusVisualFixture> {
                                 TextButton(
                                     onPressed: () => Navigator.pop(context),
                                     child: const Text('退出'))
-                              ]))),
+                              ]));
+                        return TvMode.enabled
+                            ? TvDialogInitialFocus(child: dialog)
+                            : dialog;
+                      }),
                   child: const Text('弹窗')),
               const FilledButton(onPressed: null, child: Text('禁用')),
             ]),
