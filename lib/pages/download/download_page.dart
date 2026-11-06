@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -383,9 +384,9 @@ class _DownloadPageState extends State<DownloadPage> {
           TextButton(
             autofocus: TvMode.enabled,
             onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(
@@ -400,9 +401,9 @@ class _DownloadPageState extends State<DownloadPage> {
               await deletion;
               if (mounted && target != null) _restoreAfterDelete(target);
             },
-            child: Text(
+            child: TvButtonText(
               '删除',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
         ],
@@ -419,9 +420,9 @@ class _DownloadPageState extends State<DownloadPage> {
           TextButton(
             autofocus: TvMode.enabled,
             onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(
@@ -435,9 +436,9 @@ class _DownloadPageState extends State<DownloadPage> {
               await deletion;
               if (mounted && target != null) _restoreAfterDelete(target);
             },
-            child: Text(
+            child: TvButtonText(
               '删除',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
         ],

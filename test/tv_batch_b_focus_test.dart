@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -127,8 +129,16 @@ FocusNode _entryFocus(WidgetTester tester, Finder entry) => tester
         find.descendant(of: entry, matching: find.byType(TvFocusableSurface)))
     .focusNode!;
 
+Color? _buttonTextColor(WidgetTester tester, Finder button) => tester
+    .renderObject<RenderParagraph>(
+      find.descendant(of: button, matching: find.byType(RichText)),
+    )
+    .text
+    .style!
+    .color;
+
 Future<void> _mount(WidgetTester tester, Widget page,
-    {CollectController? collect, PluginsController? plugins}) async {
+    {CollectController? collect, PluginsController? plugins, bool themed = false}) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
@@ -144,6 +154,9 @@ Future<void> _mount(WidgetTester tester, Widget page,
       navigatorObservers: [KazumiDialog.observer],
       child: Builder(
           builder: (context) => MaterialApp.router(
+              theme: themed && TvMode.enabled
+                  ? TvVisuals.theme(ThemeData())
+                  : ThemeData(),
               routerConfig: ModularApp.routerConfigOf(context)))));
   await tester.pumpAndSettle();
 }
@@ -375,6 +388,197 @@ void main() {
     });
   }
 
+  Future<void> mountCollection(
+    WidgetTester tester, {
+    bool enabled = true,
+    ValueChanged<CollectType>? changed,
+  }) async {
+    await _mount(
+      tester,
+      Scaffold(
+        body: CollectLibraryView(
+          entries: List.generate(
+            4,
+            (i) => CollectedBangumi(
+              focusItem(i + 1),
+              DateTime(2026).subtract(Duration(minutes: i)),
+              CollectType.watching.value,
+            ),
+          ),
+          showRating: false,
+          onOpen: (_) {},
+          canEdit: (_) => enabled,
+          onChangeType: (_, type) => changed?.call(type),
+        ),
+      ),
+    );
+  }
+
+  Finder card(int id) => find.byKey(ValueKey('collect-$id'));
+  FocusNode cardFocus(WidgetTester tester, int id) => tester
+      .widget<InkWell>(
+        find.descendant(
+          of: card(id),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is InkWell &&
+                w.focusNode != null &&
+                w.focusNode!.debugLabel != 'TV collection status',
+          ),
+        ),
+      )
+      .focusNode!;
+  FilledButton statusButton(WidgetTester tester, int id) =>
+      tester.widget<FilledButton>(
+        find.descendant(of: card(id), matching: find.byType(FilledButton)),
+      );
+
+  testWidgets('D06 card Right enters status and Left returns to card', (
+    tester,
+  ) async {
+    await mountCollection(tester);
+    final focus = cardFocus(tester, 1);
+    focus.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(statusButton(tester, 1).focusNode!.hasPrimaryFocus, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(focus.hasPrimaryFocus, isTrue);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  // Separate tests: directional focus undoes a reversed move, which would make
+  // the second direction look like a trap after a manual requestFocus.
+  for (final direction in [
+    LogicalKeyboardKey.arrowUp,
+    LogicalKeyboardKey.arrowDown,
+  ]) {
+    testWidgets('D06 status leaves on ${direction.debugName}', (tester) async {
+      await mountCollection(tester);
+      final status = statusButton(tester, 1).focusNode!;
+      status.requestFocus();
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(direction);
+      await tester.pumpAndSettle();
+      expect(status.hasPrimaryFocus, isFalse);
+      expect(FocusManager.instance.primaryFocus, isNot(isA<FocusScopeNode>()));
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'D06 menu starts after disabled current status and Back restores trigger',
+    (tester) async {
+      await mountCollection(tester);
+      final focus = cardFocus(tester, 1);
+      focus.requestFocus();
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      final trigger = statusButton(tester, 1).focusNode!;
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      final current = tester.widget<MenuItemButton>(
+        find.widgetWithText(MenuItemButton, '在看'),
+      );
+      expect(current.onPressed, isNull);
+      expect(current.focusNode!.hasPrimaryFocus, isFalse);
+      final next = tester
+          .widget<MenuItemButton>(find.widgetWithText(MenuItemButton, '想看'))
+          .focusNode!;
+      expect(next.hasPrimaryFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<MenuItemButton>(find.widgetWithText(MenuItemButton, '搁置'))
+            .focusNode!
+            .hasPrimaryFocus,
+        isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expect(next.hasPrimaryFocus, isTrue);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(MenuItemButton), findsNothing);
+      expect(find.byType(CollectLibraryView), findsOneWidget);
+      expect(trigger.hasPrimaryFocus, isTrue);
+      await tester.pumpWidget(const SizedBox());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('D06 menu selection retains focus when card stays', (
+    tester,
+  ) async {
+    CollectType? selected;
+    var entries = [
+      CollectedBangumi(
+        focusItem(1),
+        DateTime(2026),
+        CollectType.watching.value,
+      ),
+    ];
+    await _mount(
+      tester,
+      StatefulBuilder(
+        builder: (context, rebuild) => Scaffold(
+          body: CollectLibraryView(
+            entries: entries,
+            showRating: false,
+            onOpen: (_) {},
+            canEdit: (_) => true,
+            onChangeType: (item, type) => rebuild(() {
+              selected = type;
+              entries = [CollectedBangumi(item, DateTime(2026), type.value)];
+            }),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('collect-filter-all')));
+    await tester.pumpAndSettle();
+    final trigger = statusButton(tester, 1).focusNode!;
+    trigger.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(selected, CollectType.planToWatch);
+    expect(find.byType(MenuItemButton), findsNothing);
+    expect(
+      find.descendant(of: card(1), matching: find.text('想看')),
+      findsOneWidget,
+    );
+    // The library's existing restoration owns focus after any change.
+    expect(cardFocus(tester, 1).hasPrimaryFocus, isTrue);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('D06 disabled status leaves Right to default card traversal', (
+    tester,
+  ) async {
+    await mountCollection(tester, enabled: false);
+    final focus = cardFocus(tester, 1);
+    focus.requestFocus();
+    await tester.pumpAndSettle();
+    expect(statusButton(tester, 1).onPressed, isNull);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(focus.hasPrimaryFocus, isFalse);
+    expect(FocusManager.instance.primaryFocus, isNot(isA<FocusScopeNode>()));
+    expect(find.byType(MenuItemButton), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
   for (final index in [0, 1, 2]) {
     testWidgets(
         'C-1 changed status restores neighbor or category at index $index',
@@ -400,9 +604,11 @@ void main() {
                                 .toList();
                           })))));
       final id = index == 2 ? 2 : index + 1;
-      final card = find.byKey(ValueKey('collect-$id'));
-      await tester
-          .tap(find.descendant(of: card, matching: find.byType(FilledButton)));
+      cardFocus(tester, id).requestFocus();
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(MenuItemButton, '看过'));
       await tester.pumpAndSettle();
@@ -410,14 +616,170 @@ void main() {
         expect(_textFocus(tester, '在看').hasPrimaryFocus, isTrue);
       } else {
         final nextId = index == 2 ? 3 : 1;
-        final target = find.descendant(
-            of: find.byKey(ValueKey('collect-$nextId')),
-            matching: find
-                .byWidgetPredicate((w) => w is InkWell && w.focusNode != null));
-        expect(
-            tester.widget<InkWell>(target).focusNode!.hasPrimaryFocus, isTrue);
+        expect(cardFocus(tester, nextId).hasPrimaryFocus, isTrue);
       }
     });
+  }
+
+  for (final tv in [true, false]) {
+    testWidgets('D07 real download dialog button ink tv=$tv', (tester) async {
+      TvMode.setEnabledForTesting(tv);
+      final downloads = _Downloads(1);
+      await _mount(tester, DownloadPage(controller: downloads), themed: true);
+      await tester.tap(find.byTooltip('删除').first);
+      await tester.pumpAndSettle();
+      final colors =
+          Theme.of(tester.element(find.byType(AlertDialog))).colorScheme;
+      if (tv) expect(_textFocus(tester, '取消').hasPrimaryFocus, isTrue);
+      _textFocus(tester, '取消').requestFocus();
+      await tester.pumpAndSettle();
+      expect(_textFocus(tester, '删除').hasFocus, isFalse);
+      expect(
+        _buttonTextColor(tester, find.widgetWithText(TextButton, '删除')),
+        colors.error,
+      );
+      for (final label in ['取消', '删除']) {
+        final button = find.widgetWithText(TextButton, label);
+        _textFocus(tester, label).requestFocus();
+        await tester.pumpAndSettle();
+        expect(_textFocus(tester, label).hasPrimaryFocus, isTrue);
+        expect(
+          _buttonTextColor(tester, button),
+          tv
+              ? colors.onPrimary
+              : label == '取消'
+                  ? colors.outline
+                  : colors.error,
+        );
+      }
+      expect(downloads.snapshots, hasLength(1));
+      await tester.tap(find.widgetWithText(TextButton, '取消'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('D07 moving dialog focus updates both button inks', (tester) async {
+    final downloads = _Downloads(1);
+    await _mount(tester, DownloadPage(controller: downloads), themed: true);
+    await tester.tap(find.byTooltip('删除').first);
+    await tester.pumpAndSettle();
+    final colors =
+        Theme.of(tester.element(find.byType(AlertDialog))).colorScheme;
+    final cancel = find.widgetWithText(TextButton, '取消');
+    final delete = find.widgetWithText(TextButton, '删除');
+    final cancelFocus = _textFocus(tester, '取消');
+    final deleteFocus = _textFocus(tester, '删除');
+    expect(cancelFocus.hasPrimaryFocus, isTrue);
+    expect(_buttonTextColor(tester, cancel), colors.onPrimary);
+    expect(_buttonTextColor(tester, delete), colors.error);
+
+    deleteFocus.requestFocus();
+    await tester.pumpAndSettle();
+    expect(cancelFocus.hasFocus, isFalse);
+    expect(deleteFocus.hasPrimaryFocus, isTrue);
+    expect(_buttonTextColor(tester, cancel), colors.outline);
+    expect(_buttonTextColor(tester, delete), colors.onPrimary);
+
+    cancelFocus.requestFocus();
+    await tester.pumpAndSettle();
+    expect(cancelFocus.hasPrimaryFocus, isTrue);
+    expect(deleteFocus.hasFocus, isFalse);
+    expect(_buttonTextColor(tester, cancel), colors.onPrimary);
+    expect(_buttonTextColor(tester, delete), colors.error);
+    expect(downloads.snapshots, hasLength(1));
+    await tester.tap(cancel);
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final tv in [true, false]) {
+    for (final kind in ['text', 'icon', 'menu']) {
+      testWidgets('D07 $kind label observes its own button focus tv=$tv',
+          (tester) async {
+        TvMode.setEnabledForTesting(tv);
+        final buttonFocus = FocusNode();
+        final outerFocus = FocusNode();
+        final otherFocus = FocusNode();
+        addTearDown(buttonFocus.dispose);
+        addTearDown(outerFocus.dispose);
+        addTearDown(otherFocus.dispose);
+        final base = ThemeData();
+        final colors = base.colorScheme;
+        final color = kind == 'icon'
+            ? Colors.white
+            : kind == 'menu'
+                ? colors.error
+                : colors.onErrorContainer;
+        final label = TvButtonText('action', color: color);
+        final Widget button = switch (kind) {
+          'icon' => TextButton.icon(
+              focusNode: buttonFocus,
+              onPressed: () {},
+              icon: const Icon(Icons.close),
+              label: const TvButtonText('action', color: Colors.white),
+            ),
+          'menu' => MenuItemButton(
+              focusNode: buttonFocus,
+              onPressed: () {},
+              child: label,
+            ),
+          _ => TextButton(
+              focusNode: buttonFocus,
+              onPressed: () {},
+              child: label,
+            ),
+        };
+        await tester.pumpWidget(MaterialApp(
+          theme: tv ? TvVisuals.theme(base) : base,
+          home: Scaffold(
+            body: Column(children: [
+              Focus(focusNode: outerFocus, child: button),
+              TextButton(
+                focusNode: otherFocus,
+                onPressed: () {},
+                child: const Text('other'),
+              ),
+            ]),
+          ),
+        ));
+        final text = find.byType(TvButtonText);
+        // The outer focus also hasFocus while the button is focused. Verify
+        // node identity so an ancestor dependency cannot mask a regression.
+        expect(
+          Focus.maybeOf(tester.element(text), createDependency: false),
+          same(buttonFocus),
+        );
+        outerFocus.requestFocus();
+        await tester.pumpAndSettle();
+        expect(buttonFocus.hasFocus, isFalse);
+        expect(_buttonTextColor(tester, text), color);
+
+        buttonFocus.requestFocus();
+        await tester.pumpAndSettle();
+        expect(buttonFocus.hasPrimaryFocus, isTrue);
+        // MenuItemButton merges its own defaults. Compare with the actual
+        // paired foreground without adding an inherited dependency in the test.
+        final foreground = tester
+            .element(text)
+            .getInheritedWidgetOfExactType<DefaultTextStyle>()!
+            .style
+            .color;
+        expect(_buttonTextColor(tester, text), tv ? foreground : color);
+        if (tv) {
+          expect(tester.widget<Text>(find.text('action')).style?.color, isNull);
+        }
+
+        otherFocus.requestFocus();
+        await tester.pumpAndSettle();
+        expect(buttonFocus.hasFocus, isFalse);
+        expect(_buttonTextColor(tester, text), color);
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   for (final count in [1, 2]) {

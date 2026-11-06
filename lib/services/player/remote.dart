@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:dlna_dart/dlna.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -25,9 +26,9 @@ class RemotePlay {
               onPressed: () {
                 KazumiDialog.dismiss();
               },
-              child: Text(
+              child: TvButtonText(
                 '退出',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
             TextButton(
@@ -73,10 +74,9 @@ class RemotePlay {
                   //   );
                   // });
                 },
-                child: Text(
+                child: TvButtonText(
                   '搜索',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.outline),
+                  color: Theme.of(context).colorScheme.outline,
                 )),
           ],
         );

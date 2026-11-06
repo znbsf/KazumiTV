@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
@@ -255,7 +256,7 @@ class HistoryRecordTile extends StatelessWidget {
             leadingIcon:
                 Icon(Icons.delete_outline_rounded, color: colors.error),
             onPressed: onDelete,
-            child: Text('删除记录', style: TextStyle(color: colors.error)),
+            child: TvButtonText('删除记录', color: colors.error),
           ),
         ],
         builder: (context, controller, child) => IconButton(

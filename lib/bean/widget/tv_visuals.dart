@@ -1,4 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+
+/// Preserves semantic ink until a TV button supplies its focused foreground.
+class TvButtonText extends StatelessWidget {
+  const TvButtonText(
+    this.data, {
+    super.key,
+    required this.color,
+  });
+
+  final String data;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    // Read focus from inside the button, and subscribe even while unfocused.
+    final focused = TvMode.enabled && (Focus.maybeOf(context)?.hasFocus ?? false);
+    return Text(data, style: focused ? null : TextStyle(color: color));
+  }
+}
 
 /// TV visual tokens ported from native main KazumiTheme.kt (24bc50ef).
 abstract final class TvVisuals {

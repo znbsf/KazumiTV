@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/card/network_img_layer.dart';
@@ -152,10 +153,9 @@ class DownloadRecordSliver extends StatelessWidget {
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    child: Text(
+                                    child: TvButtonText(
                                       '全部删除',
-                                      style:
-                                          TextStyle(color: colorScheme.error),
+                                      color: colorScheme.error,
                                     ),
                                   ),
                                 ],

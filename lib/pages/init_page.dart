@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/pages/my/my_controller.dart';
@@ -139,10 +140,9 @@ class _InitPageState extends State<InitPage> {
             actions: [
               TextButton(
                 onPressed: () => KazumiDialog.dismiss(popWith: false),
-                child: Text(
+                child: TvButtonText(
                   '稍后再说',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.outline),
+                  color: Theme.of(context).colorScheme.outline,
                 ),
               ),
               TextButton(
@@ -256,10 +256,9 @@ class _InitPageState extends State<InitPage> {
                   onPressed: () {
                     exit(0);
                   },
-                  child: Text(
+                  child: TvButtonText(
                     '退出',
-                    style:
-                        TextStyle(color: Theme.of(context).colorScheme.outline),
+                    color: Theme.of(context).colorScheme.outline,
                   ),
                 ),
                 TextButton(
@@ -290,8 +289,8 @@ class _InitPageState extends State<InitPage> {
         actions: [
           TextButton(
             onPressed: () => KazumiDialog.dismiss(popWith: false),
-            child: Text('暂不创建',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline)),
+            child: TvButtonText('暂不创建',
+                color: Theme.of(context).colorScheme.outline),
           ),
           TextButton(
             onPressed: () => KazumiDialog.dismiss(popWith: true),

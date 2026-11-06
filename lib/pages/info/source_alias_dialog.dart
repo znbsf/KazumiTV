@@ -63,9 +63,9 @@ class _AliasPickerDialogState extends State<_AliasPickerDialog> {
         actions: [
           TextButton(
             onPressed: KazumiDialog.dismiss,
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(

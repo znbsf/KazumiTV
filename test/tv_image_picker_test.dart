@@ -56,6 +56,51 @@ void main() {
     messenger.setMockMethodCallHandler(pickerChannel, null);
   });
 
+  for (final size in [const Size(960, 540), const Size(560, 540)]) {
+    testWidgets(
+      'D08 missing picker keeps error and full action visible at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (_) async => false,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ImageSearchPage(controller: FocusSearchController()),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final action = find.byKey(const ValueKey('image-search-primary'));
+        await tester.ensureVisible(action);
+        tester.widget<FilledButton>(action).focusNode!.requestFocus();
+        await tester.pumpAndSettle();
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+        await tester.pumpAndSettle();
+        final viewport = tester.getRect(
+          find.ancestor(of: action, matching: find.byType(Scrollable)).first,
+        );
+        for (final target in [action, find.text(message)]) {
+          final rect = tester.getRect(target);
+          expect(rect.left, greaterThanOrEqualTo(viewport.left));
+          expect(rect.right, lessThanOrEqualTo(viewport.right));
+          expect(rect.top, greaterThanOrEqualTo(viewport.top));
+          expect(rect.bottom, lessThanOrEqualTo(viewport.bottom));
+        }
+        expect(
+          tester.widget<FilledButton>(action).focusNode!.hasPrimaryFocus,
+          isTrue,
+        );
+        expect(pickerCalls, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+      },
+    );
+  }
+
   for (final scenario in ['missing', 'available', 'throws', 'phone']) {
     testWidgets('image picker availability: $scenario', (tester) async {
       var queries = 0;

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/widget/tv_dialog_text_entry.dart';
 import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
@@ -196,9 +197,9 @@ class _PlayerSettingsPageState extends State<PlayerSettingsPage> {
         actions: <Widget>[
           TextButton(
             onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(

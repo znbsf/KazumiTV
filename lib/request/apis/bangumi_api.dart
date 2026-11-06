@@ -463,7 +463,6 @@ class BangumiApi {
   }
 
   static Future<EpisodeInfo> getBangumiEpisodeByID(int id, int episode) async {
-    EpisodeInfo episodeInfo = EpisodeInfo.fromTemplate();
     var params = <String, dynamic>{
       'subject_id': id,
       'offset': episode - 1,
@@ -474,11 +473,11 @@ class BangumiApi {
         ApiEndpoints.bangumiAPIDomain + ApiEndpoints.bangumiEpisodeByID,
         queryParameters: params,
       );
-      episodeInfo = EpisodeInfo.fromJson(jsonData['data'][0]);
+      return EpisodeInfo.fromJson(jsonData['data'][0]);
     } catch (e) {
       KazumiLogger().e('Network: resolve bangumi episode failed', error: e);
+      rethrow;
     }
-    return episodeInfo;
   }
 
   static Future<List<EpisodeInfo>> getBangumiEpisodesByID(int id) async {

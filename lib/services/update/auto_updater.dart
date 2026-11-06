@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -315,17 +316,16 @@ class AutoUpdater {
                   KazumiDialog.dismiss();
                   KazumiDialog.showToast(message: '已关闭自动更新');
                 },
-                child: Text(
+                child: TvButtonText(
                   '关闭自动更新',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.outline),
+                  color: Theme.of(context).colorScheme.outline,
                 ),
               ),
             TextButton(
               onPressed: () => KazumiDialog.dismiss(),
-              child: Text(
+              child: TvButtonText(
                 '稍后提醒',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
             if (updateInfo.releaseNotes.isNotEmpty)
@@ -601,9 +601,9 @@ class AutoUpdater {
           actions: [
             TextButton(
               onPressed: () => KazumiDialog.dismiss(),
-              child: Text(
+              child: TvButtonText(
                 '稍后安装',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
             if (isDesktop())

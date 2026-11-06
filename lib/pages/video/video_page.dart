@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:canvas_danmaku/models/danmaku_content_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -837,8 +838,10 @@ class _VideoPageState extends State<VideoPage>
                                       playerController: playerController),
                               icon:
                                   const Icon(Icons.close, color: Colors.white),
-                              label: const Text('取消加载',
-                                  style: TextStyle(color: Colors.white)),
+                              label: const TvButtonText(
+                                '取消加载',
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),

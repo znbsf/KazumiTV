@@ -154,6 +154,14 @@ class _ImageSearchPageState extends State<ImageSearchPage> {
         if (!mounted) return;
         if (!canPickImage) {
           setState(() => _inputError = '这台电视没有系统图片选择器，请改用“图片链接”');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+            final buttonContext = _primaryFocus.context;
+            if (buttonContext == null || !buttonContext.mounted) return;
+            // The error adds height after focus has already scrolled into view.
+            Scrollable.ensureVisible(buttonContext,
+                alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+          });
           return;
         }
       }

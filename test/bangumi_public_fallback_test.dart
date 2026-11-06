@@ -4,6 +4,10 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:kazumi/pages/video/video_controller.dart';
+import 'package:kazumi/pages/history/history_controller.dart';
+import 'package:kazumi/repositories/download_repository.dart';
+import 'package:kazumi/services/download/download_manager.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
@@ -61,6 +65,50 @@ void main() {
         startsWith('bangumi_public_routes_'));
     await temp.delete(recursive: true);
   });
+
+  for (final throughController in [false, true]) {
+    test(
+      'episode timeouts throw without episode zero comments controller=$throughController',
+      () async {
+        adapter.respond = (options, _) => throw DioException(
+              requestOptions: options,
+              type: DioExceptionType.connectionTimeout,
+            );
+        final controller = VideoPageController(
+          _History(),
+          _Downloads(),
+          _Manager(),
+        );
+        addTearDown(controller.dispose);
+        await expectLater(
+          throughController
+              ? controller.queryBangumiEpisodeCommentsByID(123, 2)
+              : BangumiApi.getBangumiEpisodeByID(123, 2),
+          throwsA(isA<NetworkException>()),
+        );
+        expect(adapter.requests, hasLength(3));
+        expect(
+          adapter.requests.every(
+            (request) => request.uri.path == '/v0/episodes',
+          ),
+          isTrue,
+        );
+        expect(adapter.requests.last.uri.host, 'api.bgm.tv');
+        expect(adapter.requests.last.uri.queryParameters, {
+          'subject_id': '123',
+          'offset': '1',
+          'limit': '1',
+        });
+        expect(
+          adapter.requests.where(
+            (request) => request.uri.path == '/p1/episodes/0/comments',
+          ),
+          isEmpty,
+        );
+        expect(controller.episodeCommentsList, isEmpty);
+      },
+    );
+  }
 
   for (final kind in ['subjects', 'episodes', 'characters']) {
     test('$kind comments use anonymous compatible p1 route', () async {
@@ -312,4 +360,19 @@ class _Paths extends PathProviderPlatform {
   final String path;
   @override
   Future<String?> getApplicationSupportPath() async => path;
+}
+
+class _History implements HistoryController {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Downloads implements IDownloadRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _Manager implements IDownloadManager {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

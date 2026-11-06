@@ -1,11 +1,15 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:kazumi/bean/dialog/dialog_helper.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/modules/plugin/plugin_http_module.dart';
+import 'package:kazumi/navigation.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_catalog_view.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_shop_page.dart';
 import 'package:kazumi/pages/plugin_editor/plugin_view_page.dart';
@@ -21,6 +25,28 @@ class _Paths extends PathProviderPlatform {
   final String path;
   @override
   Future<String?> getApplicationSupportPath() async => path;
+}
+
+class _MissingFilePicker extends FilePicker {
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = false,
+    int compressionQuality = 0,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async {
+    expect(type, FileType.custom);
+    expect(allowedExtensions, ['json']);
+    throw PlatformException(code: 'invalid_format_type');
+  }
 }
 
 class _Fixture {
@@ -62,6 +88,7 @@ class _Fixture {
     await controller.ensurePluginCatalog();
     await tester.pumpWidget(ModularApp(
       navigatorKey: nav,
+      navigatorObservers: [KazumiDialog.observer],
       module: createModule(register: (c) {
         c.route('/tab/my',
             child: (_, __) => const Scaffold(body: Text('My fixture')));
@@ -77,6 +104,7 @@ class _Fixture {
       initialRoute: shop ? '/settings/plugin/shop' : '/settings/plugin',
       child: Builder(
           builder: (context) => MaterialApp.router(
+              scaffoldMessengerKey: rootScaffoldMessengerKey,
               routerConfig: ModularApp.routerConfigOf(context))),
     ));
     await tester.pumpAndSettle();
@@ -130,6 +158,40 @@ void main() {
     await Hive.close();
     PathProviderPlatform.instance = oldPaths;
     await directory.delete(recursive: true);
+  });
+
+  testWidgets('D05 missing file picker offers named alternative imports', (
+    tester,
+  ) async {
+    FilePicker? original;
+    try {
+      original = FilePicker.platform;
+    } catch (_) {
+      // The platform registrant is absent in some widget test hosts.
+    }
+    FilePicker.platform = _MissingFilePicker();
+    addTearDown(() => FilePicker.platform = original ?? FilePickerIO());
+    final fixture = _Fixture();
+    await fixture.mount(tester, shop: false);
+    await tester.tap(find.widgetWithText(FilledButton, '添加规则'));
+    await tester.pumpAndSettle();
+    expect(find.text('从剪贴板导入'), findsOneWidget);
+    expect(find.text('浏览规则仓库'), findsOneWidget);
+    await tester.tap(find.text('从文件导入'));
+    await tester.pumpAndSettle();
+    final toast = find.byType(SnackBar);
+    expect(toast, findsOneWidget);
+    expect(
+      find.descendant(
+        of: toast,
+        matching: find.text('这台设备没有系统文件选择器，请改用“从剪贴板导入”或“浏览规则仓库”'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('PlatformException'), findsNothing);
+    fixture.expectUnchanged();
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
   });
 
   for (final shop in [false, true]) {

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/bean/widget/tv_dialog_text_entry.dart';
 import 'package:flutter/material.dart';
@@ -812,9 +813,9 @@ void showSmallestPlayerForwardTimeDialog(PlayerController playerController) {
       actions: <Widget>[
         TextButton(
           onPressed: () => KazumiDialog.dismiss(),
-          child: Text(
+          child: TvButtonText(
             '取消',
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            color: Theme.of(context).colorScheme.outline,
           ),
         ),
         TextButton(
