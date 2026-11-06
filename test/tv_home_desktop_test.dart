@@ -11,7 +11,6 @@ import 'package:kazumi/bean/card/bangumi_card.dart';
 import 'package:kazumi/bean/widget/tv_artwork.dart';
 import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
-import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/navigation.dart';
 import 'package:kazumi/pages/popular/popular_page.dart';
@@ -169,6 +168,33 @@ void main() {
     TvMode.setEnabledForTesting(false);
   });
 
+  testWidgets('focused function captions appear once without an overlay copy',
+      (tester) async {
+    await _mount(tester);
+    const labels = ['设置', '手机遥控', '搜索', '排期', '历史', '收藏'];
+    _node(tester, 'TV function 4').requestFocus();
+    await tester.pumpAndSettle();
+    for (var i = 0; i < labels.length; i++) {
+      final label = labels[i];
+      final surface = find.ancestor(
+          of: find.text(label), matching: find.byType(TvFocusableSurface));
+      expect(
+          tester.widget<TvFocusableSurface>(surface).focusNode!.hasPrimaryFocus,
+          isTrue);
+      // Search the whole mounted tree, including OverlayPortal's overlay.
+      expect(find.text(label), findsOneWidget);
+      expect(
+          find.ancestor(
+              of: find.text(label), matching: find.byType(OverlayPortal)),
+          findsNothing);
+      if (i + 1 < labels.length) {
+        await _press(tester, LogicalKeyboardKey.arrowRight);
+      }
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
   for (final viewport in [const Size(960, 540), const Size(1280, 720)]) {
     for (final scale in [1.0, 1.3]) {
       testWidgets('TV navigation captions fit at $viewport text $scale',
@@ -188,18 +214,15 @@ void main() {
               of: text, matching: find.byType(TvFocusableSurface));
           tester.widget<TvFocusableSurface>(surface).focusNode!.requestFocus();
           await tester.pumpAndSettle();
-          final fullName = find.byWidgetPredicate((w) =>
-              w is Text && w.data == label &&
-              w.style?.height == TvVisuals.control.height);
-          expect(fullName, findsOneWidget);
-          expect(tester.widget<Text>(fullName).style?.fontSize, 14);
-          expect(find.ancestor(of: fullName, matching: find.byType(FittedBox)),
-              findsNothing);
-          final fullRect = tester.getRect(fullName);
-          expect(fullRect.left, greaterThanOrEqualTo(0));
-          expect(fullRect.top, greaterThanOrEqualTo(0));
-          expect(fullRect.right, lessThanOrEqualTo(viewport.width));
-          expect(fullRect.bottom, lessThanOrEqualTo(viewport.height));
+          expect(
+              tester
+                  .widget<TvFocusableSurface>(surface)
+                  .focusNode!
+                  .hasPrimaryFocus,
+              isTrue);
+          expect(find.text(label), findsOneWidget);
+          expect(find.ancestor(of: text, matching: find.byType(FittedBox)),
+              findsOneWidget);
           expect(tester.getRect(text), rect);
         }
         expect(tester.takeException(), isNull);

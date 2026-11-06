@@ -11,7 +11,6 @@ import 'package:kazumi/pages/router.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/platform/tv_channel_input.dart';
 import 'package:kazumi/bean/widget/tv_focus_navigation.dart';
-import 'package:kazumi/bean/widget/tv_focus_label.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/bean/widget/tv_desktop_navigation.dart';
 import 'package:kazumi/bean/widget/phone_keyboard_control.dart';
@@ -528,77 +527,73 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
         children: [
           for (var i = 0; i < entries.length; i++)
             Expanded(
-              // The focus name stays readable outside the compact FittedBox.
-              child: TvFocusLabel(
-                message: entries[i].$2,
-                child: TvFocusableSurface(
-                  focusNode: nodes[i],
-                  focusScale: 1,
-                  borderRadius: 12,
-                  ensureVisibleOnFocus: false,
-                  onKeyEvent: (_, event) {
-                    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
-                      return KeyEventResult.ignored;
-                    }
-                    if (!event.synthesized) {
-                      _tvInputEpoch++;
-                    }
-                    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                      enterContent();
-                      return KeyEventResult.handled;
-                    }
-                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                      if (i > 0) {
-                        nodes[i - 1].requestFocus();
-                      }
-                      return KeyEventResult.handled;
-                    }
-                    if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                      if (i + 1 < nodes.length) {
-                        nodes[i + 1].requestFocus();
-                      } else {
-                        final categories =
-                            _contentFocusScope.traversalDescendants.where(
-                          (n) =>
-                              TvDesktopNavigation.homeFocusOf(n)?.kind ==
-                                  TvHomeFocusKind.category &&
-                              TvDesktopNavigation.homeFocusOf(n)?.category ==
-                                  '' &&
-                              n.context != null,
-                        );
-                        if (categories.isNotEmpty) {
-                          categories.first.requestFocus();
-                        }
-                      }
-                      return KeyEventResult.handled;
-                    }
+              child: TvFocusableSurface(
+                focusNode: nodes[i],
+                focusScale: 1,
+                borderRadius: 12,
+                ensureVisibleOnFocus: false,
+                onKeyEvent: (_, event) {
+                  if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
                     return KeyEventResult.ignored;
-                  },
-                  onPressed: () {
-                    final index = entries[i].$1;
-                    if (index == -2) {
-                      unawaited(showDialog<void>(
-                          context: context,
-                          builder: (_) => const PhoneKeyboardDialog()));
-                    } else if (index == -1) {
-                      context.pushNamed('/search/');
-                    } else {
-                      _selectDestination(index);
+                  }
+                  if (!event.synthesized) {
+                    _tvInputEpoch++;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                    enterContent();
+                    return KeyEventResult.handled;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                    if (i > 0) {
+                      nodes[i - 1].requestFocus();
                     }
-                  },
-                  child: SizedBox(
-                    height: 40,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(entries[i].$3, size: 16),
-                          const SizedBox(width: 4),
-                          Text(entries[i].$2,
-                              style: const TextStyle(fontSize: 14)),
-                        ],
-                      ),
+                    return KeyEventResult.handled;
+                  }
+                  if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                    if (i + 1 < nodes.length) {
+                      nodes[i + 1].requestFocus();
+                    } else {
+                      final categories =
+                          _contentFocusScope.traversalDescendants.where(
+                        (n) =>
+                            TvDesktopNavigation.homeFocusOf(n)?.kind ==
+                                TvHomeFocusKind.category &&
+                            TvDesktopNavigation.homeFocusOf(n)?.category ==
+                                '' &&
+                            n.context != null,
+                      );
+                      if (categories.isNotEmpty) {
+                        categories.first.requestFocus();
+                      }
+                    }
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                onPressed: () {
+                  final index = entries[i].$1;
+                  if (index == -2) {
+                    unawaited(showDialog<void>(
+                        context: context,
+                        builder: (_) => const PhoneKeyboardDialog()));
+                  } else if (index == -1) {
+                    context.pushNamed('/search/');
+                  } else {
+                    _selectDestination(index);
+                  }
+                },
+                child: SizedBox(
+                  height: 40,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(entries[i].$3, size: 16),
+                        const SizedBox(width: 4),
+                        Text(entries[i].$2,
+                            style: const TextStyle(fontSize: 14)),
+                      ],
                     ),
                   ),
                 ),

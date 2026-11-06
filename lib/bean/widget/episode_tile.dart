@@ -86,6 +86,6 @@ class EpisodeTile extends StatelessWidget {
         ),
       ),
     );
-    return TvFocusLabel(message: label, child: tile);
+    return TvFocusLabel(message: label, onlyWhenTruncated: true, child: tile);
   }
 }

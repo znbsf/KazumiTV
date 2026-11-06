@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/bean/widget/episode_tile.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
@@ -7,6 +8,46 @@ import 'package:kazumi/services/platform/tv_mode.dart';
 void main() {
   setUp(() => TvMode.setEnabledForTesting(true));
   tearDown(() => TvMode.setEnabledForTesting(false));
+
+  for (final truncated in [false, true]) {
+    testWidgets(
+        'TV episode focus shows full name only if truncated: $truncated',
+        (tester) async {
+      final node = FocusNode();
+      final other = FocusNode();
+      addTearDown(node.dispose);
+      addTearDown(other.dispose);
+      final label = truncated ? '这是需要完整阅读的很长很长的剧集名称，包含两行也无法显示的后半段剧情标题' : '第1集';
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: Column(children: [
+        SizedBox(
+            width: 150,
+            child: EpisodeTile(
+                label: label,
+                isPlaying: false,
+                focusNode: node,
+                onPressed: () {})),
+        TextButton(
+            focusNode: other, onPressed: () {}, child: const Text('other')),
+      ]))));
+      final caption = find.descendant(
+          of: find.byType(EpisodeTile), matching: find.text(label));
+      final before = tester.getRect(find.byType(EpisodeTile));
+      expect(tester.renderObject<RenderParagraph>(caption).didExceedMaxLines,
+          truncated);
+      node.requestFocus();
+      await tester.pumpAndSettle();
+      expect(node.hasPrimaryFocus, isTrue);
+      expect(find.text(label), findsNWidgets(truncated ? 2 : 1));
+      expect(tester.getRect(find.byType(EpisodeTile)), before);
+      other.requestFocus();
+      await tester.pumpAndSettle();
+      expect(find.text(label), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   for (final width in [360.0, 403.2, 440.0]) {
     for (final scale in [1.0, 1.25, 1.3, 1.5]) {
