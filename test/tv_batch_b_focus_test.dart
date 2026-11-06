@@ -513,6 +513,57 @@ void main() {
     },
   );
 
+  testWidgets('D06 shell Back consumes nested menu history before going home',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(FocusFixtureApp(
+      initialRoute: '/tab/collect/',
+      popularBuilder: (_) => const Center(child: Text('home content')),
+      collectionPage: CollectLibraryView(
+        entries: [
+          CollectedBangumi(
+              focusItem(1), DateTime(2026), CollectType.watching.value),
+        ],
+        showRating: false,
+        onOpen: (_) {},
+        canEdit: (_) => true,
+        onChangeType: (_, __) {},
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final library = tester.state(find.byType(CollectLibraryView));
+    final context = tester.element(find.byType(CollectLibraryView));
+    final navigator = Navigator.of(context);
+    final route = ModalRoute.of(context)!;
+    expect(navigator, isNot(same(rootNavigatorKey.currentState)));
+    final trigger = statusButton(tester, 1).focusNode!;
+    trigger.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byType(MenuItemButton), findsWidgets);
+    expect(route.willHandlePopInternally, isTrue);
+
+    // Same entry point as TvAppShell's platform Back, through the real shell.
+    await rootNavigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+    expect(route.willHandlePopInternally, isFalse);
+    expect(find.byType(MenuItemButton), findsNothing);
+    expect(tester.state(find.byType(CollectLibraryView)), same(library));
+    expect(find.text('home content'), findsNothing);
+    expect(trigger.hasPrimaryFocus, isTrue);
+
+    await rootNavigatorKey.currentState!.maybePop();
+    await tester.pumpAndSettle();
+    expect(find.byType(CollectLibraryView), findsNothing);
+    expect(find.text('home content'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('D06 menu selection retains focus when card stays', (
     tester,
   ) async {
@@ -575,6 +626,57 @@ void main() {
     expect(focus.hasPrimaryFocus, isFalse);
     expect(FocusManager.instance.primaryFocus, isNot(isA<FocusScopeNode>()));
     expect(find.byType(MenuItemButton), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('D06 removing last collection restores current category focus',
+      (tester) async {
+    var entries = [
+      CollectedBangumi(
+          focusItem(1), DateTime(2026), CollectType.watching.value),
+    ];
+    CollectType? selected;
+    await _mount(
+      tester,
+      StatefulBuilder(
+        builder: (context, rebuild) => Scaffold(
+          body: CollectLibraryView(
+            entries: entries,
+            showRating: false,
+            onOpen: (_) {},
+            canEdit: (_) => true,
+            onChangeType: (item, type) => rebuild(() {
+              selected = type;
+              entries = [];
+            }),
+          ),
+        ),
+      ),
+    );
+    final category = tester
+        .widget<InkWell>(find.descendant(
+          of: find.byKey(
+              ValueKey('collect-filter-${CollectType.watching.value}')),
+          matching: find.byType(InkWell),
+        ))
+        .focusNode!;
+    statusButton(tester, 1).focusNode!.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    final remove = tester
+        .widget<MenuItemButton>(find.widgetWithText(MenuItemButton, '取消收藏'))
+        .focusNode!;
+    remove.requestFocus();
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(selected, CollectType.none);
+    expect(entries, isEmpty);
+    expect(card(1), findsNothing);
+    expect(find.byType(MenuItemButton), findsNothing);
+    expect(category.hasPrimaryFocus, isTrue);
     await tester.pumpWidget(const SizedBox());
     expect(tester.takeException(), isNull);
   });

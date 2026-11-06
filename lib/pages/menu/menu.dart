@@ -289,6 +289,22 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   }
 
   void _handleSystemBack(BuildContext context) {
+    final navigator = outletNavigatorOf(_outletKey.currentContext);
+    Route<dynamic>? top;
+    // Returning true immediately only inspects the top route; nothing is popped.
+    navigator?.popUntil((route) {
+      top = route;
+      return true;
+    });
+    // RouterOutlet.maybePop bypasses local history. Consume it on the real
+    // Navigator before applying the existing page/destination back behavior.
+    final route = top;
+    if (route is ModalRoute && route.willHandlePopInternally) {
+      navigator!.pop();
+      _lastExitPromptAt = null;
+      return;
+    }
+
     if (_outletKey.currentState?.maybePop() ?? false) {
       _lastExitPromptAt = null;
       return;
