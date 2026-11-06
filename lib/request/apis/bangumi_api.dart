@@ -93,6 +93,8 @@ class BangumiApi {
       }
     } catch (e) {
       KazumiLogger().e('Resolve bangumi list failed', error: e);
+      // A failed page must differ from a successful page with seven empty days.
+      return [];
     }
     try {
       for (int weekday = 1; weekday <= 7; weekday++) {
@@ -230,16 +232,19 @@ class BangumiApi {
         ApiEndpoints.bangumiAPINextDomain + ApiEndpoints.bangumiTrendsNext,
         queryParameters: params,
       );
-      final jsonList = jsonData['data'];
-      for (dynamic jsonItem in jsonList) {
-        if (jsonItem is Map<String, dynamic>) {
-          bangumiList.add(BangumiItem.fromJson(jsonItem['subject']));
-        }
-      }
+      bangumiList.addAll(_parseTrendSubjects(jsonData));
     } catch (e) {
       KazumiLogger().e('Network: resolve bangumi trends list failed', error: e);
     }
     return bangumiList;
+  }
+
+  static Iterable<BangumiItem> _parseTrendSubjects(dynamic jsonData) sync* {
+    for (dynamic jsonItem in jsonData['data']) {
+      if (jsonItem is Map<String, dynamic>) {
+        yield BangumiItem.fromJson(jsonItem['subject']);
+      }
+    }
   }
 
   static String buildBangumiMirrorPopularPath({
@@ -302,6 +307,11 @@ class BangumiApi {
     required int offset,
   }) async {
     try {
+      if (tag.isEmpty) {
+        final jsonData =
+            await _client.publicTrends(limit: limit, offset: offset);
+        return _parseTrendSubjects(jsonData).toList();
+      }
       final jsonData = await _client.publicSearch(
         data: buildBangumiSearchParams('', tags: [if (tag.isNotEmpty) tag]),
         limit: limit,

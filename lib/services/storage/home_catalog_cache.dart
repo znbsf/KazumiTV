@@ -19,7 +19,7 @@ class HomeCatalogCache {
   final Directory? directory;
   static Future<void> _pendingWrites = Future<void>.value();
   static Future<void> flush() => _pendingWrites;
-  static const version = 1;
+  static const version = 2;
   static const maxItems = 96;
   static const maxBytes = 1024 * 1024;
   static const retention = Duration(days: 30);

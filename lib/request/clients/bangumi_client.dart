@@ -127,6 +127,26 @@ class BangumiClient {
     );
   }
 
+  /// Trending fallback must bypass Kazumi after its popular catalogue fails.
+  Future<dynamic> publicTrends({
+    required int limit,
+    required int offset,
+    CancelToken? cancelToken,
+  }) {
+    final url =
+        ApiEndpoints.bangumiAPINextDomain + ApiEndpoints.bangumiTrendsNext;
+    final route = BangumiPublicRoute.match(url, 'GET')!;
+    return _publicRequest(
+      route,
+      'GET',
+      first: GStorage.getSetting(SettingsKeys.enableBangumiProxy)
+          ? route.mirror
+          : route.official,
+      queryParameters: {'type': 2, 'limit': limit, 'offset': offset},
+      cancelToken: cancelToken,
+    );
+  }
+
   Future<dynamic> _publicRequest(
     BangumiPublicRoute route,
     String method, {
