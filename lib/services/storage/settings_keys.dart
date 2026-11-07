@@ -51,6 +51,10 @@ class SettingKey<T> {
 // Add new settings here. SettingsKeys is the public typed registry used by
 // callers; new keys can use literal string names directly.
 class SettingsKeys {
+  static const danmakuCacheEnabled = SettingKey<bool>(
+    'danmakuCacheEnabled', true, group: SettingGroup.danmaku);
+  static const danmakuCacheMiB = SettingKey<int>(
+    'danmakuCacheMiB', 256, group: SettingGroup.danmaku);
   static const recentVideoCacheEnabled = SettingKey<bool>(
     'recentVideoCacheEnabled',
     false,
@@ -698,6 +702,8 @@ class SettingsKeys {
     showAnimeCounter,
     downloadParallelEpisodes,
     recentVideoCacheEnabled,
+    danmakuCacheEnabled,
+    danmakuCacheMiB,
     recentVideoCacheGiB,
     downloadParallelSegments,
     downloadDanmaku,

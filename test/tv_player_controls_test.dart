@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/pages/player/tv_player_controls.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 void main() {
   testWidgets('remote progress seeks within bounds and returns to actions',
@@ -141,6 +142,8 @@ void main() {
 
   testWidgets('icon actions retain remote activation, semantics and tooltip',
       (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
     final semantics = tester.ensureSemantics();
     final focus = FocusNode();
     addTearDown(focus.dispose);
@@ -196,8 +199,10 @@ void main() {
 // Validate the foreground against the actual focused Material, not just a token.
 void expectFocusedSurface(WidgetTester tester, Finder action) {
   final colors = Theme.of(tester.element(action)).colorScheme;
-  final material = tester.widget<Material>(
-      find.descendant(of: action, matching: find.byType(Material)));
+  final material = tester.widget<Material>(find.descendant(
+      of: action,
+      matching: find.byWidgetPredicate(
+          (widget) => widget is Material && widget.child is InkWell)));
   expect(material.color, colors.primary);
   final shape = material.shape! as RoundedRectangleBorder;
   expect(shape.side.color, colors.onSurface);

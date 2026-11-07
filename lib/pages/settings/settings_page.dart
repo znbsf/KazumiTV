@@ -142,6 +142,9 @@ bool _isWithinPath(String location, String path) =>
     location == path || location.startsWith('$path/');
 
 String _categoryPath(String location) {
+  if (_isWithinPath(location, '/settings/danmaku-cache')) {
+    return '/settings/danmaku';
+  }
   if (location == '/settings') {
     return '/settings/player';
   }

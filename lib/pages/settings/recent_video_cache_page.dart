@@ -50,8 +50,8 @@ class _RecentVideoCachePageState extends State<RecentVideoCachePage> {
         builder: (context) => AlertDialog(
               title: Text(entry == null ? '清理近期视频缓存？' : '删除这一集的缓存？'),
               content: Text(entry == null
-                  ? '清理未在播放的视频及对应弹幕。手动下载保留。'
-                  : '${metadata?['title']} · ${metadata?['episodeTitle']}\n视频和该集缓存弹幕将一起删除。'),
+                  ? '清理未在播放的视频及旧版附带数据。独立弹幕缓存和手动下载保留。'
+                  : '${metadata?['title']} · ${metadata?['episodeTitle']}\n视频与旧版附带数据将删除；独立弹幕缓存保留。'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -169,7 +169,7 @@ class _RecentVideoCachePageState extends State<RecentVideoCachePage> {
                 leading: Icons.info_outline,
                 title: Text('已占用 ${_size(used)} / $capacity GiB'),
                 description: const Text(
-                    '按最近使用时间淘汰旧剧集，包含弹幕及少量管理预留。只保存已请求的分片，不自动补齐跳过的部分。')),
+                    '按最近使用时间淘汰旧剧集，包含旧版附带数据及少量管理预留，独立弹幕缓存另计容量。只保存已请求的分片，不自动补齐跳过的部分。')),
             SettingsTile(
                 leading: Icons.delete_outline,
                 title: const Text('清理全部近期缓存'),
@@ -194,7 +194,7 @@ class _RecentVideoCachePageState extends State<RecentVideoCachePage> {
                 leading: Icons.help_outline,
                 title: Text('MP4 与 HLS 点播'),
                 description: Text(
-                    '支持完整 MP4、单轨 HLS（含 AES-128、初始化片段和未加密字节范围），支持 HTTP 代理。缓存保留原片段，去广告由播放器执行。仅收到全部所需内容后可离线播放；跳过或中断的内容不会标为完整。\n直播、多轨/多清晰度、DRM 和加密字节范围沿用原播放方式。视频完整时优先本地；弹幕先获取最新内容，失败或无结果时使用缓存并提示。')),
+                    '支持完整 MP4、单轨 HLS（含 AES-128、初始化片段和未加密字节范围），支持 HTTP 代理。缓存保留原片段，去广告由播放器执行。仅收到全部所需内容后可离线播放；跳过或中断的内容不会标为完整。\n直播、多轨/多清晰度、DRM 和加密字节范围沿用原播放方式。视频完整时优先本地；弹幕使用独立缓存策略，可在弹幕缓存设置中管理。')),
           ]),
         ]));
   }

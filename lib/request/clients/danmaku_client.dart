@@ -5,13 +5,43 @@ import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/utils/dandan_credentials.dart';
 import 'package:kazumi/utils/http_headers.dart';
 import 'package:kazumi/utils/crypto.dart';
+import 'package:kazumi/services/danmaku/danmaku_cache_service.dart';
 
 class DanmakuClient {
-  DanmakuClient._();
+  DanmakuClient._({Dio? dio, DanmakuCacheService? cache})
+      : _dio = dio,
+        _cache = cache ?? DanmakuCacheService.shared;
+
+  DanmakuClient.forTesting(
+      {required Dio dio, required DanmakuCacheService cache})
+      : this._(dio: dio, cache: cache);
+  final Dio? _dio;
+  final DanmakuCacheService _cache;
 
   static final DanmakuClient instance = DanmakuClient._();
 
   Future<dynamic> get(
+    String url, {
+    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic> headers = const {},
+    CancelToken? cancelToken,
+  }) async {
+    final uri = Uri.parse(url);
+    Future<dynamic> request() => _request(url,
+        queryParameters: queryParameters,
+        headers: headers,
+        cancelToken: cancelToken);
+    // Custom headers or caller-owned cancellation must not affect shared work.
+    if (headers.isNotEmpty || cancelToken != null) return request();
+    return _cache.get(
+        uri.replace(queryParameters: {
+          ...uri.queryParametersAll,
+          ...?queryParameters,
+        }),
+        request);
+  }
+
+  Future<dynamic> _request(
     String url, {
     Map<String, dynamic>? queryParameters,
     Map<String, dynamic> headers = const {},
@@ -30,7 +60,7 @@ class DanmakuClient {
     };
 
     try {
-      final response = await DioFactory.apiDio.get(
+      final response = await (_dio ?? DioFactory.apiDio).get(
         url,
         queryParameters: queryParameters,
         options: Options(headers: requestHeaders),

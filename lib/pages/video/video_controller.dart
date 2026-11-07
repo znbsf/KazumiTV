@@ -836,8 +836,10 @@ abstract class _VideoPageController with Store implements Disposable {
                     : DanmakuLoadResult.success(
                         danmakus: saved.$1, bangumiID: saved.$2);
               },
-              save: (result) => _recentCache.saveDanmaku(
-                  cacheId, result.danmakus, result.bangumiID),
+              // New responses live in the independent API cache. Keep reading
+              // old attached copies for offline compatibility, without adding
+              // duplicate data to the video quota.
+              save: (_) async {},
               isCurrent: () =>
                   session.isActive &&
                   danmakuSession.isActive &&
