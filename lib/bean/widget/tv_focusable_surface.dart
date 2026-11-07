@@ -129,7 +129,7 @@ class _TvFocusableSurfaceState extends State<TvFocusableSurface> {
                     ]
                   : const [],
             ),
-            child: widget.child,
+            child: RepaintBoundary(child: widget.child),
           ),
         ),
       ),

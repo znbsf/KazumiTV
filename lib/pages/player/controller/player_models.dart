@@ -23,6 +23,7 @@ class PlaybackInitParams {
   final String? bangumiName;
   final PlaybackProgressWriter? onHistoryProgress;
   final void Function(String message)? onPlaybackError;
+  final bool loopbackCache;
 
   const PlaybackInitParams({
     required this.videoUrl,
@@ -44,6 +45,7 @@ class PlaybackInitParams {
     this.bangumiName,
     this.onHistoryProgress,
     this.onPlaybackError,
+    this.loopbackCache = false,
   });
 }
 

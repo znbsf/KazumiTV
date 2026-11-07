@@ -73,6 +73,12 @@ const List<_SettingsGroup> _settingsGroups = [
         icon: Icons.downloading_rounded,
         path: '/settings/download-settings',
       ),
+      _SettingsCategory(
+        label: '近期视频缓存',
+        description: '自动保留、离线播放与逐集清理',
+        icon: Icons.offline_pin_outlined,
+        path: '/settings/recent-cache',
+      ),
     ],
   ),
   _SettingsGroup(

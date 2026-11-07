@@ -111,6 +111,12 @@ class _DownloadPageState extends State<DownloadPage> {
     return Scaffold(
       appBar: SysAppBar(
         title: const Text('下载管理'),
+        actions: [
+          TextButton(
+            onPressed: () => context.pushNamed('/settings/recent-cache'),
+            child: const Text('近期视频缓存'),
+          ),
+        ],
         leading: TvMode.enabled
             ? IconButton(
                 focusNode: _pageFocus,

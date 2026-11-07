@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:kazumi/bean/widget/bounded_log_buffer.dart';
 
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:canvas_danmaku/models/danmaku_content_item.dart';
@@ -75,7 +76,7 @@ class _VideoPageState extends State<VideoPage>
   DownloadController get downloadController => widget.downloadController;
   late bool playResume;
   bool showDebugLog = false;
-  List<String> webviewLogLines = [];
+  final webviewLog = BoundedLogBuffer();
   StreamSubscription<String>? _logSubscription;
   final FocusNode keyboardFocus = FocusNode(
     debugLabel: 'Video player shortcut scope',
@@ -211,7 +212,9 @@ class _VideoPageState extends State<VideoPage>
 
   void _initOfflineMode() {
     final identity = videoPageController.currentHistoryIdentity;
-    videoPageController.historyOffset = identity == null
+    final args = widget.args;
+    videoPageController.historyOffset = identity == null ||
+            (args is OfflineVideoPlaybackArgs && args.recentCacheId != null)
         ? 0
         : videoPageController.getHistoryOffsetFor(identity);
     _showTabBodyImmediately();
@@ -274,12 +277,7 @@ class _VideoPageState extends State<VideoPage>
 
     _logSubscription = videoPageController.logStream.listen((log) {
       if (mounted) {
-        setState(() {
-          webviewLogLines.add(log);
-          if (webviewLogLines.length > 100) {
-            webviewLogLines.removeAt(0);
-          }
-        });
+        webviewLog.add(log);
       }
     });
 
@@ -310,6 +308,7 @@ class _VideoPageState extends State<VideoPage>
       _logSubscription?.cancel();
     } catch (_) {}
     _pipModeListener();
+    webviewLog.dispose();
     // Modular disposes the controller and its log subscription with the route.
     if (!isDesktop()) {
       try {
@@ -347,9 +346,7 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void clearWebviewLog() {
-    setState(() {
-      webviewLogLines.clear();
-    });
+    webviewLog.clear();
   }
 
   Future<void> changeEpisode(
@@ -857,14 +854,20 @@ class _VideoPageState extends State<VideoPage>
                   color: Colors.black.withValues(alpha: 0.99),
                   child: Align(
                     alignment: Alignment.center,
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: webviewLogLines.length,
-                      itemBuilder: (context, index) {
-                        return Text(
-                          webviewLogLines.isEmpty ? '' : webviewLogLines[index],
-                          style: const TextStyle(color: Colors.white),
-                          textAlign: TextAlign.center,
+                    child: ListenableBuilder(
+                      listenable: webviewLog,
+                      builder: (context, _) {
+                        final lines = webviewLog.lines;
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: lines.length,
+                          itemBuilder: (context, index) {
+                            return Text(
+                              lines[index],
+                              style: const TextStyle(color: Colors.white),
+                              textAlign: TextAlign.center,
+                            );
+                          },
                         );
                       },
                     ),

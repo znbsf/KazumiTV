@@ -1,5 +1,64 @@
 # KazumiTV 当前状态
 
+## 2026-10-31：通过手机遥控导出日志（本地实现，设备未验）
+
+用户提出电视复制日志困难，希望复用手机遥控页面获取文件/复制后提交 GitHub。复用现有工作树，从 d742d679 新建 `codex/phone-log-export`，此前缓存候选提交与产物保留。沿用配对 token、同源检查、后台断开与撤销语义；电视日志页显式生成短期脱敏快照，手机只下载该快照，不暴露文件路径、不持续读取原日志、不自动上传 GitHub。准备阶段读取现有日志/遥控协议与 README 导出限制；无项目 profile，按现有入口推进。
+
+本轮受控验收预算：日志遮盖/字节上限、过期撤销/错误 token/跨源/会话重建、手机复制下载/迟到响应及既有输入遥控回归合计 20 分钟；必要 QA ARMv7 构建最多 10 分钟。具体失败修复后只补受影响用例；到预算或无新增证据停止对应实验。手机剪贴板在 HTTP 页面可能受限，保留可选择文本和文件下载，不把 Node DOM 夹具当真实手机验收。不操作正在使用的电视，不公开原始日志。
+
+程序提交 `13648f9be0a7a16136409e166ef5cc21cf07c9a8`：电视错误日志页增加「手机导出 / 停止导出」，未连接时沿用遥控配对弹窗；手机页「问题反馈与日志」提供按需获取、纯文本预览、复制、下载 `.txt` 和 GitHub Bug 表单链接。读取既有受限近期日志，Isolate 中遮盖常见敏感内容；导出 UTF-8 上限 512 KiB，不创建持续日志流或自动上传。快照有效期最多 5 分钟，随机导出 ID 绑定当前会话；停止、清空、过期、后台断开/重建后原地址不可用。已复制/下载的手机文件不受撤销影响。常见遮盖不等于任意隐私均已识别，页面明确要求提交前检查。
+
+固定 SDK 下 57 个不同 Flutter 用例通过：HTTP/配对/在线状态四文件 42 项，UI/输入/日志批次 20 通过、2 项因 Flutter mock HttpClient 导致测试未建立在线状态而失败；将 UI 夹具改为明确在线的测试 manager 后 2 项通过，批次间重复的 7 项只计一次。覆盖显式导出、清空期间异步结果丢弃、错误 token/跨源/猜测路径、替换/撤销/过期、同 token 新会话不继承、脱敏及字节上限。Node 共 29 个合成场景通过，包括按需获取、Blob 下载内容/名称、剪贴板拒绝与手动复制、超时、超限、断线及迟到响应。最终静态检查无 error/warning，剩余 4 条既有大括号风格 info；锁文件未改。
+
+测试证据：`artifacts/phone-log-export-transport-tests.log`、`phone-log-export-ui-tests.log`（保留初次夹具失败）、`phone-log-export-ui-correction.log`、`phone-log-export-analysis-final.log`；Node 入口 `tools/qa/phone_keyboard_page_test.cjs`。测试未覆盖真实手机浏览器下载/剪贴板、实体遥控焦点、真实电视负载或 GitHub 附件提交；未向 GitHub 发送日志，也未安装、推送、合并或发布。
+
+同一固定 SDK 串行构建 QA ARMv7 成功（Gradle 145.1 秒）：`artifacts/phone-log-export/KazumiTV-0.4.6-phone-log.1-armv7-QA.apk`，remoteqa 包名、versionCode `206821`、29,494,847 字节，SHA-256 `000fbca7c5a3bbfa0c143d10d5d1f1b8e4133be4f9420e512b082294a29e36b7`。固定公开 QA 证书、ABI/TV 入口、无内部 QA/probe 标记、libmpv 哈希与 zipalign 均通过，见同目录 `verification.json`；构建日志 `artifacts/phone-log-export-build.log`。构建带有既有 Gradle/AGP/Kotlin 后续兼容与 SDK XML 工具版本提醒，本轮未升级工具链。已停止并核实本轮 Gradle 39132、其 Kotlin 子进程 9828 退出；停后主机 CPU 单次样本 9%，记录于 `process-cleanup.json`，不作为电视性能数据。
+
+## 2026-10-31：本地计划补充项核对与 #53 第二版（本地实现，设备未验）
+
+用户要求一起处理本地计划中的额外需求，并对范围澄清回答“全都看看”。在同一 `codex/issue53-persistent-playback-cache` 工作树继续，逐项比对根目录历史性能评审、下方 UI/TV 待办与本轮缓存范围；未修改旧 native checkout、独立 preview 或其他工作树。程序提交 `e7bece4fe3a796006538d81953e0903b6a72f10c`。
+
+| 项目 | 本轮结论 |
+| --- | --- |
+| 历史全量刷新、首页简介整页更新、关闭调试后原生日志整理 | 当前主线已分别采用增量更新、局部 ValueNotifier、受限原始队列/按需格式化；复用实现，相关回归通过。根目录 PERFORMANCE-CODE-REVIEW-20261030.md 的“待修改”是旧评审快照。 |
+| 解析日志触发整页 setState | 改为有上限的日志缓冲，仅打开的日志面板监听；隐藏时不重建外壳/选集栏。 |
+| 海报焦点缩放重绘 | 内容加 RepaintBoundary；绘制计数测试确认焦点动画不重绘海报内容，不声称电视 FPS 已提升。 |
+| 纯图标按钮遥控名称 | 获取焦点显示名称，失焦关闭提示；保留尺寸、主题、语义及 OK/指针操作。 |
+| #51 讨论滚动 | 增加独立阅读焦点，上下/重复键滚动，到底仍可反向，上端可回控件；实际讨论标签页进入、长内容、退出/重入受控测试通过，实体遥控未验。 |
+| MP4 持久缓存 | 支持完整 HTTP 响应落盘及离线 Range；HEAD 内容类型/长度校验，部分 seek 不冒充完整。尚未拼接多次分段请求；因此看过但未收到完整文件的 MP4 不保证离线。 |
+| 复杂 HLS | 新支持 AES-128/密钥轮换、显式及隐式 IV 的原序号保留、MAP/init、未加密 BYTERANGE 显式/隐式偏移；密钥/init/全部媒体齐全才可离线。保留 fMP4 扩展名，避免误命名为 TS。多轨/多清晰度、DRM、加密媒体字节范围、直播仍回退原播放路径。 |
+| 代理与去广告 | worker 继承与 native 一致的单会话 HTTP 代理；回环请求不走外部代理。复核锁定原生补丁：去广告基于原始 PTS/DISCONTINUITY；缓存保留原包与标记、持久保存开关，在线及离线仍由原播放器过滤，不移植下载端删组算法。真实广告内容及声画效果未验。 |
+| 缓存续播衔接 | 修复 MP4 命中被强制 HLS；在线观看同时保存缓存进度；离线入口遵守记忆进度开关/片尾归零，并与手动下载进度隔离。 |
+| 过扫描、次要页排版 | 核对现有 SettingsList/TV 输入适配与设置、规则长列表、下载列表、一起看表单回归；未复现统一布局缺陷。保留电视裁切/阅读距离走查，不盲目加入全局 5% 边距。 |
+| 常驻 TV 背景、历史 INFO 中/大方案 | 背景项已撤销；精简 INFO 已有当前实现。历史文件明确排除的虚拟电视/EPG/额外元数据不当成当前新增需求，不混入 preview。 |
+
+固定 Flutter 3.47.3 本轮 16 个相关文件最终共有 140 个不同用例通过：主批次 102 通过、一个文件因新增测试缺 import 未加载、一个文案匹配误命中说明文字；修正后两文件 37 通过（其中 2 项重复，合计 137）。再增加去广告清单保真、fMP4 后缀、真实讨论标签入口 3 项，最终 140；不累加各轮重跑次数。UI 新夹具最初使用重复 `_` 参数、动态空 map，以及提示出现后的旧语义计数断言，均按具体诊断修正；原失败日志保留。生产代码检查无 error/warning，23 条大括号风格 info；锁文件未改。
+
+证据：`artifacts/issue53-followups-regression.log`、`issue53-followups-corrections.log`、`issue53-format-discussion-tests.log`、`issue53-discussion-entry.log`、`issue53-followups-analysis.log`。HTTP 回归证明字节/密钥/初始化片段保存、Range、完整性及关闭源后重启读取；其中 AES/fMP4 使用受控字节夹具，不冒充真实解密/解码、电视首帧或性能验收。受控 16 MiB 流式转发观察 145 ms 仅为主机样本。原生算法依据复核 `Predidit/libmpv-android-video-build@dd2bfba8` 的 ffmpeg-hls-kazumi-combined.patch 与锁定 media_kit 参数传递；未修改 libmpv。
+
+第二版 QA 构建使用同一固定 SDK，按既有 runbook 串行执行检查后再构建，避免生成插件注册文件争写。仅构建 ARMv7 remoteqa / 0.4.6-cache.2 / 基础号 20681，旧 cache.1 产物保留；验证回执与最终构建结果追加于本节。未操作电视、推送、合并或发布；#53/#51 均不据本地测试关闭。
+
+构建收尾：串行正常 --pub 构建 111.7 秒成功。第二版保存在 `artifacts/issue53-persistent-cache-2/KazumiTV-0.4.6-cache.2-armv7-QA.apk`，29,484,347 字节，SHA256 `2c4b98106f1476fa630a1a894aa2e1e57a468f44ed0ddc4e36c821accffd2cd8`。固定测试证书、remoteqa / ARMv7 / 206811、TV 入口、非 debug/probe、16 KiB ZIP 对齐及原 libmpv hash 校验通过；`verification.json` 保留精确源码 SHA。构建只出现既有 AGP/Kotlin/SDK 工具版本提示，不升级依赖或绕过校验。按 PID/创建时间/父子链核实并停止本任务 Gradle 43348、Kotlin 43080，确认均退出、无本任务 Dart/Java/文件搜索残留；宿主 CPU 当次 17%，设备未操作，回执 `cleanup.json`。已同步 #53 本地进展及未测范围，保持开放。
+## 2026-10-31：#53 近期视频持久缓存（本地候选已构建，真机未验）
+
+用户授权建立 issue 并尝试实现自动视频缓存；随后明确视频有完整缓存时默认使用，弹幕优先尝试获取最新内容、失败或为空再回退缓存，命中需提示，支持逐集清理。已建立 https://github.com/znbsf/KazumiTV/issues/53 。本轮基于实时 origin/main / HEAD `3890b31b`，复用无源代码修改的工作树，新分支 `codex/issue53-persistent-playback-cache`；原 artifacts 保留。
+
+实现范围：独立开关默认关闭、额度默认 2 GiB；独立 isolate 中执行 loopback HLS 转发与流式落盘、完整分片提交、LRU、空间保留和逐集删除；近期缓存页提供无需联网选源的本地入口。首版仅明确完整的未加密单轨 VOD HLS，复杂清单、代理和去广告保留原路径，不改变原播放器临时缓冲或手动下载。弹幕遵循网络优先，并与该集缓存一同管理。主机受控回归已开始，首次编译暴露 List<int>/TypedData 与缺失 import，已按诊断修复；不记为通过。
+
+验证预算：受控本地 HTTP/临时目录回归及改动文件分析 20 分钟，覆盖重启断网、Range、取消/换集、容量/低空间、清理与弹幕新鲜度；一次 ARMv7 QA 构建最多 10 分钟。失败按具体反例修复，不扩展旧 direct/copy 或音频路线。若后续设备验证需要安装，另核对当前设备身份、占用和隔离 QA 包；本轮尚未开始设备操作。主机吞吐只证明受控数据路径，不证明电视帧率、闪存时延、首帧或真实源兼容。保留未测项，不发布、不关闭 issue。
+
+中间验证：默认 PATH 实际为 Flutter 3.47.5，核对后显式改用项目 3.47.3 / e8113bf；离线 enforce-lockfile pub get 后，同一组 100 项通过，改动文件分析无 error/warning、17 条样式 info，锁文件未变。16 MiB 单分片主机转发写盘观察 110 ms，仅本地吞吐样本。新页面测试中的 Hive 写入受 widget 虚拟时钟阻塞，停止核实归属的测试进程后改用可注入设置存取夹具，另测真实设置/隐身语义，3 项 UI/设置通过。
+
+首次 QA release 构建在 103.8 秒以 GeneratedPluginRegistrant 引用 dev-only flutter_native_splash 类而 release Gradle 未包含该类失败。核对固定 SDK 源码：releaseMode 的注册生成器过滤 dev dependency，Gradle release 也过滤；同工作树并行 analyze 可能将注册文件重写为开发模式。因此后续检查与构建串行，使用 runbook 的 --pub 正常再生成，不编辑生成文件、升级依赖或跳过校验。新边界审查另明确拒绝嵌套媒体 m3u8 分片，新增回归，防止把子清单计作可离线视频。以上具体失败/实质改动构成一次补构建依据，仍限 10 分钟；不重开旧设备路线。
+
+最终程序提交 `79ec39f84b4d6efee3f7640d9bdabf9677953166`。固定 Flutter 下 100 项相关回归通过，补嵌套分片拒绝后缓存核心 17 项通过（其中 16 项为重验，唯一相关用例合计 101，不累加为 117）。静态检查无 error/warning，17 条 info 为样式提示。证据：`artifacts/issue53-pinned-tests.log`、`issue53-core-final.log`、`issue53-pinned-analysis.log`；主机 16 MiB 样本分别 110/139 ms，不作为设备吞吐或 FPS 承诺。未实施整仓回归、真实源和设备验收。
+
+串行正常 `--pub` 补构建 89.8 秒成功：`artifacts/issue53-persistent-cache/KazumiTV-0.4.6-cache.1-armv7-QA.apk`，remoteqa / ARMv7 / 206801，SHA256 `356f57fbe2a2d80200e829ddaa515204b6483c4dc027a70daea910ddac4bc78d`。固定公开测试证书、包名/ABI/版本/TV入口、非debug/probe及16 KiB ZIP对齐通过，回执 `verification.json`；依赖锁未变。该候选使用正常 App 入口，不带设备测试夹具；尚未安装、上传、推送、合并或发布。
+
+使用入口为“设置 → 近期视频缓存”，下载管理也有同名入口。开关默认关闭；完整视频命中优先本地、弹幕先联网再按失败/空结果回退并提示，逐集删除包含对应弹幕，活动条目与手动下载受保护。首版不支持 MP4、加密/多轨/多清晰度/字节范围/嵌套 HLS、直播、代理或去广告路径的自动保存；不补齐跳过的片段，也不宣称所有“看过”的集数都完整。单集弹幕最多 8 MiB，超限保留在线结果但不新增持久副本。
+
+收尾：按 PID、创建时间、父进程与命令角色核对并停止本任务 Gradle 52384、Kotlin 12072/1872，回读均退出；未见本工作树剩余 Dart/Flutter/Java 任务，宿主 CPU 当次采样 18%（不是零负载结论），回执 `cleanup.json`。本轮未操作电视、未启动采集；电视首帧、内存/CPU/闪存时延、连续播放/退出和真实源兼容仍需后续有界验收。Issue #53 保持开放。
+
 ## 2026-10-30 0.4.6 已正式发布，讨论滚动留待下版
 
 用户明确授权发布既有草稿并更新相关 issue，同时报告播放界面“讨论”无法滚动，要求下次 release 处理。13:25:22 UTC 公开 Release 429034612，标签 v0.4.6 指向精确构建提交 0a2edbfd44bfefb65ad1e8273236fad94d9060dd；Latest=true、draft=false、prerelease=false，基础号 20667。未重建或替换任何 APK，未操作电视。发布前附件元数据与白名单一致，发布后全部 11 项实际匿名下载，字节数及 SHA256 均通过；记录 artifacts/release-046-final-20261030/published-release.json、public-download-verification.json，下载子进程均已退出。

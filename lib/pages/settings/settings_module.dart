@@ -11,6 +11,7 @@ import 'package:kazumi/pages/settings/danmaku/danmaku_module.dart';
 import 'package:kazumi/pages/settings/decoder_settings.dart';
 import 'package:kazumi/pages/settings/displaymode_settings.dart';
 import 'package:kazumi/pages/settings/download_settings.dart';
+import 'package:kazumi/pages/settings/recent_video_cache_page.dart';
 import 'package:kazumi/pages/settings/interface_settings.dart';
 import 'package:kazumi/pages/settings/keyboard_settings.dart';
 import 'package:kazumi/pages/settings/player_settings.dart';
@@ -55,6 +56,8 @@ final settingsModule = createModule(
           )
           ..route('/storage',
               child: (context, state) => const StorageSettingsPage())
+          ..route('/recent-cache',
+              child: (context, state) => const RecentVideoCachePage())
           ..route('/storage/logs', child: (context, state) => const LogsPage())
           ..route('/theme',
               child: (context, state) => const ThemeSettingsPage())
