@@ -82,6 +82,14 @@ class _InfoPageState extends State<InfoPage>
   bool staffIsEmpty = false;
   bool _showBangumiInfoSkeleton = false;
   bool _startingPlayback = false;
+  bool _bangumiInfoFailed = false;
+  bool _loadingBangumiInfo = false;
+  bool _retryingBangumiInfo = false;
+  final _tvInfoRetryFocus = FocusNode(debugLabel: 'TV detail info retry');
+
+  bool get _showTvInfoRetry =>
+      _retryingBangumiInfo ||
+      (_bangumiInfoFailed && infoController.bangumiItem.summary.isEmpty);
   HealthRun? _recordedSourceRun;
   final _detailScrollController = ScrollController();
   final _tvPlayFocus = FocusNode(debugLabel: 'TV detail play');
@@ -450,6 +458,7 @@ class _InfoPageState extends State<InfoPage>
     _recordedSourceRun?.cancel();
     _detailScrollController.dispose();
     _tvPlayFocus.dispose();
+    _tvInfoRetryFocus.dispose();
     _tvHealthFocus.dispose();
     _tvBackFocus.dispose();
     _tvTabsFocus.dispose();
@@ -464,10 +473,17 @@ class _InfoPageState extends State<InfoPage>
   }
 
   Future<void> _loadBangumiInfo() async {
+    if (_loadingBangumiInfo) return;
+    setState(() {
+      _retryingBangumiInfo = TvMode.enabled && _showTvInfoRetry;
+      _loadingBangumiInfo = true;
+      _showBangumiInfoSkeleton = true;
+    });
     final loadingStartedAt = DateTime.now();
+    var succeeded = false;
     try {
       // Attach metadata without replacing rendered image URLs.
-      await infoController.queryBangumiInfoByID(
+      succeeded = await infoController.queryBangumiInfoByID(
         infoController.bangumiItem.id,
         type: 'attach',
       );
@@ -479,7 +495,13 @@ class _InfoPageState extends State<InfoPage>
         await _waitForMinimumBangumiInfoLoadingDuration(loadingStartedAt);
       }
       if (mounted) {
+        if (TvMode.enabled && succeeded && _tvInfoRetryFocus.hasFocus) {
+          _tvPlayFocus.requestFocus();
+        }
         setState(() {
+          _bangumiInfoFailed = !succeeded;
+          _loadingBangumiInfo = false;
+          _retryingBangumiInfo = false;
           _showBangumiInfoSkeleton = false;
         });
       }
@@ -613,6 +635,16 @@ class _InfoPageState extends State<InfoPage>
                                   bangumiItem: infoController.bangumiItem,
                                   isLoading: showBangumiInfoSkeleton,
                                   showRating: showRating,
+                                  tvInfoFailed:
+                                      TvMode.enabled && _bangumiInfoFailed,
+                                  tvInfoRetrying:
+                                      TvMode.enabled && _retryingBangumiInfo,
+                                  tvOnRetryInfo:
+                                      TvMode.enabled ? _loadBangumiInfo : null,
+                                  tvInfoRetryFocus:
+                                      TvMode.enabled ? _tvInfoRetryFocus : null,
+                                  tvOnInfoRetryUp: _focusTvPlay,
+                                  tvOnInfoRetryDown: _focusTvTab,
                                   tvInitialCoverUrl:
                                       TvMode.enabled ? _initialCoverUrl : null,
                                   tvActions: TvMode.enabled
@@ -631,7 +663,13 @@ class _InfoPageState extends State<InfoPage>
                                           ),
                                           onReview: _openReviewEditor,
                                           onUp: _tvBackFocus.requestFocus,
-                                          onDown: _focusTvTab,
+                                          onDown: () {
+                                            if (_showTvInfoRetry) {
+                                              _tvInfoRetryFocus.requestFocus();
+                                            } else {
+                                              _focusTvTab();
+                                            }
+                                          },
                                         )
                                       : null,
                                 ),

@@ -97,10 +97,10 @@ abstract class _InfoController with Store {
     commentsList.removeWhere((item) => item.user.id == userId);
   }
 
-  Future<void> queryBangumiInfoByID(int id, {String type = "init"}) async {
+  Future<bool> queryBangumiInfoByID(int id, {String type = "init"}) async {
     isLoading = true;
     try {
-      await _updateBangumiInfoByID(id, type: type);
+      return await _updateBangumiInfoByID(id, type: type);
     } finally {
       isLoading = false;
     }
@@ -110,10 +110,10 @@ abstract class _InfoController with Store {
     await _updateBangumiInfoByID(id, type: "update");
   }
 
-  Future<void> _updateBangumiInfoByID(int id, {required String type}) async {
+  Future<bool> _updateBangumiInfoByID(int id, {required String type}) async {
     final value = await BangumiApi.getBangumiInfoByID(id);
     if (value == null) {
-      return;
+      return false;
     }
     if (type == "init") {
       bangumiItem = value;
@@ -139,6 +139,7 @@ abstract class _InfoController with Store {
       }
     }
     await collectController.updateLocalCollect(bangumiItem);
+    return true;
   }
 
   Future<void> queryBangumiCommentsByID(int id, {bool refresh = true}) async {

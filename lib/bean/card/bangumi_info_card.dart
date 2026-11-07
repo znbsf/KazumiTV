@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/utils/constants.dart';
@@ -22,6 +23,12 @@ class BangumiInfoCardV extends StatefulWidget {
     required this.showRating,
     this.tvActions,
     this.tvInitialCoverUrl,
+    this.tvInfoFailed = false,
+    this.tvInfoRetrying = false,
+    this.tvOnRetryInfo,
+    this.tvInfoRetryFocus,
+    this.tvOnInfoRetryUp,
+    this.tvOnInfoRetryDown,
   });
 
   final BangumiItem bangumiItem;
@@ -31,6 +38,12 @@ class BangumiInfoCardV extends StatefulWidget {
   /// Supplied only by the TV detail page; mobile keeps its original layout.
   final Widget? tvActions;
   final String? tvInitialCoverUrl;
+  final bool tvInfoFailed;
+  final bool tvInfoRetrying;
+  final VoidCallback? tvOnRetryInfo;
+  final FocusNode? tvInfoRetryFocus;
+  final VoidCallback? tvOnInfoRetryUp;
+  final VoidCallback? tvOnInfoRetryDown;
 
   @override
   State<BangumiInfoCardV> createState() => _BangumiInfoCardVState();
@@ -129,6 +142,8 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
   Widget _buildTvHeader(BuildContext context) {
     final theme = Theme.of(context);
     final item = widget.bangumiItem;
+    final showRetry = widget.tvInfoRetrying ||
+        (item.summary.isEmpty && widget.tvInfoFailed && !widget.isLoading);
     final facts = <String>[
       if (item.airDate.isNotEmpty) item.airDate,
       if (widget.showRating && item.ratingScore > 0)
@@ -201,12 +216,54 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                   const SizedBox(height: 8),
                   Text(
                     item.summary.isEmpty
-                        ? (widget.isLoading ? '正在加载…' : '暂无简介')
+                        ? (widget.isLoading
+                            ? '正在加载…'
+                            : widget.tvInfoFailed
+                                ? '资料加载失败'
+                                : '暂无简介')
                         : item.summary,
                     maxLines: 5,
                     overflow: TextOverflow.ellipsis,
                     style: TvVisuals.body,
                   ),
+                  if (showRetry)
+                    Focus(
+                      canRequestFocus: false,
+                      skipTraversal: true,
+                      onKeyEvent: (_, event) {
+                        if (event is! KeyDownEvent &&
+                            event is! KeyRepeatEvent) {
+                          return KeyEventResult.ignored;
+                        }
+                        final key = event.logicalKey;
+                        if (key == LogicalKeyboardKey.arrowUp) {
+                          widget.tvOnInfoRetryUp?.call();
+                        } else if (key == LogicalKeyboardKey.arrowDown) {
+                          widget.tvOnInfoRetryDown?.call();
+                        } else if (key != LogicalKeyboardKey.arrowLeft &&
+                            key != LogicalKeyboardKey.arrowRight) {
+                          return KeyEventResult.ignored;
+                        }
+                        return KeyEventResult.handled;
+                      },
+                      child: OutlinedButton.icon(
+                        focusNode: widget.tvInfoRetryFocus,
+                        style: TvVisuals.focusButtonStyle(theme.colorScheme)
+                            .copyWith(
+                          textStyle:
+                              const WidgetStatePropertyAll(TvVisuals.control),
+                          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16))),
+                        ),
+                        onPressed: () {
+                          if (!widget.tvInfoRetrying) {
+                            widget.tvOnRetryInfo?.call();
+                          }
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(widget.tvInfoRetrying ? '重试中…' : '重试'),
+                      ),
+                    ),
                 ],
               ),
             ),

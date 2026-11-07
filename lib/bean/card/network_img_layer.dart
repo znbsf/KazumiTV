@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/logging/logger.dart';
@@ -25,6 +27,14 @@ class NetworkImgLayer extends StatelessWidget {
     this.colorBlendMode,
     this.placeholderSrc,
   });
+
+  static const tvCoverRetryDelays = [
+    Duration(seconds: 2),
+    Duration(seconds: 6)
+  ];
+
+  @visibleForTesting
+  static List<Duration>? tvCoverRetryDelaysForTesting;
 
   final String? src;
   final double width;
@@ -282,6 +292,8 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
   int _request = 0;
   int _frame = 0;
   bool _failed = false;
+  Timer? _retryTimer;
+  int _automaticRetries = 0;
 
   NetworkImgLayer get layer => widget.layer;
   String get _url => (layer.src?.isNotEmpty ?? false)
@@ -329,6 +341,9 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
 
   void _resolve({bool retry = false}) {
     if (_url.isEmpty) {
+      _retryTimer?.cancel();
+      _automaticRetries = 0;
+      _failed = false;
       ++_request;
       _detach();
       _provider = null;
@@ -342,6 +357,8 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
       CachedNetworkImageProvider(_url),
     );
     if (!retry && _provider == next) return;
+    _retryTimer?.cancel();
+    if (!retry) _automaticRetries = 0;
     final request = ++_request;
     _detach();
     _provider = next;
@@ -371,15 +388,50 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
           'NetworkImage: network image load error',
           error: error,
         );
-        setState(() => _failed = true);
+        _detach();
+        final failedRequest = ++_request;
+        final permanent = error is HttpExceptionWithStatus &&
+            error.statusCode >= 400 &&
+            error.statusCode < 500 &&
+            error.statusCode != 408 &&
+            error.statusCode != 429;
+        final delays = NetworkImgLayer.tvCoverRetryDelaysForTesting ??
+            NetworkImgLayer.tvCoverRetryDelays;
+        if (!permanent &&
+            _automaticRetries < NetworkImgLayer.tvCoverRetryDelays.length &&
+            _automaticRetries < delays.length) {
+          final delay = delays[_automaticRetries++];
+          _retryTimer = Timer(delay, () {
+            if (!mounted || failedRequest != _request) return;
+            _retry();
+          });
+        } else {
+          setState(() => _failed = true);
+        }
       },
     );
     _listener = listener;
     stream.addListener(listener);
   }
 
+  Future<void> _retry({bool manual = false}) async {
+    _retryTimer?.cancel();
+    final provider = _provider;
+    if (provider == null) return;
+    final request = ++_request;
+    _detach();
+    if (manual) _automaticRetries = 0;
+    setState(() => _failed = false);
+    // The loader evicts its CachedNetworkImageProvider key, not the outer
+    // ResizeImageKey. Evict the provider we actually resolved before retrying.
+    await provider.evict(configuration: createLocalImageConfiguration(context));
+    if (!mounted || request != _request) return;
+    setState(() => _resolve(retry: true));
+  }
+
   @override
   void dispose() {
+    _retryTimer?.cancel();
     ++_request;
     _detach();
     _displayed?.dispose();
@@ -424,7 +476,7 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
                       .surface
                       .withValues(alpha: .88),
                   child: TextButton.icon(
-                    onPressed: () => setState(() => _resolve(retry: true)),
+                    onPressed: () => _retry(manual: true),
                     icon: const Icon(Icons.refresh_rounded, size: 16),
                     label: const Text('重试封面', style: TvVisuals.control),
                   ),
