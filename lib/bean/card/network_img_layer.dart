@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/bangumi_image_url_rewriter.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/utils/image_extension.dart';
 
@@ -44,9 +45,8 @@ class NetworkImgLayer extends StatelessWidget {
   @visibleForTesting
   static void clearTvCoverMemory() => _TvDisplayedCovers.clear();
 
-  /// P1/mirror medium covers are only 200px wide: too small for ~324px TV
-  /// home posters. Common is a bounded 400px source; compact rows retain the
-  /// thumbnail. Decode sizing still follows the rendered size and device DPR.
+  /// Source kind names have different sizes across APIs. Bound each TV surface
+  /// explicitly; decode sizing still follows the rendered size and device DPR.
   static String tvListCoverUrl(Map<String, String> images,
       {bool thumbnail = false}) {
     final kinds = thumbnail
@@ -54,20 +54,39 @@ class NetworkImgLayer extends StatelessWidget {
         : ['common', 'large', 'medium'];
     for (final kind in kinds) {
       final url = images[kind]?.trim() ?? '';
-      if (url.isNotEmpty) return url;
+      if (url.isNotEmpty) {
+        return BangumiImageUrlRewriter.sized(
+          url,
+          thumbnail
+              ? BangumiImageUrlRewriter.thumbnailWidth
+              : BangumiImageUrlRewriter.posterWidth,
+        );
+      }
     }
     return '';
   }
 
   static String tvDetailCoverUrl(Map<String, String> images) {
     final large = images['large']?.trim() ?? '';
-    return large.isNotEmpty ? large : tvListCoverUrl(images);
+    return large.isNotEmpty
+        ? BangumiImageUrlRewriter.sized(
+            large, BangumiImageUrlRewriter.detailWidth)
+        : tvListCoverUrl(images);
   }
 
   /// Detail may be opened from either a thumbnail row or a larger home card.
   /// Reuse the exact frame the user saw, without assuming one list URL size.
   static String tvInitialCoverUrl(Map<String, String> images) =>
-      _TvDisplayedCovers.latestUrl(images.values) ?? tvListCoverUrl(images);
+      _TvDisplayedCovers.latestUrl(images.values.expand((url) => [
+            url,
+            BangumiImageUrlRewriter.sized(
+                url.trim(), BangumiImageUrlRewriter.thumbnailWidth),
+            BangumiImageUrlRewriter.sized(
+                url.trim(), BangumiImageUrlRewriter.posterWidth),
+            BangumiImageUrlRewriter.sized(
+                url.trim(), BangumiImageUrlRewriter.detailWidth),
+          ])) ??
+      tvListCoverUrl(images);
 
   static Widget heroFlightShuttleBuilder(
     BuildContext flightContext,
