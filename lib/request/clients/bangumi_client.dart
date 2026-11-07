@@ -193,6 +193,10 @@ class BangumiClient {
         route.validate(response.data);
         return response.data;
       } on DioException catch (e) {
+        if (cancelToken?.isCancelled == true) {
+          throw await NetworkErrorMapper.mapException(
+              cancelToken!.cancelError!);
+        }
         if (i == attempts.length - 1 || !BangumiPublicRoute.canRetry(e)) {
           throw await NetworkErrorMapper.mapException(e);
         }
@@ -200,6 +204,10 @@ class BangumiClient {
             '${e.type.name}/${e.response?.statusCode ?? "-"} -> '
             '${attempts[i + 1]!.host}');
       } on FormatException catch (e, stack) {
+        if (cancelToken?.isCancelled == true) {
+          throw await NetworkErrorMapper.mapException(
+              cancelToken!.cancelError!);
+        }
         if (i == attempts.length - 1) {
           throw NetworkErrorMapper.parse(e, stack);
         }

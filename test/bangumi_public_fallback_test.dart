@@ -430,11 +430,14 @@ void main() {
       () async {
     adapter.respond = (o, _) => o.uri.host == 'api.kazumi.fyi'
         ? _Status(503)
-        : {'data': [], 'total': 0};
+        : {
+            'data': [if (o.uri.queryParameters['offset'] == '0') _subject(1)],
+            'total': 1,
+          };
     final result = await BangumiApi.getBangumiMirrorSeasonCalendar(
         ['2025-01-01', '2025-04-01']);
     expect(result, hasLength(7));
-    expect(adapter.requests, hasLength(2));
+    expect(adapter.requests, hasLength(3));
     final body = jsonDecode(adapter.bodies.last);
     expect(body['filter']['air_date'], ['>=2025-01-01', '<2025-04-01']);
     expect(body['filter']['tag'], ['日本']);
