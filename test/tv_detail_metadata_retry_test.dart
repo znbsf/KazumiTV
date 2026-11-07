@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
 
 import 'package:flutter/material.dart';
@@ -11,8 +14,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:logger/logger.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/bean/card/bangumi_info_card.dart';
+import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/widget/collect_button.dart';
 import 'package:kazumi/modules/bangumi/bangumi_item.dart';
+import 'package:kazumi/modules/bangumi/bangumi_tag.dart';
 import 'package:kazumi/pages/collect/collect_controller.dart';
 import 'package:kazumi/pages/info/info_controller.dart';
 import 'package:kazumi/pages/info/info_page.dart';
@@ -91,6 +96,55 @@ class _MetadataAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class _FailedCovers implements BaseCacheManager {
+  int calls = 0;
+
+  @override
+  Stream<FileResponse> getFileStream(String url,
+      {String? key, Map<String, String>? headers, bool withProgress = false}) {
+    calls++;
+    return Stream.error(const SocketException('cover fixture failure'));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+Future<void> _flushCover(WidgetTester tester) async {
+  for (var i = 0; i < 8; i++) {
+    await tester.pump();
+  }
+}
+
+Future<void> _exhaustCovers(WidgetTester tester) async {
+  await _flushCover(tester);
+  for (var i = 0; i < 2; i++) {
+    await tester.pump(const Duration(milliseconds: 3));
+    await _flushCover(tester);
+  }
+}
+
+FocusNode _coverRetry(WidgetTester tester) =>
+    Focus.of(tester.element(find.text('重试封面')));
+
+_FailedCovers _failCovers() {
+  final previous = CachedNetworkImageProvider.defaultCacheManager;
+  final cache = _FailedCovers();
+  CachedNetworkImageProvider.defaultCacheManager = cache;
+  NetworkImgLayer.tvCoverRetryDelaysForTesting = const [
+    Duration(milliseconds: 1),
+    Duration(milliseconds: 2),
+  ];
+  addTearDown(() {
+    CachedNetworkImageProvider.defaultCacheManager = previous;
+    NetworkImgLayer.tvCoverRetryDelaysForTesting = null;
+    NetworkImgLayer.clearTvCoverMemory();
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+  });
+  return cache;
+}
+
 BangumiItem _subject({String summary = ''}) => BangumiItem(
       id: 71,
       type: 2,
@@ -112,9 +166,12 @@ BangumiItem _subject({String summary = ''}) => BangumiItem(
 Future<_Info> _open(WidgetTester tester,
     {String summary = '',
     bool tv = true,
+    BangumiItem? item,
+    ThemeData? theme,
+    Size size = const Size(1280, 720),
     GlobalKey<NavigatorState>? navigator}) async {
   TvMode.setEnabledForTesting(tv);
-  tester.view.physicalSize = const Size(1280, 720);
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -124,9 +181,11 @@ Future<_Info> _open(WidgetTester tester,
   }));
   final info = _Info(collect);
   await tester.pumpWidget(MaterialApp(
+    theme: theme,
     navigatorKey: navigator,
     home: InfoPage(
-        inputBangumiItem: _subject(summary: summary), infoController: info),
+        inputBangumiItem: item ?? _subject(summary: summary),
+        infoController: info),
   ));
   await tester.pump();
   expect(info.requests.length, 1);
@@ -177,6 +236,185 @@ void main() {
     PathProviderPlatform.instance = oldPaths;
     await temp.delete(recursive: true);
     Logger.level = oldLogLevel;
+  });
+
+  Future<_Info> openFailedCover(WidgetTester tester,
+      {bool metadataFails = false}) async {
+    final item = _subject(summary: metadataFails ? '' : 'Loaded summary')
+      ..images = {'large': 'https://fixture.invalid/remote-cover.png'};
+    final info = await _open(tester,
+        item: item,
+        size: const Size(960, 540),
+        theme: ThemeData(
+            brightness: metadataFails ? Brightness.dark : Brightness.light));
+    await _complete(tester, info, !metadataFails);
+    await _exhaustCovers(tester);
+    expect(find.text('重试封面'), findsOneWidget);
+    return info;
+  }
+
+  testWidgets('cover remote 1 exhausted retries: LEFT from play reaches cover',
+      (tester) async {
+    final cache = _failCovers();
+    await openFailedCover(tester);
+    expect(cache.calls, 3);
+    _play(tester).requestFocus();
+    await tester.pump();
+    await _key(tester, LogicalKeyboardKey.arrowLeft);
+    expect(_coverRetry(tester).hasPrimaryFocus, isTrue);
+    await _key(tester, LogicalKeyboardKey.arrowRight);
+    for (var i = 0; i < 4; i++) {
+      await _key(tester, LogicalKeyboardKey.arrowRight);
+    }
+    expect(
+        tester
+            .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, '发表吐槽'))
+            .focusNode!
+            .hasPrimaryFocus,
+        isTrue);
+    await _key(tester, LogicalKeyboardKey.arrowRight);
+    expect(_play(tester).hasPrimaryFocus, isTrue,
+        reason: 'last action still wraps right while cover retry is visible');
+  });
+
+  testWidgets('cover remote 2 no failure: LEFT wraps to review, RIGHT to play',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    final item = _subject(summary: 'Loaded summary')
+      ..images = {'large': 'https://fixture.invalid/loaded-cover.png'};
+    final provider = ResizeImage.resizeIfNeeded(
+        158,
+        null,
+        CachedNetworkImageProvider(
+            NetworkImgLayer.tvDetailCoverUrl(item.images)));
+    final key = await provider.obtainKey(ImageConfiguration.empty);
+    final recorder = ui.PictureRecorder();
+    Canvas(recorder).drawColor(Colors.white, BlendMode.src);
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(2, 3);
+    picture.dispose();
+    PaintingBinding.instance.imageCache.putIfAbsent(
+        key,
+        () => OneFrameImageStreamCompleter(
+            Future.value(ImageInfo(image: image))));
+    addTearDown(() {
+      NetworkImgLayer.clearTvCoverMemory();
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+    });
+    final info = await _open(tester, item: item);
+    await _complete(tester, info, true);
+    expect(find.text('重试封面'), findsNothing);
+    expect(find.byWidgetPredicate((w) => w is RawImage && w.image != null),
+        findsOneWidget);
+    final play = _play(tester)..requestFocus();
+    await tester.pump();
+    await _key(tester, LogicalKeyboardKey.arrowLeft);
+    expect(
+        tester
+            .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, '发表吐槽'))
+            .focusNode!
+            .hasPrimaryFocus,
+        isTrue);
+    await _key(tester, LogicalKeyboardKey.arrowRight);
+    expect(play.hasPrimaryFocus, isTrue);
+  });
+
+  for (final metadataFails in [false, true]) {
+    testWidgets('cover remote 3 directions, info retry=$metadataFails',
+        (tester) async {
+      _failCovers();
+      await openFailedCover(tester, metadataFails: metadataFails);
+      final cover = _coverRetry(tester)..requestFocus();
+      await tester.pump();
+      final button =
+          tester.widget<TextButton>(find.widgetWithText(TextButton, '重试封面'));
+      final colors = Theme.of(tester.element(find.text('重试封面'))).colorScheme;
+      const focused = {WidgetState.focused};
+      expect(button.style!.backgroundColor!.resolve(focused), colors.primary);
+      expect(button.style!.foregroundColor!.resolve(focused), colors.onPrimary);
+      expect(button.style!.side!.resolve(focused)!.width, 3);
+      await _key(tester, LogicalKeyboardKey.arrowLeft);
+      expect(cover.hasPrimaryFocus, isTrue);
+      await _key(tester, LogicalKeyboardKey.arrowRight);
+      expect(_play(tester).hasPrimaryFocus, isTrue);
+      await _key(tester, LogicalKeyboardKey.arrowLeft);
+      expect(cover.hasPrimaryFocus, isTrue);
+      await _key(tester, LogicalKeyboardKey.arrowUp);
+      expect(FocusManager.instance.primaryFocus!.debugLabel, 'TV detail back');
+      cover.requestFocus();
+      await tester.pump();
+      await _key(tester, LogicalKeyboardKey.arrowDown);
+      if (metadataFails) {
+        expect(_retry(tester).hasPrimaryFocus, isTrue);
+      } else {
+        expect(
+            FocusManager.instance.primaryFocus!.context!
+                .findAncestorWidgetOfExactType<TabBar>(),
+            isNotNull);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+      'cover remote 4 OK hands focus to play before removal and refetches',
+      (tester) async {
+    final cache = _failCovers();
+    await openFailedCover(tester);
+    final play = _play(tester);
+    final cover = _coverRetry(tester)..requestFocus();
+    await tester.pump();
+    bool? retryPresentWhenPlayFocused;
+    void observeFocus() {
+      if (play.hasPrimaryFocus) {
+        retryPresentWhenPlayFocused = find.text('重试封面').evaluate().isNotEmpty;
+      }
+    }
+
+    play.addListener(observeFocus);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await _flushCover(tester);
+    play.removeListener(observeFocus);
+    expect(play.hasPrimaryFocus, isTrue);
+    expect(retryPresentWhenPlayFocused, isTrue);
+    expect(cover.hasPrimaryFocus, isFalse);
+    expect(cache.calls, 4);
+    expect(find.text('重试封面'), findsNothing);
+    await _exhaustCovers(tester);
+    expect(cache.calls, 6);
+    expect(find.text('重试封面'), findsOneWidget);
+    expect(play.hasPrimaryFocus, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('overview 6 stable tag left edge at 960x540 and no overflow',
+      (tester) async {
+    Future<double?> showTags(List<String> names, String summary) async {
+      final item = _subject(summary: summary)
+        ..tags = [
+          for (final name in names)
+            BangumiTag(name: name, count: 2, totalCount: 2),
+        ];
+      final info = await _open(tester, item: item, size: const Size(960, 540));
+      await _complete(tester, info, true);
+      expect(tester.takeException(), isNull);
+      final x = names.isEmpty ? null : tester.getTopLeft(find.text('标签')).dx;
+      if (names.isEmpty) expect(find.text('标签'), findsNothing);
+      expect(find.text('阅读完整简介'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      return x;
+    }
+
+    final shortX = await showTags(['日常', '喜剧'], 'Short summary');
+    final longX = await showTags(
+        List.generate(20, (i) => '很长的分类标签和制作信息 $i'), 'Short summary');
+    expect(shortX, longX);
+    expect(shortX, 16);
+    final longSummary = List.filled(2000, '很长的简介内容。').join();
+    await showTags([], longSummary);
+    expect(tester.takeException(), isNull);
   });
 
   for (final succeed in [false, true]) {

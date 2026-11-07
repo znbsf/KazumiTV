@@ -29,6 +29,10 @@ class BangumiInfoCardV extends StatefulWidget {
     this.tvInfoRetryFocus,
     this.tvOnInfoRetryUp,
     this.tvOnInfoRetryDown,
+    this.tvCoverRetryFocus,
+    this.tvOnCoverRetryVisibilityChanged,
+    this.tvOnCoverRetryKeyEvent,
+    this.tvOnCoverRetry,
   });
 
   final BangumiItem bangumiItem;
@@ -44,6 +48,10 @@ class BangumiInfoCardV extends StatefulWidget {
   final FocusNode? tvInfoRetryFocus;
   final VoidCallback? tvOnInfoRetryUp;
   final VoidCallback? tvOnInfoRetryDown;
+  final FocusNode? tvCoverRetryFocus;
+  final ValueChanged<bool>? tvOnCoverRetryVisibilityChanged;
+  final FocusOnKeyEventCallback? tvOnCoverRetryKeyEvent;
+  final VoidCallback? tvOnCoverRetry;
 
   @override
   State<BangumiInfoCardV> createState() => _BangumiInfoCardVState();
@@ -168,6 +176,11 @@ class _BangumiInfoCardVState extends State<BangumiInfoCardV> {
                 width: 158,
                 height: 237,
                 placeholderSrc: widget.tvInitialCoverUrl,
+                tvRetryFocus: widget.tvCoverRetryFocus,
+                tvOnRetryVisibilityChanged:
+                    widget.tvOnCoverRetryVisibilityChanged,
+                tvOnRetryKeyEvent: widget.tvOnCoverRetryKeyEvent,
+                tvOnRetry: widget.tvOnCoverRetry,
                 fadeInDuration: const Duration(milliseconds: 180),
                 fadeOutDuration: const Duration(milliseconds: 180),
               ),

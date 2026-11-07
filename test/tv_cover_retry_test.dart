@@ -47,7 +47,11 @@ const _url = 'https://fixture.invalid/cover.png';
 const _other = 'https://fixture.invalid/other.png';
 const _socket = SocketException('lossy line');
 
-Widget _cover({String url = _url, bool detail = true, double width = 80}) =>
+Widget _cover(
+        {String url = _url,
+        bool detail = true,
+        double width = 80,
+        ValueChanged<bool>? onRetryVisibilityChanged}) =>
     MaterialApp(
       home: Scaffold(
         body: Center(
@@ -56,6 +60,7 @@ Widget _cover({String url = _url, bool detail = true, double width = 80}) =>
             placeholderSrc: detail ? 'https://fixture.invalid/list.png' : null,
             width: width,
             height: 120,
+            tvOnRetryVisibilityChanged: onRetryVisibilityChanged,
           ),
         ),
       ),
@@ -131,6 +136,88 @@ void main() {
     PaintingBinding.instance.imageCache.clear();
     PaintingBinding.instance.imageCache.clearLiveImages();
     TvMode.setEnabledForTesting(false);
+  });
+
+  testWidgets(
+      'cover callback 5 retry round, URL reset and build-safe parent updates',
+      (tester) async {
+    cache.errors[_url] = List.filled(6, _socket);
+    NetworkImgLayer.tvCoverRetryDelaysForTesting = const [
+      Duration(milliseconds: 1),
+      Duration(milliseconds: 2),
+    ];
+    final events = <bool>[];
+    var url = _url;
+    var showCover = true;
+    late StateSetter update;
+    await tester.pumpWidget(StatefulBuilder(builder: (context, setState) {
+      update = setState;
+      return showCover
+          ? _cover(
+              url: url,
+              onRetryVisibilityChanged: (visible) {
+                if (!context.mounted) return;
+                setState(() => events.add(visible));
+              })
+          : const SizedBox();
+    }));
+    await _flush(tester);
+    expect(events, [false]);
+    Future<void> exhaust() async {
+      for (var i = 0; i < 2; i++) {
+        await tester.pump(const Duration(milliseconds: 3));
+        await _flush(tester);
+      }
+    }
+
+    await exhaust();
+    expect(events, [false, true]);
+    await tester.pump();
+    await tester.pump();
+    expect(events, [false, true],
+        reason: 'unchanged visibility is not repeated');
+    await tester.tap(find.text('重试封面'));
+    await _flush(tester);
+    expect(events, [false, true, false]);
+    expect(cache.calls[_url], 4);
+    await exhaust();
+    expect(events, [false, true, false, true]);
+
+    cache.pending[_other] = StreamController<FileResponse>.broadcast();
+    update(() => url = _other);
+    await tester.pump();
+    await _flush(tester);
+    expect(events, [false, true, false, true, false]);
+    expect(find.text('重试封面'), findsNothing);
+    // Keep the replacement request unresolved: no real PNG-decoder waits.
+    cache.pending[_other]!
+        .addError(const HttpExceptionWithStatus(404, 'missing'));
+    await _flush(tester);
+    expect(events.last, isTrue);
+    update(() => showCover = false);
+    await tester.pump();
+    expect(events.last, isFalse,
+        reason: 'a surviving owner clears disposed retry UI');
+    unawaited(cache.pending[_other]!.close());
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cover callback skips a queued visibility update after unmount',
+      (tester) async {
+    final events = <bool>[];
+    cache.pending[_url] = StreamController<FileResponse>.broadcast();
+    await tester.pumpWidget(_cover(onRetryVisibilityChanged: events.add));
+    expect(events, [false]);
+    cache.pending[_url]!.addError(HttpExceptionWithStatus(404, 'missing'));
+    // Deliver the failure, then dispose before rebuilding the dirty image.
+    await tester.idle();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump();
+    expect(events, [false]);
+    unawaited(cache.pending[_url]!.close());
+    expect(tester.takeException(), isNull);
   });
 
   for (final detail in [false, true]) {

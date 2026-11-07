@@ -26,6 +26,10 @@ class NetworkImgLayer extends StatelessWidget {
     this.color,
     this.colorBlendMode,
     this.placeholderSrc,
+    this.tvRetryFocus,
+    this.tvOnRetryVisibilityChanged,
+    this.tvOnRetryKeyEvent,
+    this.tvOnRetry,
   });
 
   static const tvCoverRetryDelays = [
@@ -51,6 +55,15 @@ class NetworkImgLayer extends StatelessWidget {
   /// The same work's list cover, retained while a larger TV detail image loads.
   /// Exact URLs keep covers from different works or catalog mirrors separate.
   final String? placeholderSrc;
+
+  /// Optional detail-page navigation; other image surfaces keep their defaults.
+  final FocusNode? tvRetryFocus;
+
+  /// Notifications are deferred; the owning page must check that it is mounted,
+  /// including for the final false notification when this image is disposed.
+  final ValueChanged<bool>? tvOnRetryVisibilityChanged;
+  final FocusOnKeyEventCallback? tvOnRetryKeyEvent;
+  final VoidCallback? tvOnRetry;
 
   @visibleForTesting
   static void clearTvCoverMemory() => _TvDisplayedCovers.clear();
@@ -294,6 +307,25 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
   bool _failed = false;
   Timer? _retryTimer;
   int _automaticRetries = 0;
+  bool? _reportedRetryVisible;
+  bool _retryVisibilityPending = false;
+
+  void _reportRetryVisibility() {
+    if (layer.tvOnRetryVisibilityChanged == null || _retryVisibilityPending) {
+      return;
+    }
+    _retryVisibilityPending = true;
+    // Resolution can happen while an ancestor is building. Notify the page
+    // only after layout, and coalesce changes to the actual visible state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _retryVisibilityPending = false;
+      if (!mounted) return;
+      final visible = _failed && layer.placeholderSrc != null;
+      if (_reportedRetryVisible == visible) return;
+      _reportedRetryVisible = visible;
+      layer.tvOnRetryVisibilityChanged?.call(visible);
+    });
+  }
 
   NetworkImgLayer get layer => widget.layer;
   String get _url => (layer.src?.isNotEmpty ?? false)
@@ -435,11 +467,21 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
     ++_request;
     _detach();
     _displayed?.dispose();
+    if (_reportedRetryVisible == true) {
+      final onVisibilityChanged = layer.tvOnRetryVisibilityChanged;
+      // The image can be removed while its page remains. Do not retain or read
+      // this State in the deferred teardown notification. The page guards its
+      // own lifetime; pending normal notifications above skip unmounted images.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onVisibilityChanged?.call(false);
+      });
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _reportRetryVisibility();
     return SizedBox(
       width: layer.width,
       height: layer.height,
@@ -475,10 +517,23 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
                       .colorScheme
                       .surface
                       .withValues(alpha: .88),
-                  child: TextButton.icon(
-                    onPressed: () => _retry(manual: true),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: const Text('重试封面', style: TvVisuals.control),
+                  child: Focus(
+                    skipTraversal: true,
+                    canRequestFocus: false,
+                    onKeyEvent: layer.tvOnRetryKeyEvent,
+                    child: TextButton.icon(
+                      focusNode: layer.tvRetryFocus,
+                      style: layer.tvRetryFocus == null
+                          ? null
+                          : TvVisuals.focusButtonStyle(
+                              Theme.of(context).colorScheme),
+                      onPressed: () {
+                        layer.tvOnRetry?.call();
+                        _retry(manual: true);
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('重试封面', style: TvVisuals.control),
+                    ),
                   ),
                 ),
               ),

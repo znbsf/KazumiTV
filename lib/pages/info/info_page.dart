@@ -86,6 +86,36 @@ class _InfoPageState extends State<InfoPage>
   bool _loadingBangumiInfo = false;
   bool _retryingBangumiInfo = false;
   final _tvInfoRetryFocus = FocusNode(debugLabel: 'TV detail info retry');
+  final _tvCoverRetryFocus = FocusNode(debugLabel: 'TV detail cover retry');
+  bool _showTvCoverRetry = false;
+
+  void _onTvCoverRetryVisibilityChanged(bool visible) {
+    if (!mounted || _showTvCoverRetry == visible) return;
+    setState(() => _showTvCoverRetry = visible);
+  }
+
+  KeyEventResult _tvCoverRetryKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.arrowRight:
+        _focusTvPlay();
+      case LogicalKeyboardKey.arrowUp:
+        _tvBackFocus.requestFocus();
+      case LogicalKeyboardKey.arrowDown:
+        if (_showTvInfoRetry) {
+          _tvInfoRetryFocus.requestFocus();
+        } else {
+          _focusTvTab();
+        }
+      case LogicalKeyboardKey.arrowLeft:
+        break;
+      default:
+        return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
 
   bool get _showTvInfoRetry =>
       _retryingBangumiInfo ||
@@ -459,6 +489,7 @@ class _InfoPageState extends State<InfoPage>
     _detailScrollController.dispose();
     _tvPlayFocus.dispose();
     _tvInfoRetryFocus.dispose();
+    _tvCoverRetryFocus.dispose();
     _tvHealthFocus.dispose();
     _tvBackFocus.dispose();
     _tvTabsFocus.dispose();
@@ -645,11 +676,25 @@ class _InfoPageState extends State<InfoPage>
                                       TvMode.enabled ? _tvInfoRetryFocus : null,
                                   tvOnInfoRetryUp: _focusTvPlay,
                                   tvOnInfoRetryDown: _focusTvTab,
+                                  tvCoverRetryFocus: TvMode.enabled
+                                      ? _tvCoverRetryFocus
+                                      : null,
+                                  tvOnCoverRetryVisibilityChanged:
+                                      TvMode.enabled
+                                          ? _onTvCoverRetryVisibilityChanged
+                                          : null,
+                                  tvOnCoverRetryKeyEvent:
+                                      TvMode.enabled ? _tvCoverRetryKey : null,
+                                  tvOnCoverRetry:
+                                      TvMode.enabled ? _focusTvPlay : null,
                                   tvInitialCoverUrl:
                                       TvMode.enabled ? _initialCoverUrl : null,
                                   tvActions: TvMode.enabled
                                       ? TvDetailActions(
                                           playFocus: _tvPlayFocus,
+                                          onPlayLeft: _showTvCoverRetry
+                                              ? _tvCoverRetryFocus.requestFocus
+                                              : null,
                                           sourceHealthFocus: _tvHealthFocus,
                                           onSourceHealth: () => _sourceHealth(),
                                           onPlay: _startWatching,

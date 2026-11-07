@@ -193,55 +193,58 @@ class _InfoTabViewState extends State<InfoTabView> {
           padding: const EdgeInsets.all(16),
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // The native-style header already previews five synopsis lines
-                // beside the cover; this body retains full reading and tags.
-                if (widget.bangumiItem.summary.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => TvSynopsisReader(
-                        title: widget.bangumiItem.nameCn.isEmpty
-                            ? widget.bangumiItem.name
-                            : widget.bangumiItem.nameCn,
-                        summary: widget.bangumiItem.summary,
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The native-style header already previews five synopsis lines
+                  // beside the cover; this body retains full reading and tags.
+                  if (widget.bangumiItem.summary.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => TvSynopsisReader(
+                          title: widget.bangumiItem.nameCn.isEmpty
+                              ? widget.bangumiItem.name
+                              : widget.bangumiItem.nameCn,
+                          summary: widget.bangumiItem.summary,
+                        ),
                       ),
+                      child: const Text('阅读完整简介', style: TvVisuals.control),
                     ),
-                    child: const Text('阅读完整简介', style: TvVisuals.control),
-                  ),
-                ],
-                if (widget.bangumiItem.tags.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text('标签', style: TvVisuals.title),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final tag in widget.bangumiItem.tags.take(
-                        fullTag ? widget.bangumiItem.tags.length : 12,
-                      ))
-                        ActionChip(
-                          label: Text(
-                            '${tag.name} ${tag.count}',
-                            style: TvVisuals.control,
+                  ],
+                  if (widget.bangumiItem.tags.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text('标签', style: TvVisuals.title),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tag in widget.bangumiItem.tags.take(
+                          fullTag ? widget.bangumiItem.tags.length : 12,
+                        ))
+                          ActionChip(
+                            label: Text(
+                              '${tag.name} ${tag.count}',
+                              style: TvVisuals.control,
+                            ),
+                            onPressed: () => context.pushNamed(
+                              '/search/${Uri.encodeComponent(tag.name)}',
+                            ),
                           ),
-                          onPressed: () => context.pushNamed(
-                            '/search/${Uri.encodeComponent(tag.name)}',
+                        if (!fullTag && widget.bangumiItem.tags.length > 12)
+                          ActionChip(
+                            label: const Text('更多 +', style: TvVisuals.control),
+                            onPressed: () => setState(() => fullTag = true),
                           ),
-                        ),
-                      if (!fullTag && widget.bangumiItem.tags.length > 12)
-                        ActionChip(
-                          label: const Text('更多 +', style: TvVisuals.control),
-                          onPressed: () => setState(() => fullTag = true),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

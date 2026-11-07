@@ -16,6 +16,7 @@ class TvDetailActions extends StatefulWidget {
     required this.onReview,
     required this.onUp,
     required this.onDown,
+    this.onPlayLeft,
   });
 
   final FocusNode playFocus;
@@ -27,6 +28,7 @@ class TvDetailActions extends StatefulWidget {
   final VoidCallback onReview;
   final VoidCallback onUp;
   final VoidCallback onDown;
+  final VoidCallback? onPlayLeft;
 
   @override
   State<TvDetailActions> createState() => _TvDetailActionsState();
@@ -64,6 +66,12 @@ class _TvDetailActionsState extends State<TvDetailActions> {
     final index = _nodes.indexWhere((node) => node.hasPrimaryFocus);
     if (index < 0) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (index == 0 &&
+        key == LogicalKeyboardKey.arrowLeft &&
+        widget.onPlayLeft != null) {
+      widget.onPlayLeft!();
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight) {
       _nodes[tvWrappedIndex(
