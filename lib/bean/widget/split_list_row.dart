@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/widget/tonal_card.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 
 const double splitListOuterRadius = tonalCardRadius;
 const double splitListInnerRadius = 4;
@@ -48,7 +49,11 @@ class _SplitListRowState extends State<SplitListRow> {
     final colors = theme.colorScheme;
     final child = widget.onTap == null
         ? widget.child
-        : InkWell(
+        : TvInkWell(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(_pressed ? widget.pressedRadius : widget.topRadius),
+              bottom: Radius.circular(_pressed ? widget.pressedRadius : widget.bottomRadius),
+            ),
             onTap: widget.onTap,
             onHighlightChanged: _reportPress,
             child: widget.child,

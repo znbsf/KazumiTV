@@ -132,7 +132,7 @@ class _CollectPageState extends State<CollectPage> with KazumiDialogOwner {
             canEdit: (item) =>
                 !_syncDialogOpen && !_pendingIds.contains(item.id),
             onOpen: (item) => context.pushNamed('/info/', arguments: item),
-            onChangeType: (item, type) => unawaited(_changeType(item, type)),
+            onChangeType: _changeType,
           ),
         ),
       ),

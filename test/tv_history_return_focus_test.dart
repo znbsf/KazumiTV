@@ -80,6 +80,26 @@ void main() {
   });
   tearDown(() => TvMode.setEnabledForTesting(false));
 
+  testWidgets('D02 history clear dialog initially focuses cancel', (
+    tester,
+  ) async {
+    final app = await _mount(tester);
+    await tester.tap(find.byTooltip('管理历史记录'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('清空全部历史记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('清空历史记录？'), findsOneWidget);
+    final cancel = find.widgetWithText(TextButton, '取消');
+    expect(
+      FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<TextButton>(),
+      same(tester.widget<TextButton>(cancel)),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(app.history.histories.length, 8);
+  });
   testWidgets('history playback return preserves subject after reorder',
       (tester) async {
     final app = await _mount(tester);

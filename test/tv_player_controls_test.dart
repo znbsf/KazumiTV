@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/pages/player/tv_player_controls.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 void main() {
   testWidgets('remote progress seeks within bounds and returns to actions',
@@ -110,8 +111,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('settings keep the focused row off the screen edge',
+      (tester) async {
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: TvPlayerSettingsPanel(
+          title: '设置',
+          onBack: () {},
+          children: [
+            for (var i = 0; i < 20; i++)
+              TvPlayerAction(label: 'row$i', onPressed: () {}),
+          ],
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 12; i++) {
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+    }
+    final focused = FocusManager.instance.primaryFocus!.context!;
+    final rect = tester.getRect(find.byWidget(focused.widget).first);
+    expect(rect.bottom, lessThanOrEqualTo(540 - 16));
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('icon actions retain remote activation, semantics and tooltip',
       (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
     final semantics = tester.ensureSemantics();
     final focus = FocusNode();
     addTearDown(focus.dispose);
@@ -135,8 +167,15 @@ void main() {
     ));
     focus.requestFocus();
     await tester.pumpAndSettle();
-    expect(find.text('下一集'), findsNothing);
-    expect(find.bySemanticsLabel('下一集'), findsOneWidget);
+    expect(find.text('下一集'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(TvPlayerAction),
+            matching: find.byWidgetPredicate((widget) =>
+                widget is Semantics &&
+                widget.properties.label == '下一集' &&
+                widget.properties.button == true)),
+        findsOneWidget);
     expect(tester.widget<Tooltip>(find.byType(Tooltip)).message, '下一集');
     final icon = tester.widget<Icon>(find.byIcon(Icons.skip_next_rounded));
     expect(
@@ -149,6 +188,9 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.select);
     await tester.tap(find.byIcon(Icons.skip_next_rounded));
     expect(activations, 2);
+    focus.unfocus();
+    await tester.pumpAndSettle();
+    expect(find.text('下一集'), findsNothing);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -157,8 +199,10 @@ void main() {
 // Validate the foreground against the actual focused Material, not just a token.
 void expectFocusedSurface(WidgetTester tester, Finder action) {
   final colors = Theme.of(tester.element(action)).colorScheme;
-  final material = tester.widget<Material>(
-      find.descendant(of: action, matching: find.byType(Material)));
+  final material = tester.widget<Material>(find.descendant(
+      of: action,
+      matching: find.byWidgetPredicate(
+          (widget) => widget is Material && widget.child is InkWell)));
   expect(material.color, colors.primary);
   final shape = material.shape! as RoundedRectangleBorder;
   expect(shape.side.color, colors.onSurface);

@@ -9,6 +9,18 @@ import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/utils/theme.dart';
 
 void main() {
+  test('TV caption styles are 14px without changing the inherited phone theme',
+      () {
+    final phone = ThemeData();
+    final bodySmall = phone.textTheme.bodySmall;
+    final labelSmall = phone.textTheme.labelSmall;
+    final tv = TvVisuals.theme(phone);
+    expect(TvVisuals.caption.fontSize, 14);
+    expect(tv.textTheme.bodySmall?.fontSize, 14);
+    expect(tv.textTheme.labelSmall?.fontSize, 14);
+    expect(phone.textTheme.bodySmall, bodySmall);
+    expect(phone.textTheme.labelSmall, labelSmall);
+  });
   for (final brightness in Brightness.values) {
     test('TV shell preserves user $brightness palette', () {
       final original = ThemeData(

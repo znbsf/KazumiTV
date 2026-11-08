@@ -79,6 +79,12 @@ class _StorageSettingsPageState extends State<StorageSettingsPage> {
                 title: const Text('缓存'),
                 tiles: [
                   SettingsTile(
+                    leading: Icons.subtitles_rounded,
+                    title: const Text('弹幕缓存'),
+                    description: const Text('查看用量、调整容量或清理'),
+                    onPressed: (_) => context.pushNamed('/settings/danmaku-cache'),
+                  ),
+                  SettingsTile(
                     leading: Icons.image_outlined,
                     title: const Text('清除图片缓存'),
                     description: Text(_cacheDescription(snapshot)),

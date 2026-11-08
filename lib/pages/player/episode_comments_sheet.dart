@@ -8,6 +8,7 @@ import 'package:kazumi/pages/player/episode_comments_picker.dart';
 import 'package:kazumi/pages/player/episode_comments_view.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/request/apis/bangumi_api.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 class EpisodeCommentsSheet extends StatefulWidget {
   const EpisodeCommentsSheet({
@@ -33,6 +34,14 @@ class _EpisodeCommentsSheetState extends State<EpisodeCommentsSheet>
   bool _hasError = false;
   int _requestVersion = 0;
   final Map<int, EpisodeInfo> _episodeInfoByIndex = {};
+  final _selectEpisodeFocus =
+      FocusNode(debugLabel: 'Discussion episode picker');
+
+  @override
+  void dispose() {
+    _selectEpisodeFocus.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -108,6 +117,8 @@ class _EpisodeCommentsSheetState extends State<EpisodeCommentsSheet>
 
   Future<void> _showEpisodeSelection() async {
     if (dialogs.isRunning) return;
+    final origin = FocusManager.instance.primaryFocus;
+    final selection = widget.selection;
     final controller = _controller;
     await dialogs.run((task) async {
       final episodes = await task.loading(
@@ -132,6 +143,21 @@ class _EpisodeCommentsSheetState extends State<EpisodeCommentsSheet>
       _selectedEpisode = selected;
       unawaited(_loadComments());
     }, errorMessage: '分集列表加载失败，请稍后重试');
+    if (!mounted || !TvMode.enabled || widget.selection != selection) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          widget.selection == selection &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        final target = origin?.context
+                    ?.findAncestorWidgetOfExactType<EpisodeCommentsView>() !=
+                null
+            ? origin!
+            : _selectEpisodeFocus;
+        if (target.context != null && target.canRequestFocus) {
+          target.requestFocus();
+        }
+      }
+    });
   }
 
   @override
@@ -140,6 +166,7 @@ class _EpisodeCommentsSheetState extends State<EpisodeCommentsSheet>
       final matchesEpisode = _controller.commentsEpisode == _selectedEpisode;
       final comments = _controller.episodeCommentsList.toList();
       return EpisodeCommentsView(
+        selectEpisodeFocusNode: TvMode.enabled ? _selectEpisodeFocus : null,
         episode: _selectedEpisode,
         episodeInfo: matchesEpisode && _controller.episodeInfo.id != 0
             ? _controller.episodeInfo

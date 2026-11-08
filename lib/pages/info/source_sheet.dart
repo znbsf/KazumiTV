@@ -1,12 +1,15 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/source_health/source_health_preferences.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:kazumi/pages/info/source_keyword_dialog.dart';
 import 'package:kazumi/bean/widget/tv_explicit_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
+import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/bean/dialog/dialog_helper.dart';
@@ -33,6 +36,8 @@ import 'package:kazumi/services/plugin/plugin_search_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
 import 'package:kazumi/utils/device.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'source_alias_dialog.dart';
@@ -45,12 +50,14 @@ class SourceSheet extends StatefulWidget {
       required this.infoController,
       this.autoSearchOnOpen = true,
       this.switchOrigin,
-      this.createVideoSourceService});
+      this.createVideoSourceService,
+      this.createCaptchaVerificationService});
 
   final InfoController infoController;
   final bool autoSearchOnOpen;
   final SourceSwitchOrigin? switchOrigin;
   final IVideoSourceService Function()? createVideoSourceService;
+  final CaptchaVerificationService Function()? createCaptchaVerificationService;
 
   @override
   State<SourceSheet> createState() => _SourceSheetState();
@@ -77,8 +84,13 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
       pluginsController: _pluginsController,
     );
     _captchaFlow = _SourceCaptchaFlow(
+      createService: widget.createCaptchaVerificationService,
       onVerified: _showVerifiedResult,
-      onCancelled: (plugin) => _retry(plugin.name),
+      onCancelled: (plugin) {
+        if (!mounted) return;
+        widget.infoController.pluginSearchStatus[plugin.name] =
+            PluginSearchStatus.error;
+      },
     );
     if (widget.autoSearchOnOpen) {
       _searchService.queryAllSource(_keyword);
@@ -278,7 +290,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
           // Snapshot observable values here; lazy list builders are not tracked.
           final groupsByName = {
             for (final plugin in _pluginsController.enabledPlugins)
-              plugin.name: _SourceSearchGroup(
+              plugin.name: SourceSearchGroup(
                 name: plugin.name,
                 keyword: _keywordFor(plugin.name),
                 unsearched: !widget.autoSearchOnOpen &&
@@ -302,7 +314,7 @@ class _SourceSheetState extends State<SourceSheet> with KazumiDialogOwner {
             }
             if (group.hasResults) firstResultSource ??= group.name;
           }
-          return _SourceSheetView(
+          return SourceSheetView(
             keyword: _keyword,
             groups: groupsByName.values.toList(),
             firstResultSource: firstResultSource,

@@ -90,6 +90,10 @@ abstract class _TimelineController with Store {
     for (var page = 0; page < pageCount; page++) {
       final newList =
           await BangumiApi.getCalendarBySearch(dateRange, limit, page * limit);
+      if (newList.length != 7) {
+        bangumiCalendar.clear();
+        return;
+      }
       for (int i = 0; i < resBangumiCalendar.length; ++i) {
         resBangumiCalendar[i].addAll(newList[i]);
       }

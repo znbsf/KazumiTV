@@ -1,4 +1,6 @@
 import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
+import 'package:kazumi/bean/dialog/tv_dialog_initial_focus.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -255,8 +257,13 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                 onPressed: (_) async {
                   final selected = await showDialog<int>(
                       context: context,
-                      builder: (_) =>
-                          ThemePaletteDialog(selectedColor: defaultThemeColor));
+                      builder: (_) {
+                        final dialog = ThemePaletteDialog(
+                            selectedColor: defaultThemeColor);
+                        return TvMode.enabled
+                            ? TvDialogInitialFocus(child: dialog)
+                            : dialog;
+                      });
                   if (!mounted || selected == null) return;
                   if (selected == 0) {
                     await resetTheme();

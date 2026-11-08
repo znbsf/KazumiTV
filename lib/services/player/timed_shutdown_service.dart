@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
@@ -100,9 +101,9 @@ class TimedShutdownService {
               onPressed: () {
                 dialog.dismiss();
               },
-              child: Text(
+              child: TvButtonText(
                 '关闭',
-                style: TextStyle(color: Theme.of(context).colorScheme.outline),
+                color: Theme.of(context).colorScheme.outline,
               ),
             ),
           ],
@@ -131,10 +132,10 @@ class TimedShutdownService {
     }
   }
 
-  static void showCustomTimerDialog({
+  static Future<void> showCustomTimerDialog({
     VoidCallback? onExpired,
-  }) {
-    KazumiDialog.show(
+  }) async {
+    await KazumiDialog.show<void>(
       builder: (context) => _CustomTimerDialog(
         onExpired: onExpired,
       ),
@@ -288,9 +289,9 @@ class _CustomTimerDialogState extends State<_CustomTimerDialog> {
       actions: [
         TextButton(
           onPressed: () => KazumiDialog.dismiss(context: context),
-          child: Text(
+          child: TvButtonText(
             '取消',
-            style: TextStyle(color: Theme.of(context).colorScheme.outline),
+            color: Theme.of(context).colorScheme.outline,
           ),
         ),
         TextButton(

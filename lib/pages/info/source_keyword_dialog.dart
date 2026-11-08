@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
@@ -55,9 +56,8 @@ class _SourceKeywordDialogState extends State<SourceKeywordDialog> {
         actions: [
           TextButton(
               onPressed: widget.onCancel,
-              child: Text('取消',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.outline))),
+              child: TvButtonText('取消',
+                  color: Theme.of(context).colorScheme.outline)),
           TextButton(onPressed: _submit, child: const Text('检索')),
         ],
       );

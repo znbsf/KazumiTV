@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 
 /// The playing indicator is persistent state; the outer frame is focus only.
 class EpisodeTile extends StatelessWidget {
-  static const _tvFontSize = 12.0;
+  static const _tvFontSize = 14.0;
   static const _tvLineHeight = 1.4;
 
   /// Two lines plus focus frame (10), inner padding (10) and row margin (2).
   /// Keep the compact grid usable with TV accessibility text scaling too.
-  static double tvGridMainAxisExtent(BuildContext context) => (22 +
-          MediaQuery.textScalerOf(context).scale(_tvFontSize) *
-              _tvLineHeight *
-              2)
-      .ceilToDouble();
+  /// Round each line up before adding them (e.g. two 24.5px lines need 50px).
+  static double tvGridMainAxisExtent(BuildContext context) =>
+      22 +
+      (MediaQuery.textScalerOf(context).scale(_tvFontSize) * _tvLineHeight)
+              .ceilToDouble() *
+          2;
 
   const EpisodeTile(
       {super.key,
@@ -34,7 +36,7 @@ class EpisodeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Semantics(
+    final tile = Semantics(
       selected: isPlaying,
       label: isPlaying ? '正在播放' : null,
       child: TvFocusableSurface(
@@ -84,5 +86,6 @@ class EpisodeTile extends StatelessWidget {
         ),
       ),
     );
+    return TvFocusLabel(message: label, onlyWhenTruncated: true, child: tile);
   }
 }

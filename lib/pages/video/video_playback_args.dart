@@ -39,10 +39,14 @@ class OfflineVideoPlaybackArgs extends VideoPlaybackArgs {
     required this.episodeNumber,
     required this.road,
     required this.downloadedEpisodes,
+    this.recentCacheId,
   });
 
   final String pluginName;
   final int episodeNumber;
   final int road;
   final List<DownloadEpisode> downloadedEpisodes;
+
+  /// A managed cache entry, separate from the manual download repository.
+  final String? recentCacheId;
 }

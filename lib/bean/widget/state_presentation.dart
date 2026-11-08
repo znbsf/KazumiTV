@@ -53,6 +53,7 @@ class StateActionButton extends StatelessWidget {
     this.icon,
     this.reserveText,
     this.autofocus = false,
+    this.focusNode,
   }) : _tonal = false;
 
   const StateActionButton.tonal({
@@ -62,10 +63,12 @@ class StateActionButton extends StatelessWidget {
     this.icon,
     this.reserveText,
     this.autofocus = false,
+    this.focusNode,
   }) : _tonal = true;
 
   final VoidCallback? onPressed;
   final bool autofocus;
+  final FocusNode? focusNode;
   final String text;
   final IconData? icon;
 
@@ -94,6 +97,7 @@ class StateActionButton extends StatelessWidget {
     final label = Text(text, textAlign: TextAlign.center);
     return button(
       autofocus: autofocus,
+      focusNode: focusNode,
       onPressed: onPressed,
       style: styleOf(context),
       icon: icon == null ? null : Icon(icon, size: 20),

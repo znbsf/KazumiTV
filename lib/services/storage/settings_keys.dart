@@ -51,6 +51,20 @@ class SettingKey<T> {
 // Add new settings here. SettingsKeys is the public typed registry used by
 // callers; new keys can use literal string names directly.
 class SettingsKeys {
+  static const danmakuCacheEnabled = SettingKey<bool>(
+    'danmakuCacheEnabled', true, group: SettingGroup.danmaku);
+  static const danmakuCacheMiB = SettingKey<int>(
+    'danmakuCacheMiB', 256, group: SettingGroup.danmaku);
+  static const recentVideoCacheEnabled = SettingKey<bool>(
+    'recentVideoCacheEnabled',
+    false,
+    group: SettingGroup.download,
+  );
+  static const recentVideoCacheGiB = SettingKey<int>(
+    'recentVideoCacheGiB',
+    2,
+    group: SettingGroup.download,
+  );
   static const sourceHealthPreferences = SettingKey<String>(
     'sourceHealthPreferencesV1',
     '',
@@ -62,7 +76,9 @@ class SettingsKeys {
     group: SettingGroup.misc,
   );
   static const sourceHealthGlobal = SettingKey<bool>(
-    'sourceHealthGlobal', true, group: SettingGroup.player,
+    'sourceHealthGlobal',
+    true,
+    group: SettingGroup.player,
   );
   static const firstSourceAutoSelect = SettingKey<bool>(
     'firstSourceAutoSelect',
@@ -70,7 +86,8 @@ class SettingsKeys {
     group: SettingGroup.player,
   );
   static const showNumericShortcutBadges = SettingKey<bool>(
-      'showNumericShortcutBadges', true, group: SettingGroup.interface);
+      'showNumericShortcutBadges', true,
+      group: SettingGroup.interface);
   static const hAenable = SettingKey<bool>(
     _SettingBoxKey.hAenable,
     true,
@@ -684,6 +701,10 @@ class SettingsKeys {
     showRating,
     showAnimeCounter,
     downloadParallelEpisodes,
+    recentVideoCacheEnabled,
+    danmakuCacheEnabled,
+    danmakuCacheMiB,
+    recentVideoCacheGiB,
     downloadParallelSegments,
     downloadDanmaku,
     downloadDirectory,

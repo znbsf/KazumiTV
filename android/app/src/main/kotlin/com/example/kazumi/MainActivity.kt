@@ -186,6 +186,16 @@ class MainActivity: AudioServiceActivity() {
                 result.success(sdkVersion)
             } else if (call.method == "isTelevision") {
                 result.success(isTelevision())
+            } else if (call.method == "canPickImage") {
+                val available = try {
+                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "image/*"
+                    }
+                    packageManager.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY) != null
+                } catch (e: Exception) {
+                    false
+                }
+                result.success(available)
             } else if (call.method == "enterFullscreen") {
                 enterAndroidFullscreen()
                 result.success(null)

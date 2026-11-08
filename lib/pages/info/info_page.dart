@@ -38,6 +38,7 @@ import 'package:kazumi/repositories/history_repository.dart';
 import 'package:kazumi/services/player/history_playback_service.dart';
 import 'package:kazumi/services/plugin/rule_engine_models.dart'
     show RuleCancelToken;
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class InfoPage extends StatefulWidget {
   const InfoPage({
@@ -81,9 +82,48 @@ class _InfoPageState extends State<InfoPage>
   bool staffIsEmpty = false;
   bool _showBangumiInfoSkeleton = false;
   bool _startingPlayback = false;
+  bool _bangumiInfoFailed = false;
+  bool _loadingBangumiInfo = false;
+  bool _retryingBangumiInfo = false;
+  final _tvInfoRetryFocus = FocusNode(debugLabel: 'TV detail info retry');
+  final _tvCoverRetryFocus = FocusNode(debugLabel: 'TV detail cover retry');
+  bool _showTvCoverRetry = false;
+
+  void _onTvCoverRetryVisibilityChanged(bool visible) {
+    if (!mounted || _showTvCoverRetry == visible) return;
+    setState(() => _showTvCoverRetry = visible);
+  }
+
+  KeyEventResult _tvCoverRetryKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.arrowRight:
+        _focusTvPlay();
+      case LogicalKeyboardKey.arrowUp:
+        _tvBackFocus.requestFocus();
+      case LogicalKeyboardKey.arrowDown:
+        if (_showTvInfoRetry) {
+          _tvInfoRetryFocus.requestFocus();
+        } else {
+          _focusTvTab();
+        }
+      case LogicalKeyboardKey.arrowLeft:
+        break;
+      default:
+        return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
+
+  bool get _showTvInfoRetry =>
+      _retryingBangumiInfo ||
+      (_bangumiInfoFailed && infoController.bangumiItem.summary.isEmpty);
   HealthRun? _recordedSourceRun;
   final _detailScrollController = ScrollController();
   final _tvPlayFocus = FocusNode(debugLabel: 'TV detail play');
+  final _tvHealthFocus = FocusNode(debugLabel: 'TV source health');
   final _tvBackFocus = FocusNode(debugLabel: 'TV detail back');
   final _tvTabsFocus = FocusNode(debugLabel: 'TV detail tabs');
 
@@ -136,7 +176,11 @@ class _InfoPageState extends State<InfoPage>
                 plugins: List.of(inject<PluginsController>().enabledPlugins),
               )),
     );
-    if (mounted) _tvPlayFocus.requestFocus();
+    if (TvMode.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _tvHealthFocus.requestFocus();
+      });
+    }
     return result;
   }
 
@@ -221,6 +265,7 @@ class _InfoPageState extends State<InfoPage>
       if (!mounted) return;
       await showAdaptiveBottomSheet<void>(
         context: context,
+        tvWide: true,
         builder: (_) => SourceSheet(infoController: infoController),
       );
     } finally {
@@ -443,6 +488,9 @@ class _InfoPageState extends State<InfoPage>
     _recordedSourceRun?.cancel();
     _detailScrollController.dispose();
     _tvPlayFocus.dispose();
+    _tvInfoRetryFocus.dispose();
+    _tvCoverRetryFocus.dispose();
+    _tvHealthFocus.dispose();
     _tvBackFocus.dispose();
     _tvTabsFocus.dispose();
     infoTabController.removeListener(onInfoTabChanged);
@@ -456,10 +504,17 @@ class _InfoPageState extends State<InfoPage>
   }
 
   Future<void> _loadBangumiInfo() async {
+    if (_loadingBangumiInfo) return;
+    setState(() {
+      _retryingBangumiInfo = TvMode.enabled && _showTvInfoRetry;
+      _loadingBangumiInfo = true;
+      _showBangumiInfoSkeleton = true;
+    });
     final loadingStartedAt = DateTime.now();
+    var succeeded = false;
     try {
       // Attach metadata without replacing rendered image URLs.
-      await infoController.queryBangumiInfoByID(
+      succeeded = await infoController.queryBangumiInfoByID(
         infoController.bangumiItem.id,
         type: 'attach',
       );
@@ -471,7 +526,13 @@ class _InfoPageState extends State<InfoPage>
         await _waitForMinimumBangumiInfoLoadingDuration(loadingStartedAt);
       }
       if (mounted) {
+        if (TvMode.enabled && succeeded && _tvInfoRetryFocus.hasFocus) {
+          _tvPlayFocus.requestFocus();
+        }
         setState(() {
+          _bangumiInfoFailed = !succeeded;
+          _loadingBangumiInfo = false;
+          _retryingBangumiInfo = false;
           _showBangumiInfoSkeleton = false;
         });
       }
@@ -541,16 +602,19 @@ class _InfoPageState extends State<InfoPage>
                       ),
                     ),
                   EmbeddedNativeControlArea(
-                    child: IconButton(
-                      onPressed: () {
-                        launchUrl(
-                          Uri.parse(
-                              'https://bangumi.tv/subject/${infoController.bangumiItem.id}'),
-                          mode: LaunchMode.externalApplication,
-                        );
-                      },
-                      icon: const Icon(Icons.open_in_browser_rounded),
-                    ),
+                    child: TvFocusLabel(
+                        message: '在浏览器打开',
+                        child: IconButton(
+                          tooltip: '在浏览器打开',
+                          onPressed: () {
+                            launchUrl(
+                              Uri.parse(
+                                  'https://bangumi.tv/subject/${infoController.bangumiItem.id}'),
+                              mode: LaunchMode.externalApplication,
+                            );
+                          },
+                          icon: const Icon(Icons.open_in_browser_rounded),
+                        )),
                   ),
                   if (!showWindowButton && isDesktop())
                     CloseButton(onPressed: () => windowManager.close()),
@@ -602,11 +666,36 @@ class _InfoPageState extends State<InfoPage>
                                   bangumiItem: infoController.bangumiItem,
                                   isLoading: showBangumiInfoSkeleton,
                                   showRating: showRating,
+                                  tvInfoFailed:
+                                      TvMode.enabled && _bangumiInfoFailed,
+                                  tvInfoRetrying:
+                                      TvMode.enabled && _retryingBangumiInfo,
+                                  tvOnRetryInfo:
+                                      TvMode.enabled ? _loadBangumiInfo : null,
+                                  tvInfoRetryFocus:
+                                      TvMode.enabled ? _tvInfoRetryFocus : null,
+                                  tvOnInfoRetryUp: _focusTvPlay,
+                                  tvOnInfoRetryDown: _focusTvTab,
+                                  tvCoverRetryFocus: TvMode.enabled
+                                      ? _tvCoverRetryFocus
+                                      : null,
+                                  tvOnCoverRetryVisibilityChanged:
+                                      TvMode.enabled
+                                          ? _onTvCoverRetryVisibilityChanged
+                                          : null,
+                                  tvOnCoverRetryKeyEvent:
+                                      TvMode.enabled ? _tvCoverRetryKey : null,
+                                  tvOnCoverRetry:
+                                      TvMode.enabled ? _focusTvPlay : null,
                                   tvInitialCoverUrl:
                                       TvMode.enabled ? _initialCoverUrl : null,
                                   tvActions: TvMode.enabled
                                       ? TvDetailActions(
                                           playFocus: _tvPlayFocus,
+                                          onPlayLeft: _showTvCoverRetry
+                                              ? _tvCoverRetryFocus.requestFocus
+                                              : null,
+                                          sourceHealthFocus: _tvHealthFocus,
                                           onSourceHealth: () => _sourceHealth(),
                                           onPlay: _startWatching,
                                           onSelectSource: () => _startWatching(
@@ -619,7 +708,13 @@ class _InfoPageState extends State<InfoPage>
                                           ),
                                           onReview: _openReviewEditor,
                                           onUp: _tvBackFocus.requestFocus,
-                                          onDown: _focusTvTab,
+                                          onDown: () {
+                                            if (_showTvInfoRetry) {
+                                              _tvInfoRetryFocus.requestFocus();
+                                            } else {
+                                              _focusTvTab();
+                                            }
+                                          },
                                         )
                                       : null,
                                 ),

@@ -37,6 +37,46 @@ import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/pages/player/tv_player_controls.dart';
 import 'package:kazumi/pages/player/player_control_visibility.dart';
 
+/// Keeps entry nodes alive through the dialog route's exit animation.
+class _TvSettingsFocusOwner extends StatefulWidget {
+  const _TvSettingsFocusOwner({required this.builder});
+
+  final Widget Function(BuildContext, Map<String, FocusNode>) builder;
+
+  @override
+  State<_TvSettingsFocusOwner> createState() => _TvSettingsFocusOwnerState();
+}
+
+class _TvSettingsFocusOwnerState extends State<_TvSettingsFocusOwner> {
+  final _entries = <String, FocusNode>{
+    for (final title in [
+      '播放速度',
+      '画面比例',
+      '超分辨率',
+      '定时停止',
+      '弹幕设置',
+      '一起看',
+      '弹幕来源',
+      '更换播放源',
+      '播放信息',
+      '修改跳过时间',
+      '远程投屏',
+    ])
+      title: FocusNode(debugLabel: 'Player settings entry $title'),
+  };
+
+  @override
+  void dispose() {
+    for (final node in _entries.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _entries);
+}
+
 class PlayerItemPanel extends StatefulWidget {
   const PlayerItemPanel({
     super.key,
@@ -73,7 +113,7 @@ class PlayerItemPanel extends StatefulWidget {
   final VideoPageController videoPageController;
   final void Function(BuildContext) onBackPressed;
   final Future<void> Function(double) setPlaybackSpeed;
-  final void Function() showDanmakuSwitch;
+  final Future<void> Function() showDanmakuSwitch;
   final void Function() toggleMenu;
   final void Function() handleFullscreen;
   final Future<void> Function() enterAndroidPictureInPicture;
@@ -89,8 +129,8 @@ class PlayerItemPanel extends StatefulWidget {
   final void Function() handleDanmaku;
   final void Function(String direction) handlePreNextEpisode;
   final void Function() skipOP;
-  final void Function() showVideoInfo;
-  final void Function() showSyncPlayPanel;
+  final Future<void> Function() showVideoInfo;
+  final Future<void> Function() showSyncPlayPanel;
   final VoidCallback pauseForTimedShutdown;
   final bool disableAnimations;
 
@@ -371,7 +411,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
     );
   }
 
-  void showForwardChange() => showPlayerForwardTimeDialog(playerController);
+  Future<void> showForwardChange() =>
+      showPlayerForwardTimeDialog(playerController);
 
   @override
   void initState() {
@@ -1085,16 +1126,7 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
         },
       );
 
-  Future<void> _selectSourceFromTvSettings() async {
-    await widget.selectSource?.call();
-    if (mounted &&
-        _bottomSettingsFocus.context != null &&
-        ModalRoute.of(context)?.isCurrent == true) {
-      _bottomSettingsFocus.requestFocus();
-    }
-  }
-
-  Future<void> _showTvSettings() async {
+  Future<void> _showTvSettings({String? returnSection}) async {
     if (_tvSettingsHandle != null) return;
     final handle = KazumiDialogHandle<void>();
     _tvSettingsHandle = handle;
@@ -1102,8 +1134,16 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
     widget.onMenuVisibilityChanged(true);
     String section = '设置';
     VoidCallback? afterDismiss;
+    Future<void> Function()? panelAction;
+    String? panelEntry;
     void pick(VoidCallback action) {
       afterDismiss = action;
+      handle.dismiss();
+    }
+
+    void openPanel(String entry, Future<void> Function() action) {
+      panelEntry = entry;
+      panelAction = action;
       handle.dismiss();
     }
 
@@ -1111,246 +1151,312 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
       await KazumiDialog.show<void>(
         context: context,
         handle: handle,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, update) => Observer(
-            builder: (context) {
-              void open(String title) => update(() => section = title);
-              void back() {
-                if (section == '设置') {
-                  handle.dismiss();
-                } else {
-                  open('设置');
+        builder: (dialogContext) => _TvSettingsFocusOwner(
+          builder: (context, entryFocus) => StatefulBuilder(
+            builder: (context, update) => Observer(
+              builder: (context) {
+                void open(String title) => update(() {
+                      if (title != '设置') returnSection = title;
+                      section = title;
+                    });
+                void back() {
+                  if (section == '设置') {
+                    handle.dismiss();
+                  } else {
+                    open('设置');
+                  }
                 }
-              }
 
-              final controls = <Widget>[];
-              if (section == '播放速度') {
-                for (final speed in defaultPlaySpeedList) {
+                final controls = <Widget>[];
+                if (section == '播放速度') {
+                  for (final speed in defaultPlaySpeedList) {
+                    controls.add(
+                      TvPlayerAction(
+                        label: '$speed×',
+                        selected:
+                            playerController.playback.playerSpeed == speed,
+                        onPressed: () => pick(
+                            () => unawaited(widget.setPlaybackSpeed(speed))),
+                      ),
+                    );
+                  }
+                } else if (section == '画面比例') {
+                  for (final mode in PlayerAspectRatio.values) {
+                    controls.add(
+                      TvPlayerAction(
+                        label: mode.label,
+                        selected:
+                            playerController.panel.aspectRatioMode == mode,
+                        onPressed: () => pick(
+                          () => playerController.panel.aspectRatioMode = mode,
+                        ),
+                      ),
+                    );
+                  }
+                } else if (section == '超分辨率') {
+                  for (final mode in SuperResolutionMode.values) {
+                    controls.add(
+                      TvPlayerAction(
+                        label: mode.label,
+                        selected:
+                            playerController.playback.superResolutionMode ==
+                                mode,
+                        onPressed: () => pick(
+                          () => unawaited(
+                              widget.handleSuperResolutionChange(mode)),
+                        ),
+                      ),
+                    );
+                  }
+                } else if (section == '定时停止') {
+                  controls.add(
+                    Text(
+                      '只暂停播放，换集不会重置。',
+                      style: TvVisuals.caption.copyWith(
+                          color:
+                              Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  );
                   controls.add(
                     TvPlayerAction(
-                      label: '$speed×',
-                      selected: playerController.playback.playerSpeed == speed,
+                      label: '取消定时',
                       onPressed: () =>
-                          pick(() => unawaited(widget.setPlaybackSpeed(speed))),
+                          pick(() => TimedShutdownService().cancel()),
                     ),
                   );
-                }
-              } else if (section == '画面比例') {
-                for (final mode in PlayerAspectRatio.values) {
-                  controls.add(
-                    TvPlayerAction(
-                      label: mode.label,
-                      selected: playerController.panel.aspectRatioMode == mode,
-                      onPressed: () => pick(
-                        () => playerController.panel.aspectRatioMode = mode,
+                  for (final minutes in [15, 30, 60]) {
+                    controls.add(
+                      TvPlayerAction(
+                        label: '$minutes 分钟',
+                        selected: TimedShutdownService().isActive &&
+                            TimedShutdownService().setMinutes == minutes,
+                        onPressed: () => pick(
+                          () => TimedShutdownService().start(
+                            minutes,
+                            onExpired: widget.pauseForTimedShutdown,
+                          ),
+                        ),
                       ),
-                    ),
-                  );
-                }
-              } else if (section == '超分辨率') {
-                for (final mode in SuperResolutionMode.values) {
+                    );
+                  }
                   controls.add(
                     TvPlayerAction(
-                      label: mode.label,
-                      selected:
-                          playerController.playback.superResolutionMode == mode,
-                      onPressed: () => pick(
-                        () =>
-                            unawaited(widget.handleSuperResolutionChange(mode)),
-                      ),
-                    ),
-                  );
-                }
-              } else if (section == '定时停止') {
-                controls.add(
-                  Text(
-                    '只暂停播放，换集不会重置。',
-                    style: TvVisuals.caption.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant),
-                  ),
-                );
-                controls.add(
-                  TvPlayerAction(
-                    label: '取消定时',
-                    onPressed: () =>
-                        pick(() => TimedShutdownService().cancel()),
-                  ),
-                );
-                for (final minutes in [15, 30, 60]) {
-                  controls.add(
-                    TvPlayerAction(
-                      label: '$minutes 分钟',
-                      selected: TimedShutdownService().isActive &&
-                          TimedShutdownService().setMinutes == minutes,
-                      onPressed: () => pick(
-                        () => TimedShutdownService().start(
-                          minutes,
+                      label: '自定义分钟',
+                      onPressed: () => openPanel(
+                        '定时停止',
+                        () => TimedShutdownService.showCustomTimerDialog(
                           onExpired: widget.pauseForTimedShutdown,
                         ),
                       ),
                     ),
                   );
-                }
-                controls.add(
-                  TvPlayerAction(
-                    label: '自定义分钟',
-                    onPressed: () => pick(
-                      () => TimedShutdownService.showCustomTimerDialog(
-                        onExpired: widget.pauseForTimedShutdown,
-                      ),
-                    ),
-                  ),
-                );
-              } else {
-                controls.addAll([
-                  TvPlayerAction(
-                    label: '上一集',
-                    onPressed: () =>
-                        pick(() => widget.handlePreNextEpisode('prev')),
-                  ),
-                  TvPlayerAction(
-                    label: '弹幕设置',
-                    onPressed: () => pick(
-                      () => showDanmakuSettingsSheet(
-                        context: this.context,
-                        danmakuController:
-                            playerController.danmaku.canvasController,
-                        onUpdateDanmakuSpeed:
-                            playerController.updateDanmakuSpeed,
-                        onTimelineOffsetChanged: playerController
-                            .danmaku.clearAndInvalidateScheduledDanmakus,
-                      ),
-                    ),
-                  ),
-                  if (widget.selectSource != null)
+                } else {
+                  controls.addAll([
                     TvPlayerAction(
-                      label: '更换播放源',
+                      label: '上一集',
                       onPressed: () =>
-                          pick(() => unawaited(_selectSourceFromTvSettings())),
+                          pick(() => widget.handlePreNextEpisode('prev')),
                     ),
-                  TvPlayerAction(
-                    label: '弹幕来源',
-                    onPressed: () => pick(widget.showDanmakuSwitch),
-                  ),
-                  danmakuTextField,
-                  TvPlayerAction(
-                    label: '倍速 · ${playerController.playback.playerSpeed}×',
-                    onPressed: () => open('播放速度'),
-                  ),
-                  TvPlayerAction(
-                    label:
-                        '画面比例 · ${playerController.panel.aspectRatioMode.label}',
-                    onPressed: () => open('画面比例'),
-                  ),
-                  TvPlayerAction(
-                    label:
-                        '超分辨率 · ${playerController.playback.superResolutionMode.label}',
-                    onPressed: () => open('超分辨率'),
-                  ),
-                  ValueListenableBuilder<int>(
-                    valueListenable:
-                        TimedShutdownService().remainingSecondsNotifier,
-                    builder: (context, seconds, child) => TvPlayerAction(
-                      label: seconds > 0
-                          ? '定时 · ${TimedShutdownService().formatRemainingTime()}'
-                          : '定时停止',
-                      onPressed: () => open('定时停止'),
-                    ),
-                  ),
-                  TvPlayerAction(
-                    label: '播放信息',
-                    onPressed: () => pick(widget.showVideoInfo),
-                  ),
-                  TvPlayerAction(
-                    label: '跳过 ${playerController.playback.buttonSkipTime} 秒',
-                    onPressed: () => pick(widget.skipOP),
-                  ),
-                  TvPlayerAction(
-                    label: '修改跳过时间',
-                    onPressed: () => pick(showForwardChange),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '追番',
-                          style: TvVisuals.control.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
+                    TvPlayerAction(
+                      key: const ValueKey('弹幕设置'),
+                      focusNode: entryFocus['弹幕设置'],
+                      label: '弹幕设置',
+                      onPressed: () => openPanel(
+                        '弹幕设置',
+                        () => showDanmakuSettingsSheet(
+                          context: this.context,
+                          danmakuController:
+                              playerController.danmaku.canvasController,
+                          onUpdateDanmakuSpeed:
+                              playerController.updateDanmakuSpeed,
+                          onTimelineOffsetChanged: playerController
+                              .danmaku.clearAndInvalidateScheduledDanmakus,
                         ),
                       ),
-                      PlayerPanelHoldCollectButton(
-                        acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
-                        bangumiItem: videoPageController.bangumiItem,
-                        focusNode: _topCollectFocus,
-                        color: Theme.of(context).colorScheme.primary,
+                    ),
+                    if (widget.selectSource != null)
+                      TvPlayerAction(
+                        key: const ValueKey('更换播放源'),
+                        focusNode: entryFocus['更换播放源'],
+                        label: '更换播放源',
+                        onPressed: () =>
+                            openPanel('更换播放源', widget.selectSource!),
                       ),
-                    ],
-                  ),
-                  TvPlayerAction(
-                    label: '外部播放器',
-                    onPressed: () =>
-                        pick(() => playerController.launchExternalPlayer()),
-                  ),
-                  TvPlayerAction(
-                    label: '远程投屏',
-                    onPressed: () => pick(() {
-                      final resume = playerController.playback.playing;
-                      playerController.pause();
-                      RemotePlay()
-                          .castVideo(
-                        playerController.videoUrl,
-                        videoPageController.currentPlugin.referer,
-                      )
-                          .whenComplete(() {
-                        if (mounted && resume) playerController.play();
-                      });
-                    }),
-                  ),
-                  TvPlayerAction(
-                    label: '一起看',
-                    onPressed: () => pick(widget.showSyncPlayPanel),
-                  ),
-                  TvPlayerAction(
-                    label: '截图',
-                    onPressed: () => pick(widget.handleScreenShot),
-                  ),
-                  if (Platform.isAndroid)
                     TvPlayerAction(
-                      label: '画中画',
-                      onPressed: () => pick(
-                        () => unawaited(widget.enterAndroidPictureInPicture()),
+                      key: const ValueKey('弹幕来源'),
+                      focusNode: entryFocus['弹幕来源'],
+                      label: '弹幕来源',
+                      onPressed: () =>
+                          openPanel('弹幕来源', widget.showDanmakuSwitch),
+                    ),
+                    danmakuTextField,
+                    TvPlayerAction(
+                      key: const ValueKey('播放速度'),
+                      focusNode: entryFocus['播放速度'],
+                      label: '倍速 · ${playerController.playback.playerSpeed}×',
+                      onPressed: () => open('播放速度'),
+                    ),
+                    TvPlayerAction(
+                      key: const ValueKey('画面比例'),
+                      focusNode: entryFocus['画面比例'],
+                      label:
+                          '画面比例 · ${playerController.panel.aspectRatioMode.label}',
+                      onPressed: () => open('画面比例'),
+                    ),
+                    TvPlayerAction(
+                      key: const ValueKey('超分辨率'),
+                      focusNode: entryFocus['超分辨率'],
+                      label:
+                          '超分辨率 · ${playerController.playback.superResolutionMode.label}',
+                      onPressed: () => open('超分辨率'),
+                    ),
+                    ValueListenableBuilder<int>(
+                      key: const ValueKey('定时停止'),
+                      valueListenable:
+                          TimedShutdownService().remainingSecondsNotifier,
+                      builder: (context, seconds, child) => TvPlayerAction(
+                        focusNode: entryFocus['定时停止'],
+                        label: seconds > 0
+                            ? '定时 · ${TimedShutdownService().formatRemainingTime()}'
+                            : '定时停止',
+                        onPressed: () => open('定时停止'),
                       ),
                     ),
-                  TvPlayerAction(
-                    label: '返回主页',
-                    onPressed: () => pick(TvNavigation.goHome),
+                    TvPlayerAction(
+                      key: const ValueKey('播放信息'),
+                      focusNode: entryFocus['播放信息'],
+                      label: '播放信息',
+                      onPressed: () => openPanel('播放信息', widget.showVideoInfo),
+                    ),
+                    TvPlayerAction(
+                      label: '跳过 ${playerController.playback.buttonSkipTime} 秒',
+                      onPressed: () => pick(widget.skipOP),
+                    ),
+                    TvPlayerAction(
+                      key: const ValueKey('修改跳过时间'),
+                      focusNode: entryFocus['修改跳过时间'],
+                      label: '修改跳过时间',
+                      onPressed: () => openPanel('修改跳过时间', showForwardChange),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '追番',
+                            style: TvVisuals.control.copyWith(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        PlayerPanelHoldCollectButton(
+                          acquirePlayerPanelHold: widget.acquirePlayerPanelHold,
+                          bangumiItem: videoPageController.bangumiItem,
+                          focusNode: _topCollectFocus,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ],
+                    ),
+                    TvPlayerAction(
+                      label: '外部播放器',
+                      onPressed: () =>
+                          pick(() => playerController.launchExternalPlayer()),
+                    ),
+                    TvPlayerAction(
+                      key: const ValueKey('远程投屏'),
+                      focusNode: entryFocus['远程投屏'],
+                      label: '远程投屏',
+                      onPressed: () => openPanel('远程投屏', () async {
+                        final resume = playerController.playback.playing;
+                        playerController.pause();
+                        try {
+                          await RemotePlay().castVideo(
+                            playerController.videoUrl,
+                            videoPageController.currentPlugin.referer,
+                          );
+                        } finally {
+                          if (mounted && resume) playerController.play();
+                        }
+                      }),
+                    ),
+                    TvPlayerAction(
+                      key: const ValueKey('一起看'),
+                      focusNode: entryFocus['一起看'],
+                      label: '一起看',
+                      onPressed: () =>
+                          openPanel('一起看', widget.showSyncPlayPanel),
+                    ),
+                    TvPlayerAction(
+                      label: '截图',
+                      onPressed: () => pick(widget.handleScreenShot),
+                    ),
+                    if (Platform.isAndroid)
+                      TvPlayerAction(
+                        label: '画中画',
+                        onPressed: () => pick(
+                          () =>
+                              unawaited(widget.enterAndroidPictureInPicture()),
+                        ),
+                      ),
+                    TvPlayerAction(
+                      label: '返回主页',
+                      onPressed: () => pick(TvNavigation.goHome),
+                    ),
+                  ]);
+                }
+                return PopScope(
+                  canPop: section == '设置',
+                  onPopInvokedWithResult: (didPop, result) {
+                    if (!didPop) back();
+                  },
+                  child: TvPlayerSettingsPanel(
+                    key: ValueKey(section),
+                    title: section,
+                    initialFocusNode:
+                        section == '设置' ? entryFocus[returnSection] : null,
+                    initialFocusIndex: section == '设置' && returnSection != null
+                        ? controls.indexWhere((control) =>
+                            control.key == ValueKey(returnSection!))
+                        : null,
+                    onBack: back,
+                    children: controls,
                   ),
-                ]);
-              }
-              return PopScope(
-                canPop: section == '设置',
-                onPopInvokedWithResult: (didPop, result) {
-                  if (!didPop) back();
-                },
-                child: TvPlayerSettingsPanel(
-                  key: ValueKey(section),
-                  title: section,
-                  onBack: back,
-                  children: controls,
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       );
-    } finally {
       _tvSettingsHandle = null;
-      widget.onMenuVisibilityChanged(false);
-      hold.release();
+      if (mounted &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          panelAction != null) {
+        final revision = videoPageController.playbackRevision;
+        final episode = playerController.currentEpisode;
+        final road = playerController.currentRoad;
+        await panelAction!();
+        if (mounted &&
+            ModalRoute.of(context)?.isCurrent == true &&
+            _tvSettingsHandle == null &&
+            videoPageController.playbackRevision == revision &&
+            playerController.currentEpisode == episode &&
+            playerController.currentRoad == road) {
+          // Acquire the next settings hold before releasing this one. The old
+          // entry nodes have gone; the new route owns fresh nodes at this entry.
+          unawaited(_showTvSettings(returnSection: panelEntry));
+        }
+      }
+    } finally {
+      if (identical(_tvSettingsHandle, handle)) _tvSettingsHandle = null;
       if (mounted) {
-        _bottomSettingsFocus.requestFocus();
+        widget.onMenuVisibilityChanged(false);
+        hold.release();
+        if (_tvSettingsHandle == null &&
+            ModalRoute.of(context)?.isCurrent == true) {
+          _bottomSettingsFocus.requestFocus();
+        }
         afterDismiss?.call();
+      } else {
+        hold.releaseSilently();
       }
     }
   }
@@ -2073,8 +2179,9 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
   }
 }
 
-void showPlayerForwardTimeDialog(PlayerController playerController) {
-  KazumiDialog.show(
+Future<void> showPlayerForwardTimeDialog(
+    PlayerController playerController) async {
+  await KazumiDialog.show<void>(
     builder: (context) {
       String input = "";
       return AlertDialog(
@@ -2102,9 +2209,9 @@ void showPlayerForwardTimeDialog(PlayerController playerController) {
         actions: <Widget>[
           TextButton(
             onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(

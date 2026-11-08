@@ -10,6 +10,7 @@ import 'package:kazumi/modules/bangumi/bangumi_item.dart';
 import 'package:kazumi/modules/bangumi/bangumi_review.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class RatingReviewDialog extends StatefulWidget {
   const RatingReviewDialog({
@@ -46,6 +47,8 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
   final _commentController = TextEditingController();
   final _tagController = TextEditingController();
   final _tagFocus = FocusNode();
+  final _commentFocus = FocusNode();
+  final _submitFocus = FocusNode();
   final _scrollController = ScrollController();
   late final int _savedScore;
   late final String _initialComment;
@@ -101,6 +104,11 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
         .toSet()
         .toList();
     _commentController.text = _initialComment;
+    if (TvMode.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _commentFocus.requestFocus();
+      });
+    }
   }
 
   @override
@@ -108,6 +116,8 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
     _commentController.dispose();
     _tagController.dispose();
     _tagFocus.dispose();
+    _commentFocus.dispose();
+    _submitFocus.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -231,7 +241,9 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
 
   void _revealFeedback() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
+      if (!mounted) return;
+      if (TvMode.enabled && !_submitting) _submitFocus.requestFocus();
+      if (!_scrollController.hasClients) return;
       if (_duration == Duration.zero) {
         _scrollController.jumpTo(0);
       } else {
@@ -343,6 +355,7 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
     return TvTextEntry(
         child: TextField(
       key: const ValueKey('review-comment'),
+      focusNode: TvMode.enabled ? _commentFocus : null,
       controller: _commentController,
       onChanged: (_) => setState(() {}),
       enabled: !_submitting,
@@ -415,12 +428,14 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
                         ?.copyWith(color: colors.onSecondaryContainer)),
               ])),
           if (_score != 0)
-            IconButton(
-              tooltip: '清除评分',
-              onPressed: _submitting ? null : () => _setScore(0),
-              icon: Icon(Icons.restart_alt_rounded,
-                  color: colors.onSecondaryContainer),
-            ),
+            TvFocusLabel(
+                message: '清除评分',
+                child: IconButton(
+                  tooltip: '清除评分',
+                  onPressed: _submitting ? null : () => _setScore(0),
+                  icon: Icon(Icons.restart_alt_rounded,
+                      color: colors.onSecondaryContainer),
+                )),
         ]),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, constraints) {
@@ -581,11 +596,13 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
                     fillColor: colors.surfaceContainerLowest,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16)),
-                    suffixIcon: IconButton(
-                      tooltip: '添加标签',
-                      onPressed: _submitting ? null : _addCustomTag,
-                      icon: const Icon(Icons.add_rounded),
-                    ),
+                    suffixIcon: TvFocusLabel(
+                        message: '添加标签',
+                        child: IconButton(
+                          tooltip: '添加标签',
+                          onPressed: _submitting ? null : _addCustomTag,
+                          icon: const Icon(Icons.add_rounded),
+                        )),
                   ),
                 )),
               )
@@ -649,6 +666,7 @@ class _RatingReviewDialogState extends State<RatingReviewDialog> {
                   ])))
         else
           StateActionButton(
+            focusNode: TvMode.enabled ? _submitFocus : null,
             onPressed: _canSubmit ? _submit : null,
             text: _submitError != null
                 ? '重试'

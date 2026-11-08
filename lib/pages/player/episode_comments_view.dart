@@ -6,8 +6,10 @@ import 'package:kazumi/bean/widget/error_widget.dart';
 import 'package:kazumi/bean/widget/empty_state_widget.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
+import 'package:kazumi/bean/widget/tv_comment_reading_surface.dart';
 import 'package:kazumi/modules/bangumi/episode_item.dart';
 import 'package:kazumi/modules/comments/comment_item.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 class EpisodeCommentsView extends StatelessWidget {
   const EpisodeCommentsView({
@@ -21,6 +23,7 @@ class EpisodeCommentsView extends StatelessWidget {
     required this.onToggleSort,
     required this.onSelectEpisode,
     required this.onRefresh,
+    this.selectEpisodeFocusNode,
   });
 
   final int episode;
@@ -32,6 +35,7 @@ class EpisodeCommentsView extends StatelessWidget {
   final VoidCallback onToggleSort;
   final VoidCallback onSelectEpisode;
   final VoidCallback onRefresh;
+  final FocusNode? selectEpisodeFocusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +46,7 @@ class EpisodeCommentsView extends StatelessWidget {
         final gutter = constraints.maxWidth > 760
             ? (constraints.maxWidth - 728) / 2
             : 16.0;
-        return CustomScrollView(
+        final scrollView = CustomScrollView(
           key: ValueKey(episode),
           scrollBehavior: const ScrollBehavior().copyWith(
             scrollbars: false,
@@ -60,6 +64,7 @@ class EpisodeCommentsView extends StatelessWidget {
                   episode: episode,
                   info: episodeInfo,
                   onSelectEpisode: onSelectEpisode,
+                  selectEpisodeFocusNode: selectEpisodeFocusNode,
                 ),
               ),
             ),
@@ -146,12 +151,14 @@ class EpisodeCommentsView extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  child: Text('已显示全部 ${comments.length} 条讨论 · 来自 Bangumi',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(color: colors.onSurfaceVariant)),
+                  child: TvCommentReadingSurface(
+                    child: Text('已显示全部 ${comments.length} 条讨论 · 来自 Bangumi',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(color: colors.onSurfaceVariant)),
+                  ),
                 ),
               ),
             ],
@@ -159,6 +166,29 @@ class EpisodeCommentsView extends StatelessWidget {
               child: SizedBox(height: MediaQuery.paddingOf(context).bottom),
             ),
           ],
+        );
+        if (!TvMode.enabled) return scrollView;
+        // Do not wrap from the final reading stop to an offscreen header.
+        return FocusTraversalGroup(
+          policy: ReadingOrderTraversalPolicy(
+            requestFocusCallback: (node,
+                {alignment, alignmentPolicy, duration, curve}) {
+              if (node.context?.findAncestorWidgetOfExactType<
+                      TvCommentReadingSurface>() !=
+                  null) {
+                // The reading surface reveals the arriving edge itself.
+                // Native traversal would first jump to the end of a tall card.
+                node.requestFocus();
+                return;
+              }
+              FocusTraversalPolicy.defaultTraversalRequestFocusCallback(node,
+                  alignment: alignment,
+                  alignmentPolicy: alignmentPolicy,
+                  duration: duration,
+                  curve: curve);
+            },
+          ),
+          child: scrollView,
         );
       }),
     );
@@ -236,11 +266,13 @@ class _EpisodeHeader extends StatelessWidget {
     required this.episode,
     required this.info,
     required this.onSelectEpisode,
+    this.selectEpisodeFocusNode,
   });
 
   final int episode;
   final EpisodeInfo? info;
   final VoidCallback onSelectEpisode;
+  final FocusNode? selectEpisodeFocusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -289,6 +321,17 @@ class _EpisodeHeader extends StatelessWidget {
                             fontWeight: FontWeight.w700)),
                   ),
                   FilledButton.icon(
+                    focusNode: selectEpisodeFocusNode,
+                    onFocusChange: TvMode.enabled
+                        ? (focused) {
+                            if (!focused) return;
+                            final scrollable = Scrollable.maybeOf(context);
+                            if (scrollable != null) {
+                              scrollable.position.jumpTo(
+                                  scrollable.position.minScrollExtent);
+                            }
+                          }
+                        : null,
                     onPressed: onSelectEpisode,
                     style: FilledButton.styleFrom(
                       minimumSize: const Size(48, 48),

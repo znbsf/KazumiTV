@@ -16,6 +16,7 @@ import 'package:kazumi/utils/device.dart';
 import 'package:kazumi/utils/date_time.dart';
 import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 String _historySourceText(String entryKind) {
   return HistoryEntryKind.normalize(entryKind) == HistoryEntryKind.offline
@@ -446,25 +447,27 @@ class _BangumiHistoryCardVState extends State<BangumiHistoryCardV>
         if (TvMode.enabled)
           Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: TvFocusableSurface(
-                focusNode: _moreFocus,
-                borderRadius: 24,
-                onPressed: _showMore,
-                onKeyEvent: (node, event) {
-                  _notifyNavigationInput(event);
-                  if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
-                      event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                    _resumeFocus.requestFocus();
-                    return KeyEventResult.handled;
-                  }
-                  return widget.onKeyEvent?.call(node, event) ??
-                      KeyEventResult.ignored;
-                },
-                child: IconButton(
-                    tooltip: '更多历史操作',
+              child: TvFocusLabel(
+                  message: '更多历史操作',
+                  child: TvFocusableSurface(
+                    focusNode: _moreFocus,
+                    borderRadius: 24,
                     onPressed: _showMore,
-                    icon: const Icon(Icons.more_horiz)),
-              )),
+                    onKeyEvent: (node, event) {
+                      _notifyNavigationInput(event);
+                      if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
+                          event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                        _resumeFocus.requestFocus();
+                        return KeyEventResult.handled;
+                      }
+                      return widget.onKeyEvent?.call(node, event) ??
+                          KeyEventResult.ignored;
+                    },
+                    child: IconButton(
+                        tooltip: '更多历史操作',
+                        onPressed: _showMore,
+                        icon: const Icon(Icons.more_horiz)),
+                  ))),
       ]),
     );
   }

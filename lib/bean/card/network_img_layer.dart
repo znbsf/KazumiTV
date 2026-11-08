@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/logging/logger.dart';
+import 'package:kazumi/services/network/bangumi_image_url_rewriter.dart';
 import 'package:kazumi/utils/constants.dart';
 import 'package:kazumi/utils/image_extension.dart';
 
@@ -23,7 +26,19 @@ class NetworkImgLayer extends StatelessWidget {
     this.color,
     this.colorBlendMode,
     this.placeholderSrc,
+    this.tvRetryFocus,
+    this.tvOnRetryVisibilityChanged,
+    this.tvOnRetryKeyEvent,
+    this.tvOnRetry,
   });
+
+  static const tvCoverRetryDelays = [
+    Duration(seconds: 2),
+    Duration(seconds: 6)
+  ];
+
+  @visibleForTesting
+  static List<Duration>? tvCoverRetryDelaysForTesting;
 
   final String? src;
   final double width;
@@ -41,12 +56,20 @@ class NetworkImgLayer extends StatelessWidget {
   /// Exact URLs keep covers from different works or catalog mirrors separate.
   final String? placeholderSrc;
 
+  /// Optional detail-page navigation; other image surfaces keep their defaults.
+  final FocusNode? tvRetryFocus;
+
+  /// Notifications are deferred; the owning page must check that it is mounted,
+  /// including for the final false notification when this image is disposed.
+  final ValueChanged<bool>? tvOnRetryVisibilityChanged;
+  final FocusOnKeyEventCallback? tvOnRetryKeyEvent;
+  final VoidCallback? tvOnRetry;
+
   @visibleForTesting
   static void clearTvCoverMemory() => _TvDisplayedCovers.clear();
 
-  /// P1/mirror medium covers are only 200px wide: too small for ~324px TV
-  /// home posters. Common is a bounded 400px source; compact rows retain the
-  /// thumbnail. Decode sizing still follows the rendered size and device DPR.
+  /// Source kind names have different sizes across APIs. Bound each TV surface
+  /// explicitly; decode sizing still follows the rendered size and device DPR.
   static String tvListCoverUrl(Map<String, String> images,
       {bool thumbnail = false}) {
     final kinds = thumbnail
@@ -54,20 +77,39 @@ class NetworkImgLayer extends StatelessWidget {
         : ['common', 'large', 'medium'];
     for (final kind in kinds) {
       final url = images[kind]?.trim() ?? '';
-      if (url.isNotEmpty) return url;
+      if (url.isNotEmpty) {
+        return BangumiImageUrlRewriter.sized(
+          url,
+          thumbnail
+              ? BangumiImageUrlRewriter.thumbnailWidth
+              : BangumiImageUrlRewriter.posterWidth,
+        );
+      }
     }
     return '';
   }
 
   static String tvDetailCoverUrl(Map<String, String> images) {
     final large = images['large']?.trim() ?? '';
-    return large.isNotEmpty ? large : tvListCoverUrl(images);
+    return large.isNotEmpty
+        ? BangumiImageUrlRewriter.sized(
+            large, BangumiImageUrlRewriter.detailWidth)
+        : tvListCoverUrl(images);
   }
 
   /// Detail may be opened from either a thumbnail row or a larger home card.
   /// Reuse the exact frame the user saw, without assuming one list URL size.
   static String tvInitialCoverUrl(Map<String, String> images) =>
-      _TvDisplayedCovers.latestUrl(images.values) ?? tvListCoverUrl(images);
+      _TvDisplayedCovers.latestUrl(images.values.expand((url) => [
+            url,
+            BangumiImageUrlRewriter.sized(
+                url.trim(), BangumiImageUrlRewriter.thumbnailWidth),
+            BangumiImageUrlRewriter.sized(
+                url.trim(), BangumiImageUrlRewriter.posterWidth),
+            BangumiImageUrlRewriter.sized(
+                url.trim(), BangumiImageUrlRewriter.detailWidth),
+          ])) ??
+      tvListCoverUrl(images);
 
   static Widget heroFlightShuttleBuilder(
     BuildContext flightContext,
@@ -263,6 +305,27 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
   int _request = 0;
   int _frame = 0;
   bool _failed = false;
+  Timer? _retryTimer;
+  int _automaticRetries = 0;
+  bool? _reportedRetryVisible;
+  bool _retryVisibilityPending = false;
+
+  void _reportRetryVisibility() {
+    if (layer.tvOnRetryVisibilityChanged == null || _retryVisibilityPending) {
+      return;
+    }
+    _retryVisibilityPending = true;
+    // Resolution can happen while an ancestor is building. Notify the page
+    // only after layout, and coalesce changes to the actual visible state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _retryVisibilityPending = false;
+      if (!mounted) return;
+      final visible = _failed && layer.placeholderSrc != null;
+      if (_reportedRetryVisible == visible) return;
+      _reportedRetryVisible = visible;
+      layer.tvOnRetryVisibilityChanged?.call(visible);
+    });
+  }
 
   NetworkImgLayer get layer => widget.layer;
   String get _url => (layer.src?.isNotEmpty ?? false)
@@ -310,6 +373,9 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
 
   void _resolve({bool retry = false}) {
     if (_url.isEmpty) {
+      _retryTimer?.cancel();
+      _automaticRetries = 0;
+      _failed = false;
       ++_request;
       _detach();
       _provider = null;
@@ -323,6 +389,8 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
       CachedNetworkImageProvider(_url),
     );
     if (!retry && _provider == next) return;
+    _retryTimer?.cancel();
+    if (!retry) _automaticRetries = 0;
     final request = ++_request;
     _detach();
     _provider = next;
@@ -352,23 +420,68 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
           'NetworkImage: network image load error',
           error: error,
         );
-        setState(() => _failed = true);
+        _detach();
+        final failedRequest = ++_request;
+        final permanent = error is HttpExceptionWithStatus &&
+            error.statusCode >= 400 &&
+            error.statusCode < 500 &&
+            error.statusCode != 408 &&
+            error.statusCode != 429;
+        final delays = NetworkImgLayer.tvCoverRetryDelaysForTesting ??
+            NetworkImgLayer.tvCoverRetryDelays;
+        if (!permanent &&
+            _automaticRetries < NetworkImgLayer.tvCoverRetryDelays.length &&
+            _automaticRetries < delays.length) {
+          final delay = delays[_automaticRetries++];
+          _retryTimer = Timer(delay, () {
+            if (!mounted || failedRequest != _request) return;
+            _retry();
+          });
+        } else {
+          setState(() => _failed = true);
+        }
       },
     );
     _listener = listener;
     stream.addListener(listener);
   }
 
+  Future<void> _retry({bool manual = false}) async {
+    _retryTimer?.cancel();
+    final provider = _provider;
+    if (provider == null) return;
+    final request = ++_request;
+    _detach();
+    if (manual) _automaticRetries = 0;
+    setState(() => _failed = false);
+    // The loader evicts its CachedNetworkImageProvider key, not the outer
+    // ResizeImageKey. Evict the provider we actually resolved before retrying.
+    await provider.evict(configuration: createLocalImageConfiguration(context));
+    if (!mounted || request != _request) return;
+    setState(() => _resolve(retry: true));
+  }
+
   @override
   void dispose() {
+    _retryTimer?.cancel();
     ++_request;
     _detach();
     _displayed?.dispose();
+    if (_reportedRetryVisible == true) {
+      final onVisibilityChanged = layer.tvOnRetryVisibilityChanged;
+      // The image can be removed while its page remains. Do not retain or read
+      // this State in the deferred teardown notification. The page guards its
+      // own lifetime; pending normal notifications above skip unmounted images.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        onVisibilityChanged?.call(false);
+      });
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    _reportRetryVisibility();
     return SizedBox(
       width: layer.width,
       height: layer.height,
@@ -404,10 +517,23 @@ class _TvNetworkImageState extends State<_TvNetworkImage> {
                       .colorScheme
                       .surface
                       .withValues(alpha: .88),
-                  child: TextButton.icon(
-                    onPressed: () => setState(() => _resolve(retry: true)),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: const Text('重试封面', style: TvVisuals.control),
+                  child: Focus(
+                    skipTraversal: true,
+                    canRequestFocus: false,
+                    onKeyEvent: layer.tvOnRetryKeyEvent,
+                    child: TextButton.icon(
+                      focusNode: layer.tvRetryFocus,
+                      style: layer.tvRetryFocus == null
+                          ? null
+                          : TvVisuals.focusButtonStyle(
+                              Theme.of(context).colorScheme),
+                      onPressed: () {
+                        layer.tvOnRetry?.call();
+                        _retry(manual: true);
+                      },
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('重试封面', style: TvVisuals.control),
+                    ),
                   ),
                 ),
               ),

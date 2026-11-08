@@ -3,8 +3,116 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/bean/widget/tv_idle_dismiss.dart';
 import 'package:kazumi/services/platform/app_remote.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/modules/roads/road_module.dart';
+import 'package:kazumi/pages/video/episode_selection_panel.dart';
 
 void main() {
+  testWidgets('local history pauses idle; a closing key starts a fresh timer',
+      (tester) async {
+    var closed = 0;
+    late BuildContext page;
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(
+        navigatorKey: navigator, home: const Scaffold(body: Text('root'))));
+    navigator.currentState!.push(MaterialPageRoute<void>(builder: (context) {
+      page = context;
+      return Scaffold(
+          body: TvIdleDismiss(
+              enabled: true,
+              onDismiss: () => closed++,
+              child: Focus(
+                  autofocus: true,
+                  onKeyEvent: (_, event) {
+                    if (event is KeyDownEvent &&
+                        event.logicalKey == LogicalKeyboardKey.enter) {
+                      Navigator.of(context).pop();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: const Text('panel'))));
+    }));
+    await tester.pumpAndSettle();
+    final route = ModalRoute.of(page)!;
+    route.addLocalHistoryEntry(LocalHistoryEntry());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 4));
+    expect(closed, 0);
+    // KeyDown and KeyUp straddle no extra pump: reset must follow dispatch.
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(route.willHandlePopInternally, isFalse);
+    await tester.pump(const Duration(milliseconds: 2999));
+    expect(closed, 0);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(closed, 1);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  for (final confirm in [false, true]) {
+    testWidgets(
+        'real road menu retains sidebar; ${confirm ? 'confirm' : 'Back'} resumes idle',
+        (tester) async {
+      TvMode.setEnabledForTesting(true);
+      addTearDown(() => TvMode.setEnabledForTesting(false));
+      late BuildContext page;
+      var visible = true;
+      final navigator = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(MaterialApp(
+          navigatorKey: navigator, home: const Scaffold(body: Text('root'))));
+      navigator.currentState!.push(MaterialPageRoute<void>(
+          builder: (_) => StatefulBuilder(builder: (context, setState) {
+                page = context;
+                return Scaffold(
+                    body: visible
+                        ? TvIdleDismiss(
+                            enabled: true,
+                            onDismiss: () => setState(() => visible = false),
+                            child: SizedBox(
+                                width: 400,
+                                child: EpisodeSelectionPanel(
+                                  title: '侧栏',
+                                  roads: List.generate(
+                                      2,
+                                      (i) => Road(
+                                          name: '线路$i',
+                                          data: ['url$i'],
+                                          identifier: ['剧集$i'])),
+                                  selectedRoad: 0,
+                                  selectedEpisode: 1,
+                                  downloads: const {},
+                                  onEpisodeSelected: (_, __) {},
+                                )))
+                        : const Text('player retained'));
+              })));
+      await tester.pumpAndSettle();
+      final anchor = tester.widget<MenuAnchor>(find.byType(MenuAnchor));
+      anchor.childFocusNode!.requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 4));
+      expect(visible, isTrue);
+      expect(find.byKey(const ValueKey('road-option-0')), findsOneWidget);
+      if (confirm) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      } else {
+        // Android Back reaches Navigator through the platform route-pop path.
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('road-option-0')), findsNothing);
+      expect(find.byType(EpisodeSelectionPanel), findsOneWidget);
+      expect(ModalRoute.of(page)!.isCurrent, isTrue);
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.byType(EpisodeSelectionPanel), findsNothing);
+      expect(find.text('player retained'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
   Future<BuildContext> mount(WidgetTester tester, VoidCallback dismiss,
       {ValueNotifier<bool>? enabled}) async {
     late BuildContext page;

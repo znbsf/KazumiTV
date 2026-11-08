@@ -24,6 +24,11 @@ class DioLoggerInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.type == DioExceptionType.cancel ||
+        err.requestOptions.cancelToken?.isCancelled == true) {
+      handler.next(err);
+      return;
+    }
     final elapsed = _elapsed(err.requestOptions);
     final statusCode = err.response?.statusCode;
     final status = statusCode == null ? err.type.name : statusCode.toString();

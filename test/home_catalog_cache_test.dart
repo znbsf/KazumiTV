@@ -25,6 +25,23 @@ void main() {
   test('first launch has no cached data', () async {
     expect(await cache.read(false), isNull);
   });
+  test('version one snapshots are treated as missing for both providers',
+      () async {
+    for (final mirror in [false, true]) {
+      await cache.write(mirror, [item(1)], DateTime.now());
+      final file =
+          File('${dir.path}/home-catalog-${mirror ? 'mirror' : 'direct'}.json');
+      final data =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      expect(data['version'], 2);
+      data['version'] = 1;
+      await file.writeAsString(jsonEncode(data));
+      expect(await cache.read(mirror), isNull);
+      expect(await file.exists(), isFalse);
+      await cache.write(mirror, [item(2)], DateTime.now());
+      expect((await cache.read(mirror))!.items.single.id, 2);
+    }
+  });
   test(
       'offline snapshot survives restart, strips signed URLs, separates providers',
       () async {

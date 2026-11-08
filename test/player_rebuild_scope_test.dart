@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:hive_ce/hive.dart';
@@ -16,6 +17,7 @@ import 'package:kazumi/pages/my/my_controller.dart';
 import 'package:kazumi/pages/player/player_controller.dart';
 import 'package:kazumi/pages/player/player_item.dart';
 import 'package:kazumi/pages/player/player_item_panel.dart';
+import 'package:kazumi/pages/player/tv_player_controls.dart';
 import 'package:kazumi/pages/video/video_page.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
@@ -111,6 +113,398 @@ void main() {
   tearDownAll(() async {
     await Hive.close();
     await temp.delete(recursive: true);
+  });
+  for (final tv in [true, false]) {
+    for (final closeDelay in [
+      const Duration(milliseconds: 50),
+      const Duration(milliseconds: 400),
+    ]) {
+      testWidgets('D01 real player comments reopen tv=$tv after $closeDelay', (
+        tester,
+      ) async {
+        TvMode.setEnabledForTesting(tv);
+        final previous = GStorage.getSetting(
+          SettingsKeys.playerDisableAnimations,
+        );
+        await tester.runAsync(
+          () =>
+              GStorage.putSetting(SettingsKeys.playerDisableAnimations, false),
+        );
+        addTearDown(
+          () => tester.runAsync(
+            () => GStorage.putSetting(
+              SettingsKeys.playerDisableAnimations,
+              previous,
+            ),
+          ),
+        );
+        addTearDown(() => TvMode.setEnabledForTesting(false));
+        tester.view.physicalSize = const Size(960, 540);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final downloads = Downloads();
+        final history = HistoryController(HistoryRepo());
+        final video = VideoState(history);
+        final player = PlayerController(Shader(), downloads, Audio())
+          ..bangumiId = 1
+          ..currentEpisode = 1
+          ..currentRoad = 0
+          ..currentDanmakuEpisodeNumber = 1
+          ..referer = '';
+        runInAction(() {
+          player.playback.loading = false;
+          player.playback.isBuffering = false;
+          player.playback.playerSpeed = 3.0;
+        });
+        final args = OnlineVideoPlaybackArgs(
+          bangumiItem: focusItem(1),
+          plugin: Plugin.fromJson({
+            'name': 'test',
+            'baseURL': 'https://example.invalid',
+          }),
+          title: 'Focus review',
+          src: 'https://example.invalid/series',
+          allowHistoryResume: false,
+          roads: List.generate(
+            2,
+            (i) => Road(
+              name: 'road$i',
+              data: ['/ep1', '/ep2'],
+              identifier: ['1', '2'],
+            ),
+          ),
+        );
+        await tester.pumpWidget(
+          ModularApp(
+            module: createModule(
+              register: (c) {
+                c.addInstance<MyController>(My());
+                c.addInstance<CollectController>(FocusCollectController());
+                c.addInstance<DownloadController>(downloads);
+                c.addInstance<HistoryController>(history);
+                c.route(
+                  '/',
+                  child: (_, __) => VideoPage(
+                    args: args,
+                    playerController: player,
+                    videoPageController: video,
+                    historyController: history,
+                    downloadController: downloads,
+                  ),
+                );
+              },
+            ),
+            initialRoute: '/',
+            child: Builder(
+              builder: (context) => MaterialApp.router(
+                routerConfig: ModularApp.routerConfigOf(context),
+              ),
+            ),
+          ),
+        );
+        Future<void> step() async {
+          for (var i = 0; i < 6; i++) {
+            await tester.pump(const Duration(milliseconds: 50));
+          }
+        }
+
+        await step();
+
+        runInAction(
+          () => video.selectedEpisode = const VideoEpisodeSelection(
+            episode: 2,
+            road: 0,
+          ),
+        );
+        player.currentEpisode = 2;
+        await step();
+        final tabs = tester.widget<TabBar>(find.byType(TabBar)).controller!;
+        await tester.tap(find.text('评论'));
+        await step();
+        expect(tabs.index, 1);
+        // Opening an already-visible rail must not reset the user's chosen tab.
+        expect(video.showTabBody, isTrue);
+        if (tv) {
+          await Navigator.of(tester.element(find.byType(VideoPage))).maybePop();
+        } else {
+          tester.widget<PlayerItem>(find.byType(PlayerItem)).toggleMenu();
+        }
+        await tester.pump();
+        await tester.pump(closeDelay);
+        expect(video.showTabBody, closeDelay.inMilliseconds < 120);
+        tester.widget<PlayerItem>(find.byType(PlayerItem)).toggleMenu();
+        // Check the first reopening frame too: a retained TabBarView must have
+        // built the episode page before the post-frame reveal looks up its key.
+        await tester.pump();
+        expect(tabs.index, tv ? 0 : 1);
+        if (tv) expect(find.byKey(const ValueKey('0:2')), findsOneWidget);
+        await step();
+        expect(video.showTabBody, isTrue);
+        if (tv) {
+          expect(
+            FocusManager.instance.primaryFocus?.debugLabel,
+            'TV episode 0:2',
+          );
+        }
+        if (tv && closeDelay.inMilliseconds < 120) {
+          // Reopening mid-close while already on episodes must not leave a
+          // pending TabBarView remount for a later rebuild to apply.
+          await Navigator.of(tester.element(find.byType(VideoPage))).maybePop();
+          await tester.pump();
+          await tester.pump(closeDelay);
+          tester.widget<PlayerItem>(find.byType(PlayerItem)).toggleMenu();
+          await step();
+          final key = tester.widget<TabBarView>(find.byType(TabBarView)).key;
+          tabs.index = 1;
+          await step();
+          expect(tester.widget<TabBarView>(find.byType(TabBarView)).key, key);
+          tabs.index = 0;
+          await step();
+        }
+        await tester.tap(find.text('评论'));
+        await step();
+        expect(tabs.index, 1);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 1));
+      });
+    }
+  }
+  testWidgets(
+      'P-3/P-6 real player Back preserves rail and settings entry focus',
+      (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final downloads = Downloads();
+    final history = HistoryController(HistoryRepo());
+    final video = VideoState(history);
+    final player = PlayerController(Shader(), downloads, Audio())
+      ..bangumiId = 1
+      ..currentEpisode = 1
+      ..currentRoad = 0
+      ..currentDanmakuEpisodeNumber = 1
+      ..referer = '';
+    runInAction(() {
+      player.playback.loading = false;
+      player.playback.isBuffering = false;
+      player.playback.playerSpeed = 3.0;
+    });
+    final args = OnlineVideoPlaybackArgs(
+      bangumiItem: focusItem(1),
+      plugin: Plugin.fromJson(
+          {'name': 'test', 'baseURL': 'https://example.invalid'}),
+      title: 'Focus review',
+      src: 'https://example.invalid/series',
+      allowHistoryResume: false,
+      roads: List.generate(
+          2, (i) => Road(name: 'road$i', data: ['/ep1'], identifier: ['1'])),
+    );
+    await tester.pumpWidget(ModularApp(
+      module: createModule(register: (c) {
+        c.addInstance<MyController>(My());
+        c.addInstance<CollectController>(FocusCollectController());
+        c.addInstance<DownloadController>(downloads);
+        c.addInstance<HistoryController>(history);
+        c.route('/',
+            child: (_, __) => VideoPage(
+                args: args,
+                playerController: player,
+                videoPageController: video,
+                historyController: history,
+                downloadController: downloads));
+      }),
+      initialRoute: '/',
+      child: Builder(
+          builder: (context) => MaterialApp.router(
+              routerConfig: ModularApp.routerConfigOf(context))),
+    ));
+    Future<void> step() async {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    Future<void> key(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await step();
+    }
+
+    await step();
+    final anchor = tester.widget<MenuAnchor>(find.byType(MenuAnchor));
+    anchor.childFocusNode!.requestFocus();
+    await tester.pump();
+    await key(LogicalKeyboardKey.enter);
+    expect(find.byType(MenuItemButton), findsNWidgets(2));
+    final navigator = Navigator.of(tester.element(find.byType(VideoPage)));
+    await navigator.maybePop();
+    await step();
+    expect(video.showTabBody, isTrue);
+    expect(find.byType(MenuItemButton), findsNothing);
+    expect(anchor.childFocusNode!.hasPrimaryFocus, isTrue);
+    // The key path reaches the player's shortcut handler; it must also consume
+    // the menu's local Back entry before closing the rail.
+    await key(LogicalKeyboardKey.enter);
+    await key(LogicalKeyboardKey.escape);
+    expect(video.showTabBody, isTrue);
+    expect(find.byType(MenuItemButton), findsNothing);
+    await navigator.maybePop();
+    await step();
+    expect(video.showTabBody, isFalse);
+    runInAction(() => player.panel.showVideoController = true);
+    await step();
+    final settings =
+        find.byWidgetPredicate((w) => w is TvPlayerAction && w.label == '设置');
+    await tester.tap(settings);
+    await step();
+    expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<TvPlayerAction>()
+            ?.label,
+        '上一集');
+    for (final entry in ['播放速度', '画面比例', '超分辨率', '定时停止']) {
+      final button = find.byKey(ValueKey(entry));
+      await tester.scrollUntilVisible(button, 120,
+          scrollable: find
+              .descendant(
+                  of: find.byType(TvPlayerSettingsPanel),
+                  matching: find.byType(Scrollable))
+              .first);
+      await step();
+      final focus = entry == '定时停止'
+          ? tester
+              .widget<TvPlayerAction>(find.descendant(
+                  of: button, matching: find.byType(TvPlayerAction)))
+              .focusNode!
+          : tester.widget<TvPlayerAction>(button).focusNode!;
+      focus.requestFocus();
+      await tester.pump();
+      await key(LogicalKeyboardKey.enter);
+      final focused = FocusManager.instance.primaryFocus!.context!
+          .findAncestorWidgetOfExactType<TvPlayerAction>();
+      expect(focused, isNotNull);
+      expect(focused!.label, isNot('返回设置'));
+      if (entry == '播放速度') expect(focused.label, '3.0×');
+      if (entry == '画面比例' || entry == '超分辨率') expect(focused.selected, isTrue);
+      if (entry == '定时停止') expect(focused.label, '取消定时');
+      await navigator.maybePop();
+      await step();
+      expect(focus.hasPrimaryFocus, isTrue, reason: 'restore $entry');
+      expect(focus.rect.top, greaterThanOrEqualTo(0));
+      expect(focus.rect.bottom, lessThanOrEqualTo(540));
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump(const Duration(milliseconds: 50));
+    // Rebuild the still-mounted dialog during its exit animation. Its entry
+    // nodes must outlive the pop future and remain valid until route removal.
+    runInAction(() => player.playback.playerSpeed = 1.5);
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    await step();
+    expect(find.byType(TvPlayerSettingsPanel), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+  });
+  testWidgets('C15 real settings keeps hold and restores destroyed panel entry',
+      (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
+    tester.view.physicalSize = const Size(960, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final downloads = Downloads();
+    final history = HistoryController(HistoryRepo());
+    final video = VideoState(history);
+    final player = PlayerController(Shader(), downloads, Audio())
+      ..bangumiId = 1
+      ..currentEpisode = 1
+      ..currentRoad = 0
+      ..currentDanmakuEpisodeNumber = 1
+      ..referer = '';
+    runInAction(() {
+      player.playback.loading = false;
+      player.playback.isBuffering = false;
+      player.playback.playerSpeed = 3.0;
+    });
+    final args = OnlineVideoPlaybackArgs(
+      bangumiItem: focusItem(1),
+      plugin: Plugin.fromJson(
+          {'name': 'test', 'baseURL': 'https://example.invalid'}),
+      title: 'Focus review',
+      src: 'https://example.invalid/series',
+      allowHistoryResume: false,
+      roads: List.generate(
+          2, (i) => Road(name: 'road$i', data: ['/ep1'], identifier: ['1'])),
+    );
+    await tester.pumpWidget(ModularApp(
+      module: createModule(register: (c) {
+        c.addInstance<MyController>(My());
+        c.addInstance<CollectController>(FocusCollectController());
+        c.addInstance<DownloadController>(downloads);
+        c.addInstance<HistoryController>(history);
+        c.route('/',
+            child: (_, __) => VideoPage(
+                args: args,
+                playerController: player,
+                videoPageController: video,
+                historyController: history,
+                downloadController: downloads));
+      }),
+      initialRoute: '/',
+      child: Builder(
+          builder: (context) => MaterialApp.router(
+              routerConfig: ModularApp.routerConfigOf(context))),
+    ));
+    Future<void> step() async {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    Future<void> key(LogicalKeyboardKey key) async {
+      await tester.sendKeyEvent(key);
+      await step();
+    }
+
+    await step();
+    runInAction(() => video.showTabBody = false);
+    runInAction(() => player.panel.showVideoController = true);
+    await step();
+    final settings = find.byWidgetPredicate(
+        (w) => w is TvPlayerAction && w.label == '设置');
+    await tester.tap(settings);
+    await step();
+    for (final label in ['弹幕设置', '一起看']) {
+      final entry = find.byWidgetPredicate(
+          (w) => w is TvPlayerAction && w.label == label);
+      await tester.scrollUntilVisible(entry, 120,
+          scrollable: find.descendant(of: find.byType(TvPlayerSettingsPanel),
+              matching: find.byType(Scrollable)).first);
+      await tester.tap(entry);
+      await step();
+      expect(find.byType(TvPlayerSettingsPanel), findsNothing);
+      // The settings entry is destroyed and the auto-hide delay elapses.
+      await tester.pump(const Duration(seconds: 6));
+      expect(player.panel.canHidePlayerPanel, isFalse);
+      expect(player.panel.showVideoController, isTrue);
+      await key(LogicalKeyboardKey.escape);
+      expect(find.byType(TvPlayerSettingsPanel), findsOneWidget);
+      await step();
+      expect(FocusManager.instance.primaryFocus?.context
+          ?.findAncestorWidgetOfExactType<TvPlayerAction>()?.label, label);
+    }
+    await key(LogicalKeyboardKey.escape);
+    expect(find.byType(TvPlayerSettingsPanel), findsNothing);
+    expect(player.panel.canHidePlayerPanel, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
   for (final desktop in [false, true]) {
     testWidgets(

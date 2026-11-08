@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
 import 'package:kazumi/modules/my/watch_stats.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
@@ -606,7 +607,8 @@ class _ExpressiveActionState extends State<_ExpressiveAction> {
           ),
           child: Material(
             type: MaterialType.transparency,
-            child: InkWell(
+            child: TvInkWell(
+              borderRadius: _pressed ? BorderRadius.circular(16) : widget.radius,
               onTap: widget.onTap,
               onHighlightChanged: (value) => setState(() => _pressed = value),
               overlayColor: WidgetStateProperty.resolveWith((states) {

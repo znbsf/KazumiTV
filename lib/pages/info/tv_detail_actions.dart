@@ -11,27 +11,32 @@ class TvDetailActions extends StatefulWidget {
     required this.onPlay,
     this.onSelectSource,
     this.onSourceHealth,
+    this.sourceHealthFocus,
     required this.collectionBuilder,
     required this.onReview,
     required this.onUp,
     required this.onDown,
+    this.onPlayLeft,
   });
 
   final FocusNode playFocus;
   final VoidCallback onPlay;
   final VoidCallback? onSelectSource;
   final VoidCallback? onSourceHealth;
+  final FocusNode? sourceHealthFocus;
   final Widget Function(FocusNode focusNode) collectionBuilder;
   final VoidCallback onReview;
   final VoidCallback onUp;
   final VoidCallback onDown;
+  final VoidCallback? onPlayLeft;
 
   @override
   State<TvDetailActions> createState() => _TvDetailActionsState();
 }
 
 class _TvDetailActionsState extends State<TvDetailActions> {
-  final _healthFocus = FocusNode(debugLabel: 'TV source health');
+  final _ownedHealthFocus = FocusNode(debugLabel: 'TV source health');
+  FocusNode get _healthFocus => widget.sourceHealthFocus ?? _ownedHealthFocus;
   final _sourceFocus = FocusNode(debugLabel: 'TV detail source');
   final _collectFocus = FocusNode(debugLabel: 'TV detail collect');
   final _reviewFocus = FocusNode(debugLabel: 'TV detail review');
@@ -47,7 +52,7 @@ class _TvDetailActionsState extends State<TvDetailActions> {
   @override
   void dispose() {
     _sourceFocus.dispose();
-    _healthFocus.dispose();
+    _ownedHealthFocus.dispose();
     _collectFocus.dispose();
     _reviewFocus.dispose();
     super.dispose();
@@ -61,6 +66,12 @@ class _TvDetailActionsState extends State<TvDetailActions> {
     final index = _nodes.indexWhere((node) => node.hasPrimaryFocus);
     if (index < 0) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (index == 0 &&
+        key == LogicalKeyboardKey.arrowLeft &&
+        widget.onPlayLeft != null) {
+      widget.onPlayLeft!();
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowRight) {
       _nodes[tvWrappedIndex(

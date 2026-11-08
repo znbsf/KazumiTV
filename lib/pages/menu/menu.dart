@@ -288,6 +288,22 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
   }
 
   void _handleSystemBack(BuildContext context) {
+    final navigator = outletNavigatorOf(_outletKey.currentContext);
+    Route<dynamic>? top;
+    // Returning true immediately only inspects the top route; nothing is popped.
+    navigator?.popUntil((route) {
+      top = route;
+      return true;
+    });
+    // RouterOutlet.maybePop bypasses local history. Consume it on the real
+    // Navigator before applying the existing page/destination back behavior.
+    final route = top;
+    if (route is ModalRoute && route.willHandlePopInternally) {
+      navigator!.pop();
+      _lastExitPromptAt = null;
+      return;
+    }
+
     if (_outletKey.currentState?.maybePop() ?? false) {
       _lastExitPromptAt = null;
       return;
@@ -517,15 +533,20 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                 borderRadius: 12,
                 ensureVisibleOnFocus: false,
                 onKeyEvent: (_, event) {
-                  if (event is! KeyDownEvent && event is! KeyRepeatEvent)
+                  if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
                     return KeyEventResult.ignored;
-                  if (!event.synthesized) _tvInputEpoch++;
+                  }
+                  if (!event.synthesized) {
+                    _tvInputEpoch++;
+                  }
                   if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
                     enterContent();
                     return KeyEventResult.handled;
                   }
                   if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                    if (i > 0) nodes[i - 1].requestFocus();
+                    if (i > 0) {
+                      nodes[i - 1].requestFocus();
+                    }
                     return KeyEventResult.handled;
                   }
                   if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -541,8 +562,9 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                                 '' &&
                             n.context != null,
                       );
-                      if (categories.isNotEmpty)
+                      if (categories.isNotEmpty) {
                         categories.first.requestFocus();
+                      }
                     }
                     return KeyEventResult.handled;
                   }
@@ -570,7 +592,7 @@ class _ScaffoldMenu extends State<ScaffoldMenu> with RouteAware {
                         Icon(entries[i].$3, size: 16),
                         const SizedBox(width: 4),
                         Text(entries[i].$2,
-                            style: const TextStyle(fontSize: 12)),
+                            style: const TextStyle(fontSize: 14)),
                       ],
                     ),
                   ),

@@ -1,4 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+
+/// Preserves semantic ink until a TV button supplies its focused foreground.
+class TvButtonText extends StatelessWidget {
+  const TvButtonText(
+    this.data, {
+    super.key,
+    required this.color,
+  });
+
+  final String data;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    // Read focus from inside the button, and subscribe even while unfocused.
+    final focused = TvMode.enabled && (Focus.maybeOf(context)?.hasFocus ?? false);
+    return Text(data, style: focused ? null : TextStyle(color: color));
+  }
+}
 
 /// TV visual tokens ported from native main KazumiTheme.kt (24bc50ef).
 abstract final class TvVisuals {
@@ -23,7 +43,7 @@ abstract final class TvVisuals {
     fontWeight: FontWeight.w500,
   );
   static const body = TextStyle(fontSize: 15, height: 21 / 15);
-  static const caption = TextStyle(fontSize: 13, height: 18 / 13);
+  static const caption = TextStyle(fontSize: 14, height: 18 / 14);
   static const control = TextStyle(
     fontSize: 14,
     height: 20 / 14,
@@ -36,15 +56,17 @@ abstract final class TvVisuals {
         backgroundColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.disabled)) return null;
           if (states.contains(WidgetState.focused)) return colors.primary;
-          if (states.contains(WidgetState.selected))
+          if (states.contains(WidgetState.selected)) {
             return colors.secondaryContainer;
+          }
           return null;
         }),
         foregroundColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.disabled)) return null;
           if (states.contains(WidgetState.focused)) return colors.onPrimary;
-          if (states.contains(WidgetState.selected))
+          if (states.contains(WidgetState.selected)) {
             return colors.onSecondaryContainer;
+          }
           return null;
         }),
         side: WidgetStateProperty.resolveWith((states) {

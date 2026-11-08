@@ -203,6 +203,11 @@ void main() {
   testWidgets(
     'different detail URL retains the displayed list cover on failure',
     (tester) async {
+      final oldRetryDelays = NetworkImgLayer.tvCoverRetryDelaysForTesting;
+      NetworkImgLayer.tvCoverRetryDelaysForTesting = const [];
+      addTearDown(() {
+        NetworkImgLayer.tvCoverRetryDelaysForTesting = oldRetryDelays;
+      });
       _useLogicalPixels(tester);
       const listUrl = 'https://fixture.invalid/list-cover.png';
       const largeUrl = 'https://fixture.invalid/large-cover.png';

@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:kazumi/services/player/recent_video_cache_service.dart';
+import 'package:kazumi/services/player/recent_danmaku.dart';
+import 'package:kazumi/services/video_source/video_source_format.dart';
 import 'package:kazumi/services/video_source/resolved_source_cache.dart';
 import 'package:flutter_modular/flutter_modular.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
@@ -67,7 +70,9 @@ abstract class _VideoPageController with Store implements Disposable {
     this.downloadManager, {
     WebViewVideoSourceService? videoSourceService,
     ResolvedSourceCache? resolvedSourceCache,
+    RecentVideoCacheService? recentCache,
   })  : _videoSourceService = videoSourceService,
+        _recentCache = recentCache ?? RecentVideoCacheService.shared,
         _resolvedSourceCache =
             resolvedSourceCache ?? ResolvedSourceCache.shared;
 
@@ -155,6 +160,18 @@ abstract class _VideoPageController with Store implements Disposable {
 
   WebViewVideoSourceService? _videoSourceService;
   final ResolvedSourceCache _resolvedSourceCache;
+  final RecentVideoCacheService _recentCache;
+  RecentCacheLease? _cacheLease;
+  String? _recentOfflineId;
+
+  Future<void> _releaseCache() async {
+    final lease = _cacheLease;
+    _cacheLease = null;
+    try {
+      await lease?.release();
+    } catch (_) {}
+  }
+
   int _requestedOffset = 0;
   int _playbackRevision = 0;
   int get playbackRevision => _playbackRevision;
@@ -181,6 +198,7 @@ abstract class _VideoPageController with Store implements Disposable {
         roadList.clear();
         roadList.addAll(args.roads);
       case OfflineVideoPlaybackArgs():
+        _recentOfflineId = args.recentCacheId;
         _initForOfflinePlayback(
           bangumiItem: args.bangumiItem,
           pluginName: args.pluginName,
@@ -527,6 +545,7 @@ abstract class _VideoPageController with Store implements Disposable {
     playingEpisode = null;
     _failLoading('已取消加载，可重试当前集或选择其他线路');
     await playerController.stop();
+    await _releaseCache();
   }
 
   /// The picker resolves first; this commits in the existing route scope.
@@ -652,6 +671,8 @@ abstract class _VideoPageController with Store implements Disposable {
     if (session.isStale) {
       return;
     }
+    await _releaseCache();
+    if (session.isStale) return;
 
     if (isOfflineMode) {
       await _changeOfflineEpisode(
@@ -707,13 +728,24 @@ abstract class _VideoPageController with Store implements Disposable {
       return;
     }
 
-    final localPath = _getLocalVideoPath(
-      bangumiItem.id,
-      _offlinePluginName,
-      resolvedEpisode.historyEpisodeNumber,
-    );
+    RecentCacheLease? cached;
+    if (_recentOfflineId != null) {
+      cached = await _recentCache.openOffline(_recentOfflineId!);
+      if (session.isStale) {
+        await cached?.release();
+        return;
+      }
+      _cacheLease = cached;
+    }
+    final localPath = _recentOfflineId != null
+        ? cached?.url
+        : _getLocalVideoPath(
+            bangumiItem.id,
+            _offlinePluginName,
+            resolvedEpisode.historyEpisodeNumber,
+          );
     if (localPath == null) {
-      _failLoading('该集数未下载');
+      _failLoading(_recentOfflineId == null ? '该集数未下载' : '该集缓存不完整或已被清理');
       return;
     }
     _applyResolvedSelection(resolvedEpisode);
@@ -722,8 +754,12 @@ abstract class _VideoPageController with Store implements Disposable {
       return;
     }
     _finishLoading();
-    final resolvedOffset =
-        offset > 0 ? offset : getHistoryOffsetFor(_playbackHistoryIdentity!);
+    final resolvedOffset = offset > 0
+        ? offset
+        : cached != null
+            ? RecentVideoCacheService.resumeOffset(cached.metadata,
+                playResume: GStorage.getSetting(SettingsKeys.playResume))
+            : getHistoryOffsetFor(_playbackHistoryIdentity!);
     _requestedOffset = resolvedOffset;
 
     KazumiLogger().i(
@@ -734,28 +770,34 @@ abstract class _VideoPageController with Store implements Disposable {
       videoUrl: localPath,
       offset: resolvedOffset,
       isLocalPlayback: true,
+      loopbackCache: cached != null,
       bangumiId: bangumiItem.id,
       pluginName: _offlinePluginName,
       episode: resolvedEpisode.listIndex,
-      danmakuEpisodeNumber: resolvedEpisode.danmakuEpisodeNumber,
+      danmakuEpisodeNumber: cached?.metadata['danmakuEpisode'] as int? ??
+          resolvedEpisode.danmakuEpisodeNumber,
       pageUrl: resolvedEpisode.pageUrl,
       sortNumber: resolvedEpisode.sortNumber,
       httpHeaders: {},
-      adBlockerEnabled: false,
+      adBlockerEnabled: cached?.metadata['adBlocker'] == true,
       episodeTitle: resolvedEpisode.displayTitle,
       referer: '',
       currentRoad: resolvedEpisode.roadIndex,
       coverUrl: bangumiItem.images['large'],
       bangumiName:
           bangumiItem.nameCn.isNotEmpty ? bangumiItem.nameCn : bangumiItem.name,
-      onHistoryProgress: (position, duration) => historyController
-          .updateHistory(historyIdentity, position, duration: duration),
+      onHistoryProgress: (position, duration) => cached != null
+          ? _recentCache.progress(
+              cached.id, position.inSeconds, duration.inSeconds)
+          : historyController.updateHistory(historyIdentity, position,
+              duration: duration),
       onPlaybackError: (message) =>
           _handlePlaybackFailure(message, session, playerController),
     );
 
     final initialized = await playerController.init(params);
     if (session.isActive && initialized) {
+      if (cached != null) KazumiDialog.showToast(message: '正在播放本地视频缓存');
       playingEpisode = selection;
       unawaited(_loadPlaybackDanmaku(playerController, params, session));
     } else if (session.isActive) {
@@ -771,14 +813,42 @@ abstract class _VideoPageController with Store implements Disposable {
   ) async {
     final danmakuSession = _danmakuSessions.begin();
     playerController.danmaku.beginDanmakuLoad();
+    final cacheId = _cacheLease?.id;
+    final generation =
+        cacheId == null ? null : playerController.danmaku.danmakuLoadGeneration;
     try {
-      final result = await playerController.danmaku.fetchDanmaku(
-        params.bangumiId,
-        params.pluginName,
-        params.danmakuEpisodeNumber,
-      );
+      Future<DanmakuLoadResult> fresh() => cacheId != null
+          ? playerController.danmaku
+              .fetchLatestDanmaku(params.bangumiId, params.danmakuEpisodeNumber)
+          : playerController.danmaku.fetchDanmaku(
+              params.bangumiId,
+              params.pluginName,
+              params.danmakuEpisodeNumber,
+            );
+      final (result, fromCache) = cacheId == null
+          ? (await fresh(), false)
+          : await loadRecentDanmaku(
+              fresh: fresh,
+              cached: () async {
+                final saved = await _recentCache.readDanmaku(cacheId);
+                return saved == null
+                    ? null
+                    : DanmakuLoadResult.success(
+                        danmakus: saved.$1, bangumiID: saved.$2);
+              },
+              // New responses live in the independent API cache. Keep reading
+              // old attached copies for offline compatibility, without adding
+              // duplicate data to the video quota.
+              save: (_) async {},
+              isCurrent: () =>
+                  session.isActive &&
+                  danmakuSession.isActive &&
+                  generation == playerController.danmaku.danmakuLoadGeneration,
+              deduplicate:
+                  GStorage.getSetting(SettingsKeys.danmakuDeduplication));
       if (session.isActive && danmakuSession.isActive) {
         if (result.hasDanmakus) {
+          if (fromCache) KazumiDialog.showToast(message: '未获取到最新弹幕，正在使用该集缓存弹幕');
           final bool enableDanmaku =
               GStorage.getSetting(SettingsKeys.danmakuEnabledByDefault);
           playerController.danmaku.applyDanmakuLoad(
@@ -826,6 +896,22 @@ abstract class _VideoPageController with Store implements Disposable {
     required AsyncSession session,
     required PlayerController playerController,
   }) async {
+    final forceAdBlocker = GStorage.getSetting(SettingsKeys.forceAdBlocker);
+    final adBlocker = forceAdBlocker || currentPlugin.adBlocker;
+    final identity = jsonEncode([
+      bangumiItem.id,
+      currentPlugin.name,
+      currentPlugin.baseUrl,
+      resolvedEpisode.roadIndex,
+      url,
+      adBlocker
+    ]);
+    var cached = await _recentCache.find(identity);
+    if (session.isStale) {
+      await cached?.release();
+      return;
+    }
+    _cacheLease = cached;
     _videoSourceService ??= WebViewVideoSourceService();
 
     await _logSubscription?.cancel();
@@ -845,20 +931,31 @@ abstract class _VideoPageController with Store implements Disposable {
     final requestHeaders = Map<String, String>.unmodifiable(
         preparedHeaders ?? currentPlugin.buildHttpHeaders());
     try {
-      final attempt = preparedSource != null
-          ? ResolvedSourceAttempt(preparedSource, requestHeaders,
+      final attempt = cached != null
+          ? ResolvedSourceAttempt(
+              VideoSource(
+                  url: cached.url,
+                  offset: offset,
+                  type: VideoSourceType.cached,
+                  format: cached.url.endsWith('.m3u8')
+                      ? VideoSourceFormat.hls
+                      : VideoSourceFormat.auto),
+              const {},
               fromCache: false)
-          : await _resolvedSourceCache.resolve(
-              key: cacheKey,
-              offset: offset,
-              headers: requestHeaders,
-              isCurrent: () => session.isActive,
-              fresh: () => _videoSourceService!.resolve(
-                url,
-                useLegacyParser: currentPlugin.useLegacyParser,
-                offset: offset,
-              ),
-            );
+          : preparedSource != null
+              ? ResolvedSourceAttempt(preparedSource, requestHeaders,
+                  fromCache: false)
+              : await _resolvedSourceCache.resolve(
+                  key: cacheKey,
+                  offset: offset,
+                  headers: requestHeaders,
+                  isCurrent: () => session.isActive,
+                  fresh: () => _videoSourceService!.resolve(
+                    url,
+                    useLegacyParser: currentPlugin.useLegacyParser,
+                    offset: offset,
+                  ),
+                );
       final source = attempt.source;
 
       if (session.isStale) {
@@ -874,15 +971,38 @@ abstract class _VideoPageController with Store implements Disposable {
       KazumiLogger()
           .i('VideoPageController: resolved video URL: ${source.url}');
 
-      final bool forceAdBlocker =
-          GStorage.getSetting(SettingsKeys.forceAdBlocker);
+      cached ??= await _recentCache.prepare(
+          identity: identity,
+          url: source.url,
+          headers: attempt.headers,
+          adBlocker: adBlocker,
+          hls: source.format == VideoSourceFormat.hls ||
+              Uri.tryParse(source.url)?.path.toLowerCase().endsWith('.m3u8') ==
+                  true,
+          metadata: {
+            'bangumiId': bangumiItem.id,
+            'title': bangumiItem.nameCn.isNotEmpty
+                ? bangumiItem.nameCn
+                : bangumiItem.name,
+            'pluginName': currentPlugin.name,
+            'episode': resolvedEpisode.historyEpisodeNumber,
+            'episodeTitle': resolvedEpisode.displayTitle,
+            'road': resolvedEpisode.roadIndex,
+            'danmakuEpisode': resolvedEpisode.danmakuEpisodeNumber
+          });
+      if (session.isStale) {
+        await cached?.release();
+        return;
+      }
+      _cacheLease = cached;
 
       final historyIdentity = _playbackHistoryIdentity!;
       var historyAccepted = false;
       final params = PlaybackInitParams(
-        videoUrl: source.url,
+        videoUrl: cached?.url ?? source.url,
         offset: source.offset,
-        isLocalPlayback: false,
+        isLocalPlayback: cached?.offline ?? false,
+        loopbackCache: cached != null,
         videoSourceFormat: source.format,
         bangumiId: bangumiItem.id,
         pluginName: currentPlugin.name,
@@ -890,8 +1010,8 @@ abstract class _VideoPageController with Store implements Disposable {
         danmakuEpisodeNumber: resolvedEpisode.danmakuEpisodeNumber,
         pageUrl: resolvedEpisode.pageUrl,
         sortNumber: resolvedEpisode.sortNumber,
-        httpHeaders: attempt.headers,
-        adBlockerEnabled: forceAdBlocker || currentPlugin.adBlocker,
+        httpHeaders: cached != null ? const {} : attempt.headers,
+        adBlockerEnabled: adBlocker,
         episodeTitle: resolvedEpisode.displayTitle,
         referer: attempt.headers['referer'] ?? '',
         currentRoad: resolvedEpisode.roadIndex,
@@ -903,6 +1023,12 @@ abstract class _VideoPageController with Store implements Disposable {
           if (!_switchingSource && historyAccepted) {
             await historyController.updateHistory(historyIdentity, position,
                 duration: duration);
+            if (cached != null) {
+              try {
+                await _recentCache.progress(
+                    cached.id, position.inSeconds, duration.inSeconds);
+              } catch (_) {/* Cache bookkeeping must not lose history. */}
+            }
           }
         },
         onPlaybackError: (message) {
@@ -913,11 +1039,14 @@ abstract class _VideoPageController with Store implements Disposable {
 
       final initialized = await playerController.init(params);
       if (session.isActive && initialized) {
+        if (cached?.offline == true) {
+          KazumiDialog.showToast(message: '正在播放本地视频缓存');
+        }
         historyAccepted = true;
         _lastResolvedSource = source;
         _lastResolvedHeaders = attempt.headers;
         final output = playerController.playback.videoController;
-        if (output != null && preparedSource == null) {
+        if (output != null && preparedSource == null && cached == null) {
           unawaited(_resolvedSourceCache.rememberAfterFirstFrame(
             key: cacheKey,
             attempt: attempt,
@@ -1024,6 +1153,7 @@ abstract class _VideoPageController with Store implements Disposable {
   /// Called by Modular when the '/video' route scope is disposed.
   @override
   void dispose() {
+    unawaited(_releaseCache());
     _playbackRevision++;
     _playbackSessions.close();
     _danmakuSessions.cancel();

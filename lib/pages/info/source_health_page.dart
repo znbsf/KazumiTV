@@ -40,6 +40,7 @@ class SourceHealthPage extends StatefulWidget {
 }
 
 class _SourceHealthPageState extends State<SourceHealthPage> {
+  final _cancelFocus = FocusNode(debugLabel: 'TV source health cancel');
   HealthPlaybackLease? _lease;
   final _run = HealthRun();
   final _results = <HealthRecord>[];
@@ -72,6 +73,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
 
   @override
   void dispose() {
+    _cancelFocus.dispose();
     _run.cancel();
     _active?.cancel();
     super.dispose();
@@ -218,6 +220,11 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
       _results.clear();
       _message = '开始检测';
     });
+    if (TvMode.enabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _cancelFocus.requestFocus();
+      });
+    }
     try {
       _environment =
           '${ApiEndpoints.version}|${Platform.operatingSystem}|${Platform.operatingSystemVersion}|'
@@ -444,6 +451,7 @@ class _SourceHealthPageState extends State<SourceHealthPage> {
                           child: const Text('开始检测'),
                         ),
                       OutlinedButton(
+                        focusNode: TvMode.enabled ? _cancelFocus : null,
                         autofocus: widget.autoSelect,
                         onPressed: _exit,
                         child: Text(_running ? '取消并返回' : '返回手动选源'),

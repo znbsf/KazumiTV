@@ -10,6 +10,8 @@ import 'package:hive_ce/hive.dart';
 import 'package:kazumi/modules/danmaku/danmaku_ch_convert.dart';
 import 'package:kazumi/pages/settings/danmaku/danmaku_ch_convert_tile.dart';
 import 'package:kazumi/request/apis/danmaku_api.dart';
+import 'package:kazumi/request/clients/danmaku_client.dart';
+import 'package:kazumi/services/danmaku/danmaku_cache_service.dart';
 import 'package:kazumi/request/config/api_endpoints.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/request/core/network_exception.dart';
@@ -34,6 +36,9 @@ void main() {
   });
 
   setUp(() async {
+    // This file verifies transport/status mapping. Cache behavior has its own
+    // real disk/worker and request-count regressions.
+    await GStorage.putSetting(SettingsKeys.danmakuCacheEnabled, false);
     await GStorage.resetSettings([SettingsKeys.danmakuChConvert]);
     await GStorage.putSetting(SettingsKeys.enableBangumiProxy, false);
     DioFactory.reset();
@@ -97,6 +102,32 @@ void main() {
 
     expect(await DanmakuApi.getDanDanmaku(0, 4), isEmpty);
     expect(adapter.requests, isEmpty);
+  });
+
+  test(
+      'real client caches GET responses independently of conversion and custom headers',
+      () async {
+    final cache = DanmakuCacheService(
+        directory: () async => directory,
+        enabled: () => true,
+        privateMode: () => false,
+        limitMiB: () => 256);
+    addTearDown(cache.close);
+    final client =
+        DanmakuClient.forTesting(dio: DioFactory.apiDio, cache: cache);
+    final url =
+        '${ApiEndpoints.dandanAPIDomain}${ApiEndpoints.dandanAPIComment}1234';
+    await client.get(url, queryParameters: {'chConvert': '0'});
+    await client.get(url, queryParameters: {'chConvert': '0'});
+    expect(adapter.requests, hasLength(1));
+    await client.get(url, queryParameters: {'chConvert': '2'});
+    expect(adapter.requests, hasLength(2));
+    await cache.close();
+    await client.get(url, queryParameters: {'chConvert': '0'});
+    expect(adapter.requests, hasLength(2));
+    await client.get(url,
+        headers: {'custom': 'scope'}, queryParameters: {'chConvert': '0'});
+    expect(adapter.requests, hasLength(3));
   });
 
   test('manual search keeps v2 search parameters without comment conversion',

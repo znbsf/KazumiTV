@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/pages/player/player_keyboard_shortcuts.dart';
 import 'package:kazumi/pages/player/tv_playback_info.dart';
+import 'package:kazumi/bean/widget/tv_visuals.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 TvPlaybackInfoData data(
         {List<String> labels = const ['01', '02'], int index = 1}) =>
@@ -24,6 +26,49 @@ TvPlaybackInfoData data(
     );
 
 void main() {
+  for (final viewport in [const Size(960, 540), const Size(1280, 720)]) {
+    for (final scale in [1.0, 1.3]) {
+      testWidgets('TV INFO captions fit at $viewport text $scale',
+          (tester) async {
+        TvMode.setEnabledForTesting(true);
+        addTearDown(() => TvMode.setEnabledForTesting(false));
+        tester.view.physicalSize = viewport;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(MaterialApp(
+            theme: TvVisuals.theme(ThemeData.dark()),
+            home: MediaQuery(
+                data: MediaQueryData(
+                    size: viewport, textScaler: TextScaler.linear(scale)),
+                child: TvPlaybackInfoCard(info: data(), onClose: () {}))));
+        await tester.pumpAndSettle();
+        for (final label in ['来源：测试源', '下一集：02']) {
+          expect(tester.widget<Text>(find.text(label)).style?.fontSize, 14);
+          final rect = tester.getRect(find.text(label));
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.top, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(viewport.width));
+          expect(rect.bottom, lessThanOrEqualTo(viewport.height));
+        }
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
+  testWidgets('non-TV INFO captions keep their original size', (tester) async {
+    TvMode.setEnabledForTesting(false);
+    await tester.pumpWidget(MaterialApp(
+        home: TvPlaybackInfoCard(info: data(), onClose: () {})));
+    await tester.pumpAndSettle();
+    for (final label in ['来源：测试源', '下一集：02']) {
+      expect(tester.widget<Text>(find.text(label)).style?.fontSize, 12);
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('only reliable adjacent episode labels become next episode', () {
     expect(data().episode, '01');
     expect(data().nextEpisode, '02');

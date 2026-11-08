@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'package:kazumi/bean/widget/bounded_log_buffer.dart';
 
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:canvas_danmaku/models/danmaku_content_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -74,7 +76,7 @@ class _VideoPageState extends State<VideoPage>
   DownloadController get downloadController => widget.downloadController;
   late bool playResume;
   bool showDebugLog = false;
-  List<String> webviewLogLines = [];
+  final webviewLog = BoundedLogBuffer();
   StreamSubscription<String>? _logSubscription;
   final FocusNode keyboardFocus = FocusNode(
     debugLabel: 'Video player shortcut scope',
@@ -88,6 +90,7 @@ class _VideoPageState extends State<VideoPage>
 
   bool _tabBodyTargetVisible = true;
   int _tabBodyAnimationRun = 0;
+  int _tvTabBodyOpenRun = 0;
 
   late final bool disableAnimations;
 
@@ -209,7 +212,9 @@ class _VideoPageState extends State<VideoPage>
 
   void _initOfflineMode() {
     final identity = videoPageController.currentHistoryIdentity;
-    videoPageController.historyOffset = identity == null
+    final args = widget.args;
+    videoPageController.historyOffset = identity == null ||
+            (args is OfflineVideoPlaybackArgs && args.recentCacheId != null)
         ? 0
         : videoPageController.getHistoryOffsetFor(identity);
     _showTabBodyImmediately();
@@ -272,12 +277,7 @@ class _VideoPageState extends State<VideoPage>
 
     _logSubscription = videoPageController.logStream.listen((log) {
       if (mounted) {
-        setState(() {
-          webviewLogLines.add(log);
-          if (webviewLogLines.length > 100) {
-            webviewLogLines.removeAt(0);
-          }
-        });
+        webviewLog.add(log);
       }
     });
 
@@ -308,6 +308,7 @@ class _VideoPageState extends State<VideoPage>
       _logSubscription?.cancel();
     } catch (_) {}
     _pipModeListener();
+    webviewLog.dispose();
     // Modular disposes the controller and its log subscription with the route.
     if (!isDesktop()) {
       try {
@@ -345,9 +346,7 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void clearWebviewLog() {
-    setState(() {
-      webviewLogLines.clear();
-    });
+    webviewLog.clear();
   }
 
   Future<void> changeEpisode(
@@ -432,6 +431,17 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void _setTabBodyVisible(bool visible, {required bool animated}) {
+    if (TvMode.enabled &&
+        visible &&
+        !_tabBodyTargetVisible &&
+        tabController.index != 0) {
+      tabController.index = 0;
+      // A retained TabBarView otherwise animates from comments and has no
+      // episode state for this opening frame's post-frame reveal. Only bump
+      // when the index changed: that notification applies the new key now,
+      // not on some later rebuild that would drop the focused episode.
+      _tvTabBodyOpenRun++;
+    }
     if (TvMode.enabled && visible) {
       playerController.panel.showVideoController = false;
     }
@@ -492,6 +502,11 @@ class _VideoPageState extends State<VideoPage>
   }
 
   void onBackPressed(BuildContext context) async {
+    if (TvMode.enabled &&
+        ModalRoute.of(context)?.willHandlePopInternally == true) {
+      Navigator.of(context).pop();
+      return;
+    }
     if (KazumiDialog.observer.hasKazumiDialog) {
       KazumiDialog.dismiss();
       return;
@@ -639,7 +654,7 @@ class _VideoPageState extends State<VideoPage>
   Widget get sideTabBody {
     final size = MediaQuery.sizeOf(context);
     final sideWidth = TvMode.enabled
-        ? (size.width * 0.42).clamp(360.0, 440.0).toDouble()
+        ? tvPlayerSidePanelWidth(size.width)
         : (!isDesktop() && !isTablet())
             ? size.height
             : (size.width / 3 > 420 ? 420.0 : size.width / 3);
@@ -704,6 +719,7 @@ class _VideoPageState extends State<VideoPage>
     try {
       final prepared = await showAdaptiveBottomSheet<PreparedSourceSwitch>(
         context: context,
+        tvWide: true,
         builder: (_) => SourceSheet(
           infoController: info,
           switchOrigin: SourceSwitchOrigin(
@@ -819,8 +835,10 @@ class _VideoPageState extends State<VideoPage>
                                       playerController: playerController),
                               icon:
                                   const Icon(Icons.close, color: Colors.white),
-                              label: const Text('取消加载',
-                                  style: TextStyle(color: Colors.white)),
+                              label: const TvButtonText(
+                                '取消加载',
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),
@@ -836,14 +854,20 @@ class _VideoPageState extends State<VideoPage>
                   color: Colors.black.withValues(alpha: 0.99),
                   child: Align(
                     alignment: Alignment.center,
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: webviewLogLines.length,
-                      itemBuilder: (context, index) {
-                        return Text(
-                          webviewLogLines.isEmpty ? '' : webviewLogLines[index],
-                          style: const TextStyle(color: Colors.white),
-                          textAlign: TextAlign.center,
+                    child: ListenableBuilder(
+                      listenable: webviewLog,
+                      builder: (context, _) {
+                        final lines = webviewLog.lines;
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: lines.length,
+                          itemBuilder: (context, index) {
+                            return Text(
+                              lines[index],
+                              style: const TextStyle(color: Colors.white),
+                              textAlign: TextAlign.center,
+                            );
+                          },
                         );
                       },
                     ),
@@ -1011,6 +1035,7 @@ class _VideoPageState extends State<VideoPage>
           ),
           Expanded(
             child: TabBarView(
+              key: TvMode.enabled ? ValueKey(_tvTabBodyOpenRun) : null,
               controller: tabController,
               children: [
                 episodePanel,

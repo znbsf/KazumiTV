@@ -118,7 +118,9 @@ class _ImageSearchResults extends StatelessWidget {
       required this.error,
       required this.onRetry,
       required this.onSelect,
+      this.firstResultFocus,
       required this.onPreview});
+  final FocusNode? firstResultFocus;
   final List<ResultItem> results;
   final bool searching;
   final String error;
@@ -172,6 +174,7 @@ class _ImageSearchResults extends StatelessWidget {
       ],
       const SizedBox(height: 20),
       _BestMatch(
+          focusNode: firstResultFocus,
           result: results.first, onSelect: onSelect, onPreview: onPreview),
       if (results.length > 1) ...[
         const SizedBox(height: 28),
@@ -219,7 +222,9 @@ class _ImageSearchLoadingState extends StatelessWidget {
 
 class _BestMatch extends StatelessWidget {
   const _BestMatch(
-      {required this.result, required this.onSelect, required this.onPreview});
+      {required this.result, required this.onSelect, required this.onPreview,
+      this.focusNode});
+  final FocusNode? focusNode;
   final ResultItem result;
   final ValueChanged<String> onSelect;
   final ValueChanged<Uri> onPreview;
@@ -248,6 +253,7 @@ class _BestMatch extends StatelessWidget {
         const SizedBox(height: 16),
         Wrap(spacing: 8, runSpacing: 8, children: [
           FilledButton.icon(
+            focusNode: focusNode,
             onPressed: () => onSelect(_title(result)),
             style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
             icon: const Icon(Icons.search_rounded, size: 20),
@@ -256,11 +262,33 @@ class _BestMatch extends StatelessWidget {
           if (video != null)
             OutlinedButton.icon(
               onPressed: () => onPreview(video),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: colors.onSurface,
-                side: BorderSide(color: colors.onSurface.withValues(alpha: .5)),
-                minimumSize: const Size(0, 48),
-              ),
+              style: TvMode.enabled
+                  ? TvVisuals.focusButtonStyle(colors).copyWith(
+                      foregroundColor: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.focused)
+                            ? colors.onPrimary
+                            : colors.onSurface,
+                      ),
+                      side: WidgetStateProperty.resolveWith(
+                        (states) => states.contains(WidgetState.focused)
+                            ? BorderSide(color: colors.onSurface, width: 3)
+                            : BorderSide(
+                                color: colors.onSurface.withValues(alpha: .5)),
+                      ),
+                    ).merge(
+                      OutlinedButton.styleFrom(
+                        foregroundColor: colors.onSurface,
+                        side: BorderSide(
+                            color: colors.onSurface.withValues(alpha: .5)),
+                        minimumSize: const Size(0, 48),
+                      ),
+                    )
+                  : OutlinedButton.styleFrom(
+                      foregroundColor: colors.onSurface,
+                      side: BorderSide(
+                          color: colors.onSurface.withValues(alpha: .5)),
+                      minimumSize: const Size(0, 48),
+                    ),
               icon: const Icon(Icons.play_arrow_rounded, size: 20),
               label: const Text('预览片段'),
             ),
@@ -349,7 +377,11 @@ class _OtherMatch extends StatelessWidget {
           top: Radius.circular(first ? 20 : 8),
           bottom: Radius.circular(last ? 20 : 8)),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
+      child: TvInkWell(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(first ? 20 : 8),
+          bottom: Radius.circular(last ? 20 : 8),
+        ),
         onTap: () => onSelect(_title(result)),
         child: Semantics(
           button: true,

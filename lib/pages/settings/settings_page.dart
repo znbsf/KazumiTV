@@ -4,6 +4,7 @@ import 'package:kazumi/bean/widget/tv_focus_scope.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_modular/flutter_modular.dart';
+import 'package:kazumi/navigation.dart';
 
 import 'package:kazumi/bean/appbar/sys_app_bar.dart';
 import 'package:kazumi/bean/settings/settings_detail_scaffold.dart';
@@ -72,6 +73,12 @@ const List<_SettingsGroup> _settingsGroups = [
         icon: Icons.downloading_rounded,
         path: '/settings/download-settings',
       ),
+      _SettingsCategory(
+        label: '近期视频缓存',
+        description: '自动保留、离线播放与逐集清理',
+        icon: Icons.offline_pin_outlined,
+        path: '/settings/recent-cache',
+      ),
     ],
   ),
   _SettingsGroup(
@@ -135,6 +142,9 @@ bool _isWithinPath(String location, String path) =>
     location == path || location.startsWith('$path/');
 
 String _categoryPath(String location) {
+  if (_isWithinPath(location, '/settings/danmaku-cache')) {
+    return '/settings/danmaku';
+  }
   if (location == '/settings') {
     return '/settings/player';
   }
@@ -323,28 +333,14 @@ class _SettingsPageState extends State<SettingsPage> {
 
   bool _returning = false;
 
-  // RouterOutlet.maybePop removes its page directly. Use its real Navigator
-  // instead so a pane's PopScope can cancel a preview or block an active write.
-  NavigatorState? _outletNavigator() {
-    NavigatorState? navigator;
-    void visit(Element element) {
-      if (navigator != null) return;
-      if (element is StatefulElement && element.state is NavigatorState) {
-        navigator = element.state as NavigatorState;
-        return;
-      }
-      element.visitChildElements(visit);
-    }
-
-    _outletKey.currentContext?.visitChildElements(visit);
-    return navigator;
-  }
-
   Future<void> _goBack() async {
     if (_returning) return;
     _returning = true;
     try {
-      if (await _outletNavigator()?.maybePop() ?? false) return;
+      // RouterOutlet.maybePop removes its page directly. Use its real Navigator
+      // so a pane's PopScope can cancel a preview or block an active write.
+      final navigator = outletNavigatorOf(_outletKey.currentContext);
+      if (await navigator?.maybePop() ?? false) return;
       if (mounted) _exitSettings();
     } finally {
       _returning = false;

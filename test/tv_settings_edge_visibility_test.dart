@@ -247,22 +247,49 @@ void main() {
         state.position.jumpTo(state.position.maxScrollExtent);
         await tester.pumpAndSettle();
       }
-      final reset =
-          Focus.of(tester.element(find.text(up ? 'BiliBili' : '恢复默认设置')));
-      reset.requestFocus();
+      // The cache entry precedes the source switches, so BiliBili is no
+      // longer the first focusable row on this page.
+      final originLabel = up ? '弹幕缓存' : '恢复默认设置';
+      final destinationLabel = up ? '恢复默认设置' : '弹幕缓存';
+      final sourceEnabled =
+          GStorage.getSetting<bool>(SettingsKeys.danmakuBiliBiliSource);
+      Focus.of(tester.element(find.text(originLabel))).requestFocus();
       await tester.pumpAndSettle();
-      await tester.sendKeyEvent(
-          up ? LogicalKeyboardKey.arrowUp : LogicalKeyboardKey.arrowDown);
+
+      void expectVisibleFocus(String label) {
+        final row = find.text(label);
+        expect(row, findsOneWidget);
+        expect(Focus.of(tester.element(row)).hasPrimaryFocus, isTrue,
+            reason: 'Wrap must reach the actual opposite page edge: $label');
+        final rect = FocusManager.instance.primaryFocus!.rect;
+        expect(rect.top, greaterThanOrEqualTo(56),
+            reason: 'Wrapped focus must be revealed below fixed header');
+        expect(rect.bottom, lessThanOrEqualTo(540));
+      }
+
+      for (var cycle = 0; cycle < 3; cycle++) {
+        await tester.sendKeyEvent(
+            up ? LogicalKeyboardKey.arrowUp : LogicalKeyboardKey.arrowDown);
+        await tester.pumpAndSettle();
+        expectVisibleFocus(destinationLabel);
+        await tester.sendKeyEvent(
+            up ? LogicalKeyboardKey.arrowDown : LogicalKeyboardKey.arrowUp);
+        await tester.pumpAndSettle();
+        expectVisibleFocus(originLabel);
+      }
+
+      Focus.of(tester.element(find.text('弹幕缓存'))).requestFocus();
       await tester.pumpAndSettle();
-      final destination = find.text(up ? '恢复默认设置' : 'BiliBili');
-      expect(destination, findsOneWidget);
-      expect(Focus.of(tester.element(destination)).hasFocus, isTrue,
-          reason: 'Wrap must reach the actual opposite page edge');
-      final rect = FocusManager.instance.primaryFocus!.rect;
-      debugPrint('WRAPPED FOCUS RECT $rect');
-      expect(rect.top, greaterThanOrEqualTo(56),
-          reason: 'Wrapped focus must be revealed below fixed header');
-      expect(rect.bottom, lessThanOrEqualTo(540));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pumpAndSettle();
+      expectVisibleFocus('BiliBili');
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await tester.pumpAndSettle();
+      expectVisibleFocus('弹幕缓存');
+      expect(GStorage.getSetting<bool>(SettingsKeys.danmakuBiliBiliSource),
+          sourceEnabled,
+          reason:
+              'Navigation between the cache entry and source must not toggle it');
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }

@@ -80,6 +80,9 @@ void main() {
     PathProviderPlatform.instance = _Paths(directory.path);
     Hive.init(directory.path);
     await GStorage.init();
+    // Exercise each controlled transport completion, rather than cache hits or
+    // the new service-wide cooldown (covered by danmaku_cache_test).
+    await GStorage.putSetting(SettingsKeys.danmakuCacheEnabled, false);
   });
   setUp(() {
     DioFactory.reset();

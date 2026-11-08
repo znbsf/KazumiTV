@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter_modular/flutter_modular.dart';
@@ -11,6 +12,8 @@ import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/download/download_widgets.dart';
 import 'package:kazumi/pages/video/video_playback_args.dart';
 import 'package:kazumi/utils/format.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 class DownloadPage extends StatefulWidget {
   const DownloadPage({
@@ -30,6 +33,54 @@ class _DownloadPageState extends State<DownloadPage> {
   // Keep expansion state across controller snapshot replacements.
   final Map<String, bool> _expanded = {};
   final Map<String, List<int>> _episodeOrders = {};
+  final _pageFocus = FocusNode(debugLabel: 'TV downloads back');
+  final _recordFocus = <String, FocusNode>{};
+  final _episodeFocus = <String, FocusNode>{};
+
+  FocusNode _focusForEpisode(String key, int number) => _episodeFocus.putIfAbsent(
+      '$key/$number', () => FocusNode(debugLabel: 'TV download $key/$number'));
+
+  FocusNode _focusForRecord(String key) => _recordFocus.putIfAbsent(
+      key, () => FocusNode(debugLabel: 'TV download $key'));
+
+  @override
+  void dispose() {
+    _pageFocus.dispose();
+    for (final node in [..._recordFocus.values, ..._episodeFocus.values]) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  FocusNode _afterDelete(DownloadRecord record, [DownloadEpisode? episode]) {
+    if (episode != null) {
+      final numbers = _episodeOrder(record);
+      final index = numbers.indexOf(episode.episodeNumber);
+      if (index + 1 < numbers.length) {
+        return _focusForEpisode(record.key, numbers[index + 1]);
+      }
+      if (index > 0) return _focusForEpisode(record.key, numbers[index - 1]);
+    }
+    final keys = downloadController.recordKeys.toList();
+    final index = keys.indexOf(record.key);
+    if (index + 1 < keys.length) return _focusForRecord(keys[index + 1]);
+    if (index > 0) return _focusForRecord(keys[index - 1]);
+    return _pageFocus;
+  }
+
+  void _restoreAfterDelete(FocusNode target) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
+      // The adjacent row is normally in the lazy viewport's cache. Retain the
+      // page exit if a concurrent update removed that target as well.
+      if (target.context != null) {
+        target.requestFocus();
+        Scrollable.ensureVisible(target.context!);
+      } else {
+        _pageFocus.requestFocus();
+      }
+    });
+  }
 
   List<int> _episodeOrder(DownloadRecord record) {
     final previous = _episodeOrders[record.key];
@@ -58,7 +109,21 @@ class _DownloadPageState extends State<DownloadPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const SysAppBar(title: Text('下载管理')),
+      appBar: SysAppBar(
+        title: const Text('下载管理'),
+        actions: [
+          TextButton(
+            onPressed: () => context.pushNamed('/settings/recent-cache'),
+            child: const Text('近期视频缓存'),
+          ),
+        ],
+        leading: TvMode.enabled
+            ? IconButton(
+                focusNode: _pageFocus,
+                onPressed: () => context.maybePop(),
+                icon: const Icon(Icons.arrow_back))
+            : null,
+      ),
       body: Observer(builder: (context) {
         final recordKeys = downloadController.recordKeys.toList();
         _expanded.removeWhere((key, _) => !recordKeys.contains(key));
@@ -107,6 +172,7 @@ class _DownloadPageState extends State<DownloadPage> {
           final expanded = _isExpanded(recordKey, record);
 
           return DownloadRecordSliver(
+            headerFocus: TvMode.enabled ? _focusForRecord(recordKey) : null,
             record: record,
             expanded: expanded,
             onToggle: () {
@@ -172,76 +238,98 @@ class _DownloadPageState extends State<DownloadPage> {
 
     switch (episode.status) {
       case DownloadStatus.completed:
-        buttons.add(IconButton(
-          icon: Icon(Icons.play_circle_outline,
-              size: 20, color: colorScheme.primary),
-          onPressed: () => _playEpisode(record, episode),
-          tooltip: '播放',
-          visualDensity: VisualDensity.compact,
-        ));
+        buttons.add(TvFocusLabel(
+            message: '播放',
+            child: IconButton(
+              icon: Icon(Icons.play_circle_outline,
+                  size: 20, color: TvMode.enabled ? null : colorScheme.primary),
+              style: TvMode.enabled
+                  ? ButtonStyle(foregroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.focused)
+                          ? colorScheme.onPrimary
+                          : colorScheme.primary))
+                  : null,
+              onPressed: () => _playEpisode(record, episode),
+              tooltip: '播放',
+              visualDensity: VisualDensity.compact,
+            )));
         break;
       case DownloadStatus.downloading:
-        buttons.add(IconButton(
-          icon: const Icon(Icons.pause_rounded, size: 20),
-          onPressed: () => downloadController.pauseDownload(
-            record.bangumiId,
-            record.pluginName,
-            episode.episodeNumber,
-          ),
-          tooltip: '暂停',
-          visualDensity: VisualDensity.compact,
-        ));
+        buttons.add(TvFocusLabel(
+            message: '暂停',
+            child: IconButton(
+              icon: const Icon(Icons.pause_rounded, size: 20),
+              onPressed: () => downloadController.pauseDownload(
+                record.bangumiId,
+                record.pluginName,
+                episode.episodeNumber,
+              ),
+              tooltip: '暂停',
+              visualDensity: VisualDensity.compact,
+            )));
         break;
       case DownloadStatus.paused:
-        buttons.add(IconButton(
-          icon: const Icon(Icons.play_arrow_rounded, size: 20),
-          onPressed: () => downloadController.retryDownload(
-            bangumiId: record.bangumiId,
-            pluginName: record.pluginName,
-            episodeNumber: episode.episodeNumber,
-          ),
-          tooltip: '继续',
-          visualDensity: VisualDensity.compact,
-        ));
+        buttons.add(TvFocusLabel(
+            message: '继续',
+            child: IconButton(
+              icon: const Icon(Icons.play_arrow_rounded, size: 20),
+              onPressed: () => downloadController.retryDownload(
+                bangumiId: record.bangumiId,
+                pluginName: record.pluginName,
+                episodeNumber: episode.episodeNumber,
+              ),
+              tooltip: '继续',
+              visualDensity: VisualDensity.compact,
+            )));
         break;
       case DownloadStatus.failed:
-        buttons.add(IconButton(
-          icon: const Icon(Icons.refresh_rounded, size: 20),
-          onPressed: () => downloadController.retryDownload(
-            bangumiId: record.bangumiId,
-            pluginName: record.pluginName,
-            episodeNumber: episode.episodeNumber,
-          ),
-          tooltip: '重试',
-          visualDensity: VisualDensity.compact,
-        ));
+        buttons.add(TvFocusLabel(
+            message: '重试',
+            child: IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              onPressed: () => downloadController.retryDownload(
+                bangumiId: record.bangumiId,
+                pluginName: record.pluginName,
+                episodeNumber: episode.episodeNumber,
+              ),
+              tooltip: '重试',
+              visualDensity: VisualDensity.compact,
+            )));
         break;
       case DownloadStatus.pending:
-        buttons.add(IconButton(
-          icon: Icon(Icons.priority_high, size: 20, color: colorScheme.primary),
-          onPressed: () {
-            downloadController.priorityDownload(
-              bangumiId: record.bangumiId,
-              pluginName: record.pluginName,
-              episodeNumber: episode.episodeNumber,
-            );
-            KazumiDialog.showToast(message: '已插队优先下载');
-          },
-          tooltip: '优先下载',
-          visualDensity: VisualDensity.compact,
-        ));
+        buttons.add(TvFocusLabel(
+            message: '优先下载',
+            child: IconButton(
+              icon: Icon(Icons.priority_high,
+                  size: 20, color: colorScheme.primary),
+              onPressed: () {
+                downloadController.priorityDownload(
+                  bangumiId: record.bangumiId,
+                  pluginName: record.pluginName,
+                  episodeNumber: episode.episodeNumber,
+                );
+                KazumiDialog.showToast(message: '已插队优先下载');
+              },
+              tooltip: '优先下载',
+              visualDensity: VisualDensity.compact,
+            )));
         break;
       default:
         break;
     }
 
-    buttons.add(IconButton(
-      icon: Icon(Icons.delete_outline,
-          size: 20, color: colorScheme.onSurfaceVariant),
-      onPressed: () => _confirmDeleteEpisode(record, episode),
-      tooltip: '删除',
-      visualDensity: VisualDensity.compact,
-    ));
+    buttons.add(TvFocusLabel(
+        message: '删除',
+        child: IconButton(
+          focusNode: TvMode.enabled
+              ? _focusForEpisode(record.key, episode.episodeNumber)
+              : null,
+          icon: Icon(Icons.delete_outline,
+              size: 20, color: colorScheme.onSurfaceVariant),
+          onPressed: () => _confirmDeleteEpisode(record, episode),
+          tooltip: '删除',
+          visualDensity: VisualDensity.compact,
+        )));
 
     return buttons;
   }
@@ -300,24 +388,28 @@ class _DownloadPageState extends State<DownloadPage> {
             '确定要删除「${episode.episodeName.isNotEmpty ? episode.episodeName : '第${episode.episodeNumber}集'}」的下载文件吗？'),
         actions: [
           TextButton(
+            autofocus: TvMode.enabled,
             onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(
-            onPressed: () {
-              downloadController.deleteEpisode(
+            onPressed: () async {
+              final target = TvMode.enabled ? _afterDelete(record, episode) : null;
+              final deletion = downloadController.deleteEpisode(
                 record.bangumiId,
                 record.pluginName,
                 episode.episodeNumber,
               );
               KazumiDialog.dismiss();
+              await deletion;
+              if (mounted && target != null) _restoreAfterDelete(target);
             },
-            child: Text(
+            child: TvButtonText(
               '删除',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
         ],
@@ -332,23 +424,27 @@ class _DownloadPageState extends State<DownloadPage> {
         content: Text('确定要删除「${record.bangumiName}」的所有下载文件吗？'),
         actions: [
           TextButton(
+            autofocus: TvMode.enabled,
             onPressed: () => KazumiDialog.dismiss(),
-            child: Text(
+            child: TvButtonText(
               '取消',
-              style: TextStyle(color: Theme.of(context).colorScheme.outline),
+              color: Theme.of(context).colorScheme.outline,
             ),
           ),
           TextButton(
-            onPressed: () {
-              downloadController.deleteRecord(
+            onPressed: () async {
+              final target = TvMode.enabled ? _afterDelete(record) : null;
+              final deletion = downloadController.deleteRecord(
                 record.bangumiId,
                 record.pluginName,
               );
               KazumiDialog.dismiss();
+              await deletion;
+              if (mounted && target != null) _restoreAfterDelete(target);
             },
-            child: Text(
+            child: TvButtonText(
               '删除',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
         ],

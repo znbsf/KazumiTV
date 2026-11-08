@@ -240,10 +240,10 @@ class TvPlaybackInfoCard extends StatelessWidget {
                                         text(info.episode),
                                         if (info.sourceName.isNotEmpty)
                                           text('来源：${info.sourceName}',
-                                              size: 12),
+                                              size: TvMode.enabled ? 14 : 12),
                                         if (info.nextEpisode != null)
                                           text('下一集：${info.nextEpisode}',
-                                              size: 12),
+                                              size: TvMode.enabled ? 14 : 12),
                                       ])),
                                 ]))),
                             const SizedBox(height: 8),

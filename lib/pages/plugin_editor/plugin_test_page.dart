@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:convert';
 
@@ -341,9 +342,8 @@ class _PluginTestPageState extends State<PluginTestPage> {
                 style: TextButton.styleFrom(
                     backgroundColor:
                         theme.colorScheme.error.withValues(alpha: 0.1)),
-                child: Text('重试测试',
-                    style:
-                        TextStyle(color: theme.colorScheme.onErrorContainer)),
+                child: TvButtonText('重试测试',
+                    color: theme.colorScheme.onErrorContainer),
               ),
             ]),
           ),

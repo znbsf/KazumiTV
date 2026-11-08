@@ -34,6 +34,38 @@ void main() {
     await Hive.close();
     await dir.delete(recursive: true);
   });
+  testWidgets('ST-6 TV hides swipe gesture and retains remote long press speed',
+      (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
+    await tester.pumpWidget(ModularApp(
+      module: createModule(register: (c) {
+        c.route('/settings',
+            child: (_, state) => SettingsPage(location: state.uri.path),
+            children: (sub) {
+              sub.route('/player',
+                  child: (_, __) => const PlayerSettingsPage());
+            });
+      }),
+      initialRoute: '/settings/player',
+      child: Builder(
+          builder: (context) => MaterialApp.router(
+              routerConfig: ModularApp.routerConfigOf(context))),
+    ));
+    await tester.pumpAndSettle();
+    final scrollable = find
+        .descendant(
+            of: find.byType(PlayerSettingsPage),
+            matching: find.byType(Scrollable))
+        .first;
+    await tester.scrollUntilVisible(find.text('长按倍速'), 250,
+        scrollable: scrollable);
+    await tester.pumpAndSettle();
+    expect(find.text('竖向滑动调节音量和亮度'), findsNothing);
+    expect(find.text('长按屏幕或按住方向键时的倍速'), findsOneWidget);
+    expect(find.text('长按倍速'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   for (final item in <(String, Widget)>[
     ('启动界面设置', const InterfaceSettingsPage()),
     ('深色模式', const ThemeSettingsPage()),

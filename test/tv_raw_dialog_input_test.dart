@@ -84,6 +84,8 @@ void main() {
                     child: const Text('open'))))));
     await tester.pumpAndSettle();
     await _key(tester, LogicalKeyboardKey.enter);
+    expect(FocusManager.instance.primaryFocus?.context
+        ?.findAncestorWidgetOfExactType<TvTextEntry>(), isNotNull);
     await _editDraft(tester, 'invalid\nrule');
     expect(writes, 0);
     await _key(tester, LogicalKeyboardKey.arrowDown);

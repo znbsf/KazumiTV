@@ -10,6 +10,7 @@ import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/roads/road_module.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/video/video_controller.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 
 class DownloadEpisodeSheet extends StatefulWidget {
   final int road;
@@ -29,6 +30,14 @@ class _DownloadEpisodeSheetState extends State<DownloadEpisodeSheet> {
   VideoPageController get videoPageController => widget.videoPageController;
   final DownloadController downloadController = inject<DownloadController>();
   final GridObserverController _observerController = GridObserverController();
+
+  final ScrollController _tvScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _tvScrollController.dispose();
+    super.dispose();
+  }
 
   final Set<int> _selectedEpisodes = {};
   bool _didJumpToPlayingEpisode = false;
@@ -67,6 +76,127 @@ class _DownloadEpisodeSheetState extends State<DownloadEpisodeSheet> {
     final allSelected = selectableEpisodes.isNotEmpty &&
         _selectedEpisodes.length == selectableEpisodes.length;
 
+    Widget content(BuildContext context, ScrollController scrollController) {
+      _observerController.controller = scrollController;
+      if (!_didJumpToPlayingEpisode) {
+        _didJumpToPlayingEpisode = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await Future<void>.delayed(Duration.zero);
+          final playbackEpisode = videoPageController.playbackEpisode;
+          if (!mounted ||
+              playbackEpisode.road != widget.road ||
+              episodeCount == 0 ||
+              !scrollController.hasClients) {
+            return;
+          }
+          final index = (playbackEpisode.episode - 1).clamp(0, episodeCount - 1);
+          await _observerController.jumpTo(
+            index: index,
+            isFixedHeight: true,
+          );
+        });
+      }
+      return Column(
+        children: [
+          MaterialBottomSheetHeader(
+            title: '下载选集',
+            description: downloadedCount > 0
+                ? '$episodeCount 集 · 已下载 $downloadedCount 集'
+                : '共 $episodeCount 集',
+            onClose: () => Navigator.of(context).pop(),
+          ),
+          Expanded(
+            child: GridViewObserver(
+              controller: _observerController,
+              child: GridView.builder(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 160,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  mainAxisExtent: 56,
+                ),
+                itemCount: episodeCount,
+                itemBuilder: (context, index) {
+                  final episodeNumber = index + 1;
+                  final episodeUrl = currentRoadData.data[index];
+                  final isDownloaded = downloadedUrls.contains(episodeUrl);
+                  final isSelected = _selectedEpisodes.contains(episodeNumber);
+                  return _EpisodeTile(
+                    identifier: currentRoadData.identifier[index],
+                    isDownloaded: isDownloaded,
+                    isSelected: isSelected,
+                    onTap: isDownloaded
+                        ? null
+                        : () {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedEpisodes.remove(episodeNumber);
+                              } else {
+                                _selectedEpisodes.add(episodeNumber);
+                              }
+                            });
+                          },
+                  );
+                },
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+            child: SafeArea(
+              top: false,
+              child: Row(
+                children: [
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
+                    onPressed: selectableEpisodes.isEmpty
+                        ? null
+                        : () {
+                            setState(() {
+                              _selectedEpisodes.clear();
+                              if (!allSelected) {
+                                _selectedEpisodes.addAll(selectableEpisodes);
+                              }
+                            });
+                          },
+                    // Reserve the widest label to keep the action width stable.
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Opacity(opacity: 0, child: Text('取消全选')),
+                        Text(allSelected ? '取消全选' : '全选'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: _selectedEpisodes.isEmpty
+                          ? null
+                          : () => _startBatchDownload(context),
+                      icon: const Icon(Icons.download_rounded),
+                      label: Text(_selectedEpisodes.isEmpty
+                          ? '选择集数'
+                          : '下载 ${_selectedEpisodes.length} 集'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (TvMode.enabled) return content(context, _tvScrollController);
+
     return LayoutBuilder(builder: (context, constraints) {
       // Reserve header, actions and one episode row even on short windows.
       final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
@@ -77,128 +207,7 @@ class _DownloadEpisodeSheetState extends State<DownloadEpisodeSheet> {
         minChildSize: minSize,
         maxChildSize: math.max(0.9, minSize),
         expand: false,
-        builder: (context, scrollController) {
-          _observerController.controller = scrollController;
-          if (!_didJumpToPlayingEpisode) {
-            _didJumpToPlayingEpisode = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) async {
-              await Future<void>.delayed(Duration.zero);
-              final playbackEpisode = videoPageController.playbackEpisode;
-              if (!mounted ||
-                  playbackEpisode.road != widget.road ||
-                  episodeCount == 0 ||
-                  !scrollController.hasClients) {
-                return;
-              }
-              final index =
-                  (playbackEpisode.episode - 1).clamp(0, episodeCount - 1);
-              await _observerController.jumpTo(
-                index: index,
-                isFixedHeight: true,
-              );
-            });
-          }
-          return Column(
-            children: [
-              MaterialBottomSheetHeader(
-                title: '下载选集',
-                description: downloadedCount > 0
-                    ? '$episodeCount 集 · 已下载 $downloadedCount 集'
-                    : '共 $episodeCount 集',
-                onClose: () => Navigator.of(context).pop(),
-              ),
-              Expanded(
-                child: GridViewObserver(
-                  controller: _observerController,
-                  child: GridView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 160,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      mainAxisExtent: 56,
-                    ),
-                    itemCount: episodeCount,
-                    itemBuilder: (context, index) {
-                      final episodeNumber = index + 1;
-                      final episodeUrl = currentRoadData.data[index];
-                      final isDownloaded = downloadedUrls.contains(episodeUrl);
-                      final isSelected =
-                          _selectedEpisodes.contains(episodeNumber);
-                      return _EpisodeTile(
-                        identifier: currentRoadData.identifier[index],
-                        isDownloaded: isDownloaded,
-                        isSelected: isSelected,
-                        onTap: isDownloaded
-                            ? null
-                            : () {
-                                setState(() {
-                                  if (isSelected) {
-                                    _selectedEpisodes.remove(episodeNumber);
-                                  } else {
-                                    _selectedEpisodes.add(episodeNumber);
-                                  }
-                                });
-                              },
-                      );
-                    },
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: SafeArea(
-                  top: false,
-                  child: Row(
-                    children: [
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                        ),
-                        onPressed: selectableEpisodes.isEmpty
-                            ? null
-                            : () {
-                                setState(() {
-                                  _selectedEpisodes.clear();
-                                  if (!allSelected) {
-                                    _selectedEpisodes
-                                        .addAll(selectableEpisodes);
-                                  }
-                                });
-                              },
-                        // Reserve the widest label to keep the action width stable.
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            const Opacity(opacity: 0, child: Text('取消全选')),
-                            Text(allSelected ? '取消全选' : '全选'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                          ),
-                          onPressed: _selectedEpisodes.isEmpty
-                              ? null
-                              : () => _startBatchDownload(context),
-                          icon: const Icon(Icons.download_rounded),
-                          label: Text(_selectedEpisodes.isEmpty
-                              ? '选择集数'
-                              : '下载 ${_selectedEpisodes.length} 集'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+        builder: content,
       );
     });
   }

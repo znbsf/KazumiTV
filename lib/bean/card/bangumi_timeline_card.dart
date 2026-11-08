@@ -31,6 +31,7 @@ class BangumiTimelineCard extends StatelessWidget {
   static const _titleLineHeight = 1.5;
   static const _labelFontSize = 12.0;
   static const _labelLineHeight = 4 / 3;
+  static const _tvLabelFontSize = 14.0;
   static const _metadataGap = 8.0;
   static const _footerGap = 12.0;
   static const _ratingIconSize = 16.0;
@@ -44,7 +45,11 @@ class BangumiTimelineCard extends StatelessWidget {
       // and one metadata/rating line. Grow for accessibility text scaling.
       return 22 +
           math.max(
-              72.0, scaler.scale(16) * 1.35 * 2 + 4 + scaler.scale(12) * 4 / 3);
+              72.0,
+              (scaler.scale(16) * 1.35 * 2).ceilToDouble() +
+                  4 +
+                  (scaler.scale(_tvLabelFontSize) * _labelLineHeight)
+                      .ceilToDouble());
     }
     final titleHeight = scaler.scale(_titleFontSize) * _titleLineHeight * 2;
     final labelHeight = scaler.scale(_labelFontSize) * _labelLineHeight;
@@ -149,8 +154,8 @@ class BangumiTimelineCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        height: 4 / 3,
+                        fontSize: _tvLabelFontSize,
+                        height: _labelLineHeight,
                         color: colors.onSurfaceVariant))),
             if (showRating) ...[
               const SizedBox(width: 8),
@@ -161,8 +166,8 @@ class BangumiTimelineCard extends StatelessWidget {
                       ? bangumiItem.ratingScore.toStringAsFixed(1)
                       : '—',
                   style: theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 12,
-                      height: 4 / 3,
+                      fontSize: _tvLabelFontSize,
+                      height: _labelLineHeight,
                       fontWeight: FontWeight.w700)),
             ],
             if (isWatching) ...[

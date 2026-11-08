@@ -158,6 +158,7 @@ class FocusFixtureApp extends StatelessWidget {
       int count = 31,
       int historyCount = 5,
       Widget Function(FocusPopularController)? popularBuilder,
+      Widget? collectionPage,
       bool startupRedirect = false,
       PageTransition? shellTransition,
       this.textScale = 1,
@@ -185,6 +186,7 @@ class FocusFixtureApp extends StatelessWidget {
                 child: (_, __) => HistoryPage(controller: history));
             sub.route('/collect/',
                 child: (_, __) =>
+                    collectionPage ??
                     const _FixtureDestination(label: 'collection content'));
             sub.route('/my/',
                 child: (_, __) =>

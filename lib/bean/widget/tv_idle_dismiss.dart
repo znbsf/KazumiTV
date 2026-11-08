@@ -13,6 +13,11 @@ class TvIdleDismiss extends StatefulWidget {
   final Widget child;
   final bool enabled;
   final VoidCallback onDismiss;
+
+  /// Resume after an interaction whose local history closes asynchronously,
+  /// after the hardware key itself has already been handled.
+  static void notifyActivity(BuildContext context) =>
+      context.findAncestorStateOfType<_TvIdleDismissState>()?._reset();
   @override
   State<TvIdleDismiss> createState() => _TvIdleDismissState();
 }
@@ -23,7 +28,11 @@ class _TvIdleDismissState extends State<TvIdleDismiss>
   ModalRoute<dynamic>? _route;
   bool _foreground = true;
   bool get _active =>
-      mounted && widget.enabled && _foreground && _route?.isCurrent == true;
+      mounted &&
+      widget.enabled &&
+      _foreground &&
+      _route?.isCurrent == true &&
+      _route?.willHandlePopInternally != true;
 
   @override
   void initState() {

@@ -8,6 +8,7 @@ import 'package:flutter_modular/flutter_modular.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kazumi/pages/settings/settings_page.dart';
 import 'package:kazumi/pages/settings/keyboard_settings.dart';
+import 'package:kazumi/pages/settings/displaymode_settings.dart';
 import 'package:kazumi/pages/settings/sync/local_library_backup_page.dart';
 import 'package:kazumi/services/storage/local_library_backup.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
@@ -24,6 +25,46 @@ void main() {
   tearDownAll(() async {
     await Hive.close();
     await temp.delete(recursive: true);
+  });
+  testWidgets('display mode failure offers retry and recovers', (tester) async {
+    TvMode.setEnabledForTesting(true);
+    addTearDown(() => TvMode.setEnabledForTesting(false));
+    const channel = MethodChannel('flutter_display_mode');
+    var fail = true;
+    const mode = {'id': 0, 'width': 0, 'height': 0, 'refreshRate': 0.0};
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'getSupportedModes') {
+        if (fail) throw PlatformException(code: 'unavailable');
+        return <Map<String, Object>>[];
+      }
+      if (call.method == 'getPreferredMode' || call.method == 'getActiveMode') {
+        return mode;
+      }
+      return null;
+    });
+    addTearDown(() => TestDefaultBinaryMessengerBinding
+        .instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null));
+    await tester.pumpWidget(const MaterialApp(home: SetDisplayMode()));
+    await tester.pumpAndSettle();
+    expect(find.text('无法读取屏幕帧率'), findsOneWidget);
+    final retry = find.widgetWithText(TextButton, '重试');
+    expect(retry, findsOneWidget);
+    expect(tester.widget<TextButton>(retry).focusNode!.hasPrimaryFocus, isTrue);
+    fail = false;
+    // The success path persists the preferred mode through real Hive I/O.
+    // Start it outside the widget fake clock and wait for that write to finish.
+    await tester.runAsync(() async {
+      final saved = GStorage.watchSettings([SettingsKeys.displayMode]).first;
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await saved.timeout(const Duration(seconds: 5));
+      await Hive.box('setting').flush();
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('自动'), findsOneWidget);
+    expect(find.text('无法读取屏幕帧率'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('category reselection keeps draft but exits a nested route',
       (tester) async {
@@ -136,6 +177,8 @@ void main() {
       });
       await tester.pumpAndSettle();
       expect(find.textContaining('恢复预览：'), findsOneWidget);
+      expect(FocusManager.instance.primaryFocus?.debugLabel,
+          'backup preview cancel');
       if (source == 'system') {
         await tester.binding.handlePopRoute();
       } else {
@@ -147,6 +190,8 @@ void main() {
       expect(find.byType(LocalLibraryBackupPage), findsOneWidget);
       expect(find.textContaining('恢复预览：'), findsNothing);
       expect(find.text('已取消恢复，收藏与历史未改动。'), findsOneWidget);
+      expect(
+          FocusManager.instance.primaryFocus?.debugLabel, 'backup local entry');
       expect(storage.read().fingerprint, before);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();

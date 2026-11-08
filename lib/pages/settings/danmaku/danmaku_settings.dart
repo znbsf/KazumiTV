@@ -159,6 +159,12 @@ class _DanmakuSettingsPageState extends State<DanmakuSettingsPage> {
           SettingsSection(
             title: Text('弹幕来源'),
             tiles: [
+              SettingsTile(
+                leading: Icons.storage_rounded,
+                title: const Text('弹幕缓存'),
+                description: const Text('独立容量、用量与清理'),
+                onPressed: (_) => context.pushNamed('/settings/danmaku-cache'),
+              ),
               SettingsTile.switchTile(
                 leading: Icons.live_tv_rounded,
                 onToggle: (value) async {

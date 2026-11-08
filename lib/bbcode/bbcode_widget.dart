@@ -3,12 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:antlr4/antlr4.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:kazumi/bean/widget/image_preview.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'bbcode_base_listener.dart';
 import 'bbcode_elements.dart';
 import 'generated/BBCodeParser.dart';
 import 'generated/BBCodeLexer.dart';
+
+class BBCodeAction {
+  const BBCodeAction({required this.label, required this.onSelected});
+
+  final String label;
+  final Future<void> Function() onSelected;
+}
 
 class BBCodeWidget extends StatefulWidget {
   const BBCodeWidget({
@@ -21,11 +29,55 @@ class BBCodeWidget extends StatefulWidget {
   final TextScaler textScaler;
 
   @override
-  State<StatefulWidget> createState() => _BBCodeWidgetState();
+  BBCodeWidgetState createState() => BBCodeWidgetState();
 }
 
-class _BBCodeWidgetState extends State<BBCodeWidget> {
+class BBCodeWidgetState extends State<BBCodeWidget> {
   bool _isVisible = false;
+  List<dynamic> _elements = [];
+
+  List<String> get _imageUrls =>
+      _elements.whereType<BBCodeImg>().map((e) => e.imageUrl).toList();
+
+  /// The same parsed fragments and reveal state used by pointer interaction.
+  List<BBCodeAction> get tvActions {
+    final actions = <BBCodeAction>[];
+    final links = <String>{};
+    for (final text in _elements.whereType<BBCodeText>()) {
+      final link = text.link;
+      if (link != null && (!text.masked || _isVisible) && links.add(link)) {
+        actions.add(BBCodeAction(
+          label: '打开链接 $link',
+          onSelected: () async {
+            await launchUrl(Uri.parse(link));
+          },
+        ));
+      }
+    }
+    if (_elements.whereType<BBCodeText>().any((text) => text.masked)) {
+      actions.add(BBCodeAction(
+        label: _isVisible ? '隐藏遮罩' : '显示遮罩',
+        onSelected: () async {
+          if (mounted) setState(() => _isVisible = !_isVisible);
+        },
+      ));
+    }
+    final images = _imageUrls;
+    for (var index = 0; index < images.length; index++) {
+      final imageIndex = index;
+      actions.add(BBCodeAction(
+        label: '查看图片 ${index + 1}',
+        onSelected: () async {
+          if (!mounted) return;
+          await ImageViewer.show(context,
+              imageUrls: images,
+              initialIndex: imageIndex,
+              heroTag: ImageViewer.heroTagFor(images[imageIndex], imageIndex));
+        },
+      ));
+    }
+    return actions;
+  }
 
   Color? _parseColor(String hex) {
     if (hex.startsWith('#')) {
@@ -64,6 +116,7 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
     final bbcodeBaseListener = BBCodeBaseListener();
     ParseTreeWalker.DEFAULT.walk(bbcodeBaseListener, tree);
     bbCodeTag.clear();
+    _elements = bbcodeBaseListener.bbcode;
 
     final imageUrls = bbcodeBaseListener.bbcode
         .whereType<BBCodeImg>()
@@ -137,10 +190,38 @@ class _BBCodeWidgetState extends State<BBCodeWidget> {
                       tag: heroTag,
                       child: CachedNetworkImage(
                         imageUrl: e.imageUrl,
-                        placeholder: (context, url) =>
-                            const SizedBox(width: 1, height: 1),
+                        placeholder: (context, url) => TvMode.enabled
+                            ? const SizedBox(
+                                width: 180,
+                                height: 48,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.image_outlined, size: 20),
+                                    SizedBox(width: 8),
+                                    Text('图片加载中',
+                                        style: TextStyle(fontSize: 14)),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox(width: 1, height: 1),
                         errorWidget: (context, error, stackTrace) {
-                          return const Text('.');
+                          return TvMode.enabled
+                              ? const SizedBox(
+                                  width: 180,
+                                  height: 48,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.broken_image_outlined,
+                                          size: 20),
+                                      SizedBox(width: 8),
+                                      Text('图片无法显示',
+                                          style: TextStyle(fontSize: 14)),
+                                    ],
+                                  ),
+                                )
+                              : const Text('.');
                         },
                       ),
                     ),

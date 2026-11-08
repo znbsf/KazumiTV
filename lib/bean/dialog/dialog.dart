@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'package:kazumi/navigation.dart';
+import 'package:kazumi/bean/dialog/tv_dialog_initial_focus.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/utils/constants.dart';
 
@@ -60,7 +61,9 @@ class KazumiDialog {
       final navigator = Navigator.of(ctx, rootNavigator: true);
       final route = DialogRoute<T>(
         context: ctx,
-        builder: builder,
+        builder: TvMode.enabled
+            ? (context) => TvDialogInitialFocus(child: builder(context))
+            : builder,
         themes: InheritedTheme.capture(from: ctx, to: navigator.context),
         barrierColor: DialogTheme.of(ctx).barrierColor ??
             Theme.of(ctx).dialogTheme.barrierColor ??

@@ -7,16 +7,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 
 import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
+import 'package:kazumi/bean/dialog/tv_panel_page_host.dart';
 import 'package:kazumi/bean/dialog/material_bottom_sheet.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/bean/widget/split_list_row.dart';
 import 'package:kazumi/bean/widget/tonal_card.dart';
 import 'package:kazumi/pages/player/player_controller.dart';
 import 'package:kazumi/services/player/syncplay_endpoint.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:kazumi/utils/device.dart';
 
-// Close each step before opening the next to avoid stacked modal routes.
+// Non-TV closes each step first. TV keeps a page stack in one modal route.
 enum _SyncPlayDestination { create, join, server }
 
 Future<void> showSyncPlaySheet(
@@ -25,6 +27,28 @@ Future<void> showSyncPlaySheet(
   required Future<void> Function(int episode, {int currentRoad, int offset})
       changeEpisode,
 }) async {
+  Widget destinationPage(_SyncPlayDestination destination) =>
+      switch (destination) {
+        _SyncPlayDestination.create || _SyncPlayDestination.join =>
+          _SyncPlayRoomSheet(
+            isCreate: destination == _SyncPlayDestination.create,
+            playerController: playerController,
+            changeEpisode: changeEpisode,
+          ),
+        _SyncPlayDestination.server => const _SyncPlayServerSheet(),
+      };
+
+  if (TvMode.enabled) {
+    await _showStep<void>(
+      context,
+      (context) => _SyncPlayHomeSheet(
+        playerController: playerController,
+        onDestination: (destination) => TvPanelPageHost.of(context)
+            .push((_) => destinationPage(destination)),
+      ),
+    );
+    return;
+  }
   final _SyncPlayDestination? destination =
       await _showStep<_SyncPlayDestination>(
     context,
@@ -35,16 +59,7 @@ Future<void> showSyncPlaySheet(
   }
   await _showStep<void>(
     context,
-    (context) => switch (destination) {
-      _SyncPlayDestination.create ||
-      _SyncPlayDestination.join =>
-        _SyncPlayRoomSheet(
-          isCreate: destination == _SyncPlayDestination.create,
-          playerController: playerController,
-          changeEpisode: changeEpisode,
-        ),
-      _SyncPlayDestination.server => const _SyncPlayServerSheet(),
-    },
+    (context) => destinationPage(destination),
   );
 }
 
@@ -95,7 +110,7 @@ class _SyncPlaySheetScaffold extends StatelessWidget {
     final Size size = MediaQuery.sizeOf(context);
     final double keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    final bool compact =
+    final bool compact = !TvMode.enabled &&
         size.width > size.height && !isDesktop() && size.shortestSide < 600;
     final bool showDescription = !(compact && keyboardInset > 0);
 
@@ -156,7 +171,21 @@ class _SyncPlaySheetScaffold extends StatelessWidget {
 }
 
 class _SyncPlayHomeSheet extends StatelessWidget {
-  const _SyncPlayHomeSheet({required this.playerController});
+  const _SyncPlayHomeSheet({
+    required this.playerController,
+    this.onDestination,
+  });
+
+  final ValueChanged<_SyncPlayDestination>? onDestination;
+
+  void _openDestination(
+      BuildContext context, _SyncPlayDestination destination) {
+    if (onDestination != null) {
+      onDestination!(destination);
+    } else {
+      Navigator.of(context).pop(destination);
+    }
+  }
 
   final PlayerController playerController;
 
@@ -259,7 +288,7 @@ class _SyncPlayHomeSheet extends StatelessWidget {
               title: '创建房间',
               description: '邀请朋友加入',
               onTap: () =>
-                  Navigator.of(context).pop(_SyncPlayDestination.create),
+                  _openDestination(context, _SyncPlayDestination.create),
             )),
             const SizedBox(width: 12),
             Expanded(
@@ -267,7 +296,8 @@ class _SyncPlayHomeSheet extends StatelessWidget {
               icon: Icons.login_rounded,
               title: '加入房间',
               description: '输入房间号',
-              onTap: () => Navigator.of(context).pop(_SyncPlayDestination.join),
+              onTap: () =>
+                  _openDestination(context, _SyncPlayDestination.join),
             )),
           ],
         )),
@@ -277,7 +307,8 @@ class _SyncPlayHomeSheet extends StatelessWidget {
           title: const Text('同步服务器'),
           subtitle: Text(_readEndPoint(), overflow: TextOverflow.ellipsis),
           trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => Navigator.of(context).pop(_SyncPlayDestination.server),
+          onTap: () =>
+              _openDestination(context, _SyncPlayDestination.server),
         ),
       ],
     );

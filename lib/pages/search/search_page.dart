@@ -25,6 +25,7 @@ import 'package:kazumi/bean/widget/tv_focusable_surface.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
 
 import 'package:kazumi/bean/widget/tv_range_slider.dart';
+import 'package:kazumi/bean/widget/tv_focus_label.dart';
 
 part 'search_filter_sheet.dart';
 part 'search_widgets.dart';
@@ -176,14 +177,18 @@ class _SearchPageState extends State<SearchPage> {
             onPressed: _qrSearch,
             icon: const Icon(Icons.qr_code),
             label: const Text('手机输入')),
-        IconButton(
-            tooltip: '清空搜索',
-            onPressed: _clearSearch,
-            icon: const Icon(Icons.close_rounded)),
-        IconButton(
-            tooltip: '以图搜番',
-            onPressed: _imageSearch,
-            icon: const Icon(Icons.image_search_rounded)),
+        TvFocusLabel(
+            message: '清空搜索',
+            child: IconButton(
+                tooltip: '清空搜索',
+                onPressed: _clearSearch,
+                icon: const Icon(Icons.close_rounded))),
+        TvFocusLabel(
+            message: '以图搜番',
+            child: IconButton(
+                tooltip: '以图搜番',
+                onPressed: _imageSearch,
+                icon: const Icon(Icons.image_search_rounded))),
       ]);
     }
     final colors = Theme.of(context).colorScheme;
@@ -345,17 +350,19 @@ class _SearchPageState extends State<SearchPage> {
                   value: submitted.sort,
                   onChanged: (sort) =>
                       _applyFilters(submitted.copyWith(sort: sort))),
-            IconButton(
-              tooltip: '筛选番剧',
-              onPressed: _showFilters,
-              icon: Badge(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  isLabelVisible: submitted.hasAdvancedFilters ||
-                      _controller.notShowWatchedBangumis ||
-                      _controller.notShowAbandonedBangumis,
-                  smallSize: 6,
-                  child: const Icon(Icons.tune_rounded)),
-            ),
+            TvFocusLabel(
+                message: '筛选番剧',
+                child: IconButton(
+                  tooltip: '筛选番剧',
+                  onPressed: _showFilters,
+                  icon: Badge(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      isLabelVisible: submitted.hasAdvancedFilters ||
+                          _controller.notShowWatchedBangumis ||
+                          _controller.notShowAbandonedBangumis,
+                      smallSize: 6,
+                      child: const Icon(Icons.tune_rounded)),
+                )),
           ]),
           Text(
               busy

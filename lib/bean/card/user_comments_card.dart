@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:kazumi/bbcode/bbcode_widget.dart';
+import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/bangumi_avatar.dart';
+import 'package:kazumi/bean/widget/tv_comment_reading_surface.dart';
 import 'package:kazumi/modules/comments/comment_item.dart';
+import 'package:kazumi/services/platform/tv_mode.dart';
 import 'package:kazumi/utils/date_time.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -27,11 +30,80 @@ class UserCommentsCard extends StatefulWidget {
 class _UserCommentsCardState extends State<UserCommentsCard> {
   static const _previewCount = 2;
   bool _expanded = false;
+  bool _menuOpen = false;
+  late List<GlobalKey<BBCodeWidgetState>> _bodyKeys;
+
+  @override
+  void initState() {
+    super.initState();
+    _resetBodyKeys();
+  }
+
+  void _resetBodyKeys() {
+    _bodyKeys = List.generate(widget._replies.length + 1,
+        (_) => GlobalKey<BBCodeWidgetState>());
+  }
 
   @override
   void didUpdateWidget(covariant UserCommentsCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget._source != widget._source) _expanded = false;
+    if (oldWidget._source != widget._source) {
+      _expanded = false;
+      _resetBodyKeys();
+    }
+  }
+
+  Future<void> _showActions() async {
+    if (_menuOpen) return;
+    final actions = <BBCodeAction>[
+      for (var index = 0; index < _bodyKeys.length; index++)
+        for (final action in _bodyKeys[index].currentState?.tvActions ??
+            const <BBCodeAction>[])
+          if (index == 0)
+            action
+          else
+            BBCodeAction(
+                label: '回复 $index · ${action.label}',
+                onSelected: action.onSelected),
+      if (widget._replies.length > _previewCount)
+        BBCodeAction(
+          label: _expanded ? '收起回复' : '展开其余回复',
+          onSelected: () async => setState(() => _expanded = !_expanded),
+        ),
+    ];
+    if (actions.isEmpty) return;
+    _menuOpen = true;
+    final origin = FocusManager.instance.primaryFocus;
+    final source = widget._source;
+    try {
+      final selected = await KazumiDialog.show<int>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('评论操作'),
+          children: [
+            for (var index = 0; index < actions.length; index++)
+              TextButton(
+                autofocus: index == 0,
+                style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+                onPressed: () => KazumiDialog.dismiss(
+                    context: dialogContext, popWith: index),
+                child: Text(actions[index].label),
+              ),
+          ],
+        ),
+      );
+      if (!mounted || widget._source != source || selected == null) return;
+      await actions[selected].onSelected();
+    } finally {
+      _menuOpen = false;
+      if (mounted &&
+          widget._source == source &&
+          ModalRoute.of(context)?.isCurrent == true &&
+          origin?.context != null &&
+          origin!.canRequestFocus) {
+        origin.requestFocus();
+      }
+    }
   }
 
   @override
@@ -44,13 +116,14 @@ class _UserCommentsCardState extends State<UserCommentsCard> {
         : _previewCount;
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
 
-    return _CommentSurface(
+    final card = _CommentSurface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CommentAuthor(comment: widget._comment),
           const SizedBox(height: 16),
-          _CommentBody(content: widget._comment.content),
+          _CommentBody(
+              content: widget._comment.content, bodyKey: _bodyKeys[0]),
           if (replies.isNotEmpty) ...[
             const SizedBox(height: 20),
             Padding(
@@ -95,7 +168,9 @@ class _UserCommentsCardState extends State<UserCommentsCard> {
                                 compact: true,
                               ),
                               const SizedBox(height: 10),
-                              _CommentBody(content: replies[index].content),
+                              _CommentBody(
+                                  content: replies[index].content,
+                                  bodyKey: _bodyKeys[index + 1]),
                             ],
                           ),
                         ),
@@ -110,27 +185,45 @@ class _UserCommentsCardState extends State<UserCommentsCard> {
                 expanded: _expanded,
                 child: SizedBox(
                   width: double.infinity,
-                  child: TextButton.icon(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      backgroundColor: colors.secondaryContainer,
-                      foregroundColor: colors.onSecondaryContainer,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: AnimatedRotation(
-                      turns: _expanded ? .5 : 0,
-                      duration: disableAnimations
-                          ? Duration.zero
-                          : const Duration(milliseconds: 200),
-                      child: const Icon(Icons.expand_more_rounded, size: 20),
-                    ),
-                    label: Text(_expanded
-                        ? '收起回复'
-                        : '展开其余 ${replies.length - _previewCount} 条回复'),
-                  ),
+                  // TV uses the card's action menu as its single action target.
+                  // Keep the footer's space while showing reading state here.
+                  child: TvMode.enabled
+                      ? Container(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: colors.secondaryContainer,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Text('已显示 $visibleCount / ${replies.length} 条回复',
+                              textAlign: TextAlign.center,
+                              style: type.labelLarge?.copyWith(
+                                  color: colors.onSecondaryContainer)),
+                        )
+                      : TextButton.icon(
+                          onPressed: () =>
+                              setState(() => _expanded = !_expanded),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                            backgroundColor: colors.secondaryContainer,
+                            foregroundColor: colors.onSecondaryContainer,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: AnimatedRotation(
+                            turns: _expanded ? .5 : 0,
+                            duration: disableAnimations
+                                ? Duration.zero
+                                : const Duration(milliseconds: 200),
+                            child:
+                                const Icon(Icons.expand_more_rounded, size: 20),
+                          ),
+                          label: Text(_expanded
+                              ? '收起回复'
+                              : '展开其余 ${replies.length - _previewCount} 条回复'),
+                        ),
                 ),
               ),
             ],
@@ -138,6 +231,7 @@ class _UserCommentsCardState extends State<UserCommentsCard> {
         ],
       ),
     );
+    return TvCommentReadingSurface(onPressed: _showActions, child: card);
   }
 }
 
@@ -190,9 +284,10 @@ class _CommentAuthor extends StatelessWidget {
 }
 
 class _CommentBody extends StatelessWidget {
-  const _CommentBody({required this.content});
+  const _CommentBody({required this.content, this.bodyKey});
 
   final String content;
+  final GlobalKey<BBCodeWidgetState>? bodyKey;
 
   @override
   Widget build(BuildContext context) {
@@ -206,6 +301,7 @@ class _CommentBody extends StatelessWidget {
           ? Text('该评论已被删除',
               style: TextStyle(color: theme.colorScheme.onSurfaceVariant))
           : BBCodeWidget(
+              key: TvMode.enabled ? bodyKey : null,
               bbcode: content,
               textScaler: MediaQuery.textScalerOf(context),
             ),

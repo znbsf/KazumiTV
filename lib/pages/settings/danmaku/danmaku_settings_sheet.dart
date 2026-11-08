@@ -4,6 +4,7 @@ import 'package:canvas_danmaku/canvas_danmaku.dart';
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/dialog/adaptive_bottom_sheet.dart';
+import 'package:kazumi/bean/dialog/tv_panel_page_host.dart';
 import 'package:kazumi/bean/dialog/material_bottom_sheet.dart';
 import 'package:kazumi/bean/settings/settings_list.dart';
 import 'package:kazumi/bean/widget/connected_tabs.dart';
@@ -25,6 +26,25 @@ Future<void> showDanmakuSettingsSheet({
   required VoidCallback onUpdateDanmakuSpeed,
   VoidCallback? onTimelineOffsetChanged,
 }) async {
+  if (TvMode.enabled) {
+    await showAdaptiveBottomSheet<void>(
+      context: context,
+      builder: (context) => _DanmakuSettingsSheet(
+        danmakuController: danmakuController,
+        onUpdateDanmakuSpeed: onUpdateDanmakuSpeed,
+        onDestination: (destination) => TvPanelPageHost.of(context).push(
+          (_) => switch (destination) {
+            _DanmakuSettingsDestination.shield =>
+              const DanmakuShieldSettingsSheet(),
+            _DanmakuSettingsDestination.timeOffset => DanmakuTimeOffsetSheet(
+                onTimelineOffsetChanged: onTimelineOffsetChanged,
+              ),
+          },
+        ),
+      ),
+    );
+    return;
+  }
   final destination =
       await showAdaptiveBottomSheet<_DanmakuSettingsDestination>(
     context: context,
@@ -51,10 +71,12 @@ Future<void> showDanmakuSettingsSheet({
 class _DanmakuSettingsSheet extends StatefulWidget {
   final DanmakuController danmakuController;
   final VoidCallback onUpdateDanmakuSpeed;
+  final ValueChanged<_DanmakuSettingsDestination>? onDestination;
 
   const _DanmakuSettingsSheet({
     required this.danmakuController,
     required this.onUpdateDanmakuSpeed,
+    this.onDestination,
   });
 
   @override
@@ -62,6 +84,15 @@ class _DanmakuSettingsSheet extends StatefulWidget {
 }
 
 class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
+  void _openDestination(
+      BuildContext context, _DanmakuSettingsDestination destination) {
+    if (widget.onDestination != null) {
+      widget.onDestination!(destination);
+    } else {
+      Navigator.of(context).pop(destination);
+    }
+  }
+
   // The slider uses stored duration, before playback speed scales it.
   late double _duration;
 
@@ -226,15 +257,15 @@ class _DanmakuSettingsSheetState extends State<_DanmakuSettingsSheet> {
                       normalizeDanmakuTimeOffset(GStorage.getSetting<double>(
                           SettingsKeys.danmakuTimeOffset)),
                     )),
-                    onPressed: (context) => Navigator.of(context)
-                        .pop(_DanmakuSettingsDestination.timeOffset),
+                    onPressed: (context) => _openDestination(
+                        context, _DanmakuSettingsDestination.timeOffset),
                   ),
                   SettingsTile(
                     leading: Icons.filter_alt_outlined,
                     title: const Text('屏蔽规则'),
                     description: const Text('关键词与正则表达式'),
-                    onPressed: (context) => Navigator.of(context)
-                        .pop(_DanmakuSettingsDestination.shield),
+                    onPressed: (context) => _openDestination(
+                        context, _DanmakuSettingsDestination.shield),
                   ),
                 ]),
               ],

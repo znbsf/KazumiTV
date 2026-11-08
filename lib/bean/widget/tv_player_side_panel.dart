@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+/// Shared width for the episode panel and TV modal panels.
+double tvPlayerSidePanelWidth(double screenWidth) =>
+    (screenWidth * 0.42).clamp(360.0, 440.0).toDouble();
+
 /// A single translucent background. Children must not repaint canvasColor.
 class TvPlayerSidePanel extends StatelessWidget {
   const TvPlayerSidePanel({

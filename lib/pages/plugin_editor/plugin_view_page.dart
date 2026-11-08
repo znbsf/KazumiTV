@@ -1,3 +1,4 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:kazumi/bean/widget/tv_settings_menu_anchor.dart';
 import 'package:kazumi/bean/widget/tv_text_entry.dart';
 import 'dart:async';
@@ -126,7 +127,10 @@ class _PluginViewPageState extends State<PluginViewPage> {
     } catch (error, stackTrace) {
       KazumiLogger().e('Plugin: failed to import rules from file',
           error: error, stackTrace: stackTrace);
-      KazumiDialog.showToast(message: '导入规则文件失败：$error');
+      KazumiDialog.showToast(
+          message: error is PlatformException && error.code == 'invalid_format_type'
+              ? '这台设备没有系统文件选择器，请改用“从剪贴板导入”或“浏览规则仓库”'
+              : '导入规则文件失败：$error');
     }
   }
 
@@ -520,9 +524,8 @@ class _PluginViewPageState extends State<PluginViewPage> {
               leadingIcon: Icon(Icons.delete_outline_rounded,
                   color: Theme.of(context).colorScheme.error),
               onPressed: _deleting ? null : () => _delete({plugin.name}),
-              child: Text('删除规则',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.error))),
+              child: TvButtonText('删除规则',
+                  color: Theme.of(context).colorScheme.error)),
         ],
       );
 }

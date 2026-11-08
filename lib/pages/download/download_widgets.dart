@@ -1,8 +1,10 @@
+import 'package:kazumi/bean/widget/tv_visuals.dart';
 import 'package:flutter/material.dart';
 
 import 'package:kazumi/bean/card/network_img_layer.dart';
 import 'package:kazumi/bean/card/rule_card.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
+import 'package:kazumi/bean/widget/tv_ink_well.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/utils/format.dart';
 
@@ -20,9 +22,11 @@ class DownloadRecordSliver extends StatelessWidget {
     required this.totalSpeed,
     required this.episodeNumbers,
     required this.episodeTileBuilder,
+    this.headerFocus,
   });
 
   final DownloadRecord record;
+  final FocusNode? headerFocus;
   final bool expanded;
   final VoidCallback onToggle;
   final VoidCallback onResumeAll;
@@ -78,7 +82,9 @@ class DownloadRecordSliver extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      InkWell(
+                      TvInkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        focusNode: headerFocus,
                         onTap: onToggle,
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
@@ -147,10 +153,9 @@ class DownloadRecordSliver extends StatelessWidget {
                                   ),
                                   PopupMenuItem(
                                     value: 'delete',
-                                    child: Text(
+                                    child: TvButtonText(
                                       '全部删除',
-                                      style:
-                                          TextStyle(color: colorScheme.error),
+                                      color: colorScheme.error,
                                     ),
                                   ),
                                 ],
@@ -229,8 +234,9 @@ class DownloadEpisodeTile extends StatelessWidget {
         (episode.status == DownloadStatus.paused &&
             episode.progressPercent > 0);
 
-    return InkWell(
+    return TvInkWell(
       borderRadius: BorderRadius.circular(12),
+      mobileBorderRadius: BorderRadius.circular(12),
       onTap: onPlay,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
