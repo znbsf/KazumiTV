@@ -1,3 +1,5 @@
+import 'package:kazumi/request/core/danmaku_response_error.dart';
+
 class DanmakuEpisode {
   int episodeId;
   String episodeTitle;
@@ -38,6 +40,10 @@ class DanmakuEpisodeResponse {
   });
 
   factory DanmakuEpisodeResponse.fromJson(Map<String, dynamic> json) {
+    checkDanmakuResponse(json);
+    if (json['bangumi'] is! Map || json['bangumi']['episodes'] is! List) {
+      throw const FormatException('Invalid danmaku episode response');
+    }
     var list = json['bangumi']['episodes'] as List;
     List<DanmakuEpisode> episodeList =
         list.map((i) => DanmakuEpisode.fromJson(i)).toList();
@@ -63,7 +69,10 @@ class DanmakuEpisodeResponse {
 
   Map<String, dynamic> toJson() {
     return {
-      'bangumi': episodes.map((episode) => episode.toJson()).toList(),
+      'bangumi': {
+        'animeId': bangumiId,
+        'episodes': episodes.map((episode) => episode.toJson()).toList()
+      },
       'errorCode': errorCode,
       'success': success,
       'errorMessage': errorMessage,
