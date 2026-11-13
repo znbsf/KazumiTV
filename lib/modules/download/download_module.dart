@@ -87,6 +87,13 @@ class DownloadEpisode {
   @HiveField(15, defaultValue: 0)
   int danDanBangumiID;
 
+  /// Stable slot inside the record; old rows use their original episode number.
+  /// Colliding source URLs receive a negative slot without renumbering the UI.
+  @HiveField(16)
+  int? storageSlot;
+
+  int get taskNumber => storageSlot ?? episodeNumber;
+
   DownloadEpisode(
     this.episodeNumber,
     this.episodeName,
@@ -102,6 +109,7 @@ class DownloadEpisode {
     this.errorMessage,
     this.totalBytes,
     this.episodePageUrl, {
+    this.storageSlot,
     this.danmakuData = '',
     this.danDanBangumiID = 0,
   });

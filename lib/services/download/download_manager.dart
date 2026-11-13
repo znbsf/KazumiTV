@@ -252,8 +252,15 @@ class DownloadManager implements IDownloadManager {
     final storedDir = episode.downloadDirectory.trim();
     final episodeDir = storedDir.isNotEmpty
         ? storedDir
-        : _getEpisodeDir(
-            await _downloadBaseDir, bangumiId, pluginName, episodeNumber);
+        : path.joinAll([
+            _getEpisodeDir(
+                await _downloadBaseDir, bangumiId, pluginName, episodeNumber),
+            // URL identity prevents a later same-number source reusing an old
+            // directory; existing stored paths remain untouched.
+            if (episode.storageSlot != null &&
+                episode.episodePageUrl.isNotEmpty)
+              sha256.convert(utf8.encode(episode.episodePageUrl)).toString(),
+          ]);
     await ensureDirectoryWritable(episodeDir);
     episode.downloadDirectory = episodeDir;
     await _checkStorageSpace(episodeDir);
@@ -270,8 +277,12 @@ class DownloadManager implements IDownloadManager {
   ) async {
     final storedDir = episode?.downloadDirectory.trim() ?? '';
     if (storedDir.isNotEmpty) return storedDir;
-    return _getEpisodeDir(await getDefaultDownloadDirectory(), bangumiId,
-        pluginName, episodeNumber);
+    return path.joinAll([
+      _getEpisodeDir(await getDefaultDownloadDirectory(), bangumiId, pluginName,
+          episodeNumber),
+      if (episode?.storageSlot != null && episode!.episodePageUrl.isNotEmpty)
+        sha256.convert(utf8.encode(episode.episodePageUrl)).toString(),
+    ]);
   }
 
   @override

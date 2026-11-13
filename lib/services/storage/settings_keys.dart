@@ -52,9 +52,10 @@ class SettingKey<T> {
 // callers; new keys can use literal string names directly.
 class SettingsKeys {
   static const danmakuCacheEnabled = SettingKey<bool>(
-    'danmakuCacheEnabled', true, group: SettingGroup.danmaku);
-  static const danmakuCacheMiB = SettingKey<int>(
-    'danmakuCacheMiB', 256, group: SettingGroup.danmaku);
+      'danmakuCacheEnabled', true,
+      group: SettingGroup.danmaku);
+  static const danmakuCacheMiB =
+      SettingKey<int>('danmakuCacheMiB', 256, group: SettingGroup.danmaku);
   static const recentVideoCacheEnabled = SettingKey<bool>(
     'recentVideoCacheEnabled',
     false,
@@ -309,6 +310,8 @@ class SettingsKeys {
     true,
     group: SettingGroup.proxy,
   );
+  static const ruleRepositoryUrl =
+      SettingKey<String>('ruleRepositoryUrl', '', group: SettingGroup.proxy);
   static const enableBangumiProxy = SettingKey<bool>(
     _SettingBoxKey.enableBangumiProxy,
     true,
@@ -659,6 +662,7 @@ class SettingsKeys {
     oledEnhance,
     displayMode,
     enableGitProxy,
+    ruleRepositoryUrl,
     enableBangumiProxy,
     enableSystemProxy,
     defaultStartupPage,

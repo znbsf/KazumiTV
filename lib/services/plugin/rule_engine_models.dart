@@ -104,8 +104,7 @@ class PreparedRuleRequest {
   final String bodyType;
   final Object? body;
 
-  /// Whether stored plugin cookies are attached to the request. Historically
-  /// only search and API requests send cookies; XPath chapter requests do not.
+  /// Whether matching stored plugin cookies are attached to this request.
   final bool includeCookies;
 }
 

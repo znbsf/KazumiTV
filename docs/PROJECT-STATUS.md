@@ -1,3 +1,42 @@
+## 2026-11-13：上游吸收，P0/P1 本地候选及部分 P2 完成
+
+- 基准实时 fetch：TV `8b10e05d5127de143ff8fdecc08202451d392ce2`，上游 `4ca04009fdae696883629e0984e7d7134cc7ed84`。独立工作树 `tv-upstream-safety/Kazumi`，分支 `codex/tv-upstream-safety-20261113`；归档工作树和发布工作树的未提交资料未改。
+- orchestrate-engineering v1.1.1：catalog 已列出，用户 `.agents` 文件可读、正文已手动读取。复用原工程经验及下载完整性/429 停止条件；无真实服务、电视、发布、推送或评论授权。
+- 本轮实验仅隔离 Hive、内存 WebDAV、合成下载/响应及本机 HTTP 假服务；未请求真实弹幕或用户 WebDAV。日志中的弹幕 API URL 来自假 adapter，并非线上请求。定向失败即定位，相关回归通过后不重复旧设备路线。
+- Hive：所有打开错误向启动错误页传播，不删除 `.hive`/`.lock`，禁用可能截断损坏尾部的 Hive crashRecovery；提示先排除多实例、权限/空间并保留备份。4 项测试涵盖真实临时库坏尾字节保全、恢复原备份再打开，以及注入 OS 5/32/33。不声称自动修复损坏或真实权限/多进程锁验收。
+- WebDAV/收藏：参考开放 PR #2359（wanxinlei1，head `597ecbd5`），自行实现安全替换和设备快照；不采用先删除目标的回退。唯一暂存名、SHA-256 回读、MOVE 结果验证、失败保留恢复副本；不支持覆盖 MOVE 的服务器明确失败。收藏操作按内容/时间去重并兼容整数 Hive 键，冲突 ID 重分配不修改输入；按设备发布成对 Hive 快照再合并，保留旧 shared 文件供旧客户端读取。旧客户端不会读取设备快照，因此混合版本并发只保证新版可恢复/再次合并，不承诺旧客户端实时一致。失败暂存保留，未增加自动远端清理。
+- 固定 Flutter 3.47.3 / `e8113bf456` 已核对。`pub get --enforce-lockfile` 解析成功、锁未变，最后的 Windows 插件符号链接生成因系统权限退出 1；`flutter test --no-pub` 可执行。未改变系统开发者模式；APK/设备验证 not_run。
+
+### 吸收范围与出处
+
+| 优先级 / 项目 | 本地结果与边界 | 来源（实施前实时核对） |
+| --- | --- | --- |
+| P0 Hive | 所有打开失败保留原文件并报错；关闭会截断坏尾的自动恢复。不自动判定锁/权限错误为损坏，不创建空库代替恢复。 | [issue #2027](https://github.com/Predidit/Kazumi/issues/2027) 已关闭，无直接补丁；本地独立实现。 |
+| P0 WebDAV / 收藏 | 唯一暂存、回读哈希、MOVE 后验证；伪成功/失败保留可恢复副本，禁止先删目标。每设备成对快照避免新版设备互相覆盖操作日志；同 ID 不同操作保留、冲突键重排，完整时间线重放删除操作。旧客户端限制见上文。 | [PR #2359](https://github.com/Predidit/Kazumi/pull/2359)，wanxinlei1，仍开放；参考 `597ecbd55be6c7f82020c615f2d8ceaea63494ed`，未采用其删除回退。 |
+| P0 同集数覆盖 | 新增可空 Hive 字段 storageSlot，显示集数与任务身份分开；同号不同 URL 分配独立槽位和 URL 哈希目录。暂停、重试、删除和离线入口使用任务槽位，弹幕/历史仍保存原集数；旧索引与已有路径原样读取，不迁移真实文件。 | [issue #2719](https://github.com/Predidit/Kazumi/issues/2719) 开放；本地独立实现。 |
+| P1 排队离线弹幕 | 下载真正开始且目录就绪时触发，完成回调兜底；每任务去重，保留独立离线文件与既有近期 API 缓存。隐身/关闭开关不写，失败不自动重试；删除/取消屏蔽迟到结果并等待已开始写入，重复取消也等待同一写入。 | [PR #2781](https://github.com/Predidit/Kazumi/pull/2781)，wanxinlei1，已合并 `16735534ba65bd2fb665f565dde2bd8f696532aa`。实际补丁仅移动到完成回调；本轮按 TV 生命周期扩展。 |
+| P1 HLS 断点 | 每个分片都更新上一组编号，修正首组非零时的本地 discontinuity 输出。 | [PR #2788](https://github.com/Predidit/Kazumi/pull/2788)，wqnmlgb151，开放草稿；适配 `385f5c43037daf622781a642560a7fc42a371a7a`。 |
+| P1 广告过滤保全 | 仅时长与 discontinuity 不足以判断广告；下载默认保留所有不确定分组。只有显式确认的广告组参数才能删除；当前下载调用没有该证据，因此不再按短组启发式删片，即使广告过滤开关开启。在线播放过滤不在本次修改范围。 | [#2786](https://github.com/Predidit/Kazumi/issues/2786)、[#2620](https://github.com/Predidit/Kazumi/issues/2620) 是现象参考，不声称两者已确诊或所有缺片已解决。 |
+| P1 弹幕业务错误 | 在缓存和模型解析之前识别 `success:false`；业务 429 进入现有共享冷却，其他错误显示有界消息；修正剧集响应嵌套序列化。 | [PR #2674](https://github.com/Predidit/Kazumi/pull/2674)，Yainno，仍开放；参考 `ef8a7d4ac3b8c08afc3d720ac5b6e91e62f3a401`，仅合成响应验证。 |
+| P1 XPath Cookie | 选集请求携带匹配规则 Cookie 与验证 UA；WebView 捕获 Cookie 按 host-only 保存，HTTPS 捕获不能降级发送。最多五跳手动重定向，同源保留，跨源移除 Cookie/认证/Referer；跨源非 GET/HEAD 请求体不转发。 | [issue #2734](https://github.com/Predidit/Kazumi/issues/2734) 开放；本地独立实现，不宣称覆盖所有验证码。 |
+| P2 自定义规则仓库 | 规则页提供保存/恢复官方入口，沿用 TV 文本输入。URL 限 HTTP(S)，拒绝凭据、查询/片段及 GitHub 网页地址；安装与切换串行，旧目录迟到响应不覆盖新仓库，已安装规则保留。镜像开关只影响官方地址。 | [PR #2487](https://github.com/Predidit/Kazumi/pull/2487)，chendianshuiyin，已合并 `85c5106ffba94cd56a95d3439e41091b159284bf`；复用 URL 配置与测试，重做 TV 入口及竞态处理。 |
+| P2 DLNA | 按 AVTransport 服务筛选，携带标题并对内层 DIDL 文本转义，等待 setUrl 再 play；重复搜索只订阅一次，关闭取消订阅；本地路径及需要 Referer 的来源明确提示不支持。 | [PR #2799](https://github.com/Predidit/Kazumi/pull/2799)，DSplay123，已合并 `60288c33553fc2ffd331821345a027b2873cb770`。现有 dlna_dart 0.0.9 已支持标题，未升级 [#2796](https://github.com/Predidit/Kazumi/pull/2796) 的 0.1.1；只通过服务类型/嵌套 XML 夹具，真实设备未验。 |
+
+### 审阅后暂缓的 P2
+
+- Android 自定义目录：[PR #2647](https://github.com/Predidit/Kazumi/pull/2647)，LiggMax，已合并 `2768c230407d5fd8a57716160ba1a85a99161581`。上游方案引入 MANAGE_EXTERNAL_STORAGE、原生选择器与下载改动；本轮保留当前路径与续传保护，不直接引入广泛文件权限。TV 选择器、授权失效、外置存储仍需另行设计及设备验证，此功能尚未实现。
+- 更多镜像：已审阅合并提交 [`b2bd7ae0d0b7e65616298847a1fce42e53664eb1`](https://github.com/Predidit/Kazumi/commit/b2bd7ae0d0b7e65616298847a1fce42e53664eb1)，其范围包含 ECH/共享网络传输。本轮保留官方镜像开关并新增显式自定义仓库；未加入额外第三方镜像或切换整个网络层，也没有第三方凭据请求。
+- API 9 #2693、非 2xx 验证检测 #2579、启动尊重历史开关 #2563：本树有等价实现，不重复移植。收藏页面 `4d04b470`/`5f9b3137` 与 TV 页面差异较大，未直接覆盖。
+
+### 验证与未测范围
+
+- `flutter test --no-pub --concurrency=2 --reporter expanded`：全量 1733 项通过（本机 `test-all.log`）。之后补充两项集成测试：原 16 字段 adapter 写入旧 Hive 数据后用当前 adapter 重开、完成新同号下载再删除仍保留旧文件；真实等待 31 秒排队后下载弹幕只请求一次。两项均通过。
+- 收尾修正重复取消的写入等待后，仅复测受影响的四个下载文件，共 6 项通过（`check-download-final.log`，包含上述新增两项）。没有把重复运行累加成新用例。
+- WebDAV 假服务覆盖不支持 MOVE、失败、伪成功、损坏回读与并发；收藏覆盖 ID 冲突、离线旧修改、删除及幂等合并。Hive 仅临时目录；OS 5/32/33 是注入异常，不是真实系统权限/多进程锁验收。
+- HLS 合成清单覆盖首组非零、组切换及短片头/尾保全。规则本机双 HTTP 服务覆盖同源和跨端口 Cookie/UA；单测覆盖 host/subdomain/HTTPS 降级、仓库切换迟到响应；widget 覆盖键盘保存/恢复官方。DLNA 验证服务类型与嵌套 XML 特殊字符。
+- `flutter analyze --no-pub --no-fatal-infos --fatal-warnings`：退出 0，0 error、0 warning，224 条 info（`analyze-final.log`）。`node tools/qa/phone_keyboard_page_test.cjs`：29 项合成 JavaScript 场景通过（`test-phone.log`）。`git diff --check` 通过，依赖锁文件未变。
+- 项目 android-tv-ui-qa 文件可读、正文已手动读取；本轮仅使用其验收边界。未运行 APK 构建、实体 TV 焦点/遥控、真实服务器 WebDAV、多台实体设备同步、DLNA 设备或 Android 外置目录验收。没有发布、推送、PR、GitHub 评论、安装或用户真实数据迁移。测试服务均在 finally 中关闭。
+
 # KazumiTV 当前状态
 
 ## 2026-11-08：0.4.7 已正式发布，公开附件核验完成

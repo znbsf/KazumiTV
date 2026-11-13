@@ -24,7 +24,8 @@ class StorageErrorPage extends StatelessWidget {
             return GeneralErrorWidget(
               title: '无法初始化本地存储',
               icon: Icons.storage_rounded,
-              errMsg: '当前存储位置：\n$path\n\n可在退出后删除该目录以重置本地存储，此操作会清除本地数据。',
+              errMsg:
+                  '当前存储位置：\n$path\n\n原有数据已保留。请退出其他程序实例并检查存储权限和可用空间，再重新启动。若仍失败，请先备份该目录后排查或从备份恢复，不要直接删除原数据。',
               actions: [
                 StateActionButton(
                   onPressed: () {

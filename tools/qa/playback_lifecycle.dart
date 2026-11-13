@@ -75,8 +75,8 @@ class _LocalDanmaku extends PlayerDanmakuController {
   _LocalDanmaku(DownloadController downloads)
       : super(isLocalPlayback: () => false, downloadController: downloads);
   @override
-  Future<DanmakuLoadResult> fetchDanmaku(
-          int id, String plugin, int episode) async =>
+  Future<DanmakuLoadResult> fetchDanmaku(int id, String plugin, int episode,
+          {int? downloadTaskNumber}) async =>
       DanmakuLoadResult.success(danmakus: const [], bangumiID: id);
 }
 

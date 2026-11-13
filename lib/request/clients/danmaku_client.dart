@@ -1,3 +1,4 @@
+import 'package:kazumi/request/core/danmaku_response_error.dart';
 import 'package:dio/dio.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
 import 'package:kazumi/request/core/network_error_mapper.dart';
@@ -66,6 +67,7 @@ class DanmakuClient {
         options: Options(headers: requestHeaders),
         cancelToken: cancelToken,
       );
+      checkDanmakuResponse(response.data);
       return response.data;
     } on DioException catch (e) {
       if (e.response?.statusCode == 429) {

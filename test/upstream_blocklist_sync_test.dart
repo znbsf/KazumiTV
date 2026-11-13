@@ -236,7 +236,9 @@ void main() {
       await expectLater(service.sync(), throwsStateError);
       expect(client.files['$root/$deviceA.json'], published);
       expect(GStorage.shieldList.values, isEmpty);
-      expect(client.files.keys, ['$root/$deviceA.json']);
+      expect(client.files.keys, contains('$root/$deviceA.json'));
+      expect(
+          client.files.keys.where((p) => p.contains('.cache.')), hasLength(2));
       client.failRename = false;
       await service.sync();
       expect(uploaded(deviceA).entries['广告']!.deleted, isTrue);
