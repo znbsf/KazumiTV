@@ -1371,7 +1371,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                         try {
                           await RemotePlay().castVideo(
                             playerController.videoUrl,
-                            videoPageController.currentPlugin.referer,
+                            playerController.referer,
+                            title: playerController.mediaTitle,
                           );
                         } finally {
                           if (mounted && resume) playerController.play();
@@ -1998,7 +1999,8 @@ class PlayerItemPanelState extends State<PlayerItemPanel> {
                         RemotePlay()
                             .castVideo(
                           playerController.videoUrl,
-                          videoPageController.currentPlugin.referer,
+                          playerController.referer,
+                          title: playerController.mediaTitle,
                         )
                             .whenComplete(() {
                           if (mounted && needRestart) {

@@ -85,6 +85,7 @@ class PlayerController implements Disposable {
   late String referer;
   String? coverUrl;
   String videoUrl = '';
+  String mediaTitle = '';
   bool isLocalPlayback = false;
   Timer? hideVolumeUITimer;
   Timer? _volumeGestureSyncTimer;
@@ -221,6 +222,9 @@ class PlayerController implements Disposable {
     }
 
     videoUrl = params.videoUrl;
+    mediaTitle = [params.bangumiName ?? '', params.episodeTitle.trim()]
+        .where((part) => part.isNotEmpty)
+        .join(' · ');
     isLocalPlayback = params.isLocalPlayback;
     bangumiId = params.bangumiId;
     currentEpisode = params.episode;
