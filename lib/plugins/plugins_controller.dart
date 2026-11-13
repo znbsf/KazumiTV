@@ -1,3 +1,5 @@
+import 'package:kazumi/request/config/rules_repository_config.dart';
+import 'package:kazumi/services/storage/storage.dart';
 import 'dart:io';
 import 'dart:convert';
 import 'package:mobx/mobx.dart';
@@ -72,16 +74,16 @@ abstract class _PluginsController with Store {
     PluginLoader? pluginLoader,
     PluginJsonWriter? pluginJsonWriter,
     PluginErrorReporter? errorReporter,
-  })  : _catalogLoader = catalogLoader ?? PluginCatalogApi.getPluginList,
-        _pluginLoader = pluginLoader ?? PluginCatalogApi.getPlugin,
+  })  : _catalogLoader = catalogLoader,
+        _pluginLoader = pluginLoader,
         _pluginJsonWriter = pluginJsonWriter,
         _errorReporter = errorReporter ?? _defaultPluginErrorReporter;
 
-  final PluginCatalogLoader _catalogLoader;
-  final PluginLoader _pluginLoader;
+  final PluginCatalogLoader? _catalogLoader;
+  final PluginLoader? _pluginLoader;
   final PluginJsonWriter? _pluginJsonWriter;
   final PluginErrorReporter _errorReporter;
-  final AsyncSingleFlight<List<PluginHTTPItem>> _catalogRefreshSingleFlight =
+  AsyncSingleFlight<List<PluginHTTPItem>> _catalogRefreshSingleFlight =
       AsyncSingleFlight<List<PluginHTTPItem>>();
   final AsyncSerialQueue _mutations = AsyncSerialQueue();
   Map<String, PluginHTTPItem> _pluginCatalogByName = const {};
@@ -134,6 +136,7 @@ abstract class _PluginsController with Store {
 
   // Initializes the plugin directory and loads all plugins
   Future<void> init() async {
+    _ruleRepository = GStorage.getSetting(SettingsKeys.ruleRepositoryUrl);
     final directory = await getApplicationSupportDirectory();
     oldPluginDirectory = Directory('${directory.path}/plugins');
     if (!await oldPluginDirectory!.exists()) {
@@ -343,10 +346,35 @@ abstract class _PluginsController with Store {
     }
   }
 
+  String _ruleRepository = '';
+  String get ruleRepository => _ruleRepository;
+  int _catalogEpoch = 0;
+
+  Future<bool> setRuleRepository(String input) {
+    final normalized = RulesRepositoryConfig.normalizeForStorage(input);
+    // Changing repositories waits for installs/updates already in progress.
+    return _mutations.run(() async {
+      if (normalized == _ruleRepository) return false;
+      await GStorage.putSetting(SettingsKeys.ruleRepositoryUrl, normalized);
+      _ruleRepository = normalized;
+      _catalogEpoch++;
+      _catalogRefreshSingleFlight = AsyncSingleFlight();
+      _pluginCatalogByName = const {};
+      _pluginCatalogRefreshedAt = null;
+      runInAction(() => pluginHTTPList.clear());
+      return true;
+    });
+  }
+
   Future<List<PluginHTTPItem>> refreshPluginCatalog() {
     return _catalogRefreshSingleFlight.run(() async {
+      final epoch = _catalogEpoch;
+      final repository = _ruleRepository;
       try {
-        final catalog = await _catalogLoader();
+        final catalog = await (_catalogLoader?.call() ??
+            PluginCatalogApi.getPluginList(repository: repository));
+        if (epoch != _catalogEpoch)
+          return List<PluginHTTPItem>.unmodifiable(catalog);
         _pluginCatalogByName = {
           for (final item in catalog) pluginNameKey(item.name): item,
         };
@@ -447,7 +475,8 @@ abstract class _PluginsController with Store {
   Future<_PluginUpdateAttempt> _preparePluginUpdate(String name) async {
     late final Plugin remotePlugin;
     try {
-      remotePlugin = await _pluginLoader(name);
+      remotePlugin = await (_pluginLoader?.call(name) ??
+          PluginCatalogApi.getPlugin(name, repository: _ruleRepository));
     } catch (error, stackTrace) {
       _errorReporter(
         'Plugin: failed to download rule $name',

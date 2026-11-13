@@ -247,16 +247,19 @@ class _PluginCatalogViewState extends State<PluginCatalogView> {
       final enabled = GStorage.getSetting(SettingsKeys.enableGitProxy);
       return GeneralErrorWidget(
         title: '无法访问规则仓库',
-        errMsg: '请检查网络连接，或切换规则仓库镜像后重试。',
+        errMsg: _controller.ruleRepository.isEmpty
+            ? '请检查网络连接，或切换规则仓库镜像后重试。'
+            : '请检查自定义仓库地址和网络连接后重试。',
         icon: Icons.cloud_off_rounded,
         onRetry: _refresh,
         retryText: '重新加载',
         actions: [
-          StateActionButton.tonal(
-            onPressed: _toggleGitProxyAndRefresh,
-            icon: Icons.tune_rounded,
-            text: enabled ? '关闭规则镜像' : '启用规则镜像',
-          ),
+          if (_controller.ruleRepository.isEmpty)
+            StateActionButton.tonal(
+              onPressed: _toggleGitProxyAndRefresh,
+              icon: Icons.tune_rounded,
+              text: enabled ? '关闭规则镜像' : '启用规则镜像',
+            ),
         ],
       );
     }

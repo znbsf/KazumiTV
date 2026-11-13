@@ -90,9 +90,7 @@ class XPathRuleStrategy {
         kind: XPathRuleFormatKind.invalidUrl,
       );
     }
-    // XPath chapter requests historically go out without stored cookies;
-    // only search requests attach them.
-    return PreparedRuleRequest(method: 'GET', url: url);
+    return PreparedRuleRequest(method: 'GET', url: url, includeCookies: true);
   }
 
   RuleSearchParseResult parseSearch(

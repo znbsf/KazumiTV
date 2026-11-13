@@ -17,18 +17,59 @@ class PluginSiteClient {
     CancelToken? cancelToken,
   }) async {
     try {
-      final response = await DioFactory.pluginDio.request<String>(
-        url,
-        queryParameters: queryParameters,
-        data: data,
-        options: Options(
-          method: method,
-          responseType: ResponseType.plain,
-          headers: _headers(headers),
-        ),
-        cancelToken: cancelToken,
-      );
-      return response.data ?? '';
+      var target = Uri.parse(url);
+      var currentHeaders = _headers(headers);
+      var currentMethod = method;
+      var body = data;
+      for (var hop = 0; hop <= 5; hop++) {
+        final response = await DioFactory.pluginDio.request<String>(
+          target.toString(),
+          queryParameters: hop == 0 ? queryParameters : null,
+          data: body,
+          options: Options(
+            method: currentMethod,
+            responseType: ResponseType.plain,
+            headers: currentHeaders,
+            followRedirects: false,
+            validateStatus: (status) =>
+                status != null && status >= 200 && status < 400,
+          ),
+          cancelToken: cancelToken,
+        );
+        final status = response.statusCode;
+        if (![301, 302, 303, 307, 308].contains(status))
+          return response.data ?? '';
+        final location = response.headers.value('location');
+        if (location == null || hop == 5)
+          throw const FormatException('Invalid or excessive rule redirects');
+        final next = response.realUri.resolve(location);
+        if (!['http', 'https'].contains(next.scheme) ||
+            next.userInfo.isNotEmpty) {
+          throw const FormatException('Unsupported rule redirect');
+        }
+        if (status == 303 ||
+            ((status == 301 || status == 302) && currentMethod == 'POST')) {
+          currentMethod = 'GET';
+          body = null;
+        }
+        if (next.origin != target.origin) {
+          if (currentMethod != 'GET' && currentMethod != 'HEAD') {
+            throw const FormatException(
+                'Cross-origin rule body redirect rejected');
+          }
+          // Never forward manually attached credentials to another origin,
+          // including subdomains, other ports or an HTTPS downgrade.
+          currentHeaders = Map<String, dynamic>.from(currentHeaders)
+            ..removeWhere((key, value) => {
+                  'cookie',
+                  'authorization',
+                  'proxy-authorization',
+                  'referer'
+                }.contains(key.toLowerCase()));
+        }
+        target = next;
+      }
+      throw const FormatException('Excessive rule redirects');
     } on DioException catch (e) {
       throw await NetworkErrorMapper.mapException(e);
     }

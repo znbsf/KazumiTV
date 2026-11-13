@@ -51,7 +51,9 @@ class PluginCookieManager {
       final value = trimmed.substring(eqIndex + 1).trim();
       try {
         final cookie = Cookie(name, value)
-          ..domain = uri.host
+          // document.cookie has no Domain/Secure attributes. Do not promote
+          // a host-only observation into subdomain or HTTP access.
+          ..secure = uri.scheme == 'https'
           ..path = '/';
         cookies.add(cookie);
       } catch (_) {}
@@ -65,7 +67,10 @@ class PluginCookieManager {
   ) async {
     final jar = _jars[pluginName];
     if (jar == null) return <Cookie>[];
-    return jar.loadForRequest(uri);
+    final cookies = await jar.loadForRequest(uri);
+    return cookies
+        .where((cookie) => !cookie.secure || uri.scheme == 'https')
+        .toList();
   }
 
   /// 验证时 WebView 使用的 User-Agent；未验证过的规则返回 null
