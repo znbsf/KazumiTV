@@ -116,7 +116,7 @@ class HistoryPlaybackService {
         numberMatch ??= episode;
       }
     }
-    targetEpisode ??= numberMatch;
+    if (history.episodePageUrl.isEmpty) targetEpisode ??= numberMatch;
     if (targetEpisode == null) {
       return null;
     }
@@ -124,7 +124,7 @@ class HistoryPlaybackService {
     final localPath = _downloadController.getLocalVideoPath(
       history.bangumiItem.id,
       history.adapterName,
-      targetEpisode.episodeNumber,
+      targetEpisode.taskNumber,
     );
     if (localPath == null) {
       return null;
@@ -133,7 +133,7 @@ class HistoryPlaybackService {
     return OfflineVideoPlaybackArgs(
       bangumiItem: history.bangumiItem,
       pluginName: history.adapterName,
-      episodeNumber: targetEpisode.episodeNumber,
+      episodeNumber: targetEpisode.taskNumber,
       road: targetEpisode.road,
       downloadedEpisodes: downloadedEpisodes,
     );

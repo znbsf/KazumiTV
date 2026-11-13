@@ -273,7 +273,7 @@ abstract class _VideoPageController with Store implements Disposable {
     int episodeNumber, {
     required int preferredOriginalRoad,
   }) {
-    if (episodeNumber <= 0 || roadList.isEmpty) {
+    if (episodeNumber == 0 || roadList.isEmpty) {
       return null;
     }
     final preferredDisplayRoad =
@@ -393,7 +393,8 @@ abstract class _VideoPageController with Store implements Disposable {
       roadIndex: targetRoad,
       displayTitle: episodeTitle,
       pageUrl: downloadEpisode?.episodePageUrl ?? '',
-      episodeNumber: episodeNumber,
+      episodeNumber: downloadEpisode?.episodeNumber ?? episodeNumber,
+      downloadTaskNumber: episodeNumber,
       originalRoadIndex: downloadEpisode?.road ??
           _offlineDisplayRoadToOriginalRoad[targetRoad] ??
           targetRoad,
@@ -742,7 +743,8 @@ abstract class _VideoPageController with Store implements Disposable {
         : _getLocalVideoPath(
             bangumiItem.id,
             _offlinePluginName,
-            resolvedEpisode.historyEpisodeNumber,
+            resolvedEpisode.downloadTaskNumber ??
+                resolvedEpisode.historyEpisodeNumber,
           );
     if (localPath == null) {
       _failLoading(_recentOfflineId == null ? '该集数未下载' : '该集缓存不完整或已被清理');
@@ -824,6 +826,10 @@ abstract class _VideoPageController with Store implements Disposable {
               params.bangumiId,
               params.pluginName,
               params.danmakuEpisodeNumber,
+              downloadTaskNumber: downloadRepository
+                  .getEpisodeByUrl(
+                      params.bangumiId, params.pluginName, params.pageUrl)
+                  ?.taskNumber,
             );
       final (result, fromCache) = cacheId == null
           ? (await fresh(), false)
@@ -1216,7 +1222,7 @@ OfflineRoadListSnapshot buildOfflineRoadListSnapshot(
   final episodesByNumber = <int, DownloadEpisode>{};
 
   for (final episode in episodes) {
-    episodesByNumber[episode.episodeNumber] = episode;
+    episodesByNumber[episode.taskNumber] = episode;
     groupedEpisodes.putIfAbsent(episode.road, () => []).add(episode);
   }
 
@@ -1235,7 +1241,7 @@ OfflineRoadListSnapshot buildOfflineRoadListSnapshot(
       name: originalRoad >= 0
           ? '播放列表${originalRoad + 1}'
           : '播放列表${displayRoad + 1}',
-      data: roadEpisodes.map((e) => e.episodeNumber.toString()).toList(),
+      data: roadEpisodes.map((e) => e.taskNumber.toString()).toList(),
       identifier: roadEpisodes
           .map((e) =>
               e.episodeName.isNotEmpty ? e.episodeName : '第${e.episodeNumber}集')
@@ -1261,6 +1267,7 @@ class EpisodeRef {
     required this.historyEpisodeNumber,
     required this.danmakuEpisodeNumber,
     required this.originalRoadIndex,
+    this.downloadTaskNumber,
   });
 
   final int listIndex;
@@ -1276,6 +1283,7 @@ class EpisodeRef {
   final int historyEpisodeNumber;
   final int danmakuEpisodeNumber;
   final int originalRoadIndex;
+  final int? downloadTaskNumber;
 
   factory EpisodeRef.online({
     required int listIndex,
@@ -1303,6 +1311,7 @@ class EpisodeRef {
     required String displayTitle,
     required String pageUrl,
     required int episodeNumber,
+    int? downloadTaskNumber,
     required int originalRoadIndex,
   }) = _OfflineEpisodeRef;
 }
@@ -1314,6 +1323,7 @@ class _OfflineEpisodeRef extends EpisodeRef {
     required super.displayTitle,
     required super.pageUrl,
     required int episodeNumber,
+    super.downloadTaskNumber,
     required super.originalRoadIndex,
   }) : super(
           sortNumber: episodeNumber,

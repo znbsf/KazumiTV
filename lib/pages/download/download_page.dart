@@ -37,8 +37,9 @@ class _DownloadPageState extends State<DownloadPage> {
   final _recordFocus = <String, FocusNode>{};
   final _episodeFocus = <String, FocusNode>{};
 
-  FocusNode _focusForEpisode(String key, int number) => _episodeFocus.putIfAbsent(
-      '$key/$number', () => FocusNode(debugLabel: 'TV download $key/$number'));
+  FocusNode _focusForEpisode(String key, int number) =>
+      _episodeFocus.putIfAbsent('$key/$number',
+          () => FocusNode(debugLabel: 'TV download $key/$number'));
 
   FocusNode _focusForRecord(String key) => _recordFocus.putIfAbsent(
       key, () => FocusNode(debugLabel: 'TV download $key'));
@@ -55,7 +56,7 @@ class _DownloadPageState extends State<DownloadPage> {
   FocusNode _afterDelete(DownloadRecord record, [DownloadEpisode? episode]) {
     if (episode != null) {
       final numbers = _episodeOrder(record);
-      final index = numbers.indexOf(episode.episodeNumber);
+      final index = numbers.indexOf(episode.taskNumber);
       if (index + 1 < numbers.length) {
         return _focusForEpisode(record.key, numbers[index + 1]);
       }
@@ -165,7 +166,7 @@ class _DownloadPageState extends State<DownloadPage> {
               totalSpeed += downloadController.getSpeed(
                 record.bangumiId,
                 record.pluginName,
-                e.episodeNumber,
+                e.taskNumber,
               );
             }
           }
@@ -213,7 +214,7 @@ class _DownloadPageState extends State<DownloadPage> {
         final speed = downloadController.getSpeed(
           record.bangumiId,
           record.pluginName,
-          episode.episodeNumber,
+          episode.taskNumber,
         );
         final speedText = speed > 0 ? ' · ${formatSpeed(speed)}' : '';
         return '${(episode.progressPercent * 100).toStringAsFixed(0)}% · '
@@ -244,10 +245,11 @@ class _DownloadPageState extends State<DownloadPage> {
               icon: Icon(Icons.play_circle_outline,
                   size: 20, color: TvMode.enabled ? null : colorScheme.primary),
               style: TvMode.enabled
-                  ? ButtonStyle(foregroundColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.focused)
-                          ? colorScheme.onPrimary
-                          : colorScheme.primary))
+                  ? ButtonStyle(
+                      foregroundColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.focused)
+                              ? colorScheme.onPrimary
+                              : colorScheme.primary))
                   : null,
               onPressed: () => _playEpisode(record, episode),
               tooltip: '播放',
@@ -262,7 +264,7 @@ class _DownloadPageState extends State<DownloadPage> {
               onPressed: () => downloadController.pauseDownload(
                 record.bangumiId,
                 record.pluginName,
-                episode.episodeNumber,
+                episode.taskNumber,
               ),
               tooltip: '暂停',
               visualDensity: VisualDensity.compact,
@@ -276,7 +278,7 @@ class _DownloadPageState extends State<DownloadPage> {
               onPressed: () => downloadController.retryDownload(
                 bangumiId: record.bangumiId,
                 pluginName: record.pluginName,
-                episodeNumber: episode.episodeNumber,
+                episodeNumber: episode.taskNumber,
               ),
               tooltip: '继续',
               visualDensity: VisualDensity.compact,
@@ -290,7 +292,7 @@ class _DownloadPageState extends State<DownloadPage> {
               onPressed: () => downloadController.retryDownload(
                 bangumiId: record.bangumiId,
                 pluginName: record.pluginName,
-                episodeNumber: episode.episodeNumber,
+                episodeNumber: episode.taskNumber,
               ),
               tooltip: '重试',
               visualDensity: VisualDensity.compact,
@@ -306,7 +308,7 @@ class _DownloadPageState extends State<DownloadPage> {
                 downloadController.priorityDownload(
                   bangumiId: record.bangumiId,
                   pluginName: record.pluginName,
-                  episodeNumber: episode.episodeNumber,
+                  episodeNumber: episode.taskNumber,
                 );
                 KazumiDialog.showToast(message: '已插队优先下载');
               },
@@ -322,7 +324,7 @@ class _DownloadPageState extends State<DownloadPage> {
         message: '删除',
         child: IconButton(
           focusNode: TvMode.enabled
-              ? _focusForEpisode(record.key, episode.episodeNumber)
+              ? _focusForEpisode(record.key, episode.taskNumber)
               : null,
           icon: Icon(Icons.delete_outline,
               size: 20, color: colorScheme.onSurfaceVariant),
@@ -338,7 +340,7 @@ class _DownloadPageState extends State<DownloadPage> {
     final localPath = downloadController.getLocalVideoPath(
       record.bangumiId,
       record.pluginName,
-      episode.episodeNumber,
+      episode.taskNumber,
     );
     if (localPath == null) {
       KazumiDialog.showToast(message: '本地文件不存在');
@@ -373,7 +375,7 @@ class _DownloadPageState extends State<DownloadPage> {
       arguments: OfflineVideoPlaybackArgs(
         bangumiItem: bangumiItem,
         pluginName: record.pluginName,
-        episodeNumber: episode.episodeNumber,
+        episodeNumber: episode.taskNumber,
         road: episode.road,
         downloadedEpisodes: downloadedEpisodes,
       ),
@@ -397,11 +399,12 @@ class _DownloadPageState extends State<DownloadPage> {
           ),
           TextButton(
             onPressed: () async {
-              final target = TvMode.enabled ? _afterDelete(record, episode) : null;
+              final target =
+                  TvMode.enabled ? _afterDelete(record, episode) : null;
               final deletion = downloadController.deleteEpisode(
                 record.bangumiId,
                 record.pluginName,
-                episode.episodeNumber,
+                episode.taskNumber,
               );
               KazumiDialog.dismiss();
               await deletion;

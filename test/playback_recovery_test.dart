@@ -124,8 +124,8 @@ class _Danmaku implements PlayerDanmakuController {
   }
 
   @override
-  Future<DanmakuLoadResult> fetchDanmaku(
-          int id, String plugin, int episode) async =>
+  Future<DanmakuLoadResult> fetchDanmaku(int id, String plugin, int episode,
+          {int? downloadTaskNumber}) async =>
       DanmakuLoadResult.success(danmakus: const [], bangumiID: id);
   @override
   dynamic noSuchMethod(Invocation invocation) => null;

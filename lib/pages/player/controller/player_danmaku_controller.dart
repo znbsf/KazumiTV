@@ -216,13 +216,15 @@ abstract class _PlayerDanmakuController with Store {
   Future<DanmakuLoadResult> fetchDanmaku(
     int bangumiId,
     String pluginName,
-    int episode,
-  ) async {
+    int episode, {
+    int? downloadTaskNumber,
+  }) async {
     final result = isLocalPlayback()
         ? await _fetchCachedDanmaku(
             bangumiId,
             pluginName,
             episode,
+            downloadTaskNumber ?? episode,
           )
         : await _fetchDanDanmakuByBgmBangumiID(
             bangumiId,
@@ -295,7 +297,7 @@ abstract class _PlayerDanmakuController with Store {
   }
 
   Future<DanmakuLoadResult> _fetchCachedDanmaku(
-      int bangumiId, String pluginName, int episode) async {
+      int bangumiId, String pluginName, int episode, int taskNumber) async {
     final generation = _danmakuLoadGeneration;
     KazumiLogger().i(
         'PlayerController: attempting to load cached danmaku for episode $episode');
@@ -304,7 +306,7 @@ abstract class _PlayerDanmakuController with Store {
       final cachedDanmakus = await downloadController.getCachedDanmakus(
         bangumiId,
         pluginName,
-        episode,
+        taskNumber,
       );
       _checkDanmakuLoadGeneration(generation);
 
@@ -329,7 +331,7 @@ abstract class _PlayerDanmakuController with Store {
               KazumiLogger()
                   .i('PlayerController: fetched ${res.length} danmakus online');
               _saveDanmakuToCache(downloadController, bangumiId, pluginName,
-                  episode, res, nextBangumiID);
+                  taskNumber, res, nextBangumiID);
             }
             return DanmakuLoadResult.success(
               danmakus: res,
