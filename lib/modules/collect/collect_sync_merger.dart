@@ -61,58 +61,62 @@ class CollectSyncMerger {
     required List<CollectedBangumi> remoteCollectibles,
     required List<CollectedBangumiChange> remoteChanges,
   }) {
-    final mergedCollectibles =
-        remoteCollectibles.map(_copyCollectible).toList();
-    final newLocalChanges = localChanges.where((localChange) {
-      return !remoteChanges
-          .any((remoteChange) => remoteChange.id == localChange.id);
-    }).toList()
-      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-
-    for (final change in newLocalChanges) {
-      if (change.action == 3) {
-        mergedCollectibles
-            .removeWhere((item) => item.bangumiItem.id == change.bangumiID);
-        continue;
-      }
-
-      final localCollectible = _findCollectible(
-        localCollectibles,
-        change.bangumiID,
-      );
-      if (localCollectible == null) {
-        continue;
-      }
-
-      final changedCollectible = CollectedBangumi(
-        localCollectible.bangumiItem,
-        localCollectible.time,
-        change.type,
-      );
-      final index = mergedCollectibles.indexWhere(
-        (item) => item.bangumiItem.id == change.bangumiID,
-      );
-
-      if (change.action == 1) {
-        if (index == -1) {
-          mergedCollectibles.add(changedCollectible);
-        } else {
-          mergedCollectibles[index] = changedCollectible;
+    // IDs in legacy boxes are only device-local seconds/counters. Compare the
+    // operation itself, including its time, so remapped IDs remain idempotent.
+    String identity(CollectedBangumiChange c) =>
+        '${c.timestamp}:${c.bangumiID}:${c.action}:${c.type}';
+    final operations = <String, CollectedBangumiChange>{};
+    for (final c in [...remoteChanges, ...localChanges]) {
+      final old = operations[identity(c)];
+      if (old == null || c.id < old.id) operations[identity(c)] = c;
+    }
+    final ordered = operations.values.toList()
+      ..sort((a, b) {
+        final time = a.timestamp.compareTo(b.timestamp);
+        return time != 0 ? time : identity(a).compareTo(identity(b));
+      });
+    final used = <int>{};
+    final reserved = ordered.map((c) => c.id).toSet();
+    var next = 0;
+    final changes = <CollectedBangumiChange>[];
+    for (final c in ordered) {
+      var id = c.id;
+      if (used.contains(id)) {
+        while (reserved.contains(next) || used.contains(next)) {
+          next++;
         }
-      } else if (change.action == 2 && index != -1) {
-        mergedCollectibles[index] = changedCollectible;
+        if (next > 0xffffffff)
+          throw StateError('Collection change IDs exhausted');
+        id = next++;
+      }
+      used.add(id);
+      changes.add(CollectedBangumiChange(
+          id, c.bangumiID, c.action, c.type, c.timestamp));
+    }
+    final items = <int, CollectedBangumi>{};
+    for (final item in [...remoteCollectibles, ...localCollectibles]) {
+      final old = items[item.bangumiItem.id];
+      if (old == null || item.time.isAfter(old.time)) {
+        items[item.bangumiItem.id] = _copyCollectible(item);
       }
     }
-
-    final mergedChanges = <int, CollectedBangumiChange>{
-      for (final change in remoteChanges) change.id: change,
-      for (final change in newLocalChanges) change.id: change,
-    }.values.toList();
-
-    return CollectiblesMergeResult(
-      collectibles: mergedCollectibles,
-      changes: mergedChanges,
-    );
+    // Replaying all operations makes merging independent of device order and
+    // preserves tombstones when an offline device brings an older snapshot.
+    for (final c in changes) {
+      if (c.action == 3) {
+        items.remove(c.bangumiID);
+      } else if (c.action == 1 || c.action == 2) {
+        final source = _findCollectible(localCollectibles, c.bangumiID) ??
+            _findCollectible(remoteCollectibles, c.bangumiID);
+        if (source != null) {
+          items[c.bangumiID] = CollectedBangumi(source.bangumiItem,
+              DateTime.fromMillisecondsSinceEpoch(c.timestamp * 1000), c.type);
+        }
+      }
+    }
+    final result = items.values.toList()
+      ..sort((a, b) => a.bangumiItem.id.compareTo(b.bangumiItem.id));
+    return CollectiblesMergeResult(collectibles: result, changes: changes);
   }
 
   static BangumiCollectiblesMergePlan planBangumi({

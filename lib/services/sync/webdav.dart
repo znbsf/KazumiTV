@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav;
 import 'package:path_provider/path_provider.dart';
 import 'package:kazumi/modules/history/history_sync.dart';
@@ -177,6 +179,7 @@ class WebDav {
   Future<void> updateCollectibles() async {
     try {
       await _runWebDavExclusive(() async {
+        await _publishCollectionDeviceSnapshot();
         await _updateBox('collectibles');
         if (GStorage.collectChanges.isNotEmpty) {
           await _updateBox('collectchanges');
@@ -202,6 +205,7 @@ class WebDav {
   }
 
   Future<void> _syncCollectibles() async {
+    await _publishCollectionDeviceSnapshot();
     List<CollectedBangumi> remoteCollectibles = [];
     List<CollectedBangumiChange> remoteChanges = [];
 
@@ -211,6 +215,8 @@ class WebDav {
     final changesExists =
         files.any((file) => file.name == 'collectchanges.tmp');
     if (!collectiblesExists && !changesExists) {
+      await _mergeCollectionDeviceSnapshots();
+      await _publishCollectionDeviceSnapshot();
       await _updateBox('collectibles');
       if (GStorage.collectChanges.isNotEmpty) {
         await _updateBox('collectchanges');
@@ -250,9 +256,75 @@ class WebDav {
     if (remoteChanges.isNotEmpty || remoteCollectibles.isNotEmpty) {
       await GStorage.patchCollectibles(remoteCollectibles, remoteChanges);
     }
+    await _mergeCollectionDeviceSnapshots();
+    await _publishCollectionDeviceSnapshot();
     await _updateBox('collectibles');
     if (GStorage.collectChanges.isNotEmpty) {
       await _updateBox('collectchanges');
+    }
+  }
+
+  static const _collectionDevices = '$_syncRootPath/collection-devices-v1';
+
+  Future<void> _publishCollectionDeviceSnapshot() async {
+    await _ensureLocalTempDirectory();
+    await _ensureRemoteDirectory(_collectionDevices);
+    final device = await HistorySyncService().getDeviceId();
+    if (!RegExp(r'^[a-zA-Z0-9-]+$').hasMatch(device)) {
+      throw const FormatException('Invalid collection device identity');
+    }
+    final run =
+        await webDavLocalTempDirectory.createTemp('collection-publish-');
+    try {
+      final snapshot = File('${run.path}/snapshot.json');
+      // The snapshot keeps data and its change log in a single published file.
+      await GStorage.runLibraryWriteExclusive(() async {
+        await GStorage.collectibles.flush();
+        await GStorage.collectChanges.flush();
+        await snapshot.writeAsString(
+            jsonEncode({
+              'version': 1,
+              'collectibles': base64Encode(
+                  await File(GStorage.collectibles.path!).readAsBytes()),
+              'changes': base64Encode(
+                  await File(GStorage.collectChanges.path!).readAsBytes()),
+            }),
+            flush: true);
+      });
+      await _publishRemoteFile(
+          sourceFilePath: snapshot.path,
+          destinationPath: '$_collectionDevices/$device.json',
+          temporaryPath: '$_collectionDevices/$device.cache');
+    } finally {
+      await run.delete(recursive: true);
+    }
+  }
+
+  Future<void> _mergeCollectionDeviceSnapshots() async {
+    final entries = await client.readDir(_collectionDevices);
+    entries.sort((a, b) => (a.name ?? '').compareTo(b.name ?? ''));
+    final run = await webDavLocalTempDirectory.createTemp('collection-read-');
+    try {
+      for (final entry in entries) {
+        final name = entry.name ?? '';
+        if (entry.isDir == true ||
+            !RegExp(r'^[a-zA-Z0-9-]+\.json$').hasMatch(name)) continue;
+        final snapshot = File('${run.path}/snapshot.json');
+        await client.read2File('$_collectionDevices/$name', snapshot.path);
+        final data =
+            jsonDecode(await snapshot.readAsString()) as Map<String, dynamic>;
+        if (data['version'] != 1)
+          throw const FormatException('Unsupported collection snapshot');
+        final items = File('${run.path}/items.hive');
+        final changes = File('${run.path}/changes.hive');
+        await items.writeAsBytes(base64Decode(data['collectibles'] as String));
+        await changes.writeAsBytes(base64Decode(data['changes'] as String));
+        await GStorage.patchCollectibles(
+            await GStorage.getCollectiblesFromFile(items.path),
+            await GStorage.getCollectChangesFromFile(changes.path));
+      }
+    } finally {
+      await run.delete(recursive: true);
     }
   }
 
@@ -521,7 +593,7 @@ class WebDav {
     required String sourceFilePath,
     required String destinationPath,
     required String temporaryPath,
-    bool removeDestinationBeforeRename = true,
+    bool removeDestinationBeforeRename = false,
   }) async {
     await _remoteFileCommitter.replaceFile(
       sourceFilePath: sourceFilePath,
@@ -533,6 +605,17 @@ class WebDav {
       rename: (sourcePath, targetPath) =>
           client.rename(sourcePath, targetPath, true),
       exists: _remoteEntryExists,
+      verify: (source, remote) async {
+        final check = await webDavLocalTempDirectory.createTemp('verify-');
+        try {
+          final copy = File('${check.path}/remote');
+          await client.read2File(remote, copy.path);
+          return await sha256.bind(File(source).openRead()).first ==
+              await sha256.bind(copy.openRead()).first;
+        } finally {
+          await check.delete(recursive: true);
+        }
+      },
       removeDestinationBeforeRename: removeDestinationBeforeRename,
     );
   }
@@ -590,12 +673,8 @@ class WebDav {
     final index = normalized.lastIndexOf('/');
     final parent = index <= 0 ? '/' : normalized.substring(0, index);
     final name = normalized.substring(index + 1);
-    try {
-      final files = await client.readDir(parent);
-      return files.any((file) => file.name == name);
-    } catch (_) {
-      return false;
-    }
+    final files = await client.readDir(parent);
+    return files.any((file) => file.name == name);
   }
 
   Future<bool> _tryImportLegacyHistory(Directory runDirectory) async {

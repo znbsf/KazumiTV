@@ -73,6 +73,46 @@ void main() {
   });
 
   group('CollectSyncMerger', () {
+    test(
+        'same ID preserves different operations and repeated merging converges',
+        () {
+      final local = _collect(1, CollectType.watching, 10);
+      final remote = _collect(2, CollectType.watched, 10);
+      final a = [_change(10, 1, 1, CollectType.watching, 10)];
+      final b = [_change(10, 2, 1, CollectType.watched, 10)];
+      final merged = CollectSyncMerger.mergeWebDav(
+          localCollectibles: [local],
+          localChanges: a,
+          remoteCollectibles: [remote],
+          remoteChanges: b);
+      expect(merged.collectibles.map((c) => c.bangumiItem.id), [1, 2]);
+      expect(merged.changes.map((c) => c.id).toSet(), hasLength(2));
+      final again = CollectSyncMerger.mergeWebDav(
+          localCollectibles: [local],
+          localChanges: a,
+          remoteCollectibles: merged.collectibles,
+          remoteChanges: merged.changes);
+      expect(again.changes, hasLength(2));
+      final reversed = CollectSyncMerger.mergeWebDav(
+          localCollectibles: [remote],
+          localChanges: b,
+          remoteCollectibles: [local],
+          remoteChanges: a);
+      expect(reversed.changes.map((c) => c.toString()),
+          merged.changes.map((c) => c.toString()));
+      expect(a.single.id, 10);
+      expect(b.single.id, 10);
+    });
+    test('older offline edits cannot resurrect a later deletion', () {
+      final merged = CollectSyncMerger.mergeWebDav(
+          localCollectibles: [_collect(1, CollectType.watching, 10)],
+          localChanges: [_change(10, 1, 1, CollectType.watching, 10)],
+          remoteCollectibles: [],
+          remoteChanges: [_change(20, 1, 3, CollectType.watching, 20)]);
+      expect(merged.collectibles, isEmpty);
+      expect(merged.changes, hasLength(2));
+    });
+
     test('merges local change log into WebDAV collectibles', () {
       final mergeResult = CollectSyncMerger.mergeWebDav(
         localCollectibles: [
@@ -177,7 +217,9 @@ void main() {
       expect(plan.conflictLocalUpdates, isEmpty);
     });
 
-    test('resolves conflicts with timeFirst (local newer, remote newer, same moment)', () {
+    test(
+        'resolves conflicts with timeFirst (local newer, remote newer, same moment)',
+        () {
       final plan = CollectSyncMerger.planBangumi(
         localCollectibles: [
           // id 1: local newer (timestamp 50 vs remote 10)
@@ -205,23 +247,30 @@ void main() {
       expect(plan.localOnlyUploads.single.type, CollectType.watched.value);
       // remote only put
       expect(plan.remoteOnlyPuts.map((p) => p.collectible.bangumiItem.id), [5]);
-      expect(plan.remoteOnlyPuts.single.collectible.type, CollectType.planToWatch.value);
+      expect(plan.remoteOnlyPuts.single.collectible.type,
+          CollectType.planToWatch.value);
       // conflict uploads: id 1 (local newer), id 3 (same moment)
       expect(plan.conflictUploads.map((u) => u.bangumiId), [1, 3]);
-      expect(plan.conflictUploads.firstWhere((u) => u.bangumiId == 1).type, CollectType.watching.value);
-      expect(plan.conflictUploads.firstWhere((u) => u.bangumiId == 3).type, CollectType.onHold.value);
+      expect(plan.conflictUploads.firstWhere((u) => u.bangumiId == 1).type,
+          CollectType.watching.value);
+      expect(plan.conflictUploads.firstWhere((u) => u.bangumiId == 3).type,
+          CollectType.onHold.value);
       // conflict local updates: id 2 (remote newer)
-      expect(plan.conflictLocalUpdates.map((u) => u.collectible.bangumiItem.id), [2]);
-      expect(plan.conflictLocalUpdates.single.collectible.type, CollectType.watched.value);
+      expect(plan.conflictLocalUpdates.map((u) => u.collectible.bangumiItem.id),
+          [2]);
+      expect(plan.conflictLocalUpdates.single.collectible.type,
+          CollectType.watched.value);
     });
   });
 
   group('BangumiSyncPriority', () {
     test('fromValue maps correctly including timeFirst and fallback', () {
       expect(BangumiSyncPriority.fromValue(0), BangumiSyncPriority.localFirst);
-      expect(BangumiSyncPriority.fromValue(1), BangumiSyncPriority.bangumiFirst);
+      expect(
+          BangumiSyncPriority.fromValue(1), BangumiSyncPriority.bangumiFirst);
       expect(BangumiSyncPriority.fromValue(2), BangumiSyncPriority.timeFirst);
-      expect(BangumiSyncPriority.fromValue(999), BangumiSyncPriority.localFirst);
+      expect(
+          BangumiSyncPriority.fromValue(999), BangumiSyncPriority.localFirst);
       expect(BangumiSyncPriority.timeFirst.value, 2);
       expect(BangumiSyncPriority.timeFirst.label, '最新优先');
     });
@@ -263,7 +312,9 @@ void main() {
       expect(collection.tags.length, 1);
     });
 
-    test('handles missing or malformed fields defensively while requiring valid updated_at', () {
+    test(
+        'handles missing or malformed fields defensively while requiring valid updated_at',
+        () {
       final collection = BangumiCollection.fromJson({
         'updated_at': '2026-08-30T14:00:00Z',
         'type': 1,
