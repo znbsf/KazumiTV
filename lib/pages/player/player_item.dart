@@ -1584,11 +1584,18 @@ class _PlayerItemState extends State<PlayerItem>
             },
           );
           playerController.danmaku.setDanmakuEnabled(hasDanmakus);
+          if (hasDanmakus) {
+            await GStorage.putSetting(SettingsKeys.danmakuEnabledByDefault, true);
+          }
           KazumiDialog.showToast(message: hasDanmakus ? '弹幕切换成功' : '未找到弹幕内容');
         },
         onError: (error, stackTrace) {
           if (error is DanmakuLoadCancelled) return;
-          KazumiDialog.showToast(message: '弹幕检索错误: $error');
+          videoPageController.showDanmakuFailure(
+            DanmakuLoadResult.failed(bangumiID: 0, error: error),
+            playerController,
+            isCurrent: () => mounted,
+          );
         },
       );
 

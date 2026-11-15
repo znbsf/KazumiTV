@@ -135,6 +135,23 @@ void main() {
     expect(values, hasLength(12));
   });
 
+  test('comments within two hours stay local, including after worker restart',
+      () async {
+    var calls = 0;
+    Future<dynamic> fetch() async {
+      calls++;
+      return comments('saved');
+    }
+
+    await service.get(episode, fetch);
+    now = now.add(const Duration(hours: 1, minutes: 59, seconds: 59));
+    expect(await service.get(episode, fetch), comments('saved'));
+    await service.close();
+    now = now.add(const Duration(seconds: 1));
+    expect(await service.get(episode, fetch), comments('saved'));
+    expect(calls, 1);
+  });
+
   test('comments, mapping and search keep independent valid lifetimes',
       () async {
     var calls = 0;

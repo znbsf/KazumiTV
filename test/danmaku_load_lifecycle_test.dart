@@ -10,6 +10,7 @@ import 'package:kazumi/modules/danmaku/danmaku_module.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/player/controller/player_danmaku_controller.dart';
 import 'package:kazumi/request/core/dio_factory.dart';
+import 'package:kazumi/request/core/network_exception.dart';
 import 'package:kazumi/services/logging/logger.dart';
 import 'package:kazumi/services/storage/storage.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
@@ -69,6 +70,20 @@ class _PendingComments implements HttpClientAdapter {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  for (final type in [
+    NetworkExceptionType.connectionTimeout,
+    NetworkExceptionType.receiveTimeout,
+    NetworkExceptionType.sendTimeout,
+  ]) {
+    test('$type is shown as timeout rather than a 429 or another search', () {
+      final result = DanmakuLoadResult.failed(
+          bangumiID: 0,
+          error: NetworkException(type: type, message: 'timeout'));
+      expect(result.failureMessage, contains('超时'));
+      expect(result.failureMessage, isNot(contains('429')));
+      expect(result.failureMessage, isNot(contains('手动检索')));
+    });
+  }
   late Directory directory;
   late PathProviderPlatform previousPaths;
   late _PendingComments adapter;

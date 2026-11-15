@@ -1,8 +1,9 @@
 import 'package:kazumi/pages/player/controller/player_danmaku_controller.dart';
 import 'package:kazumi/utils/danmaku.dart';
 
-/// Video is local-first; comments are network-first. Empty responses and errors
-/// may fall back, but cancellation must never revive a retired episode's load.
+/// Video is local-first; comments use the shared API cache before networking.
+/// Empty responses and errors may fall back to legacy video-attached comments,
+/// but cancellation must never revive a retired episode's load.
 Future<(DanmakuLoadResult, bool)> loadRecentDanmaku({
   required Future<DanmakuLoadResult> Function() fresh,
   required Future<DanmakuLoadResult?> Function() cached,
