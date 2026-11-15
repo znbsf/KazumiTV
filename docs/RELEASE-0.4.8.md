@@ -1,6 +1,6 @@
 # KazumiTV 0.4.8 发布说明草稿
 
-[0.4.8 发布草稿](https://github.com/znbsf/KazumiTV/releases/tag/untagged-69af1653b9381ff6a2c9)及 11 项正式附件已备齐，尚未公开。当前公开稳定版仍为 0.4.7。
+[Release 列表中的 0.4.8 草稿](https://github.com/znbsf/KazumiTV/releases)及 11 项正式附件已备齐，尚未公开（release ID 445889609）。当前公开稳定版仍为 0.4.7。
 
 ## 本版变化
 
