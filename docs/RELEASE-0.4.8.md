@@ -1,6 +1,6 @@
-# KazumiTV 0.4.8 发布说明草稿
+# KazumiTV 0.4.8 发布说明
 
-[Release 列表中的 0.4.8 草稿](https://github.com/znbsf/KazumiTV/releases)及 11 项正式附件已备齐，尚未公开（release ID 445889609）。当前公开稳定版仍为 0.4.7。
+[0.4.8 已于 2026-11-15 正式发布](https://github.com/znbsf/KazumiTV/releases/tag/v0.4.8)，并设为 Latest。三个架构的正式签名 APK 及配套源码、许可等 11 项附件均已匿名下载，大小和 SHA256 与冻结白名单一致。
 
 ## 本版变化
 
@@ -34,4 +34,4 @@ MiTV-ASTP0 / Android 9 / ARMv7 已验证正式身份修复候选的缓存续播�
 | ARM64 | `036188c707728b63440ff2db13eb760dfa59a9db970ca8654cbccbdbf3b42e16` |
 | x86_64 | `d343f6ba6fb409aa23a289f8bd2eb3470bac3aae242dab52fd9e6b4220dbe7f7` |
 
-附件白名单共 11 项：三个正式签名 APK、三个验证 JSON、SHA256SUMS、精确源码 ZIP、LICENSE.txt、THIRD_PARTY_NOTICES.md 及 notices ZIP（含原生构建资料/许可）。全部已上传至 Release 草稿，逐项名称、大小、uploaded 状态及 GitHub SHA256 digest 与本地白名单一致。公开稳定版仍为 0.4.7，远端尚无 v0.4.8 tag；不移动旧 tag 或替换旧附件。正式公开后须另行从下载链接取回并核对哈希，draft 附件核验不代替匿名公开下载验证。
+附件白名单共 11 项：三个正式签名 APK、三个验证 JSON、SHA256SUMS、精确源码 ZIP、LICENSE.txt、THIRD_PARTY_NOTICES.md 及 notices ZIP（含原生构建资料/许可）。全部为 uploaded，名称、大小及 GitHub SHA256 digest 与冻结白名单一致；公开后从浏览器下载链接匿名取回全部 141,035,560 字节，逐项 SHA256 通过。Release 和 tag `v0.4.8` 均对应上述冻结源码，Latest 指向 0.4.8，未重建或替换已验收附件。源码包内文档保留构建时快照，后续验收以本文与当前项目状态为准。
