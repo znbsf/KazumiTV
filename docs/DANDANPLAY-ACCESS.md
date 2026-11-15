@@ -6,4 +6,6 @@
 
 私有配置源文件与构建凭据留在受控环境，不能加入源码或公开附件。客户端二进制注入不保证秘密不可提取，分发范围须符合应用授权。
 
+本机正式构建配置固定保存在 `%USERPROFILE%\Documents\KazumiTV-signing\app-config\dandan.json`，与 `stable` 签名目录集中管理；后续构建从此路径注入。该目录根 README 是本机材料入口，旧临时路径仅用于历史脚本兼容。
+
 [经验与事实](ENGINEERING-LESSONS.md) · [发布前原始记录](history/2026-10-10/DANDANPLAY-ACCESS.md) · [官方接入说明](https://doc.dandanplay.com/open/)
