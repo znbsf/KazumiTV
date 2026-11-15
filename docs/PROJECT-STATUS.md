@@ -2,6 +2,11 @@
 
 - 用户授权提交、推送、合并main并准备发布。6笔修复/验收提交已推送，PR #58 正常merge为 `d2453190cc327064e351e2695f0562ee38eb0788`。当次读取main、经典保护404、完整ruleset详情及有效规则：仅禁止删除/非快进，无bypass、无required review/check；head `b0e9ccdf5cd76c48b3e55b730e73e87fc69760a1` 可合并、无reviews/未解决讨论，CI尚在运行，未冒充通过。沿用有效主机/电视验收，不为合并重跑或等额外APK，不改变保护。
 - 发布准备目标0.4.8/base20801，远端目前无v0.4.8 tag或Release，公开latest仍v0.4.7。更新版本、CHANGELOG和发布说明草稿后固定精确源码。正式签名三ABI构建/校验预算20分钟，复用长期签名与合法配置，不输出凭据；核对包身份、版本、TV入口、非debug/probe/fixture、原libmpv及16KiB对齐，生成源码、许可、校验和及附件白名单。完成或决定性失败即停，自有编译进程结束后检查负载。准备draft及附件，不公开发布或移动旧tag；不重复电视播放矩阵或把旧候选当新APK升级验收。
+- PR #59 正常合并为 `60e7c8a9080ce0cc235c5e5e6fb39809f166b885`，仅版本及文档变更，正式APK与源码附件固定此SHA。受保护配置未在清理副本中找到，用户提示复查后，从私有历史归档 `LOCAL-EXTERNAL-NOTES.zip` 的旧构建脚本找到仓库外原路径；原文件仍存在、弹幕两项必需字段非空，三ABI实际native snapshot均核对已注入，不打印值或公开原始配置。Gradle141.3秒完成，三ABI正式签名、16KiB及原libmpv核验通过。追加最多5分钟只验新版正式身份覆盖升级与可见数据/设置保留，不重复播放矩阵；同一电视空闲、媒体state0、原音量20，身份或安装失败即停，不卸载清数据。
+- 正式 ARMv7/ARM64/x86_64 SHA256 分别为 `627eadfa7bc72db9c51ce53e7c1acc9a7876a61656dddf617375220f11b17019`、`036188c707728b63440ff2db13eb760dfa59a9db970ca8654cbccbdbf3b42e16`、`d343f6ba6fb409aa23a289f8bd2eb3470bac3aae242dab52fd9e6b4220dbe7f7`。11项附件及逐项大小/哈希白名单在本地忽略目录 `artifacts/release-0.4.8-20261115/`；原始配置/签名材料不在附件中，源码 ZIP/许可 ZIP 完整性通过，lockfile未变。
+- 约15:38–15:41香港时间，正式ARMv7从207251保数据覆盖升级到208011，电视回读APK哈希一致；UID10075、首次安装2026-10-10 16:19:09及dataDir均保持。新版首页显示原最近观看样本，原作品“在看”状态和深色主题保持，最终详情资料加载完成。仅静态截图/新鲜树、ADB与一次补充坐标点击确认，未播放或修改收藏/缓存开关，不声称逐条数据库或全部设置核对。音量20/100保持，QA包未动，无临时forward/reverse或录制；本任务XML移除，自有wrapper/Gradle PID70088/87140最终均退出，主机CPU快照9%，电视停后top另存。
+- 固定源码 `60e7c8a9` 的 CI [43690043662](https://github.com/znbsf/KazumiTV/actions/runs/43690043662) 已completed/success，checks及三ABI全部成功；修复PR #58和版本PR #59各自head CI也成功。中间main `d2453190` 的run被后续版本合入正常取消，不作为通过。后续纯交付文档与APK冻结源分别记录，不因文档重建或重复电视测试。
+- [0.4.8 Release草稿](https://github.com/znbsf/KazumiTV/releases/tag/untagged-69af1653b9381ff6a2c9)，release ID445889609、target精确为 `60e7c8a9080ce0cc235c5e5e6fb39809f166b885`，11项附件全部uploaded，远端名称、大小及GitHub SHA256 digest与唯一白名单逐项一致。GitHub连接器无Release附件能力，沿用现有gh CLI创建/上传，未改凭据或权限。公开latest仍v0.4.7、远端尚无v0.4.8 tag，未公开发布；匿名公开下载核验留在正式发布之后。草稿核验、配置定位链及安装记录只在既有本地忽略证据目录，正式附件不含原始凭据或私有日志。
 
 ## 2026-11-15：故障按钮电视补验通过
 
