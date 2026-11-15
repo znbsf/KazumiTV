@@ -329,7 +329,17 @@ class RecentVideoCache {
         request.response.statusCode = HttpStatus.notFound;
         return;
       }
-      // A concurrent request for the same segment waits for the original tee.
+      final file = _file(session.entry.id, 's$index.ts');
+      // Completed files are immutable while leased. A seek opens a new Range
+      // before the native player closes its old reader; serializing these reads
+      // would make the seek wait for the very connection it needs to replace.
+      if (session.entry.lengths[index] > 0 && await file.exists()) {
+        if (!session.closed) {
+          await _serveFile(request, file, mp4: session.entry.mp4);
+        }
+        return;
+      }
+      // A concurrent request for an unsaved segment waits for the original tee.
       // There is never a second background full-file download.
       final previous = session.pending[index];
       final done = Completer<void>();
@@ -337,7 +347,6 @@ class RecentVideoCache {
       try {
         await previous;
         if (session.closed) return;
-        final file = _file(session.entry.id, 's$index.ts');
         if (session.entry.lengths[index] > 0 && await file.exists()) {
           await _serveFile(request, file, mp4: session.entry.mp4);
           return;

@@ -7,6 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:kazumi/bean/widget/media_error_widget.dart';
 import 'package:kazumi/bean/widget/state_presentation.dart';
+import 'package:kazumi/navigation.dart';
+import 'package:kazumi/request/core/network_exception.dart';
+import 'package:kazumi/pages/video/video_playback_failure.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/modules/history/history_module.dart';
 import 'package:kazumi/services/platform/tv_mode.dart';
@@ -115,8 +118,18 @@ class _Playback implements PlayerPlaybackController {
 
 class _Danmaku implements PlayerDanmakuController {
   int latestRequests = 0;
+  int generation = 0;
+  int disables = 0;
   @override
-  int get danmakuLoadGeneration => 0;
+  void beginDanmakuLoad() => generation++;
+  @override
+  void finishDanmakuLoad({bool disableDanmaku = false}) {
+    generation++;
+    if (disableDanmaku) disables++;
+  }
+
+  @override
+  int get danmakuLoadGeneration => generation;
   @override
   Future<DanmakuLoadResult> fetchLatestDanmaku(int id, int episode) async {
     latestRequests++;
@@ -149,6 +162,16 @@ class _Lease extends RecentCacheLease {
 
 class _RecentCache extends RecentVideoCacheService {
   Future<RecentCacheLease?>? found;
+  bool active = true;
+  int clears = 0;
+  @override
+  Future<void> setEnabled(bool value) async {
+    active = value;
+    await super.setEnabled(value);
+  }
+
+  @override
+  Future<void> clear({String? id}) async => clears++;
   final progressWrites = <(int, int)>[];
   @override
   Future<RecentCacheLease?> openOffline(String id) async => await found;
@@ -158,7 +181,8 @@ class _RecentCache extends RecentVideoCacheService {
   }
 
   @override
-  Future<RecentCacheLease?> find(String identity) async => await found;
+  Future<RecentCacheLease?> find(String identity) async =>
+      active ? await found : null;
   @override
   Future<RecentCacheLease?> prepare(
           {required String identity,
@@ -222,7 +246,8 @@ void main() {
     await Hive.close();
     await temporary.delete(recursive: true);
   });
-  setUp(() {
+  setUp(() async {
+    await GStorage.putSetting(SettingsKeys.danmakuEnabledByDefault, true);
     history = _History();
     source = _Source();
     player = _Player();
@@ -270,6 +295,105 @@ void main() {
     await controller.cancelEpisodeLoad(playerController: player);
     expect(lease.releases, 1);
   });
+
+  test('default-off skips automatic danmaku loading for cached playback',
+      () async {
+    await GStorage.putSetting(SettingsKeys.danmakuEnabledByDefault, false);
+    recentCache.found = Future.value(_Lease(mp4: true));
+    await controller.changeEpisode(1, playerController: player);
+    await Future<void>.delayed(Duration.zero);
+    expect(player.initializations, hasLength(1));
+    expect(player.danmaku.latestRequests, 0);
+    expect(player.danmaku.disables, greaterThan(0));
+  });
+
+  test(
+      'disabling failed cache retries online at the same offset without deletion',
+      () async {
+    final lease = _Lease(mp4: true);
+    recentCache.found = Future.value(lease);
+    await controller.changeEpisode(1, offset: 823, playerController: player);
+    player.playback.playerPosition = const Duration(seconds: 823);
+    player.initializations.single.onPlaybackError!('缓存读取失败');
+    expect(controller.canDisableVideoCache, isTrue);
+    await controller.disableVideoCache();
+    await controller.retryCurrentEpisode(playerController: player);
+    expect(recentCache.active, isFalse);
+    expect(recentCache.clears, 0);
+    expect(lease.releases, 1);
+    expect(source.requests.single.offset, 823);
+    expect(player.initializations.last.loopbackCache, isFalse);
+    expect(player.initializations.last.videoUrl,
+        'https://media.example.test/video.mp4');
+  });
+
+  for (final offline in [false, true]) {
+    testWidgets('cache failure action is reachable by remote, offline=$offline',
+        (tester) async {
+      TvMode.setEnabledForTesting(true);
+      var called = 0;
+      final label = offline ? '关闭视频缓存并返回' : '关闭视频缓存并重试';
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: VideoPlaybackFailure(
+        message: '缓存读取失败',
+        isOffline: offline,
+        onRetry: () {},
+        onSelectEpisode: () {},
+        onSelectSource: () {},
+        onDisableCache: () => called++,
+      ))));
+      final button = find.widgetWithText(FilledButton, label);
+      Focus.of(tester.element(
+              find.descendant(of: button, matching: find.byType(Text)).first))
+          .requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+      expect(called, 1);
+      expect(find.text('更换播放源'), offline ? findsNothing : findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final stale in [false, true]) {
+    testWidgets('danmaku 429 action persists default-off, stale=$stale',
+        (tester) async {
+      TvMode.setEnabledForTesting(true);
+      await tester.pumpWidget(MaterialApp(
+        navigatorKey: rootNavigatorKey,
+        home: const Scaffold(body: Text('video keeps playing')),
+      ));
+      await tester.runAsync(() async {
+        controller.showDanmakuFailure(
+            DanmakuLoadResult.failed(
+              bangumiID: 0,
+              error: const NetworkException(
+                  type: NetworkExceptionType.badResponse,
+                  statusCode: 429,
+                  message: 'limited'),
+            ),
+            player);
+      });
+      await tester.pumpAndSettle();
+      expect(find.textContaining('429'), findsOneWidget);
+      if (stale) player.danmaku.generation++;
+      final button = find.widgetWithText(FilledButton, '关闭弹幕并默认关闭');
+      Focus.of(tester.element(
+              find.descendant(of: button, matching: find.byType(Text)).first))
+          .requestFocus();
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      });
+      expect(GStorage.getSetting(SettingsKeys.danmakuEnabledByDefault), stale);
+      expect(player.danmaku.disables, stale ? 0 : 1);
+      expect(player.stops, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   test('MP4 cache retains native format detection and online progress',
       () async {

@@ -67,9 +67,21 @@ class DanmakuLoadResult {
   final NetworkException? failure;
   final Map<int, List<DanmakuEntry>>? prepared;
 
-  // A second search uses the same service; do not recommend it after a 429.
-  String get failureMessage =>
-      failure?.statusCode == 429 ? failure!.message : '弹幕加载失败，可手动检索';
+  String get failureMessage {
+    // A second search uses the same service; do not recommend it after a 429.
+    if (failure?.statusCode == 429) {
+      return '弹幕服务请求受限（429），请稍后再试，避免连续重试';
+    }
+    if (failure != null &&
+        const {
+          NetworkExceptionType.connectionTimeout,
+          NetworkExceptionType.receiveTimeout,
+          NetworkExceptionType.sendTimeout,
+        }.contains(failure!.type)) {
+      return '弹幕服务请求超时，可稍后再试或关闭弹幕';
+    }
+    return '弹幕加载失败，可手动检索';
+  }
 
   bool get hasDanmakus => status == DanmakuLoadStatus.success;
 

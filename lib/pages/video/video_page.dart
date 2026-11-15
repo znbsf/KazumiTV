@@ -16,8 +16,7 @@ import 'package:kazumi/bean/dialog/dialog_helper.dart';
 import 'package:kazumi/bean/widget/embedded_native_control_area.dart';
 import 'package:kazumi/bean/widget/loading_indicator.dart';
 import 'package:kazumi/pages/player/player_item_surface.dart';
-import 'package:kazumi/bean/widget/media_error_widget.dart';
-import 'package:kazumi/bean/widget/state_presentation.dart';
+import 'package:kazumi/pages/video/video_playback_failure.dart';
 import 'package:kazumi/modules/download/download_module.dart';
 import 'package:kazumi/pages/download/download_controller.dart';
 import 'package:kazumi/pages/download/download_episode_sheet.dart';
@@ -385,6 +384,23 @@ class _VideoPageState extends State<VideoPage>
     _closeTabBodyAnimated();
     await videoPageController.retryCurrentEpisode(
         playerController: playerController);
+  }
+
+  Future<void> _disableVideoCacheAndRetry() async {
+    if (!mounted || _isClosing) return;
+    try {
+      await videoPageController.disableVideoCache();
+    } catch (_) {
+      KazumiDialog.showToast(message: '关闭视频缓存失败，请在设置中重试');
+      return;
+    }
+    if (!mounted || _isClosing) return;
+    if (videoPageController.isOfflineMode) {
+      await exitPlayer();
+      KazumiDialog.showToast(message: '视频缓存已关闭，请从番剧详情选择在线播放；已有缓存保留');
+    } else {
+      await _retryCurrentEpisode();
+    }
   }
 
   void _showEpisodeGuide() {
@@ -789,27 +805,16 @@ class _VideoPageState extends State<VideoPage>
                     builder: (context) {
                       final errorMessage = videoPageController.errorMessage;
                       if (errorMessage != null) {
-                        return MediaErrorWidget(
-                          title: '暂时无法播放',
-                          errMsg: errorMessage,
-                          icon: Icons.videocam_off_outlined,
+                        return VideoPlaybackFailure(
+                          message: errorMessage,
+                          isOffline: videoPageController.isOfflineMode,
                           onRetry: _retryCurrentEpisode,
-                          retryText: '重试当前集',
-                          actions: [
-                            StateActionButton.tonal(
-                              onPressed: _showEpisodeGuide,
-                              text: videoPageController.isOfflineMode
-                                  ? '选择集数'
-                                  : '选集 / 换线路',
-                              icon: Icons.video_library_outlined,
-                            ),
-                            if (!videoPageController.isOfflineMode)
-                              StateActionButton.tonal(
-                                onPressed: _selectSource,
-                                text: '更换播放源',
-                                icon: Icons.swap_horiz_rounded,
-                              ),
-                          ],
+                          onDisableCache:
+                              videoPageController.canDisableVideoCache
+                                  ? _disableVideoCacheAndRetry
+                                  : null,
+                          onSelectEpisode: _showEpisodeGuide,
+                          onSelectSource: _selectSource,
                         );
                       }
                       return Center(

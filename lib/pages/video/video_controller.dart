@@ -164,6 +164,44 @@ abstract class _VideoPageController with Store implements Disposable {
   RecentCacheLease? _cacheLease;
   String? _recentOfflineId;
 
+  bool get canDisableVideoCache =>
+      _cacheLease != null || _recentOfflineId != null;
+
+  Future<void> disableVideoCache() async {
+    await _recentCache.setEnabled(false);
+  }
+
+  Future<void> disableDanmakuByDefault(
+      PlayerController playerController) async {
+    _danmakuSessions.cancel();
+    playerController.danmaku.finishDanmakuLoad(disableDanmaku: true);
+    playerController.danmaku.clearAndInvalidateScheduledDanmakus();
+    await GStorage.putSetting(SettingsKeys.danmakuEnabledByDefault, false);
+  }
+
+  void showDanmakuFailure(
+      DanmakuLoadResult result, PlayerController playerController,
+      {bool Function()? isCurrent}) {
+    final revision = playbackRevision;
+    final generation = playerController.danmaku.danmakuLoadGeneration;
+    KazumiDialog.showToast(
+      message: '${result.failureMessage}。关闭后，后续播放默认不再自动加载弹幕，可在播放控制栏重新开启。',
+      showActionButton: true,
+      actionLabel: '关闭弹幕并默认关闭',
+      duration: const Duration(seconds: 10),
+      isActionCurrent: () =>
+          playbackRevision == revision &&
+          generation == playerController.danmaku.danmakuLoadGeneration &&
+          (isCurrent?.call() ?? true),
+      onActionPressed: () {
+        unawaited(disableDanmakuByDefault(playerController)
+            .catchError((Object error) {
+          KazumiDialog.showToast(message: '本次弹幕已关闭，但默认设置保存失败，请在设置中重试');
+        }));
+      },
+    );
+  }
+
   Future<void> _releaseCache() async {
     final lease = _cacheLease;
     _cacheLease = null;
@@ -814,6 +852,11 @@ abstract class _VideoPageController with Store implements Disposable {
     AsyncSession session,
   ) async {
     final danmakuSession = _danmakuSessions.begin();
+    if (!GStorage.getSetting(SettingsKeys.danmakuEnabledByDefault)) {
+      playerController.danmaku.finishDanmakuLoad(disableDanmaku: true);
+      playerController.danmaku.clearAndInvalidateScheduledDanmakus();
+      return;
+    }
     playerController.danmaku.beginDanmakuLoad();
     final cacheId = _cacheLease?.id;
     final generation =
@@ -864,9 +907,8 @@ abstract class _VideoPageController with Store implements Disposable {
         } else {
           playerController.danmaku.applyUnavailableDanmakuLoad(result);
           if (result.isFailed) {
-            KazumiDialog.showToast(
-              message: result.failureMessage,
-            );
+            showDanmakuFailure(result, playerController,
+                isCurrent: () => session.isActive && danmakuSession.isActive);
           }
         }
       }
@@ -876,7 +918,9 @@ abstract class _VideoPageController with Store implements Disposable {
     } catch (e) {
       if (session.isActive && danmakuSession.isActive) {
         playerController.danmaku.finishDanmakuLoad(disableDanmaku: true);
-        KazumiDialog.showToast(message: '弹幕加载失败，可手动检索');
+        showDanmakuFailure(
+            DanmakuLoadResult.failed(bangumiID: 0, error: e), playerController,
+            isCurrent: () => session.isActive && danmakuSession.isActive);
       }
       KazumiLogger().w('VideoPageController: failed to load danmaku', error: e);
     }
